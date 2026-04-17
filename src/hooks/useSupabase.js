@@ -22,28 +22,21 @@ export default function useSupabase() {
 
   const signInWithGoogle = useCallback(async () => {
     if (!isSupabaseConfigured) return;
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: { redirectTo: window.location.origin },
-    });
+    const { error } = await supabase.auth.signInWithOAuth({ provider: 'google' });
     if (error) console.error('[sb] Google sign-in:', error.message);
   }, []);
 
   const signInWithLinkedin = useCallback(async () => {
     if (!isSupabaseConfigured) return;
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: 'linkedin_oidc',
-      options: { redirectTo: window.location.origin },
-    });
+    const { error } = await supabase.auth.signInWithOAuth({ provider: 'linkedin_oidc' });
     if (error) console.error('[sb] LinkedIn sign-in:', error.message);
   }, []);
 
   const signInWithMagicLink = useCallback(async (email) => {
-    if (!isSupabaseConfigured) return { error: null };
-    const { error } = await supabase.auth.signInWithOtp({
-      email,
-      options: { emailRedirectTo: window.location.origin },
-    });
+    if (!isSupabaseConfigured) return { error: { message: 'Supabase not configured' } };
+    const redirectTo = window.location.origin || window.location.href.split('/').slice(0, 3).join('/');
+    console.log('[sb] magic link redirect:', redirectTo);
+    const { error } = await supabase.auth.signInWithOtp({ email });
     if (error) console.error('[sb] Magic link:', error.message);
     return { error };
   }, []);

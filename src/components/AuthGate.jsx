@@ -11,15 +11,20 @@ export default function AuthGate({ children, onJoin, workshopCode }) {
   const [showAdmin, setShowAdmin] = useState(false);
 
   useEffect(() => {
-    sb.getSession().then(s => {
-      setSession(s);
-      if (s?.user) sb.checkIsAdmin(s.user.id).then(setIsAdmin);
-      setLoading(false);
-    });
+    // Listen for auth changes first (catches OAuth redirects)
     const unsub = sb.onAuthStateChange(s => {
+      console.log('[auth] state change:', s ? 'signed in' : 'signed out');
       setSession(s);
       if (s?.user) sb.checkIsAdmin(s.user.id).then(setIsAdmin);
       else setIsAdmin(false);
+      setLoading(false);
+    });
+    // Also check existing session
+    sb.getSession().then(s => {
+      console.log('[auth] existing session:', s ? 'yes' : 'no');
+      setSession(s);
+      if (s?.user) sb.checkIsAdmin(s.user.id).then(setIsAdmin);
+      setLoading(false);
     });
     return unsub;
   }, []); // eslint-disable-line react-hooks/exhaustive-deps

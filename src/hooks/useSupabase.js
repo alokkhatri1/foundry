@@ -7,6 +7,94 @@ export default function useSupabase() {
   const presenceChannelRef = useRef(null);
   const realtimeChannelRef = useRef(null);
 
+  // ===== Auth =====
+  const getSession = useCallback(async () => {
+    if (!isSupabaseConfigured) return null;
+    const { data: { session } } = await supabase.auth.getSession();
+    return session;
+  }, []);
+
+  const getUser = useCallback(async () => {
+    if (!isSupabaseConfigured) return null;
+    const { data: { user } } = await supabase.auth.getUser();
+    return user;
+  }, []);
+
+  const signInWithGoogle = useCallback(async () => {
+    if (!isSupabaseConfigured) return;
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: { redirectTo: window.location.origin },
+    });
+    if (error) console.error('[sb] Google sign-in:', error.message);
+  }, []);
+
+  const signInWithLinkedin = useCallback(async () => {
+    if (!isSupabaseConfigured) return;
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'linkedin_oidc',
+      options: { redirectTo: window.location.origin },
+    });
+    if (error) console.error('[sb] LinkedIn sign-in:', error.message);
+  }, []);
+
+  const signInWithMagicLink = useCallback(async (email) => {
+    if (!isSupabaseConfigured) return { error: null };
+    const { error } = await supabase.auth.signInWithOtp({
+      email,
+      options: { emailRedirectTo: window.location.origin },
+    });
+    if (error) console.error('[sb] Magic link:', error.message);
+    return { error };
+  }, []);
+
+  const signOut = useCallback(async () => {
+    if (!isSupabaseConfigured) return;
+    await supabase.auth.signOut();
+  }, []);
+
+  const checkIsAdmin = useCallback(async (userId) => {
+    if (!isSupabaseConfigured || !userId) return false;
+    const { data } = await supabase.from('admins').select('id').eq('id', userId).single();
+    return !!data;
+  }, []);
+
+  const onAuthStateChange = useCallback((callback) => {
+    if (!isSupabaseConfigured) return () => {};
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      callback(session);
+    });
+    return () => subscription.unsubscribe();
+  }, []);
+
+  // ===== Admin: workshop management =====
+  const createWorkshop = useCallback(async (name, orgName, adminId) => {
+    if (!isSupabaseConfigured) return null;
+    const code = Math.random().toString(36).slice(2, 8).toUpperCase();
+    const { data, error } = await supabase.from('rooms')
+      .insert({ code, org_name: orgName || name, admin_id: adminId })
+      .select('id, code')
+      .single();
+    if (error) { console.error('[sb] createWorkshop:', error.message); return null; }
+    return data;
+  }, []);
+
+  const loadAdminWorkshops = useCallback(async (adminId) => {
+    if (!isSupabaseConfigured) return [];
+    const { data, error } = await supabase.from('rooms')
+      .select('id, code, org_name, created_at')
+      .eq('admin_id', adminId)
+      .order('created_at', { ascending: false });
+    if (error) { console.error('[sb] loadAdminWorkshops:', error.message); return []; }
+    return data || [];
+  }, []);
+
+  const loadWorkshopParticipants = useCallback(async (roomId) => {
+    if (!isSupabaseConfigured) return [];
+    const { data } = await supabase.from('participants').select('*').eq('room_id', roomId);
+    return data || [];
+  }, []);
+
   // ===== Room: create or join =====
   const joinRoom = useCallback(async (code, orgName) => {
     if (!isSupabaseConfigured) return null;
@@ -279,6 +367,12 @@ export default function useSupabase() {
 
   return {
     isConfigured: isSupabaseConfigured,
+    // Auth
+    getSession, getUser, signInWithGoogle, signInWithLinkedin, signInWithMagicLink,
+    signOut, checkIsAdmin, onAuthStateChange,
+    // Admin
+    createWorkshop, loadAdminWorkshops, loadWorkshopParticipants,
+    // Room
     joinRoom, getRoomId,
     upsertParticipant, loadParticipants,
     loadFiles, saveFile, deleteFile, saveFilesBatch,

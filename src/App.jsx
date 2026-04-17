@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useMemo } from 'react';
 import './App.css';
-import RoomScreen from './components/RoomScreen';
+import AuthGate from './components/AuthGate';
 import FileExplorer from './components/FileExplorer';
 import FileEditor from './components/FileEditor';
 import WorkflowBuilder from './components/WorkflowBuilder';
@@ -1069,16 +1069,13 @@ Be concise. Confirm actions after completing them.${knowledgeSection}`;
   }
 
   // ===== Render =====
-  if (!isJoined) {
-    return <RoomScreen onJoin={handleJoin} />;
-  }
-
   const selectedFile = selectedFileId ? findNode(fileTree, selectedFileId) : null;
   const activeRuns = workflowRuns.filter(r => r.status === 'running' || r.status === 'waiting_approval');
   const hasActiveRuns = activeRuns.length > 0;
   const selectedDeptName = selectedDeptId ? getDepartmentName(fileTree, selectedDeptId) : null;
 
   return (
+    <AuthGate onJoin={handleJoin} workshopCode={isJoined ? workshopCode : null}>
     <div className="app-shell">
       <header className="app-header">
         <div className="app-header-left" onClick={() => { setActiveTab('chat'); setChatBadge(false); }} style={{ cursor: 'pointer' }}>
@@ -1202,6 +1199,7 @@ Be concise. Confirm actions after completing them.${knowledgeSection}`;
         )}
       </div>
     </div>
+    </AuthGate>
   );
 }
 

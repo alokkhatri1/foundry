@@ -21,4 +21,4 @@ export const supabase = createClient(url || 'http://placeholder', anonKey || 'pl
 });
 
 export const isSupabaseConfigured = !!(url && anonKey && !url.includes('your-project-ref'));
-console.log('[supabase] configured:', isSupabaseConfigured, 'url:', url?.slice(0, 30));
+console.log('[supabase] configured:', isSupabaseConfigured, 'url:', url?.slice(0, 40), 'key-len:', anonKey?.length);

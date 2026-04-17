@@ -230,14 +230,20 @@ export default function useSupabase() {
 
   // ===== Presence: track who's online in the workshop =====
   const trackPresence = useCallback((userName, userColor, onPresenceChange) => {
-    if (!isSupabaseConfigured || !roomIdRef.current) return () => {};
+    console.log('[supabase] trackPresence called, room:', roomIdRef.current, 'user:', userName);
+    if (!isSupabaseConfigured || !roomIdRef.current) {
+      console.log('[supabase] trackPresence skipped — not configured or no room');
+      return () => {};
+    }
 
     // Clean up existing presence channel
     if (presenceChannelRef.current) {
       supabase.removeChannel(presenceChannelRef.current);
     }
 
-    const channel = supabase.channel(`presence:${roomIdRef.current}`, {
+    const channelName = `presence:${roomIdRef.current}`;
+    console.log('[supabase] joining presence channel:', channelName);
+    const channel = supabase.channel(channelName, {
       config: { presence: { key: userName } },
     });
 
@@ -254,12 +260,15 @@ export default function useSupabase() {
           });
         }
       }
+      console.log('[supabase] presence sync:', online.map(u => u.name).join(', '));
       if (onPresenceChange) onPresenceChange(online);
     });
 
     channel.subscribe(async (status) => {
+      console.log('[supabase] presence channel status:', status);
       if (status === 'SUBSCRIBED') {
         await channel.track({ name: userName, color: userColor });
+        console.log('[supabase] tracked user:', userName);
       }
     });
 

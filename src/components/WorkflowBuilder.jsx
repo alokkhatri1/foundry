@@ -587,6 +587,7 @@ export default function WorkflowBuilder({ workflows, onUpdateWorkflows, fileTree
         <div className="wf-list-header">
           <div>
             <h2 className="wf-list-title">Workflows</h2>
+            <p className="wf-list-subtitle">Multi-step processes with AI coworkers, human approvals, and system actions.</p>
             <EducationalCue cueId="workflow-overview" show={showEducationalCues} />
           </div>
           <button className="wf-create-btn" onClick={handleCreateWorkflow}>+ New Workflow</button>

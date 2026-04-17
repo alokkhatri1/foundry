@@ -222,11 +222,30 @@ function App() {
 
   useEffect(() => { activeTabRef.current = activeTab; }, [activeTab]);
 
-  // On load: reconnect to Supabase room if already joined
+  // On load: reconnect to Supabase room and start presence tracking
   useEffect(() => {
     if (isJoined && workshopCode) {
       sb.joinRoom(workshopCode, orgName).then(() => {
-        if (userName) sb.upsertParticipant(userName, null);
+        if (userName) {
+          sb.upsertParticipant(userName, null);
+          // Start presence tracking — updates participants in real time
+          sb.trackPresence(userName, participants.find(p => p.name === userName)?.color, (onlineUsers) => {
+            setParticipants(prev => {
+              // Merge presence data with existing participants
+              const merged = [...prev].map(p => ({ ...p, online: false }));
+              for (const u of onlineUsers) {
+                const existing = merged.find(p => p.name === u.name);
+                if (existing) {
+                  existing.online = true;
+                  existing.lastSeen = Date.now();
+                } else {
+                  merged.push({ id: 'p-' + Date.now() + '-' + Math.random().toString(36).slice(2, 4), name: u.name, color: u.color || COLORS[merged.length % COLORS.length], online: true, joinedAt: Date.now(), lastSeen: Date.now() });
+                }
+              }
+              return merged;
+            });
+          });
+        }
       });
     }
     if (isJoined && initParticipants.length > 0) {
@@ -284,8 +303,19 @@ function App() {
       ? existingParticipants.map(p => p.name === name ? { ...p, online: true, lastSeen: Date.now() } : p)
       : [...existingParticipants, { id: 'p-' + Date.now(), name, color, online: true, joinedAt: Date.now(), lastSeen: Date.now() }];
 
-    // Sync participant to Supabase
+    // Sync participant to Supabase and start presence
     sb.upsertParticipant(name, color);
+    sb.trackPresence(name, color, (onlineUsers) => {
+      setParticipants(prev => {
+        const merged = [...prev].map(p => ({ ...p, online: false }));
+        for (const u of onlineUsers) {
+          const existing = merged.find(p => p.name === u.name);
+          if (existing) { existing.online = true; existing.lastSeen = Date.now(); }
+          else { merged.push({ id: 'p-' + Date.now() + '-' + Math.random().toString(36).slice(2, 4), name: u.name, color: u.color || COLORS[merged.length % COLORS.length], online: true, joinedAt: Date.now(), lastSeen: Date.now() }); }
+        }
+        return merged;
+      });
+    });
 
     setUserName(name);
     setWorkshopCode(code);
@@ -322,6 +352,7 @@ function App() {
   }
 
   function handleLeave() {
+    sb.leavePresence();
     localStorage.removeItem(STORAGE_KEY);
     localStorage.removeItem('sandbox:conversations');
     setIsJoined(false);

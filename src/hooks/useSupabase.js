@@ -13,6 +13,7 @@ function debounce(fn, ms) {
 export default function useSupabase() {
   const roomIdRef = useRef(null);
   const channelRef = useRef(null);
+  const presenceChannelRef = useRef(null);
 
   // ===== Room: create or join =====
   const joinRoom = useCallback(async (code, orgName) => {
@@ -227,10 +228,66 @@ export default function useSupabase() {
     };
   }, []);
 
+  // ===== Presence: track who's online in the workshop =====
+  const trackPresence = useCallback((userName, userColor, onPresenceChange) => {
+    if (!isSupabaseConfigured || !roomIdRef.current) return () => {};
+
+    // Clean up existing presence channel
+    if (presenceChannelRef.current) {
+      supabase.removeChannel(presenceChannelRef.current);
+    }
+
+    const channel = supabase.channel(`presence:${roomIdRef.current}`, {
+      config: { presence: { key: userName } },
+    });
+
+    channel.on('presence', { event: 'sync' }, () => {
+      const state = channel.presenceState();
+      const online = [];
+      for (const [key, entries] of Object.entries(state)) {
+        if (entries.length > 0) {
+          const entry = entries[0];
+          online.push({
+            name: entry.name || key,
+            color: entry.color || null,
+            online: true,
+          });
+        }
+      }
+      if (onPresenceChange) onPresenceChange(online);
+    });
+
+    channel.subscribe(async (status) => {
+      if (status === 'SUBSCRIBED') {
+        await channel.track({ name: userName, color: userColor });
+      }
+    });
+
+    presenceChannelRef.current = channel;
+
+    return () => {
+      channel.untrack();
+      supabase.removeChannel(channel);
+      presenceChannelRef.current = null;
+    };
+  }, []);
+
+  const leavePresence = useCallback(() => {
+    if (presenceChannelRef.current) {
+      presenceChannelRef.current.untrack();
+      supabase.removeChannel(presenceChannelRef.current);
+      presenceChannelRef.current = null;
+    }
+  }, []);
+
   // Cleanup on unmount
   useEffect(() => {
     return () => {
       if (channelRef.current) supabase.removeChannel(channelRef.current);
+      if (presenceChannelRef.current) {
+        presenceChannelRef.current.untrack();
+        supabase.removeChannel(presenceChannelRef.current);
+      }
     };
   }, []);
 
@@ -246,5 +303,7 @@ export default function useSupabase() {
     logToolCall,
     logApproval,
     subscribe,
+    trackPresence,
+    leavePresence,
   };
 }

@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { supabase } from '../supabase';
 import useSupabase from '../hooks/useSupabase';
 import JoinScreen from './JoinScreen';
 import AdminDashboard from './AdminDashboard';
@@ -13,35 +14,48 @@ export default function AuthGate({ children, onJoin, workshopCode }) {
   useEffect(() => {
     let mounted = true;
 
-    // The onAuthStateChange listener is the most reliable way to detect
-    // OAuth callbacks — Supabase fires SIGNED_IN when it processes the hash
-    const unsub = sb.onAuthStateChange(s => {
-      console.log('[auth] state change:', s ? s.user?.email : 'signed out');
+    async function init() {
+      // Handle PKCE callback: ?code= in URL
+      const params = new URLSearchParams(window.location.search);
+      const code = params.get('code');
+      if (code) {
+        console.log('[auth] PKCE code found, exchanging...');
+        const { data, error } = await supabase.auth.exchangeCodeForSession(code);
+        if (error) {
+          console.error('[auth] code exchange failed:', error.message);
+        } else {
+          console.log('[auth] code exchange success:', data.session?.user?.email);
+        }
+        window.history.replaceState(null, '', window.location.pathname);
+      }
+
+      // Check session
+      const { data: { session: s } } = await supabase.auth.getSession();
+      console.log('[auth] session:', s ? s.user?.email : 'none');
+      if (mounted) {
+        setSession(s);
+        if (s?.user) {
+          const admin = await sb.checkIsAdmin(s.user.id);
+          setIsAdmin(admin);
+        }
+        setLoading(false);
+      }
+    }
+
+    init();
+
+    // Listen for future auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, s) => {
+      console.log('[auth] state change:', _event, s?.user?.email);
       if (mounted) {
         setSession(s);
         if (s?.user) sb.checkIsAdmin(s.user.id).then(a => mounted && setIsAdmin(a));
         else setIsAdmin(false);
         setLoading(false);
-        // Clean OAuth params from URL
-        if (window.location.hash?.includes('access_token') || window.location.search?.includes('code=')) {
-          window.history.replaceState(null, '', window.location.pathname);
-        }
       }
     });
 
-    // Fallback: if no auth event fires within 2s, check session manually
-    setTimeout(async () => {
-      if (!mounted) return;
-      const s = await sb.getSession();
-      console.log('[auth] fallback check:', s ? s.user?.email : 'none');
-      if (mounted && loading) {
-        setSession(s);
-        if (s?.user) sb.checkIsAdmin(s.user.id).then(a => mounted && setIsAdmin(a));
-        setLoading(false);
-      }
-    }, 2000);
-
-    return () => { mounted = false; unsub(); };
+    return () => { mounted = false; subscription.unsubscribe(); };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Loading

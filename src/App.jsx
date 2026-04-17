@@ -170,7 +170,11 @@ function App() {
   const [workshopCode, setWorkshopCode] = useState(saved?.workshopCode || '');
   const [orgName] = useState(saved?.orgName || 'My Organization');
   const [apiKey] = useState(saved?.apiKey || import.meta.env.VITE_ANTHROPIC_API_KEY || '');
-  const [flatFiles, setFlatFiles] = useState([]);
+  const [flatFiles, setFlatFiles] = useState(() => {
+    // Initialize from localStorage tree if available
+    if (saved?.fileTree) return flattenTree(saved.fileTree, null).map(mapFileRow);
+    return [];
+  });
   const fileTree = useMemo(() => buildTree(flatFiles), [flatFiles]);
   const [workflows, setWorkflows] = useState(saved?.workflows || (saved?.workflow ? [saved.workflow] : null));
   const [coworkers, setCoworkers] = useState(saved?.coworkers || null);

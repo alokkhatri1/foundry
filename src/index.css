@@ -1957,44 +1957,23 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
 
 /* Agent chat banner */
 .cl-agent-banner {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 10px 20px;
-  background: var(--bg-white);
-  border-bottom: 1px solid var(--border-color);
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 20px; border-bottom: 1px solid var(--border-color);
   flex-shrink: 0;
 }
 .cl-agent-banner-avatar {
-  width: 30px; height: 30px; border-radius: 8px;
+  width: 26px; height: 26px; border-radius: 7px;
   display: inline-flex; align-items: center; justify-content: center;
-  background: #4a7fb5; flex-shrink: 0;
+  flex-shrink: 0;
 }
 .cl-agent-banner-name {
-  font-size: 14px;
-  font-weight: 700;
-  color: var(--text-dark);
-}
-.cl-agent-banner-role {
-  font-size: 12px;
-  color: var(--text-muted);
-  flex: 1;
+  font-size: 13px; font-weight: 600; color: var(--text-dark); flex: 1;
 }
 .cl-agent-banner-close {
-  width: 24px;
-  height: 24px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 50%;
-  font-size: 12px;
-  color: var(--text-muted);
-  transition: background 0.15s;
+  width: 22px; height: 22px; display: flex; align-items: center; justify-content: center;
+  border-radius: 50%; font-size: 11px; color: var(--text-muted); transition: background 0.15s;
 }
-.cl-agent-banner-close:hover {
-  background: var(--bg-warm);
-  color: var(--text-dark);
-}
+.cl-agent-banner-close:hover { background: var(--bg-warm); color: var(--text-dark); }
 
 /* Inline file editor panel */
 .ctx-editor {

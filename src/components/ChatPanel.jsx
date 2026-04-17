@@ -582,16 +582,10 @@ export default function ChatPanel({ messages, onSendMessage, onApprovalAction, o
         ) : (
           <>
             {activeCoworker && (
-              <div>
-                <div className="cl-agent-banner">
-                  <span className="cl-agent-banner-avatar" style={{ background: activeCoworker.color || '#4a7fb5' }}><CoworkerGlyph avatar={activeCoworker.avatar} size={18} color="#ffffff" /></span>
-                  <span className="cl-agent-banner-name">Chatting with {activeCoworker.name}</span>
-                  <span className="cl-agent-banner-role">{activeCoworker.role}</span>
-                  <button className="cl-agent-banner-close" onClick={() => setActiveCoworkerId(null)}>{'\u2715'}</button>
-                </div>
-                <div style={{ padding: '4px 20px' }}>
-                  <EducationalCue cueId="chat-agent-conversation" show={showEducationalCues} />
-                </div>
+              <div className="cl-agent-banner">
+                <span className="cl-agent-banner-avatar" style={{ background: activeCoworker.color || '#4a7fb5' }}><CoworkerGlyph avatar={activeCoworker.avatar} size={18} color="#ffffff" /></span>
+                <span className="cl-agent-banner-name">{activeCoworker.name}</span>
+                <button className="cl-agent-banner-close" onClick={() => setActiveCoworkerId(null)}>{'\u2715'}</button>
               </div>
             )}
             <div className="cl-messages" ref={messagesRef}>

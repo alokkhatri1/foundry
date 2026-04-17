@@ -78,7 +78,7 @@ export default function RoomScreen({ onJoin }) {
                 type="text"
                 value={code}
                 onChange={e => setCode(e.target.value)}
-                placeholder="e.g., alok"
+                placeholder="Enter code"
                 onKeyDown={e => e.key === 'Enter' && handleJoin()}
               />
             </div>

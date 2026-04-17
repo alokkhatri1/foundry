@@ -3,9 +3,9 @@ import { useState } from 'react';
 const DEFAULT_CODE = 'alok';
 
 const FEATURES = [
-  { icon: '\uD83D\uDCAC', title: 'Chat with AI', desc: 'Build and manage your platform through natural language' },
-  { icon: '\uD83E\uDDD1\u200D\uD83D\uDCBB', title: 'AI Coworkers', desc: 'Create specialists with instructions, knowledge, and tools' },
-  { icon: '\uD83D\uDD04', title: 'Workflows', desc: 'Automate multi-step processes with human-in-the-loop approval' },
+  { icon: '\uD83E\uDDD1\u200D\uD83D\uDCBB', title: 'Create AI Coworkers', desc: 'Give them instructions, knowledge, and a role — watch them work' },
+  { icon: '\uD83D\uDD04', title: 'Build Workflows', desc: 'Wire coworkers into multi-step processes with human approval gates' },
+  { icon: '\uD83D\uDCAC', title: 'Talk to the Platform', desc: 'Create files, coworkers, and workflows through plain English' },
 ];
 
 export default function RoomScreen({ onJoin }) {
@@ -33,12 +33,12 @@ export default function RoomScreen({ onJoin }) {
           </div>
 
           <h1 className="landing-title">
-            Build AI teams that<br />
-            <span className="landing-highlight">work together</span>
+            Learn to build<br />
+            <span className="landing-highlight">AI-native teams</span>
           </h1>
 
           <p className="landing-subtitle">
-            Create AI coworkers, give them knowledge and instructions, wire them into workflows — all through conversation.
+            A hands-on workshop simulator. Create AI coworkers, give them knowledge and instructions, and wire them into real workflows — all through conversation.
           </p>
 
           <div className="landing-features">
@@ -57,8 +57,8 @@ export default function RoomScreen({ onJoin }) {
         {/* Right — join form */}
         <div className="landing-right">
           <div className="landing-card">
-            <h2 className="landing-card-title">Join Workshop</h2>
-            <p className="landing-card-desc">Enter your name and the workshop code to get started.</p>
+            <h2 className="landing-card-title">Join a Session</h2>
+            <p className="landing-card-desc">Enter your name and the workshop code provided by your facilitator.</p>
 
             <div className="landing-field">
               <label>Your Name</label>

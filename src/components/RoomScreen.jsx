@@ -1,6 +1,6 @@
 import { useState } from 'react';
 
-const DEFAULT_CODE = 'alok';
+const DEFAULT_CODE = '';
 
 const FEATURES = [
   { icon: '\uD83E\uDDD1\u200D\uD83D\uDCBB', title: 'Create AI Coworkers', desc: 'Give them instructions, knowledge, and a role — watch them work' },

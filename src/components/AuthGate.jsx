@@ -15,23 +15,41 @@ export default function AuthGate({ children, onJoin, workshopCode }) {
 
     async function init() {
       // PKCE flow: after Google redirect, URL has ?code=... parameter
+      // The Supabase client auto-exchanges it via detectSessionInUrl
+      // We just need to wait for it, then check the session
       const params = new URLSearchParams(window.location.search);
-      const code = params.get('code');
-      if (code) {
-        console.log('[auth] detected PKCE code in URL');
-        // Supabase client will exchange the code automatically via exchangeCodeForSession
-        // Clean the URL
+      const hasCode = params.get('code');
+      const hasError = params.get('error');
+      const hasHash = window.location.hash?.includes('access_token');
+
+      if (hasCode || hasHash) {
+        console.log('[auth] OAuth callback detected, waiting for session exchange...');
+        // Wait for Supabase to exchange the code/token
+        let attempts = 0;
+        while (attempts < 20) {
+          const s = await sb.getSession();
+          if (s) {
+            console.log('[auth] session obtained after exchange:', s.user.email);
+            // Clean URL
+            window.history.replaceState(null, '', window.location.pathname);
+            if (mounted) {
+              setSession(s);
+              const admin = await sb.checkIsAdmin(s.user.id);
+              setIsAdmin(admin);
+              setLoading(false);
+            }
+            return;
+          }
+          await new Promise(r => setTimeout(r, 300));
+          attempts++;
+        }
+        console.log('[auth] failed to obtain session after callback');
         window.history.replaceState(null, '', window.location.pathname);
-        // Wait for the exchange to complete
-        await new Promise(r => setTimeout(r, 1000));
       }
 
-      // Also check hash (implicit flow fallback)
-      const hash = window.location.hash;
-      if (hash && hash.includes('access_token')) {
-        console.log('[auth] detected OAuth token in URL hash');
+      if (hasError) {
+        console.log('[auth] OAuth error:', params.get('error_description'));
         window.history.replaceState(null, '', window.location.pathname);
-        await new Promise(r => setTimeout(r, 500));
       }
 
       const s = await sb.getSession();

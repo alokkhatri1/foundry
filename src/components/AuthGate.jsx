@@ -11,22 +11,45 @@ export default function AuthGate({ children, onJoin, workshopCode }) {
   const [showAdmin, setShowAdmin] = useState(false);
 
   useEffect(() => {
-    // Listen for auth changes first (catches OAuth redirects)
+    let mounted = true;
+
+    async function init() {
+      // If URL has hash with access_token, Supabase should auto-detect it
+      // Give it a moment to process the callback
+      const hash = window.location.hash;
+      if (hash && hash.includes('access_token')) {
+        console.log('[auth] detected OAuth callback in URL hash');
+        // Clean the hash from URL
+        window.history.replaceState(null, '', window.location.pathname);
+        // Wait for Supabase to process
+        await new Promise(r => setTimeout(r, 500));
+      }
+
+      const s = await sb.getSession();
+      console.log('[auth] session:', s ? s.user.email : 'none');
+      if (mounted) {
+        setSession(s);
+        if (s?.user) {
+          const admin = await sb.checkIsAdmin(s.user.id);
+          setIsAdmin(admin);
+        }
+        setLoading(false);
+      }
+    }
+
+    init();
+
     const unsub = sb.onAuthStateChange(s => {
       console.log('[auth] state change:', s ? 'signed in' : 'signed out');
-      setSession(s);
-      if (s?.user) sb.checkIsAdmin(s.user.id).then(setIsAdmin);
-      else setIsAdmin(false);
-      setLoading(false);
+      if (mounted) {
+        setSession(s);
+        if (s?.user) sb.checkIsAdmin(s.user.id).then(a => mounted && setIsAdmin(a));
+        else setIsAdmin(false);
+        setLoading(false);
+      }
     });
-    // Also check existing session
-    sb.getSession().then(s => {
-      console.log('[auth] existing session:', s ? 'yes' : 'no');
-      setSession(s);
-      if (s?.user) sb.checkIsAdmin(s.user.id).then(setIsAdmin);
-      setLoading(false);
-    });
-    return unsub;
+
+    return () => { mounted = false; unsub(); };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Loading

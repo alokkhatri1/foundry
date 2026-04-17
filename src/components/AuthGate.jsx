@@ -15,23 +15,44 @@ export default function AuthGate({ children, onJoin, workshopCode }) {
     let mounted = true;
 
     async function init() {
+      // Handle implicit OAuth callback: #access_token= in URL hash
+      const hash = window.location.hash;
+      if (hash && hash.includes('access_token')) {
+        console.log('[auth] access_token found in hash, setting session...');
+        // Parse hash params
+        const hashParams = new URLSearchParams(hash.substring(1));
+        const accessToken = hashParams.get('access_token');
+        const refreshToken = hashParams.get('refresh_token');
+
+        if (accessToken && refreshToken) {
+          const { data, error } = await supabase.auth.setSession({
+            access_token: accessToken,
+            refresh_token: refreshToken,
+          });
+          if (error) {
+            console.error('[auth] setSession failed:', error.message);
+          } else {
+            console.log('[auth] session set:', data.session?.user?.email);
+          }
+        }
+        // Clean hash from URL
+        window.history.replaceState(null, '', window.location.pathname);
+      }
+
       // Handle PKCE callback: ?code= in URL
       const params = new URLSearchParams(window.location.search);
       const code = params.get('code');
       if (code) {
         console.log('[auth] PKCE code found, exchanging...');
         const { data, error } = await supabase.auth.exchangeCodeForSession(code);
-        if (error) {
-          console.error('[auth] code exchange failed:', error.message);
-        } else {
-          console.log('[auth] code exchange success:', data.session?.user?.email);
-        }
+        if (error) console.error('[auth] code exchange failed:', error.message);
+        else console.log('[auth] code exchange success:', data.session?.user?.email);
         window.history.replaceState(null, '', window.location.pathname);
       }
 
       // Check session
       const { data: { session: s } } = await supabase.auth.getSession();
-      console.log('[auth] session:', s ? s.user?.email : 'none');
+      console.log('[auth] final session:', s ? s.user?.email : 'none');
       if (mounted) {
         setSession(s);
         if (s?.user) {

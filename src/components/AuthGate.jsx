@@ -14,14 +14,23 @@ export default function AuthGate({ children, onJoin, workshopCode }) {
     let mounted = true;
 
     async function init() {
-      // If URL has hash with access_token, Supabase should auto-detect it
-      // Give it a moment to process the callback
+      // PKCE flow: after Google redirect, URL has ?code=... parameter
+      const params = new URLSearchParams(window.location.search);
+      const code = params.get('code');
+      if (code) {
+        console.log('[auth] detected PKCE code in URL');
+        // Supabase client will exchange the code automatically via exchangeCodeForSession
+        // Clean the URL
+        window.history.replaceState(null, '', window.location.pathname);
+        // Wait for the exchange to complete
+        await new Promise(r => setTimeout(r, 1000));
+      }
+
+      // Also check hash (implicit flow fallback)
       const hash = window.location.hash;
       if (hash && hash.includes('access_token')) {
-        console.log('[auth] detected OAuth callback in URL hash');
-        // Clean the hash from URL
+        console.log('[auth] detected OAuth token in URL hash');
         window.history.replaceState(null, '', window.location.pathname);
-        // Wait for Supabase to process
         await new Promise(r => setTimeout(r, 500));
       }
 

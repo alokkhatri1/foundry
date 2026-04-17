@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useMemo } from 'react';
 import './App.css';
 import RoomScreen from './components/RoomScreen';
 import FileExplorer from './components/FileExplorer';
@@ -24,6 +24,7 @@ import { executeWorkflowRun } from './utils/runWorkflowAsync';
 import { executeTool, toolToClaudeSchema, toolFromClaudeName } from './utils/toolExecutor';
 import { PLATFORM_TOOL_SCHEMAS, TOOL_DISPLAY_NAMES, TOOL_ICONS, executePlatformAction } from './utils/platformActions';
 import useSupabase from './hooks/useSupabase';
+import { buildTree, flattenTree, mapFileRow, mapCoworkerRow, mapToolRow, mapWorkflowRow } from './utils/treeUtils';
 
 const STORAGE_KEY = 'sandbox:state';
 
@@ -169,7 +170,8 @@ function App() {
   const [workshopCode, setWorkshopCode] = useState(saved?.workshopCode || '');
   const [orgName] = useState(saved?.orgName || 'My Organization');
   const [apiKey] = useState(saved?.apiKey || import.meta.env.VITE_ANTHROPIC_API_KEY || '');
-  const [fileTree, setFileTree] = useState(saved?.fileTree || null);
+  const [flatFiles, setFlatFiles] = useState([]);
+  const fileTree = useMemo(() => buildTree(flatFiles), [flatFiles]);
   const [workflows, setWorkflows] = useState(saved?.workflows || (saved?.workflow ? [saved.workflow] : null));
   const [coworkers, setCoworkers] = useState(saved?.coworkers || null);
   const [tools, setTools] = useState(saved?.tools || null);
@@ -222,7 +224,7 @@ function App() {
 
   useEffect(() => { activeTabRef.current = activeTab; }, [activeTab]);
 
-  // On load: reconnect to Supabase room, load participants, start presence
+  // On load: reconnect to Supabase, load state from granular tables, start presence + realtime
   useEffect(() => {
     if (isJoined && workshopCode) {
       sb.joinRoom(workshopCode, orgName).then(async (roomId) => {
@@ -231,49 +233,33 @@ function App() {
         const myColor = participants.find(p => p.name === userName)?.color || COLORS[0];
         sb.upsertParticipant(userName, myColor);
 
-        // Load all participants from Supabase (includes users from other browsers)
-        const dbParticipants = await sb.loadParticipants();
+        // Load state from granular tables
+        const [files, cws, tls, wfs, dbParticipants] = await Promise.all([
+          sb.loadFiles(), sb.loadCoworkers(), sb.loadTools(), sb.loadWorkflows(), sb.loadParticipants(),
+        ]);
 
-        // Start presence tracking
-        sb.trackPresence(userName, myColor, (onlineUsers) => {
-          const onlineNames = new Set(onlineUsers.map(u => u.name));
-          setParticipants(prev => {
-            // Start from DB participants + any local-only ones
-            const all = new Map();
-            for (const p of prev) all.set(p.name, { ...p, online: false });
-            for (const p of dbParticipants) {
-              if (!all.has(p.name)) all.set(p.name, { ...p, online: false });
-            }
-            // Add anyone from presence we haven't seen
-            for (const u of onlineUsers) {
-              if (!all.has(u.name)) {
-                all.set(u.name, { id: 'p-' + Date.now() + '-' + Math.random().toString(36).slice(2, 4), name: u.name, color: u.color || COLORS[all.size % COLORS.length], online: true, joinedAt: Date.now(), lastSeen: Date.now() });
-              }
-            }
-            // Mark online from presence
-            for (const [name, p] of all) {
-              p.online = onlineNames.has(name);
-            }
-            return [...all.values()];
-          });
-        });
-
-        // Also set DB participants immediately (before presence kicks in)
+        if (files.length > 0) setFlatFiles(files);
+        if (cws.length > 0) setCoworkers(cws);
+        if (tls.length > 0) setTools(tls);
+        if (wfs.length > 0) setWorkflows(wfs);
         if (dbParticipants.length > 0) {
           setParticipants(prev => {
             const all = new Map();
             for (const p of prev) all.set(p.name, p);
-            for (const p of dbParticipants) {
-              if (!all.has(p.name)) all.set(p.name, p);
-            }
+            for (const p of dbParticipants) { if (!all.has(p.name)) all.set(p.name, p); }
             return [...all.values()];
           });
         }
+
+        // Start presence + realtime
+        sb.trackPresence(userName, myColor, handlePresenceSync);
+        startRealtimeSync();
       });
     }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  function persist(updates = {}) {
+  // Persist to localStorage (lightweight cache for offline/refresh)
+  function persistLocal(updates = {}) {
     const state = {
       userName: updates.userName ?? userName,
       workshopCode: updates.workshopCode ?? workshopCode,
@@ -288,70 +274,136 @@ function App() {
       selectedDeptId: updates.selectedDeptId ?? selectedDeptId,
     };
     saveState(state);
-    // Also sync to Supabase (debounced)
-    sb.saveRoomState(state);
+  }
+
+  // Presence handler (reused in join and load)
+  function handlePresenceSync(onlineUsers) {
+    const onlineNames = new Set(onlineUsers.map(u => u.name));
+    setParticipants(prev => {
+      const all = new Map();
+      for (const p of prev) all.set(p.name, { ...p, online: false });
+      for (const u of onlineUsers) {
+        if (!all.has(u.name)) {
+          all.set(u.name, { id: 'p-' + Date.now() + '-' + Math.random().toString(36).slice(2, 4), name: u.name, color: u.color || COLORS[all.size % COLORS.length], online: true, joinedAt: Date.now(), lastSeen: Date.now() });
+        }
+      }
+      for (const [, p] of all) p.online = onlineNames.has(p.name);
+      return [...all.values()];
+    });
+  }
+
+  // Wire up realtime subscriptions
+  function startRealtimeSync() {
+    sb.subscribeToRoom({
+      onFileChange: (eventType, row, old) => {
+        if (eventType === 'DELETE') {
+          setFlatFiles(prev => prev.filter(f => f.id !== old.id));
+        } else {
+          const mapped = mapFileRow(row);
+          setFlatFiles(prev => {
+            const idx = prev.findIndex(f => f.id === mapped.id);
+            return idx >= 0 ? prev.map(f => f.id === mapped.id ? mapped : f) : [...prev, mapped];
+          });
+        }
+      },
+      onCoworkerChange: (eventType, row, old) => {
+        if (eventType === 'DELETE') {
+          setCoworkers(prev => (prev || []).filter(c => c.id !== old.id));
+        } else {
+          const mapped = mapCoworkerRow(row);
+          setCoworkers(prev => {
+            const list = prev || [];
+            const idx = list.findIndex(c => c.id === mapped.id);
+            return idx >= 0 ? list.map(c => c.id === mapped.id ? mapped : c) : [...list, mapped];
+          });
+        }
+      },
+      onToolChange: (eventType, row, old) => {
+        if (eventType === 'DELETE') {
+          setTools(prev => (prev || []).filter(t => t.id !== old.id));
+        } else {
+          const mapped = mapToolRow(row);
+          setTools(prev => {
+            const list = prev || [];
+            const idx = list.findIndex(t => t.id === mapped.id);
+            return idx >= 0 ? list.map(t => t.id === mapped.id ? mapped : t) : [...list, mapped];
+          });
+        }
+      },
+      onWorkflowChange: (eventType, row, old) => {
+        if (eventType === 'DELETE') {
+          setWorkflows(prev => (prev || []).filter(w => w.id !== old.id));
+        } else {
+          const mapped = mapWorkflowRow(row);
+          setWorkflows(prev => {
+            const list = prev || [];
+            const idx = list.findIndex(w => w.id === mapped.id);
+            return idx >= 0 ? list.map(w => w.id === mapped.id ? mapped : w) : [...list, mapped];
+          });
+        }
+      },
+    });
   }
 
   async function handleJoin(name, code) {
-    // Try Supabase first, fall back to localStorage
-    let tree, wfs, cws, tls, runs;
     const roomId = await sb.joinRoom(code, 'My Organization');
-    const remoteState = roomId ? await sb.loadRoomState() : null;
 
-    if (remoteState?.file_tree) {
-      // Load from Supabase
-      tree = remoteState.file_tree;
-      wfs = remoteState.workflows || [createStarterWorkflow()];
-      cws = remoteState.coworkers || createStarterCoworkers();
-      tls = ensurePrebuiltTools(remoteState.tools);
-      runs = saved?.workflowRuns || [createStarterRun()];
-    } else {
-      // Fall back to localStorage or create fresh
-      tree = saved?.fileTree || createStarterFolders('My Organization');
-      wfs = saved?.workflows || (saved?.workflow ? [saved.workflow] : [createStarterWorkflow()]);
-      cws = saved?.coworkers || createStarterCoworkers();
-      tls = ensurePrebuiltTools(saved?.tools);
-      runs = saved?.workflowRuns || [createStarterRun()];
+    // Load from Supabase granular tables
+    let files, cws, tls, wfs, runs;
+    if (roomId) {
+      [files, cws, tls, wfs] = await Promise.all([
+        sb.loadFiles(), sb.loadCoworkers(), sb.loadTools(), sb.loadWorkflows(),
+      ]);
     }
 
+    // If Supabase has data, use it. Otherwise seed from localStorage or defaults.
+    if (files && files.length > 0) {
+      setFlatFiles(files);
+      setCoworkers(cws.length > 0 ? cws : createStarterCoworkers());
+      setTools(tls.length > 0 ? tls : ensurePrebuiltTools(null));
+      setWorkflows(wfs.length > 0 ? wfs : [createStarterWorkflow()]);
+    } else {
+      // Seed from localStorage or create fresh
+      const tree = saved?.fileTree || createStarterFolders('My Organization');
+      const seedFiles = flattenTree(tree, roomId);
+      setFlatFiles(seedFiles.map(mapFileRow));
+      // Seed to Supabase
+      if (roomId) sb.saveFilesBatch(seedFiles);
+
+      const seedCws = saved?.coworkers || createStarterCoworkers();
+      setCoworkers(seedCws);
+      if (roomId) seedCws.forEach(cw => sb.saveCoworker(cw));
+
+      const seedTls = ensurePrebuiltTools(saved?.tools);
+      setTools(seedTls);
+      if (roomId) seedTls.forEach(t => sb.saveTool(t));
+
+      const seedWfs = saved?.workflows || [createStarterWorkflow()];
+      setWorkflows(seedWfs);
+      if (roomId) seedWfs.forEach(wf => sb.saveWorkflow(wf));
+    }
+
+    runs = saved?.workflowRuns || [createStarterRun()];
     const starterLogs = saved?.workflowRuns ? [] : createStarterLogs();
     const existingParticipants = saved?.participants || [];
-
     const color = COLORS[existingParticipants.length % COLORS.length];
     const alreadyIn = existingParticipants.find(p => p.name === name);
     const newParticipants = alreadyIn
       ? existingParticipants.map(p => p.name === name ? { ...p, online: true, lastSeen: Date.now() } : p)
       : [...existingParticipants, { id: 'p-' + Date.now(), name, color, online: true, joinedAt: Date.now(), lastSeen: Date.now() }];
 
-    // Sync participant to Supabase and start presence
     sb.upsertParticipant(name, color);
-    sb.trackPresence(name, color, (onlineUsers) => {
-      const onlineNames = new Set(onlineUsers.map(u => u.name));
-      setParticipants(prev => {
-        const all = new Map();
-        for (const p of prev) all.set(p.name, { ...p, online: false });
-        for (const u of onlineUsers) {
-          if (!all.has(u.name)) {
-            all.set(u.name, { id: 'p-' + Date.now() + '-' + Math.random().toString(36).slice(2, 4), name: u.name, color: u.color || COLORS[all.size % COLORS.length], online: true, joinedAt: Date.now(), lastSeen: Date.now() });
-          }
-        }
-        for (const [n, p] of all) p.online = onlineNames.has(n);
-        return [...all.values()];
-      });
-    });
+    sb.trackPresence(name, color, handlePresenceSync);
+    startRealtimeSync();
 
     setUserName(name);
     setWorkshopCode(code);
-    setFileTree(tree);
-    setWorkflows(wfs);
-    setCoworkers(cws);
-    setTools(tls);
     setWorkflowRuns(runs);
     if (starterLogs.length > 0) setLogs(starterLogs);
     setParticipants(newParticipants);
     setSelectedDeptId(saved?.selectedDeptId || 'dept-credit');
     setIsJoined(true);
-    persist({ userName: name, workshopCode: code, fileTree: tree, workflows: wfs, coworkers: cws, tools: tls, workflowRuns: runs, participants: newParticipants, selectedDeptId: saved?.selectedDeptId || 'dept-credit' });
+    persistLocal({ userName: name, workshopCode: code, workflows, coworkers, tools, workflowRuns: runs, participants: newParticipants, selectedDeptId: saved?.selectedDeptId || 'dept-credit' });
   }
 
   function handleReset() {
@@ -359,7 +411,9 @@ function App() {
     const tree = createStarterFolders(orgName);
     const wfs = [createStarterWorkflow()];
     const cws = createStarterCoworkers();
-    setFileTree(tree);
+    const newFlat = flattenTree(tree, sb.getRoomId()).map(mapFileRow);
+    setFlatFiles(newFlat);
+    sb.saveFilesBatch(flattenTree(tree, sb.getRoomId()));
     setWorkflows(wfs);
     setCoworkers(cws);
     setSelectedFileId(null);
@@ -370,7 +424,9 @@ function App() {
     setWorkflowRuns([]);
     const tls = createStarterTools();
     setTools(tls);
-    persist({ fileTree: tree, workflows: wfs, coworkers: cws, tools: tls, workflowRuns: [] });
+    wfs.forEach(wf => sb.saveWorkflow(wf));
+    cws.forEach(cw => sb.saveCoworker(cw));
+    tls.forEach(t => sb.saveTool(t));
     localStorage.removeItem('sandbox:conversations');
   }
 
@@ -381,7 +437,7 @@ function App() {
     setIsJoined(false);
     setUserName('');
     setWorkshopCode('');
-    setFileTree(null);
+    setFlatFiles([]);
     setWorkflows(null);
     setConversations([]);
     setActiveConvoId(null);
@@ -389,29 +445,40 @@ function App() {
   }
 
   function handleUpdateTree(newTree) {
-    setFileTree(newTree);
-    persist({ fileTree: newTree });
+    // Convert tree to flat files, update state, sync each file to Supabase
+    const newFlat = flattenTree(newTree, sb.getRoomId()).map(mapFileRow);
+    setFlatFiles(newFlat);
+    // Batch save all files
+    sb.saveFilesBatch(flattenTree(newTree, sb.getRoomId()));
+    persistLocal({ fileTree: newTree });
   }
 
   function handleUpdateFileContent(fileId, content) {
-    const newTree = updateFileContent(fileTree, fileId, content);
-    setFileTree(newTree);
-    persist({ fileTree: newTree });
+    // Update the flat file in state
+    setFlatFiles(prev => prev.map(f => f.id === fileId ? { ...f, content } : f));
+    // Save just this file to Supabase
+    const file = flatFiles.find(f => f.id === fileId);
+    if (file) sb.saveFile({ ...file, content });
+    persistLocal({ fileTree: updateFileContent(fileTree, fileId, content) });
   }
 
   function handleUpdateWorkflows(newWorkflows) {
     setWorkflows(newWorkflows);
-    persist({ workflows: newWorkflows });
+    // Save each changed workflow
+    for (const wf of newWorkflows) sb.saveWorkflow(wf);
+    persistLocal({ workflows: newWorkflows });
   }
 
   function handleUpdateTools(newTools) {
     setTools(newTools);
-    persist({ tools: newTools });
+    for (const t of newTools) sb.saveTool(t);
+    persistLocal({ tools: newTools });
   }
 
   function handleUpdateCoworkers(newCoworkers) {
     setCoworkers(newCoworkers);
-    persist({ coworkers: newCoworkers });
+    for (const cw of newCoworkers) sb.saveCoworker(cw);
+    persistLocal({ coworkers: newCoworkers });
   }
 
   function addMessage(msg) {
@@ -742,7 +809,7 @@ function App() {
   function updateRun(runId, updates) {
     setWorkflowRuns(prev => {
       const updated = prev.map(r => r.id === runId ? { ...r, ...updates } : r);
-      persist({ workflowRuns: updated });
+      persistLocal({ workflowRuns: updated });
       // Sync completed/errored runs to Supabase
       const run = updated.find(r => r.id === runId);
       if (run && (updates.status === 'completed' || updates.status === 'error')) {
@@ -760,7 +827,7 @@ function App() {
         stepResults[stepIndex] = { ...stepResults[stepIndex], ...stepUpdates };
         return { ...r, stepResults };
       });
-      persist({ workflowRuns: updated });
+      persistLocal({ workflowRuns: updated });
       return updated;
     });
   }

@@ -1000,62 +1000,16 @@ Be concise. Confirm actions after completing them.${knowledgeSection}`;
         <div className="modal-overlay" onClick={() => setShowSettings(false)}>
           <div className="modal-box" onClick={e => e.stopPropagation()}>
             <h3>Settings</h3>
-            <p>Workshop: {workshopCode} | {orgName} | Logged in as {userName}</p>
-            <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, color: 'var(--text-body)', marginBottom: 8, cursor: 'pointer' }}>
+            <div style={{ fontSize: 14, color: 'var(--text-body)', marginBottom: 16 }}>
+              <span style={{ fontWeight: 600 }}>{userName}</span> in <span style={{ fontWeight: 600 }}>{orgName}</span>
+            </div>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, color: 'var(--text-body)', cursor: 'pointer' }}>
               <input type="checkbox" checked={showEducationalCues} onChange={handleToggleEducationalCues} />
               Show learning tips
             </label>
 
-            <div style={{ marginTop: 16, padding: '12px 0', borderTop: '1px solid var(--border-color)' }}>
-              <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-dark)', marginBottom: 8 }}>Research Data</div>
-              <p style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 10 }}>
-                Export full session — chat history, platform state, and activity logs — as a JSON file for research analysis.
-              </p>
-              <button className="modal-btn primary" style={{ fontSize: 13 }} onClick={() => {
-                const exportData = {
-                  exportedAt: new Date().toISOString(),
-                  session: {
-                    userName,
-                    workshopCode,
-                    orgName,
-                    startedAt: saved?.participants?.find(p => p.name === userName)?.joinedAt || null,
-                  },
-                  conversations: conversations.map(c => ({ id: c.id, title: c.title, createdAt: c.createdAt, messageCount: c.messages.length, messages: c.messages })),
-                  activityLogs: logs,
-                  platformState: {
-                    coworkers: coworkers?.map(c => ({ id: c.id, name: c.name, role: c.role, instructionFileIds: c.instructionFileIds, knowledgeFileIds: c.knowledgeFileIds })) || [],
-                    workflows: workflows?.map(w => ({ id: w.id, name: w.name, steps: w.steps.length })) || [],
-                    tools: tools?.filter(t => !t.isBuiltin).map(t => ({ id: t.id, name: t.name, type: t.type })) || [],
-                    fileCount: (() => { let n = 0; function count(node) { if (node.type === 'file') n++; if (node.children) node.children.forEach(count); } if (fileTree) count(fileTree); return n; })(),
-                  },
-                  workflowRuns: workflowRuns.map(r => ({ id: r.id, workflowName: r.workflowName, status: r.status, startedBy: r.startedBy, startedAt: r.startedAt, completedAt: r.completedAt, stepCount: r.stepResults?.length })),
-                  stats: (() => {
-                    const allMsgs = conversations.flatMap(c => c.messages);
-                    return {
-                      totalConversations: conversations.length,
-                      totalMessages: allMsgs.length,
-                      userMessages: allMsgs.filter(m => m.type === 'user').length,
-                      aiResponses: allMsgs.filter(m => m.type === 'direct-response').length,
-                      toolExecutions: allMsgs.filter(m => m.type === 'tool_execution').length,
-                      approvalGates: allMsgs.filter(m => m.type === 'approval').length,
-                    };
-                  })(),
-                };
-                const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = `foundry-session-${userName.replace(/\s+/g, '-').toLowerCase()}-${new Date().toISOString().slice(0, 10)}.json`;
-                a.click();
-                URL.revokeObjectURL(url);
-              }}>
-                Export Session Data
-              </button>
-            </div>
-
-            <div className="modal-actions" style={{ marginTop: 16 }}>
+            <div className="modal-actions" style={{ marginTop: 24 }}>
               <button className="modal-btn cancel" onClick={() => setShowSettings(false)}>Close</button>
-              <button className="modal-btn primary" onClick={() => { handleReset(); setShowSettings(false); }}>Reset Content</button>
               <button className="modal-btn danger" onClick={handleLeave}>Leave Workshop</button>
             </div>
           </div>

@@ -1,0 +1,610 @@
+import { useState, useRef, useEffect, useMemo } from 'react';
+import { parseFile, getFileCategory, getFileIcon } from '../utils/fileParser';
+import ToolExecutionCard from './ToolExecutionCard';
+import EducationalCue from './EducationalCue';
+import RichText from './RichText';
+import { CoworkerGlyph } from './Icon';
+
+function parseConfidence(text) {
+  const match = text.match(/[Cc]onfidence\s*[Ss]core[:\s]*([01]?\.\d+|[01])/);
+  if (!match) return null;
+  const val = parseFloat(match[1]);
+  if (isNaN(val) || val < 0 || val > 1) return null;
+  return val;
+}
+
+function ConfidenceBadge({ score }) {
+  if (score === null || score === undefined) return null;
+  const level = score >= 0.8 ? 'high' : score >= 0.5 ? 'medium' : 'low';
+  return (
+    <div className="cl-confidence">
+      <span className={`cl-confidence-dot ${level}`}></span>
+      Confidence: {score.toFixed(2)}
+    </div>
+  );
+}
+
+function UserAvatar({ name, color }) {
+  return (
+    <div className="cl-avatar cl-avatar-user" style={color ? { background: color } : undefined}>
+      {(name || 'You').charAt(0).toUpperCase()}
+    </div>
+  );
+}
+
+function AssistantAvatar({ label, coworkerAvatar }) {
+  if (coworkerAvatar) {
+    return (
+      <div className="cl-avatar cl-avatar-ai">
+        <CoworkerGlyph avatar={coworkerAvatar} size={18} color="#ffffff" />
+      </div>
+    );
+  }
+  const letter = (label || 'AI').charAt(0).toUpperCase();
+  return <div className="cl-avatar cl-avatar-ai">{letter}</div>;
+}
+
+function ChatMessage({ msg, onApprovalAction, onRetry, participants, showEducationalCues }) {
+  const [comment, setComment] = useState('');
+  const sender = msg.participantName ? participants?.find(p => p.name === msg.participantName) : null;
+
+  if (msg.type === 'status') return <div className="cl-status"><span>{msg.content}</span></div>;
+
+  if (msg.type === 'user') {
+    return (
+      <div className="cl-row cl-row-user">
+        <UserAvatar name={msg.participantName} color={sender?.color} />
+        <div className="cl-bubble cl-bubble-user">
+          {msg.participantName && <div className="cl-bubble-sender">{msg.participantName}</div>}
+          {msg.attachments && msg.attachments.length > 0 && (
+            <div className="cl-attachments">
+              {msg.attachments.map((att, i) => (
+                <span key={i} className="cl-attachment-chip">
+                  <span className="cl-attachment-icon">{getFileIcon(att.category)}</span>
+                  {att.fileName}
+                </span>
+              ))}
+            </div>
+          )}
+          <div>{msg.content}</div>
+        </div>
+      </div>
+    );
+  }
+
+  if (msg.type === 'agent') {
+    const confidence = parseConfidence(msg.content);
+    return (
+      <div className="cl-row cl-row-ai">
+        <AssistantAvatar label={msg.label} coworkerAvatar={msg.coworkerAvatar} />
+        <div className="cl-bubble cl-bubble-ai">
+          <div className="cl-bubble-label agent">{msg.label || 'Agent'}</div>
+          <ConfidenceBadge score={confidence} />
+          {confidence !== null && <EducationalCue cueId="chat-confidence" show={showEducationalCues} />}
+          <RichText content={msg.content} />
+        </div>
+      </div>
+    );
+  }
+
+  if (msg.type === 'approval') {
+    const isActive = !msg.resolved;
+    return (
+      <div className="cl-row cl-row-ai">
+        <AssistantAvatar label="!" />
+        <div className="cl-bubble cl-bubble-approval">
+          <div className="cl-bubble-label approval">Approval Gate</div>
+          <div className="cl-bubble-content">{msg.prompt}</div>
+          <EducationalCue cueId="chat-approval-gate" show={showEducationalCues} />
+          {msg.previousOutput && (
+            <div className="cl-approval-context">
+              {msg.previousOutput.length > 400 ? msg.previousOutput.slice(0, 400) + '...' : msg.previousOutput}
+            </div>
+          )}
+          {isActive && (
+            <>
+              <textarea className="cl-approval-comment" placeholder="Add a comment (optional)..." value={comment} onChange={e => setComment(e.target.value)} rows={2} />
+              <EducationalCue cueId="chat-approval-actions" show={showEducationalCues} />
+              <div className="cl-approval-actions">
+                {(msg.actions || ['Approve', 'Reject', 'Request Correction', 'Escalate']).map(action => {
+                  const cls = action === 'Approve' ? 'approve' : action === 'Reject' ? 'reject' : action === 'Request Correction' ? 'correction' : 'escalate';
+                  const disabled = action === 'Request Correction' && msg.correctionsRemaining <= 0;
+                  return (
+                    <button key={action} className={`cl-approval-btn ${cls}`} disabled={disabled} onClick={() => onApprovalAction(msg.runId, msg.id, action, comment)}>
+                      {action}{action === 'Request Correction' && msg.maxCorrections && ` (${msg.correctionsRemaining}/${msg.maxCorrections})`}
+                    </button>
+                  );
+                })}
+              </div>
+              {msg.correctionsRemaining <= 0 && <div className="cl-approval-max">Maximum corrections reached.</div>}
+            </>
+          )}
+          {msg.resolved && (
+            <div className="cl-approval-resolved">
+              {msg.resolvedAction}
+              {msg.resolvedComment && <span className="cl-approval-resolved-comment"> — "{msg.resolvedComment}"</span>}
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  if (msg.type === 'system') {
+    return (
+      <div className="cl-row cl-row-ai"><AssistantAvatar label="S" />
+        <div className="cl-bubble cl-bubble-system"><div className="cl-bubble-label system">System</div><div className="cl-bubble-content cl-mono">{msg.content}</div></div>
+      </div>
+    );
+  }
+
+  if (msg.type === 'error') {
+    return (
+      <div className="cl-row cl-row-ai"><AssistantAvatar label="!" />
+        <div className="cl-bubble cl-bubble-error"><div className="cl-bubble-label error">Error</div><div className="cl-bubble-content">{msg.content}</div>
+          {onRetry && <button className="cl-retry-btn" onClick={() => onRetry(msg.stepId)}>Retry</button>}
+        </div>
+      </div>
+    );
+  }
+
+  if (msg.type === 'loading') {
+    return (
+      <div className="cl-row cl-row-ai"><AssistantAvatar label={msg.label} />
+        <div className="cl-bubble cl-bubble-ai"><div className="cl-bubble-label agent">{msg.label || 'AI'}</div><div className="cl-loading"><span></span><span></span><span></span></div></div>
+      </div>
+    );
+  }
+
+  if (msg.type === 'tool_execution') {
+    return <ToolExecutionCard msg={msg} />;
+  }
+
+  if (msg.type === 'direct-response') {
+    return (
+      <div className="cl-row cl-row-ai">
+        <AssistantAvatar label={msg.label || 'AI'} coworkerAvatar={msg.coworkerAvatar} />
+        <div className="cl-bubble cl-bubble-ai">
+          {msg.label && <div className="cl-bubble-label agent">{msg.label}</div>}
+          <RichText content={msg.content} />
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="cl-row cl-row-ai"><AssistantAvatar label="AI" />
+      <div className="cl-bubble cl-bubble-ai"><RichText content={msg.content} /></div>
+    </div>
+  );
+}
+
+// ===== Helper: find node in tree =====
+function findNode(tree, id) {
+  if (!tree) return null;
+  if (tree.id === id) return tree;
+  if (tree.children) {
+    for (const child of tree.children) {
+      const found = findNode(child, id);
+      if (found) return found;
+    }
+  }
+  return null;
+}
+
+// ===== Slack-style Context Sidebar =====
+function ContextSidebar({ fileTree, selectedFileIds, onToggleFile, onToggleFolder, onOpenFile, editingFileId, participants, currentUserName, coworkers, activeCoworkerId, onSelectCoworker, showEducationalCues, conversations, activeConvoId, onNewChat, onSelectConvo, onDeleteConvo }) {
+  const [collapsedSections, setCollapsedSections] = useState(() => {
+    // Default all folders to collapsed
+    const collapsed = {};
+    if (fileTree?.children) {
+      fileTree.children.forEach(dept => {
+        collapsed[dept.id] = true;
+        if (dept.children) dept.children.forEach(sub => { collapsed[sub.id] = true; });
+      });
+    }
+    return collapsed;
+  });
+  const [searchFilter, setSearchFilter] = useState('');
+
+  if (!fileTree) return null;
+
+  function getAllFiles(node) {
+    const results = [];
+    if (node.type === 'file') results.push(node);
+    if (node.children) node.children.forEach(c => results.push(...getAllFiles(c)));
+    return results;
+  }
+
+  function toggleSection(id) {
+    setCollapsedSections(prev => ({ ...prev, [id]: !prev[id] }));
+  }
+
+  // Build department-level groups with their subfolders
+  function getDepartments() {
+    return (fileTree.children || []).map(dept => ({
+      id: dept.id,
+      name: dept.name,
+      subfolders: (dept.children || []).map(subfolder => ({
+        id: subfolder.id,
+        name: subfolder.name,
+        files: (subfolder.children || []).filter(c => c.type === 'file'),
+      })),
+    }));
+  }
+
+  const departments = getDepartments();
+  const online = (participants || []).filter(p => p.online);
+  const offline = (participants || []).filter(p => !p.online);
+  const activeCount = selectedFileIds.length;
+  const filterTerm = searchFilter.toLowerCase().trim();
+
+  // Resolve active files for pinned section
+  const activeFiles = selectedFileIds.map(id => findNode(fileTree, id)).filter(Boolean);
+
+  const sortedConvos = [...(conversations || [])].reverse();
+
+  return (
+    <div className="sl-sidebar">
+      {/* Files */}
+      <div className="sl-section sl-context-section">
+        <div className="sl-section-header">
+          <span className="sl-section-name">Files</span>
+        </div>
+
+        {departments.map(dept => {
+          const isDeptCollapsed = collapsedSections[dept.id];
+          return (
+            <div key={dept.id} className="sl-dept">
+              <div className="sl-dept-header" onClick={() => toggleSection(dept.id)}>
+                <span className={`sl-group-caret${!isDeptCollapsed ? ' open' : ''}`}>{'\u25B6'}</span>
+                <span className="sl-dept-name">{dept.name}</span>
+              </div>
+              {!isDeptCollapsed && dept.subfolders.map(subfolder => {
+                const isCollapsed = collapsedSections[subfolder.id];
+                return (
+                  <div key={subfolder.id} className="sl-channel-group">
+                    <div className="sl-group-header" onClick={() => toggleSection(subfolder.id)}>
+                      <span className={`sl-group-caret${!isCollapsed ? ' open' : ''}`}>{'\u25B6'}</span>
+                      <span className="sl-group-name">{subfolder.name}</span>
+                    </div>
+                    {!isCollapsed && subfolder.files.map(file => {
+                      const isActive = selectedFileIds.includes(file.id);
+                      const displayName = file.name.replace(/\.md$/, '');
+                      return (
+                        <div key={file.id} className={`sl-channel${isActive ? ' active' : ''}`}>
+                          <span className={`sl-channel-hash${isActive ? ' on' : ''}`}>#</span>
+                          <span className="sl-channel-name" onClick={() => onOpenFile(file.id)}>{displayName}</span>
+                          <span className={`sl-channel-dot${isActive ? ' on' : ''}`} onClick={e => { e.stopPropagation(); onToggleFile(file.id); }} title={isActive ? 'Remove from context' : 'Add to context'}></span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                );
+              })}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Chat History */}
+      <div className="sl-section sl-chats-section">
+        <div className="sl-section-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <span className="sl-section-name">Chats</span>
+          <button className="sl-new-chat-btn" onClick={onNewChat}>+ New</button>
+        </div>
+        <div className="sl-chat-list">
+          {sortedConvos.map(c => (
+            <div
+              key={c.id}
+              className={`sl-chat-item${activeConvoId === c.id ? ' active' : ''}`}
+              onClick={() => onSelectConvo(c.id)}
+            >
+              <span className="sl-chat-title">{c.title || 'New Chat'}</span>
+              <span className="sl-chat-meta">{c.messages?.length || 0} msgs</span>
+              {sortedConvos.length > 1 && (
+                <button className="sl-chat-delete" onClick={e => { e.stopPropagation(); onDeleteConvo(c.id); }}>{'\u2715'}</button>
+              )}
+            </div>
+          ))}
+          {sortedConvos.length === 0 && (
+            <div className="sl-chat-empty" onClick={onNewChat}>Start a conversation</div>
+          )}
+        </div>
+      </div>
+
+      <div className="sl-spacer" />
+
+      {/* AI Coworkers */}
+      {coworkers && coworkers.length > 0 && (
+        <div className="sl-section sl-agents-section">
+          <div className="sl-section-header" onClick={() => toggleSection('agents')}>
+            <span className="sl-section-name">AI Co-workers</span>
+            <span className="sl-section-count">{coworkers.length}</span>
+          </div>
+          {!collapsedSections['agents'] && coworkers.map(cw => (
+            <div
+              key={cw.id}
+              className={`sl-dm sl-agent-item${activeCoworkerId === cw.id ? ' active-agent' : ''}`}
+              onClick={() => onSelectCoworker(cw.id)}
+            >
+              <span className="sl-agent-emoji"><CoworkerGlyph avatar={cw.avatar} size={14} color="currentColor" /></span>
+              <span className="sl-dm-name">{cw.name}</span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Co-workers / People */}
+      <div className="sl-section sl-people-section">
+        <div className="sl-section-header" onClick={() => toggleSection('people')}>
+          <span className="sl-section-name">Co-workers</span>
+          <span className="sl-section-count">{online.length}</span>
+        </div>
+        {!collapsedSections['people'] && (
+          <>
+            {online.map(p => (
+              <div key={p.id} className="sl-dm online">
+                <span className="sl-dm-status on"></span>
+                <span className="sl-dm-name">{p.name}{p.name === currentUserName ? ' (you)' : ''}</span>
+              </div>
+            ))}
+            {offline.map(p => (
+              <div key={p.id} className="sl-dm">
+                <span className="sl-dm-status"></span>
+                <span className="sl-dm-name">{p.name}</span>
+              </div>
+            ))}
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ===== Inline File Editor =====
+function InlineEditor({ file, onUpdateContent, onClose }) {
+  return (
+    <div className="ctx-editor">
+      <div className="ctx-editor-header">
+        <span className="ctx-editor-filename">{file.name}</span>
+        <button className="ctx-editor-close" onClick={onClose}>{'\u2715'}</button>
+      </div>
+      <textarea
+        className="ctx-editor-textarea"
+        value={file.content || ''}
+        onChange={e => onUpdateContent(file.id, e.target.value)}
+        spellCheck={false}
+      />
+    </div>
+  );
+}
+
+// ===== Main ChatPanel =====
+export default function ChatPanel({ messages, onSendMessage, onApprovalAction, onRetry, isLoading, participants, currentUserName, fileTree, onUpdateFileContent, coworkers, showEducationalCues, conversations, activeConvoId, onNewChat, onSelectConvo, onDeleteConvo }) {
+  const [input, setInput] = useState('');
+  const [selectedFileIds, setSelectedFileIds] = useState([]);
+  const [editingFileId, setEditingFileId] = useState(null);
+  const [activeCoworkerId, setActiveCoworkerId] = useState(null);
+  const [attachedFiles, setAttachedFiles] = useState([]);
+  const [parsingFiles, setParsingFiles] = useState(false);
+  const messagesRef = useRef(null);
+  const greeting = useMemo(() => {
+    const firstName = (currentUserName || '').split(' ')[0] || 'there';
+    const hour = new Date().getHours();
+    const timeGreetings = hour < 12
+      ? [`Good morning, ${firstName}`, `Morning, ${firstName}`, `Rise and build, ${firstName}`]
+      : hour < 17
+        ? [`Good afternoon, ${firstName}`, `Hey ${firstName}, what are we building?`, `Ready to create, ${firstName}?`]
+        : [`Good evening, ${firstName}`, `Evening, ${firstName}`, `Still going, ${firstName}?`];
+    const general = [
+      `What's on your mind, ${firstName}?`,
+      `Let's build something, ${firstName}.`,
+      `What are we working on, ${firstName}?`,
+      `How can I help, ${firstName}?`,
+    ];
+    const all = [...timeGreetings, ...general];
+    return all[Math.floor(Math.random() * all.length)];
+  }, [currentUserName, messages.length === 0]);
+  const fileInputRef = useRef(null);
+  const activeCoworker = activeCoworkerId ? coworkers?.find(c => c.id === activeCoworkerId) : null;
+
+  // Clear context when switching conversations
+  useEffect(() => {
+    setSelectedFileIds([]);
+    setActiveCoworkerId(null);
+    setAttachedFiles([]);
+    setInput('');
+  }, [activeConvoId]);
+
+  useEffect(() => {
+    if (messagesRef.current) messagesRef.current.scrollTop = messagesRef.current.scrollHeight;
+  }, [messages.length]);
+
+  function handleSend() {
+    if ((!input.trim() && attachedFiles.length === 0) || isLoading || parsingFiles) return;
+    const text = input.trim() || (attachedFiles.length > 0 ? `Analyze the attached file${attachedFiles.length > 1 ? 's' : ''}.` : '');
+    onSendMessage(text, selectedFileIds, activeCoworkerId, attachedFiles);
+    setInput('');
+    setAttachedFiles([]);
+  }
+
+  async function handleFileSelect(e) {
+    const files = Array.from(e.target.files);
+    if (files.length === 0) return;
+    setParsingFiles(true);
+    const parsed = [];
+    for (const file of files) {
+      const result = await parseFile(file);
+      parsed.push({
+        ...result,
+        category: getFileCategory(file),
+        originalName: file.name,
+      });
+    }
+    setAttachedFiles(prev => [...prev, ...parsed]);
+    setParsingFiles(false);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  }
+
+  function removeAttachment(index) {
+    setAttachedFiles(prev => prev.filter((_, i) => i !== index));
+  }
+
+  function handleSelectCoworker(cwId) {
+    setActiveCoworkerId(activeCoworkerId === cwId ? null : cwId);
+  }
+
+  function handleToggleFile(fileId) {
+    setSelectedFileIds(prev => prev.includes(fileId) ? prev.filter(id => id !== fileId) : [...prev, fileId]);
+  }
+
+  function handleToggleFolder(folder) {
+    function getAllFileIds(node) {
+      const ids = [];
+      if (node.type === 'file') ids.push(node.id);
+      if (node.children) node.children.forEach(c => ids.push(...getAllFileIds(c)));
+      return ids;
+    }
+    const folderFileIds = getAllFileIds(folder);
+    const allSelected = folderFileIds.every(id => selectedFileIds.includes(id));
+    if (allSelected) setSelectedFileIds(prev => prev.filter(id => !folderFileIds.includes(id)));
+    else setSelectedFileIds(prev => [...new Set([...prev, ...folderFileIds])]);
+  }
+
+  function handleOpenFile(fileId) {
+    setEditingFileId(editingFileId === fileId ? null : fileId);
+  }
+
+  const isEmpty = messages.length === 0;
+
+  function renderInputArea() {
+    const placeholder = isLoading ? 'Thinking...'
+      : parsingFiles ? 'Reading files...'
+      : activeCoworker ? `Ask ${activeCoworker.name}...`
+      : 'How can I help you today?';
+
+    return (
+      <div className="cl-input-area">
+        <input type="file" ref={fileInputRef} style={{ display: 'none' }} multiple onChange={handleFileSelect}
+          accept=".pdf,.doc,.docx,.xls,.xlsx,.csv,.txt,.md,.json,.png,.jpg,.jpeg,.gif,.webp" />
+        <div className="cl-input-row">
+          <div className="cl-context-info">
+            {activeCoworker
+              ? <span className="cl-context-active"><CoworkerGlyph avatar={activeCoworker.avatar} size={14} color="currentColor" /> Talking to {activeCoworker.name}</span>
+              : activeContextCount > 0
+                ? <div className="cl-context-files-list">
+                    {selectedFileIds.map(id => {
+                      const node = findNode(fileTree, id);
+                      if (!node) return null;
+                      return (
+                        <span key={id} className="cl-context-file-chip">
+                          <span className="cl-context-file-chip-name">{node.name.replace(/\.md$/, '')}</span>
+                          <button className="cl-context-file-chip-remove" onClick={() => handleToggleFile(id)}>{'\u2715'}</button>
+                        </span>
+                      );
+                    })}
+                  </div>
+                : <span className="cl-context-none">No context selected</span>
+            }
+          </div>
+        </div>
+        {attachedFiles.length > 0 && (
+          <div className="cl-attached-files">
+            <EducationalCue cueId="chat-attachment" show={showEducationalCues} />
+            {attachedFiles.map((f, i) => (
+              <span key={i} className="cl-attached-chip">
+                <span className="cl-attached-chip-icon">{getFileIcon(f.category)}</span>
+                <span className="cl-attached-chip-name">{f.fileName}</span>
+                <button className="cl-attached-chip-remove" onClick={() => removeAttachment(i)}>{'\u2715'}</button>
+              </span>
+            ))}
+          </div>
+        )}
+        <div className="cl-input-box">
+          <button className="cl-attach-btn" onClick={() => fileInputRef.current?.click()} disabled={isLoading || parsingFiles} title="Attach file">
+            <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M15.75 8.49L9.12 15.12C7.56 16.68 5.04 16.68 3.48 15.12C1.92 13.56 1.92 11.04 3.48 9.48L10.11 2.85C11.1 1.86 12.72 1.86 13.71 2.85C14.7 3.84 14.7 5.46 13.71 6.45L7.78 12.38C7.29 12.87 6.48 12.87 5.99 12.38C5.5 11.89 5.5 11.08 5.99 10.59L11.22 5.36" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
+          </button>
+          <textarea className="cl-input" placeholder={placeholder} value={input} onChange={e => setInput(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
+            disabled={isLoading || parsingFiles} rows={1} />
+          <button className="cl-send-btn" onClick={handleSend} disabled={(!input.trim() && attachedFiles.length === 0) || isLoading || parsingFiles}>
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 13L13 8L3 3V7L9 8L3 9V13Z" fill="currentColor"/></svg>
+          </button>
+        </div>
+      </div>
+    );
+  }
+  const activeContextCount = selectedFileIds.length;
+  const editingFile = editingFileId ? findNode(fileTree, editingFileId) : null;
+
+  return (
+    <div className="cl-chat-teams">
+      {/* Left: context sidebar */}
+      <ContextSidebar
+        fileTree={fileTree}
+        selectedFileIds={selectedFileIds}
+        onToggleFile={handleToggleFile}
+        onToggleFolder={handleToggleFolder}
+        onOpenFile={handleOpenFile}
+        editingFileId={editingFileId}
+        participants={participants}
+        currentUserName={currentUserName}
+        coworkers={coworkers}
+        activeCoworkerId={activeCoworkerId}
+        onSelectCoworker={handleSelectCoworker}
+        showEducationalCues={showEducationalCues}
+        conversations={conversations}
+        activeConvoId={activeConvoId}
+        onNewChat={onNewChat}
+        onSelectConvo={onSelectConvo}
+        onDeleteConvo={onDeleteConvo}
+      />
+
+      {/* Middle: file editor (when open) */}
+      {editingFile && onUpdateFileContent && (
+        <InlineEditor
+          file={editingFile}
+          onUpdateContent={onUpdateFileContent}
+          onClose={() => setEditingFileId(null)}
+        />
+      )}
+
+      {/* Right: chat */}
+      <div className="cl-chat-main">
+        {isEmpty ? (
+          <div className="cl-center-layout">
+            <div className="cl-welcome">
+              <h2 className="cl-welcome-greeting">{greeting}</h2>
+            </div>
+            {renderInputArea()}
+          </div>
+        ) : (
+          <>
+            {activeCoworker && (
+              <div>
+                <div className="cl-agent-banner">
+                  <span className="cl-agent-banner-avatar" style={{ background: activeCoworker.color || '#4a7fb5' }}><CoworkerGlyph avatar={activeCoworker.avatar} size={18} color="#ffffff" /></span>
+                  <span className="cl-agent-banner-name">Chatting with {activeCoworker.name}</span>
+                  <span className="cl-agent-banner-role">{activeCoworker.role}</span>
+                  <button className="cl-agent-banner-close" onClick={() => setActiveCoworkerId(null)}>{'\u2715'}</button>
+                </div>
+                <div style={{ padding: '4px 20px' }}>
+                  <EducationalCue cueId="chat-agent-conversation" show={showEducationalCues} />
+                </div>
+              </div>
+            )}
+            <div className="cl-messages" ref={messagesRef}>
+              <div className="cl-messages-inner">
+                {messages.map((msg, i) => (
+                  <ChatMessage key={msg.id || i} msg={msg} onApprovalAction={onApprovalAction} onRetry={onRetry} participants={participants} showEducationalCues={showEducationalCues} />
+                ))}
+              </div>
+            </div>
+            {renderInputArea()}
+          </>
+        )}
+      </div>
+    </div>
+  );
+}

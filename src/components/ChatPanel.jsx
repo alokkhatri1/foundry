@@ -476,7 +476,7 @@ export default function ChatPanel({ messages, onSendMessage, onApprovalAction, o
     setEditingFileId(editingFileId === fileId ? null : fileId);
   }
 
-  const isEmpty = messages.length === 0;
+  const isEmpty = messages.length === 0 && !isLoading;
 
   function renderInputArea() {
     const placeholder = isLoading ? 'Thinking...'

@@ -91,6 +91,114 @@ export default function useSupabase() {
     return data || [];
   }, []);
 
+  const deleteWorkshop = useCallback(async (roomId) => {
+    if (!isSupabaseConfigured) return;
+    // Cascade delete handled by foreign keys
+    const { error } = await supabase.from('rooms').delete().eq('id', roomId);
+    if (error) console.error('[sb] deleteWorkshop:', error.message);
+  }, []);
+
+  const loadWorkshopStats = useCallback(async (roomId) => {
+    if (!isSupabaseConfigured) return null;
+    const [files, coworkers, workflows, participants, messages] = await Promise.all([
+      supabase.from('files').select('id', { count: 'exact', head: true }).eq('room_id', roomId),
+      supabase.from('coworkers').select('id', { count: 'exact', head: true }).eq('room_id', roomId),
+      supabase.from('workflows').select('id', { count: 'exact', head: true }).eq('room_id', roomId),
+      supabase.from('participants').select('id', { count: 'exact', head: true }).eq('room_id', roomId),
+      supabase.from('messages').select('id', { count: 'exact', head: true }).eq('room_id', roomId),
+    ]);
+    return {
+      files: files.count || 0,
+      coworkers: coworkers.count || 0,
+      workflows: workflows.count || 0,
+      participants: participants.count || 0,
+      messages: messages.count || 0,
+    };
+  }, []);
+
+  const loadWorkshopContent = useCallback(async (roomId) => {
+    if (!isSupabaseConfigured) return {};
+    const [files, coworkers, workflows] = await Promise.all([
+      supabase.from('files').select('id, name, type, parent_id').eq('room_id', roomId),
+      supabase.from('coworkers').select('id, name, role, avatar, color, created_by, created_at').eq('room_id', roomId),
+      supabase.from('workflows').select('id, name, steps, created_at').eq('room_id', roomId),
+    ]);
+    return {
+      files: files.data || [],
+      coworkers: coworkers.data || [],
+      workflows: workflows.data || [],
+    };
+  }, []);
+
+  const loadWorkshopActivity = useCallback(async (roomId, limit = 20) => {
+    if (!isSupabaseConfigured) return [];
+    const { data } = await supabase.from('messages')
+      .select('id, type, participant_name, content, label, created_at')
+      .eq('room_id', roomId)
+      .in('type', ['user', 'direct-response', 'status'])
+      .order('created_at', { ascending: false })
+      .limit(limit);
+    return data || [];
+  }, []);
+
+  const seedWorkshopContent = useCallback(async (roomId) => {
+    if (!isSupabaseConfigured) return;
+    const { createStarterFolders, createStarterCoworkers, createStarterTools, createStarterWorkflow } = await import('../data/starterContent');
+    const { flattenTree } = await import('../utils/treeUtils');
+
+    const tree = createStarterFolders('Workshop Organization');
+    const files = flattenTree(tree, roomId);
+    const coworkers = createStarterCoworkers();
+    const tools = createStarterTools();
+    const workflow = createStarterWorkflow();
+
+    // Insert files
+    await supabase.from('files').upsert(
+      files.map(f => ({ ...f, room_id: roomId, updated_at: new Date().toISOString() })),
+      { onConflict: 'id' }
+    );
+    // Insert coworkers
+    for (const cw of coworkers) {
+      await supabase.from('coworkers').upsert({
+        id: cw.id, room_id: roomId, name: cw.name, role: cw.role,
+        avatar: cw.avatar, color: cw.color,
+        instruction_file_ids: cw.instructionFileIds || [],
+        knowledge_file_ids: cw.knowledgeFileIds || [],
+        tool_ids: cw.toolIds || [],
+        created_by: 'System',
+      }, { onConflict: 'id' });
+    }
+    // Insert tools
+    for (const t of tools) {
+      await supabase.from('tools').upsert({
+        id: t.id, room_id: roomId, name: t.name, type: t.type,
+        description: t.description, icon: t.icon,
+        is_builtin: t.isBuiltin || false, config: t.config,
+        created_by: 'System',
+      }, { onConflict: 'id' });
+    }
+    // Insert workflow
+    await supabase.from('workflows').upsert({
+      id: workflow.id, room_id: roomId, name: workflow.name,
+      steps: workflow.steps, created_by: 'System',
+    }, { onConflict: 'id' });
+  }, []);
+
+  const subscribeToWorkshopPresence = useCallback((roomId, onPresenceChange) => {
+    if (!isSupabaseConfigured) return () => {};
+    const channel = supabase.channel(`admin-presence:${roomId}`);
+    channel.on('presence', { event: 'sync' }, () => {
+      const state = channel.presenceState();
+      const online = [];
+      for (const [key, entries] of Object.entries(state)) {
+        if (entries.length > 0) online.push({ name: entries[0].name || key, color: entries[0].color });
+      }
+      onPresenceChange(online);
+    });
+    channel.subscribe();
+    return () => supabase.removeChannel(channel);
+  }, []);
+
   // ===== Room: create or join =====
   const joinRoom = useCallback(async (code, orgName) => {
     if (!isSupabaseConfigured) return null;
@@ -368,6 +476,8 @@ export default function useSupabase() {
     signOut, checkIsAdmin, onAuthStateChange,
     // Admin
     createWorkshop, loadAdminWorkshops, loadWorkshopParticipants,
+    deleteWorkshop, loadWorkshopStats, loadWorkshopContent, loadWorkshopActivity,
+    seedWorkshopContent, subscribeToWorkshopPresence,
     // Room
     joinRoom, getRoomId,
     upsertParticipant, loadParticipants,

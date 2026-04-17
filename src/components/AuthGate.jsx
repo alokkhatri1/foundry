@@ -13,68 +13,33 @@ export default function AuthGate({ children, onJoin, workshopCode }) {
   useEffect(() => {
     let mounted = true;
 
-    async function init() {
-      // PKCE flow: after Google redirect, URL has ?code=... parameter
-      // The Supabase client auto-exchanges it via detectSessionInUrl
-      // We just need to wait for it, then check the session
-      const params = new URLSearchParams(window.location.search);
-      const hasCode = params.get('code');
-      const hasError = params.get('error');
-      const hasHash = window.location.hash?.includes('access_token');
-
-      if (hasCode || hasHash) {
-        console.log('[auth] OAuth callback detected, waiting for session exchange...');
-        // Wait for Supabase to exchange the code/token
-        let attempts = 0;
-        while (attempts < 20) {
-          const s = await sb.getSession();
-          if (s) {
-            console.log('[auth] session obtained after exchange:', s.user.email);
-            // Clean URL
-            window.history.replaceState(null, '', window.location.pathname);
-            if (mounted) {
-              setSession(s);
-              const admin = await sb.checkIsAdmin(s.user.id);
-              setIsAdmin(admin);
-              setLoading(false);
-            }
-            return;
-          }
-          await new Promise(r => setTimeout(r, 300));
-          attempts++;
-        }
-        console.log('[auth] failed to obtain session after callback');
-        window.history.replaceState(null, '', window.location.pathname);
-      }
-
-      if (hasError) {
-        console.log('[auth] OAuth error:', params.get('error_description'));
-        window.history.replaceState(null, '', window.location.pathname);
-      }
-
-      const s = await sb.getSession();
-      console.log('[auth] session:', s ? s.user.email : 'none');
-      if (mounted) {
-        setSession(s);
-        if (s?.user) {
-          const admin = await sb.checkIsAdmin(s.user.id);
-          setIsAdmin(admin);
-        }
-        setLoading(false);
-      }
-    }
-
-    init();
-
+    // The onAuthStateChange listener is the most reliable way to detect
+    // OAuth callbacks — Supabase fires SIGNED_IN when it processes the hash
     const unsub = sb.onAuthStateChange(s => {
-      console.log('[auth] state change:', s ? 'signed in' : 'signed out');
+      console.log('[auth] state change:', s ? s.user?.email : 'signed out');
       if (mounted) {
         setSession(s);
         if (s?.user) sb.checkIsAdmin(s.user.id).then(a => mounted && setIsAdmin(a));
         else setIsAdmin(false);
         setLoading(false);
+        // Clean OAuth params from URL
+        if (window.location.hash?.includes('access_token') || window.location.search?.includes('code=')) {
+          window.history.replaceState(null, '', window.location.pathname);
+        }
       }
     });
+
+    // Fallback: if no auth event fires within 2s, check session manually
+    setTimeout(async () => {
+      if (!mounted) return;
+      const s = await sb.getSession();
+      console.log('[auth] fallback check:', s ? s.user?.email : 'none');
+      if (mounted && loading) {
+        setSession(s);
+        if (s?.user) sb.checkIsAdmin(s.user.id).then(a => mounted && setIsAdmin(a));
+        setLoading(false);
+      }
+    }, 2000);
 
     return () => { mounted = false; unsub(); };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps

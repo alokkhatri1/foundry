@@ -222,34 +222,54 @@ function App() {
 
   useEffect(() => { activeTabRef.current = activeTab; }, [activeTab]);
 
-  // On load: reconnect to Supabase room and start presence tracking
+  // On load: reconnect to Supabase room, load participants, start presence
   useEffect(() => {
     if (isJoined && workshopCode) {
-      sb.joinRoom(workshopCode, orgName).then(() => {
-        if (userName) {
-          sb.upsertParticipant(userName, null);
-          // Start presence tracking — updates participants in real time
-          sb.trackPresence(userName, participants.find(p => p.name === userName)?.color, (onlineUsers) => {
-            setParticipants(prev => {
-              // Merge presence data with existing participants
-              const merged = [...prev].map(p => ({ ...p, online: false }));
-              for (const u of onlineUsers) {
-                const existing = merged.find(p => p.name === u.name);
-                if (existing) {
-                  existing.online = true;
-                  existing.lastSeen = Date.now();
-                } else {
-                  merged.push({ id: 'p-' + Date.now() + '-' + Math.random().toString(36).slice(2, 4), name: u.name, color: u.color || COLORS[merged.length % COLORS.length], online: true, joinedAt: Date.now(), lastSeen: Date.now() });
-                }
+      sb.joinRoom(workshopCode, orgName).then(async (roomId) => {
+        if (!roomId || !userName) return;
+
+        const myColor = participants.find(p => p.name === userName)?.color || COLORS[0];
+        sb.upsertParticipant(userName, myColor);
+
+        // Load all participants from Supabase (includes users from other browsers)
+        const dbParticipants = await sb.loadParticipants();
+
+        // Start presence tracking
+        sb.trackPresence(userName, myColor, (onlineUsers) => {
+          const onlineNames = new Set(onlineUsers.map(u => u.name));
+          setParticipants(prev => {
+            // Start from DB participants + any local-only ones
+            const all = new Map();
+            for (const p of prev) all.set(p.name, { ...p, online: false });
+            for (const p of dbParticipants) {
+              if (!all.has(p.name)) all.set(p.name, { ...p, online: false });
+            }
+            // Add anyone from presence we haven't seen
+            for (const u of onlineUsers) {
+              if (!all.has(u.name)) {
+                all.set(u.name, { id: 'p-' + Date.now() + '-' + Math.random().toString(36).slice(2, 4), name: u.name, color: u.color || COLORS[all.size % COLORS.length], online: true, joinedAt: Date.now(), lastSeen: Date.now() });
               }
-              return merged;
-            });
+            }
+            // Mark online from presence
+            for (const [name, p] of all) {
+              p.online = onlineNames.has(name);
+            }
+            return [...all.values()];
+          });
+        });
+
+        // Also set DB participants immediately (before presence kicks in)
+        if (dbParticipants.length > 0) {
+          setParticipants(prev => {
+            const all = new Map();
+            for (const p of prev) all.set(p.name, p);
+            for (const p of dbParticipants) {
+              if (!all.has(p.name)) all.set(p.name, p);
+            }
+            return [...all.values()];
           });
         }
       });
-    }
-    if (isJoined && initParticipants.length > 0) {
-      persist({ participants: initParticipants });
     }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -306,14 +326,17 @@ function App() {
     // Sync participant to Supabase and start presence
     sb.upsertParticipant(name, color);
     sb.trackPresence(name, color, (onlineUsers) => {
+      const onlineNames = new Set(onlineUsers.map(u => u.name));
       setParticipants(prev => {
-        const merged = [...prev].map(p => ({ ...p, online: false }));
+        const all = new Map();
+        for (const p of prev) all.set(p.name, { ...p, online: false });
         for (const u of onlineUsers) {
-          const existing = merged.find(p => p.name === u.name);
-          if (existing) { existing.online = true; existing.lastSeen = Date.now(); }
-          else { merged.push({ id: 'p-' + Date.now() + '-' + Math.random().toString(36).slice(2, 4), name: u.name, color: u.color || COLORS[merged.length % COLORS.length], online: true, joinedAt: Date.now(), lastSeen: Date.now() }); }
+          if (!all.has(u.name)) {
+            all.set(u.name, { id: 'p-' + Date.now() + '-' + Math.random().toString(36).slice(2, 4), name: u.name, color: u.color || COLORS[all.size % COLORS.length], online: true, joinedAt: Date.now(), lastSeen: Date.now() });
+          }
         }
-        return merged;
+        for (const [n, p] of all) p.online = onlineNames.has(n);
+        return [...all.values()];
       });
     });
 

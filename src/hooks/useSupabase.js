@@ -42,6 +42,24 @@ export default function useSupabase() {
     );
   }, []);
 
+  // ===== Participants: load all for room =====
+  const loadParticipants = useCallback(async () => {
+    if (!isSupabaseConfigured || !roomIdRef.current) return [];
+    const { data, error } = await supabase
+      .from('participants')
+      .select('*')
+      .eq('room_id', roomIdRef.current);
+    if (error) { console.error('[supabase] loadParticipants:', error.message); return []; }
+    return (data || []).map(p => ({
+      id: p.id,
+      name: p.name,
+      color: p.color,
+      online: false,
+      joinedAt: new Date(p.joined_at).getTime(),
+      lastSeen: new Date(p.last_seen_at).getTime(),
+    }));
+  }, []);
+
   // ===== Room state: load =====
   const loadRoomState = useCallback(async () => {
     if (!isSupabaseConfigured || !roomIdRef.current) return null;
@@ -304,6 +322,7 @@ export default function useSupabase() {
     isConfigured: isSupabaseConfigured,
     joinRoom,
     upsertParticipant,
+    loadParticipants,
     loadRoomState,
     saveRoomState,
     saveMessage,

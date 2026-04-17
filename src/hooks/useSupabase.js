@@ -16,6 +16,7 @@ export default function useSupabase() {
 
   // ===== Room: create or join =====
   const joinRoom = useCallback(async (code, orgName) => {
+    console.log('[supabase] joinRoom called, configured:', isSupabaseConfigured);
     if (!isSupabaseConfigured) return null;
 
     // Upsert room
@@ -25,8 +26,9 @@ export default function useSupabase() {
       .select('id')
       .single();
 
-    if (error) { console.error('[supabase] joinRoom:', error.message); return null; }
+    if (error) { console.error('[supabase] joinRoom error:', error.message); return null; }
     roomIdRef.current = room.id;
+    console.log('[supabase] joinRoom success, roomId:', room.id);
     return room.id;
   }, []);
 

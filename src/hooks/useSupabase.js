@@ -22,14 +22,9 @@ export default function useSupabase() {
 
   const signInWithGoogle = useCallback(async () => {
     if (!isSupabaseConfigured) return;
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: {
-        redirectTo: window.location.origin,
-        skipBrowserRedirect: false,
-      },
-    });
-    if (error) console.error('[sb] Google sign-in:', error.message);
+    // Direct redirect to Supabase OAuth endpoint
+    const redirectTo = encodeURIComponent(window.location.origin);
+    window.location.href = `${import.meta.env.VITE_SUPABASE_URL}/auth/v1/authorize?provider=google&redirect_to=${redirectTo}`;
   }, []);
 
   const signInWithLinkedin = useCallback(async () => {

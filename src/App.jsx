@@ -5,10 +5,8 @@ import FileExplorer from './components/FileExplorer';
 import FileEditor from './components/FileEditor';
 import WorkflowBuilder from './components/WorkflowBuilder';
 import CoworkerBuilder from './components/CoworkerBuilder';
-import ToolBuilder from './components/ToolBuilder';
 import ChatPanel from './components/ChatPanel';
 import ActivityDashboard from './components/ActivityDashboard';
-import ActivityLog from './components/ActivityLog';
 import {
   createStarterFolders,
   createStarterWorkflow,
@@ -152,10 +150,7 @@ function getKnowledgeForDepartment(tree, deptId) {
   return knowledgeFolder.children?.filter(c => c.type === 'file') || [];
 }
 
-function getDepartmentName(tree, deptId) {
-  const dept = findNode(tree, deptId);
-  return dept?.name || 'Unknown Department';
-}
+
 
 
 
@@ -199,7 +194,6 @@ function App() {
   const messages = activeConvo?.messages || [];
   const [logs, setLogs] = useState([]);
   const [workflowRuns, setWorkflowRuns] = useState(saved?.workflowRuns || []);
-  const [contextOn, setContextOn] = useState(true);
   const [networkError, setNetworkError] = useState(false);
   const [activeTab, setActiveTab] = useState('chat');
   const [showSettings, setShowSettings] = useState(false);
@@ -207,7 +201,6 @@ function App() {
     try { const v = localStorage.getItem('sandbox:show-edu-cues'); return v === null ? true : v === 'true'; } catch { return true; }
   });
   const [chatBadge, setChatBadge] = useState(false);
-  const [workflowBadge, setWorkflowBadge] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const COLORS = ['#4a7fb5', '#5a9e6f', '#c8956c', '#8b6fb0', '#c45c5c', '#4a9e9e', '#b5784a', '#6f8bb0', '#9e6f8b', '#6fb06f'];
 
@@ -1059,21 +1052,10 @@ Be concise. Confirm actions after completing them.${knowledgeSection}`;
     try { localStorage.setItem('sandbox:show-edu-cues', String(next)); } catch {}
   }
 
-  function handleToggleContext() {
-    const newVal = !contextOn;
-    setContextOn(newVal);
-    const deptName = selectedDeptId ? getDepartmentName(fileTree, selectedDeptId) : null;
-    addMessage({
-      type: 'status',
-      content: newVal ? `Context switched ON — using ${deptName || 'department'} knowledge` : 'Context switched OFF — general knowledge only',
-    });
-  }
-
   // ===== Render =====
   const selectedFile = selectedFileId ? findNode(fileTree, selectedFileId) : null;
   const activeRuns = workflowRuns.filter(r => r.status === 'running' || r.status === 'waiting_approval');
   const hasActiveRuns = activeRuns.length > 0;
-  const selectedDeptName = selectedDeptId ? getDepartmentName(fileTree, selectedDeptId) : null;
 
   return (
     <AuthGate onJoin={handleJoin} workshopCode={isJoined ? workshopCode : null}>

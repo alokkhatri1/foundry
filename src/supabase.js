@@ -11,6 +11,11 @@ if (!url || !anonKey || url.includes('your-project-ref')) {
 }
 
 export const supabase = createClient(url || 'http://placeholder', anonKey || 'placeholder', {
+  auth: {
+    autoRefreshToken: true,
+    persistSession: true,
+    detectSessionInUrl: true,
+  },
   realtime: { params: { eventsPerSecond: 10 } },
 });
 

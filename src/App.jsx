@@ -222,8 +222,13 @@ function App() {
 
   useEffect(() => { activeTabRef.current = activeTab; }, [activeTab]);
 
-  // Persist participants fix on first load
+  // On load: reconnect to Supabase room if already joined
   useEffect(() => {
+    if (isJoined && workshopCode) {
+      sb.joinRoom(workshopCode, orgName).then(() => {
+        if (userName) sb.upsertParticipant(userName, null);
+      });
+    }
     if (isJoined && initParticipants.length > 0) {
       persist({ participants: initParticipants });
     }

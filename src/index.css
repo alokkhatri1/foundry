@@ -67,24 +67,27 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
 
 /* Title */
 .landing-title {
-  font-size: 42px; font-weight: 800; line-height: 1.15;
-  color: var(--text-dark); letter-spacing: -1px; margin-bottom: 16px;
+  font-size: 48px; font-weight: 900; line-height: 1.1;
+  color: var(--text-dark); letter-spacing: -1.5px; margin-bottom: 20px;
+  font-family: Georgia, 'Times New Roman', serif;
 }
 .landing-highlight {
-  color: var(--accent-gold); display: inline;
+  display: inline;
+  background: linear-gradient(180deg, transparent 50%, rgba(200, 149, 108, 0.35) 50%);
+  padding: 0 4px;
 }
 .landing-subtitle {
-  font-size: 16px; color: var(--text-body); line-height: 1.6;
-  margin-bottom: 36px; max-width: 440px;
+  font-size: 17px; color: var(--text-body); line-height: 1.6;
+  margin-bottom: 40px; max-width: 440px;
 }
 
 /* Features */
-.landing-features { display: flex; flex-direction: column; gap: 16px; }
+.landing-features { display: flex; flex-direction: column; gap: 14px; }
 .landing-feature {
-  display: flex; align-items: flex-start; gap: 12px;
+  display: flex; align-items: flex-start; gap: 10px;
 }
-.landing-feature-icon { font-size: 20px; flex-shrink: 0; margin-top: 2px; }
-.landing-feature-title { font-size: 14px; font-weight: 700; color: var(--text-dark); margin-bottom: 2px; }
+.landing-feature-icon { font-size: 18px; flex-shrink: 0; margin-top: 1px; }
+.landing-feature-title { font-size: 14px; font-weight: 700; color: var(--text-dark); margin-bottom: 1px; }
 .landing-feature-desc { font-size: 13px; color: var(--text-muted); line-height: 1.4; }
 
 /* Join card */
@@ -113,12 +116,12 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
 }
 
 .landing-join-btn {
-  width: 100%; padding: 12px; background: var(--text-dark); color: white;
-  border-radius: var(--radius-sm); font-size: 15px; font-weight: 600;
+  width: 100%; padding: 14px; background: var(--text-dark); color: white;
+  border-radius: var(--radius-pill); font-size: 16px; font-weight: 700;
   cursor: pointer; transition: transform 0.15s, box-shadow 0.15s;
-  margin-top: 8px;
+  margin-top: 12px; letter-spacing: 0.02em;
 }
-.landing-join-btn:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
+.landing-join-btn:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(0,0,0,0.18); }
 .landing-join-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 
 @media (max-width: 768px) {

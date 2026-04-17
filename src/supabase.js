@@ -15,6 +15,7 @@ export const supabase = createClient(url || 'http://placeholder', anonKey || 'pl
     autoRefreshToken: true,
     persistSession: true,
     detectSessionInUrl: true,
+    flowType: 'implicit',
   },
   realtime: { params: { eventsPerSecond: 10 } },
 });

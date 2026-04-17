@@ -28,10 +28,24 @@ export default function AuthGate({ children, onJoin, workshopCode }) {
     return unsub;
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
+  const [sendingLink, setSendingLink] = useState(false);
+  const [linkError, setLinkError] = useState('');
+
   async function handleMagicLink() {
     if (!adminEmail.trim()) return;
-    const { error } = await sb.signInWithMagicLink(adminEmail.trim());
-    if (!error) setMagicLinkSent(true);
+    setSendingLink(true);
+    setLinkError('');
+    try {
+      const { error } = await sb.signInWithMagicLink(adminEmail.trim());
+      if (error) {
+        setLinkError(error.message || 'Failed to send login link');
+      } else {
+        setMagicLinkSent(true);
+      }
+    } catch (e) {
+      setLinkError(e.message || 'Something went wrong');
+    }
+    setSendingLink(false);
   }
 
   // Loading
@@ -105,8 +119,9 @@ export default function AuthGate({ children, onJoin, workshopCode }) {
                           autoFocus
                         />
                       </div>
-                      <button className="landing-join-btn" onClick={handleMagicLink} disabled={!adminEmail.trim()}>
-                        Send Login Link
+                      {linkError && <div className="landing-error">{linkError}</div>}
+                      <button className="landing-join-btn" onClick={handleMagicLink} disabled={!adminEmail.trim() || sendingLink}>
+                        {sendingLink ? 'Sending...' : 'Send Login Link'}
                       </button>
                       <div className="landing-admin-link" onClick={() => setShowAdminLogin(false)}>
                         Back to participant login

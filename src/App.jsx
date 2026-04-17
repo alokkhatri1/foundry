@@ -973,10 +973,7 @@ Be concise. Confirm actions after completing them.${knowledgeSection}`;
           <button className={`tab-nav-item${activeTab === 'coworkers' ? ' active' : ''}`} onClick={() => setActiveTab('coworkers')}>
             Coworkers{coworkers && coworkers.length > 0 && <span className="tab-count">{coworkers.length}</span>}
           </button>
-          <button className={`tab-nav-item${activeTab === 'tools' ? ' active' : ''}`} onClick={() => setActiveTab('tools')}>
-            Tools{tools && tools.filter(t => !t.isPrebuilt && t.type === 'connect').length > 0 && <span className="tab-count">{tools.filter(t => !t.isPrebuilt && t.type === 'connect').length}</span>}
-          </button>
-          <button className={`tab-nav-item${activeTab === 'workflow' ? ' active' : ''}`} onClick={() => { setActiveTab('workflow'); setWorkflowBadge(false); }}>
+<button className={`tab-nav-item${activeTab === 'workflow' ? ' active' : ''}`} onClick={() => { setActiveTab('workflow'); setWorkflowBadge(false); }}>
             Workflow{hasActiveRuns && <span className="tab-running-dot" />}
           </button>
           <button className={`tab-nav-item${activeTab === 'activity' ? ' active' : ''}`} onClick={() => setActiveTab('activity')}>
@@ -1038,12 +1035,7 @@ Be concise. Confirm actions after completing them.${knowledgeSection}`;
             />
           </div>
         )}
-        {activeTab === 'tools' && (
-          <div className="tab-pane tab-pane-tools">
-            <ToolBuilder tools={tools || []} onUpdateTools={handleUpdateTools} fileTree={fileTree} callClaudeAPI={callClaudeAPI} showEducationalCues={showEducationalCues} />
-          </div>
-        )}
-        {activeTab === 'coworkers' && (
+{activeTab === 'coworkers' && (
           <div className="tab-pane tab-pane-coworkers">
             <CoworkerBuilder coworkers={coworkers || []} onUpdateCoworkers={handleUpdateCoworkers} fileTree={fileTree} tools={tools || []} userName={userName} callClaudeAPI={callClaudeAPI} showEducationalCues={showEducationalCues} />
           </div>

@@ -51,7 +51,7 @@ export default function useSupabase() {
 
   const checkIsAdmin = useCallback(async (userId) => {
     if (!isSupabaseConfigured || !userId) return false;
-    const { data } = await supabase.from('admins').select('id').eq('id', userId).single();
+    const { data } = await supabase.from('admins').select('id').eq('id', userId).maybeSingle();
     return !!data;
   }, []);
 

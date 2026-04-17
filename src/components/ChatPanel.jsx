@@ -584,7 +584,10 @@ export default function ChatPanel({ messages, onSendMessage, onApprovalAction, o
             {activeCoworker && (
               <div className="cl-agent-banner">
                 <span className="cl-agent-banner-avatar" style={{ background: activeCoworker.color || '#4a7fb5' }}><CoworkerGlyph avatar={activeCoworker.avatar} size={18} color="#ffffff" /></span>
-                <span className="cl-agent-banner-name">{activeCoworker.name}</span>
+                <div className="cl-agent-banner-info">
+                  <span className="cl-agent-banner-name">{activeCoworker.name}</span>
+                  {activeCoworker.role && <span className="cl-agent-banner-bio">{activeCoworker.role.length > 80 ? activeCoworker.role.slice(0, 80) + '...' : activeCoworker.role}</span>}
+                </div>
                 <button className="cl-agent-banner-close" onClick={() => setActiveCoworkerId(null)}>{'\u2715'}</button>
               </div>
             )}

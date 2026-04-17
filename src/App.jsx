@@ -436,6 +436,7 @@ function App() {
 
   function handleLeave() {
     sb.leavePresence();
+    sb.signOut();
     localStorage.removeItem(STORAGE_KEY);
     localStorage.removeItem('sandbox:conversations');
     setIsJoined(false);

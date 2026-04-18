@@ -607,6 +607,7 @@ function App() {
 
   function handleCoworkerChange(cwId) {
     if (!cwId) return;
+    setActiveDm(null);
     setConversations(prev => {
       const existing = prev.find(c => c.coworkerId === cwId);
       if (existing) {

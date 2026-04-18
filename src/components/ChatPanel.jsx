@@ -1,5 +1,4 @@
 import { useState, useRef, useEffect, useMemo } from 'react';
-import DirectMessageThread from './DirectMessageThread';
 import { parseFile, getFileCategory, getFileIcon } from '../utils/fileParser';
 import ToolExecutionCard from './ToolExecutionCard';
 import EducationalCue from './EducationalCue';
@@ -410,6 +409,7 @@ export default function ChatPanel({ messages, onSendMessage, onApprovalAction, o
   const [activeCoworkerId, setActiveCoworkerId] = useState(null);
   const [attachedFiles, setAttachedFiles] = useState([]);
   const [parsingFiles, setParsingFiles] = useState(false);
+  const [dmMessages, setDmMessages] = useState([]);
   const messagesRef = useRef(null);
   const greeting = useMemo(() => {
     const firstName = (currentUserName || '').split(' ')[0] || 'there';
@@ -441,11 +441,44 @@ export default function ChatPanel({ messages, onSendMessage, onApprovalAction, o
 
   useEffect(() => {
     if (messagesRef.current) messagesRef.current.scrollTop = messagesRef.current.scrollHeight;
-  }, [messages.length]);
+  }, [messages.length, dmMessages.length]);
 
-  function handleSend() {
+  // When entering DM mode: clear AI-side selections so the UI stays simple.
+  useEffect(() => {
+    if (activeDm) {
+      setActiveCoworkerId(null);
+      setAttachedFiles([]);
+      setSelectedFileIds([]);
+    }
+  }, [activeDm]);
+
+  // Load and subscribe to DM messages when a DM is active.
+  useEffect(() => {
+    if (!activeDm?.id || !myParticipantId) { setDmMessages([]); return; }
+    let cancelled = false;
+    sb.fetchDmThread(myParticipantId, activeDm.id).then(initial => {
+      if (!cancelled) setDmMessages(initial);
+    });
+    const unsub = sb.subscribeToDms(myParticipantId, (dm) => {
+      const belongs = (dm.from_participant_id === activeDm.id && dm.to_participant_id === myParticipantId)
+                    || (dm.from_participant_id === myParticipantId && dm.to_participant_id === activeDm.id);
+      if (belongs) setDmMessages(prev => prev.some(m => m.id === dm.id) ? prev : [...prev, dm]);
+    });
+    return () => { cancelled = true; unsub(); };
+  }, [sb, myParticipantId, activeDm?.id]);
+
+  async function handleSend() {
     if ((!input.trim() && attachedFiles.length === 0) || isLoading || parsingFiles) return;
     const text = input.trim() || (attachedFiles.length > 0 ? `Analyze the attached file${attachedFiles.length > 1 ? 's' : ''}.` : '');
+    if (activeDm) {
+      if (!myParticipantId) return;
+      const result = await sb.sendDm(myParticipantId, activeDm.id, text);
+      if (result?.data) {
+        setDmMessages(prev => prev.some(m => m.id === result.data.id) ? prev : [...prev, result.data]);
+        setInput('');
+      }
+      return;
+    }
     onSendMessage(text, selectedFileIds, activeCoworkerId, attachedFiles);
     setInput('');
     setAttachedFiles([]);
@@ -505,6 +538,7 @@ export default function ChatPanel({ messages, onSendMessage, onApprovalAction, o
   function renderInputArea() {
     const placeholder = isLoading ? 'Thinking...'
       : parsingFiles ? 'Reading files...'
+      : activeDm ? `Message ${activeDm.name}...`
       : activeCoworker ? `Ask ${activeCoworker.name}...`
       : 'How can I help you today?';
 
@@ -512,27 +546,29 @@ export default function ChatPanel({ messages, onSendMessage, onApprovalAction, o
       <div className="cl-input-area">
         <input type="file" ref={fileInputRef} style={{ display: 'none' }} multiple onChange={handleFileSelect}
           accept=".pdf,.doc,.docx,.xls,.xlsx,.csv,.txt,.md,.json,.png,.jpg,.jpeg,.gif,.webp" />
-        <div className="cl-input-row">
-          <div className="cl-context-info">
-            {activeCoworker
-              ? <span className="cl-context-active"><CoworkerGlyph avatar={activeCoworker.avatar} size={14} color="currentColor" /> Talking to {activeCoworker.name}</span>
-              : activeContextCount > 0
-                ? <div className="cl-context-files-list">
-                    {selectedFileIds.map(id => {
-                      const node = findNode(fileTree, id);
-                      if (!node) return null;
-                      return (
-                        <span key={id} className="cl-context-file-chip">
-                          <span className="cl-context-file-chip-name">{node.name.replace(/\.md$/, '')}</span>
-                          <button className="cl-context-file-chip-remove" onClick={() => handleToggleFile(id)}>{'\u2715'}</button>
-                        </span>
-                      );
-                    })}
-                  </div>
-                : <span className="cl-context-none">No context selected</span>
-            }
+        {!activeDm && (
+          <div className="cl-input-row">
+            <div className="cl-context-info">
+              {activeCoworker
+                ? <span className="cl-context-active"><CoworkerGlyph avatar={activeCoworker.avatar} size={14} color="currentColor" /> Talking to {activeCoworker.name}</span>
+                : activeContextCount > 0
+                  ? <div className="cl-context-files-list">
+                      {selectedFileIds.map(id => {
+                        const node = findNode(fileTree, id);
+                        if (!node) return null;
+                        return (
+                          <span key={id} className="cl-context-file-chip">
+                            <span className="cl-context-file-chip-name">{node.name.replace(/\.md$/, '')}</span>
+                            <button className="cl-context-file-chip-remove" onClick={() => handleToggleFile(id)}>{'\u2715'}</button>
+                          </span>
+                        );
+                      })}
+                    </div>
+                  : <span className="cl-context-none">No context selected</span>
+              }
+            </div>
           </div>
-        </div>
+        )}
         {attachedFiles.length > 0 && (
           <div className="cl-attached-files">
             <EducationalCue cueId="chat-attachment" show={showEducationalCues} />
@@ -546,9 +582,11 @@ export default function ChatPanel({ messages, onSendMessage, onApprovalAction, o
           </div>
         )}
         <div className="cl-input-box">
-          <button className="cl-attach-btn" onClick={() => fileInputRef.current?.click()} disabled={isLoading || parsingFiles} title="Attach file">
-            <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M15.75 8.49L9.12 15.12C7.56 16.68 5.04 16.68 3.48 15.12C1.92 13.56 1.92 11.04 3.48 9.48L10.11 2.85C11.1 1.86 12.72 1.86 13.71 2.85C14.7 3.84 14.7 5.46 13.71 6.45L7.78 12.38C7.29 12.87 6.48 12.87 5.99 12.38C5.5 11.89 5.5 11.08 5.99 10.59L11.22 5.36" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
-          </button>
+          {!activeDm && (
+            <button className="cl-attach-btn" onClick={() => fileInputRef.current?.click()} disabled={isLoading || parsingFiles} title="Attach file">
+              <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M15.75 8.49L9.12 15.12C7.56 16.68 5.04 16.68 3.48 15.12C1.92 13.56 1.92 11.04 3.48 9.48L10.11 2.85C11.1 1.86 12.72 1.86 13.71 2.85C14.7 3.84 14.7 5.46 13.71 6.45L7.78 12.38C7.29 12.87 6.48 12.87 5.99 12.38C5.5 11.89 5.5 11.08 5.99 10.59L11.22 5.36" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
+            </button>
+          )}
           <textarea className="cl-input" placeholder={placeholder} value={input} onChange={e => setInput(e.target.value)}
             onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
             disabled={isLoading || parsingFiles} rows={1} />
@@ -597,17 +635,56 @@ export default function ChatPanel({ messages, onSendMessage, onApprovalAction, o
         />
       )}
 
-      {/* Right: DM thread or chat */}
-      {activeDm ? (
-        <DirectMessageThread
-          myParticipantId={myParticipantId}
-          otherParticipant={activeDm}
-          sb={sb}
-          onBack={onCloseDm}
-        />
-      ) : (
+      {/* Right: main chat area — one interface; context swaps via banner */}
       <div className="cl-chat-main">
-        {isEmpty ? (
+        {(activeDm || activeCoworker) && (
+          <div className="cl-agent-banner">
+            {activeDm ? (
+              <>
+                <span className="cl-agent-banner-avatar" style={{ background: activeDm.color || '#888', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 600, fontSize: 13 }}>
+                  {activeDm.name?.charAt(0)?.toUpperCase() || '?'}
+                </span>
+                <div className="cl-agent-banner-info">
+                  <span className="cl-agent-banner-name">Talking to {activeDm.name}</span>
+                </div>
+                <button className="cl-agent-banner-close" onClick={onCloseDm}>{'\u2715'}</button>
+              </>
+            ) : (
+              <>
+                <span className="cl-agent-banner-avatar" style={{ background: activeCoworker.color || '#4a7fb5' }}>
+                  <CoworkerGlyph avatar={activeCoworker.avatar} size={18} color="#ffffff" />
+                </span>
+                <div className="cl-agent-banner-info">
+                  <span className="cl-agent-banner-name">Talking to {activeCoworker.name}</span>
+                </div>
+                <button className="cl-agent-banner-close" onClick={() => { setActiveCoworkerId(null); if (onCoworkerChange) onCoworkerChange(null); }}>{'\u2715'}</button>
+              </>
+            )}
+          </div>
+        )}
+
+        {activeDm ? (
+          <>
+            <div className="cl-messages" ref={messagesRef}>
+              <div className="cl-messages-inner">
+                {dmMessages.length === 0 ? (
+                  <div className="dm-empty">No messages yet. Send the first one.</div>
+                ) : (
+                  dmMessages.map(m => {
+                    const isMine = m.from_participant_id === myParticipantId;
+                    return (
+                      <div key={m.id} className={`dm-message${isMine ? ' mine' : ''}`}>
+                        <div className="dm-bubble">{m.content}</div>
+                        <div className="dm-time">{new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </div>
+            {renderInputArea()}
+          </>
+        ) : isEmpty ? (
           <div className="cl-center-layout">
             <div className="cl-welcome">
               <h2 className="cl-welcome-greeting">{greeting}</h2>
@@ -616,15 +693,6 @@ export default function ChatPanel({ messages, onSendMessage, onApprovalAction, o
           </div>
         ) : (
           <>
-            {activeCoworker && (
-              <div className="cl-agent-banner">
-                <span className="cl-agent-banner-avatar" style={{ background: activeCoworker.color || '#4a7fb5' }}><CoworkerGlyph avatar={activeCoworker.avatar} size={18} color="#ffffff" /></span>
-                <div className="cl-agent-banner-info">
-                  <span className="cl-agent-banner-name">{activeCoworker.name}</span>
-                </div>
-                <button className="cl-agent-banner-close" onClick={() => setActiveCoworkerId(null)}>{'\u2715'}</button>
-              </div>
-            )}
             <div className="cl-messages" ref={messagesRef}>
               <div className="cl-messages-inner">
                 {messages.map((msg, i) => (
@@ -636,7 +704,6 @@ export default function ChatPanel({ messages, onSendMessage, onApprovalAction, o
           </>
         )}
       </div>
-      )}
     </div>
   );
 }

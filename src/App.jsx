@@ -8,6 +8,7 @@ import CoworkerBuilder from './components/CoworkerBuilder';
 import ChatPanel from './components/ChatPanel';
 import ActivityDashboard from './components/ActivityDashboard';
 import RevealAt, { STAGE_META, stageReached } from './components/RevealAt';
+import { buildStageGuidance } from './data/stageGuidance';
 import PreferencesEditor from './components/PreferencesEditor';
 import {
   createStarterFolders,
@@ -1135,10 +1136,15 @@ function App() {
         ? `## About the user\n${userPreferences.trim()}\n\n---\n\n`
         : '';
 
+      // Stage guidance — only on the first AI reply in this conversation.
+      const priorAiMessages = (messages || []).filter(m => m.type === 'direct-response' || m.type === 'agent');
+      const isFirstExchange = priorAiMessages.length === 0;
+      const stageGuidanceSection = isFirstExchange ? buildStageGuidance(currentStage) + '\n\n---\n\n' : '';
+
       if (!stageReached(currentStage, '5a')) {
         // Pre-Stage-5a: simple chat mode. No platform features described, no
         // platform-action tools attached. Just conversational AI.
-        const chatPrompt = `${userPrefsForPlatform}You are a helpful assistant. Have a conversation with the user. Be concise, warm, and helpful. Do not describe platform features, coworkers, files, workflows, or tools unless the user explicitly asks about them.${knowledgeSection}`;
+        const chatPrompt = `${userPrefsForPlatform}${stageGuidanceSection}You are a helpful assistant. Have a conversation with the user. Be concise, warm, and helpful. Do not describe platform features, coworkers, files, workflows, or tools unless the user explicitly asks about them.${knowledgeSection}`;
         const result = await callClaudeAPI(chatPrompt, userMessage);
         updateActiveMessages(prev => prev.filter(m => m.id !== loadingId));
         setIsLoading(false);
@@ -1149,7 +1155,7 @@ function App() {
         }
       } else {
         // Stage 5a+: platform assistant with full tool access
-        const platformSystemPrompt = `${userPrefsForPlatform}You are the Foundry platform assistant for ${orgName}. You help users build and manage their AI coworker platform through natural language.
+        const platformSystemPrompt = `${userPrefsForPlatform}${stageGuidanceSection}You are the Foundry platform assistant for ${orgName}. You help users build and manage their AI coworker platform through natural language.
 
 The platform has these elements:
 - **Files**: Knowledge documents (policies, rules, reference) and instruction files (AI coworker behavior). Organized in department folders.

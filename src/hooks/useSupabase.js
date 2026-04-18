@@ -314,7 +314,10 @@ export default function useSupabase() {
 
   const subscribeToDms = useCallback((myParticipantId, onNewMessage) => {
     if (!isSupabaseConfigured || !roomIdRef.current) return () => {};
-    const channel = supabase.channel(`dms:${roomIdRef.current}:${myParticipantId}`)
+    // Unique suffix so multiple subscribers (App-level notifications + DM thread)
+    // don't collide on the same Supabase channel name and throw on .on() after .subscribe().
+    const uniq = Math.random().toString(36).slice(2, 10);
+    const channel = supabase.channel(`dms:${roomIdRef.current}:${myParticipantId}:${uniq}`)
       .on('postgres_changes', {
         event: 'INSERT',
         schema: 'public',

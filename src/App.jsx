@@ -7,7 +7,7 @@ import WorkflowBuilder from './components/WorkflowBuilder';
 import CoworkerBuilder from './components/CoworkerBuilder';
 import ChatPanel from './components/ChatPanel';
 import ActivityDashboard from './components/ActivityDashboard';
-import RevealAt from './components/RevealAt';
+import RevealAt, { STAGE_META } from './components/RevealAt';
 import PreferencesEditor from './components/PreferencesEditor';
 import {
   createStarterFolders,
@@ -221,11 +221,24 @@ function App() {
   const [currentStage, setCurrentStage] = useState('6');
   const [userPreferences, setUserPreferences] = useState('');
   const [showPreferences, setShowPreferences] = useState(false);
+  const [justRevealed, setJustRevealed] = useState(null);
+  const previousStageRef = useRef(null);
   const [myParticipantId, setMyParticipantId] = useState(null);
   const [activeDm, setActiveDm] = useState(null);
   const [unreadDmCounts, setUnreadDmCounts] = useState({});
   const activeDmRef = useRef(activeDm);
   useEffect(() => { activeDmRef.current = activeDm; }, [activeDm]);
+
+  // Detect live stage reveals — show banner only when stage CHANGES after initial load.
+  useEffect(() => {
+    const prev = previousStageRef.current;
+    previousStageRef.current = currentStage;
+    if (prev !== null && prev !== currentStage) {
+      setJustRevealed(currentStage);
+      const timer = setTimeout(() => setJustRevealed(null), 10000);
+      return () => clearTimeout(timer);
+    }
+  }, [currentStage]);
 
   const approvalResolversRef = useRef(new Map());
   const activeTabRef = useRef(activeTab);
@@ -1176,12 +1189,37 @@ Be concise. Confirm actions after completing them.${knowledgeSection}`;
   const hasActiveRuns = activeRuns.length > 0;
 
   if (workshopEnded) {
+    const totalMessages = (conversations || []).reduce((sum, c) => sum + (c.messages?.length || 0), 0);
+    const filesCount = (flatFiles || []).filter(f => f.type === 'file').length;
+    const coworkersCount = (coworkers || []).length;
+    const runsCount = (workflowRuns || []).length;
     return (
       <div className="landing">
         <div className="landing-content" style={{ flexDirection: 'column', alignItems: 'center', gap: 24, textAlign: 'center', paddingTop: 80 }}>
-          <h1 className="landing-title">This workshop has ended</h1>
+          <h1 className="landing-title">Thanks for participating</h1>
           <p className="landing-subtitle" style={{ maxWidth: 480 }}>
-            Thanks for participating. All your work is preserved in the workshop archive.
+            Your journey in this workshop:
+          </p>
+          <div className="journey-stats">
+            <div className="journey-stat">
+              <div className="journey-stat-num">{totalMessages}</div>
+              <div className="journey-stat-label">messages</div>
+            </div>
+            <div className="journey-stat">
+              <div className="journey-stat-num">{filesCount}</div>
+              <div className="journey-stat-label">files</div>
+            </div>
+            <div className="journey-stat">
+              <div className="journey-stat-num">{coworkersCount}</div>
+              <div className="journey-stat-label">coworkers</div>
+            </div>
+            <div className="journey-stat">
+              <div className="journey-stat-num">{runsCount}</div>
+              <div className="journey-stat-label">workflow runs</div>
+            </div>
+          </div>
+          <p className="landing-subtitle" style={{ maxWidth: 480, opacity: 0.8, fontSize: 14 }}>
+            All your work is preserved in the workshop archive.
           </p>
           <button className="landing-join-btn" style={{ width: 'auto', padding: '12px 32px' }} onClick={() => {
             try { localStorage.removeItem('sandbox:state'); } catch {}
@@ -1200,6 +1238,12 @@ Be concise. Confirm actions after completing them.${knowledgeSection}`;
   return (
     <AuthGate onJoin={handleJoin} workshopCode={isJoined ? workshopCode : null}>
     <div className="app-shell">
+      {justRevealed && (
+        <div className="reveal-banner" role="status">
+          <span>New capability unlocked: <strong>{STAGE_META[justRevealed]?.label || justRevealed}</strong></span>
+          <button className="reveal-banner-dismiss" onClick={() => setJustRevealed(null)} aria-label="Dismiss">{'\u00D7'}</button>
+        </div>
+      )}
       <header className="app-header">
         <div className="app-header-left" onClick={() => { setActiveTab('chat'); setChatBadge(false); }} style={{ cursor: 'pointer' }}>
           <span className="app-logo">S</span>

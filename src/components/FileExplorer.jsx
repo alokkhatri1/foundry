@@ -171,10 +171,7 @@ export default function FileExplorer({ fileTree, selectedFileId, onSelectFile, o
         id: genId(),
         name: newName.trim(),
         type: 'folder',
-        children: [
-          { id: genId(), name: 'knowledge', type: 'folder', children: [] },
-          { id: genId(), name: 'instructions', type: 'folder', children: [] },
-        ],
+        children: [],
       });
     } else {
       const fileName = newName.trim().endsWith('.md') ? newName.trim() : newName.trim() + '.md';

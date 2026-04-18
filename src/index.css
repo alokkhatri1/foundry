@@ -4003,6 +4003,21 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
 .dm-back-btn:hover {
   background: rgba(0, 0, 0, 0.05);
 }
+.dm-header-close {
+  margin-left: auto;
+  background: none;
+  border: none;
+  font-size: 14px;
+  cursor: pointer;
+  color: var(--text-muted, #888);
+  padding: 6px 10px;
+  border-radius: 6px;
+  transition: background 0.15s, color 0.15s;
+}
+.dm-header-close:hover {
+  background: rgba(0, 0, 0, 0.05);
+  color: var(--text-body);
+}
 .dm-header-avatar {
   width: 32px;
   height: 32px;

@@ -605,6 +605,29 @@ function App() {
     setChatBadge(false);
   }
 
+  function handleCoworkerChange(cwId) {
+    if (!cwId) return;
+    setConversations(prev => {
+      const existing = prev.find(c => c.coworkerId === cwId);
+      if (existing) {
+        setActiveConvoId(existing.id);
+        return prev;
+      }
+      const coworker = (coworkers || []).find(c => c.id === cwId);
+      const newConvo = {
+        id: 'convo-' + Date.now() + '-' + Math.random().toString(36).slice(2, 5),
+        title: coworker?.name || 'Chat',
+        coworkerId: cwId,
+        createdAt: Date.now(),
+        messages: [],
+      };
+      setActiveConvoId(newConvo.id);
+      const updated = [...prev, newConvo];
+      persistConversations(updated);
+      return updated;
+    });
+  }
+
   function handleSelectConvo(convoId) {
     setActiveConvoId(convoId);
     setActiveTab('chat');
@@ -1229,6 +1252,7 @@ Be concise. Confirm actions after completing them.${knowledgeSection}`;
               onNewChat={handleNewChat}
               onSelectConvo={handleSelectConvo}
               onDeleteConvo={handleDeleteConvo}
+              onCoworkerChange={handleCoworkerChange}
               activeDm={activeDm}
               onOpenDm={handleOpenDm}
               onCloseDm={handleCloseDm}

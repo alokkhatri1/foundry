@@ -403,7 +403,7 @@ function InlineEditor({ file, onUpdateContent, onClose }) {
 }
 
 // ===== Main ChatPanel =====
-export default function ChatPanel({ messages, onSendMessage, onApprovalAction, onRetry, isLoading, participants, currentUserName, fileTree, onUpdateFileContent, coworkers, showEducationalCues, conversations, activeConvoId, onNewChat, onSelectConvo, onDeleteConvo, activeDm, onOpenDm, onCloseDm, myParticipantId, sb, unreadDmCounts }) {
+export default function ChatPanel({ messages, onSendMessage, onApprovalAction, onRetry, isLoading, participants, currentUserName, fileTree, onUpdateFileContent, coworkers, showEducationalCues, conversations, activeConvoId, onNewChat, onSelectConvo, onDeleteConvo, onCoworkerChange, activeDm, onOpenDm, onCloseDm, myParticipantId, sb, unreadDmCounts }) {
   const [input, setInput] = useState('');
   const [selectedFileIds, setSelectedFileIds] = useState([]);
   const [editingFileId, setEditingFileId] = useState(null);
@@ -474,7 +474,9 @@ export default function ChatPanel({ messages, onSendMessage, onApprovalAction, o
   }
 
   function handleSelectCoworker(cwId) {
-    setActiveCoworkerId(activeCoworkerId === cwId ? null : cwId);
+    const newId = activeCoworkerId === cwId ? null : cwId;
+    setActiveCoworkerId(newId);
+    if (onCoworkerChange) onCoworkerChange(newId);
   }
 
   function handleToggleFile(fileId) {
@@ -619,7 +621,6 @@ export default function ChatPanel({ messages, onSendMessage, onApprovalAction, o
                 <span className="cl-agent-banner-avatar" style={{ background: activeCoworker.color || '#4a7fb5' }}><CoworkerGlyph avatar={activeCoworker.avatar} size={18} color="#ffffff" /></span>
                 <div className="cl-agent-banner-info">
                   <span className="cl-agent-banner-name">{activeCoworker.name}</span>
-                  {activeCoworker.role && <span className="cl-agent-banner-bio">{activeCoworker.role.length > 80 ? activeCoworker.role.slice(0, 80) + '...' : activeCoworker.role}</span>}
                 </div>
                 <button className="cl-agent-banner-close" onClick={() => setActiveCoworkerId(null)}>{'\u2715'}</button>
               </div>

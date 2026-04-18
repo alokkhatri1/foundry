@@ -62,11 +62,11 @@ export default function DirectMessageThread({ myParticipantId, otherParticipant,
   return (
     <div className="dm-thread">
       <div className="dm-header">
-        <button className="dm-back-btn" onClick={onBack} aria-label="Back">{'\u2190'}</button>
         <div className="dm-header-avatar" style={{ background: otherParticipant?.color || '#888' }}>
           {otherParticipant?.name?.charAt(0)?.toUpperCase() || '?'}
         </div>
         <span className="dm-header-name">{otherParticipant?.name || 'Direct message'}</span>
+        <button className="dm-header-close" onClick={onBack} aria-label="Close">{'\u2715'}</button>
       </div>
       <div className="dm-messages">
         {messages.length === 0 ? (

@@ -225,12 +225,32 @@ export default function useSupabase() {
     const row = { room_id: roomIdRef.current, name, color, online: true, last_seen_at: new Date().toISOString() };
     if (authUserId) row.auth_user_id = authUserId;
     if (email) row.email = email;
+
+    const conflictKey = email ? 'room_id,email' : 'room_id,name';
     const { data, error } = await supabase.from('participants').upsert(
       row,
-      { onConflict: email ? 'room_id,email' : 'room_id,name' }
+      { onConflict: conflictKey }
     ).select('id, name, color, email').single();
-    if (error) { console.error('[sb] upsertParticipant:', error.message); return null; }
-    return data;
+
+    if (!error && data) return data;
+
+    // Upsert failed — log and try to recover by fetching existing row.
+    console.error('[sb] upsertParticipant upsert failed:', error?.message || 'no data', 'conflictKey=' + conflictKey);
+
+    // Recovery path: look up by email (preferred) or name within the room.
+    let q = supabase.from('participants').select('id, name, color, email').eq('room_id', roomIdRef.current);
+    q = email ? q.eq('email', email) : q.eq('name', name);
+    const lookup = await q.maybeSingle();
+    if (lookup.error) {
+      console.error('[sb] upsertParticipant lookup failed:', lookup.error.message);
+      return null;
+    }
+    if (lookup.data) return lookup.data;
+
+    // Final fallback: plain insert without conflict handling.
+    const insert = await supabase.from('participants').insert(row).select('id, name, color, email').single();
+    if (insert.error) { console.error('[sb] upsertParticipant insert fallback failed:', insert.error.message); return null; }
+    return insert.data;
   }, []);
 
   const loadParticipants = useCallback(async () => {
@@ -254,7 +274,12 @@ export default function useSupabase() {
 
   // ===== Direct messages =====
   const sendDm = useCallback(async (fromParticipantId, toParticipantId, content) => {
-    if (!isSupabaseConfigured || !roomIdRef.current) return null;
+    if (!isSupabaseConfigured || !roomIdRef.current) {
+      console.error('[sb] sendDm aborted: supabase not configured or no room');
+      return null;
+    }
+    if (!fromParticipantId) { console.error('[sb] sendDm aborted: missing fromParticipantId (myParticipantId is null)'); return null; }
+    if (!toParticipantId) { console.error('[sb] sendDm aborted: missing toParticipantId'); return null; }
     const { data, error } = await supabase.from('direct_messages').insert({
       room_id: roomIdRef.current,
       from_participant_id: fromParticipantId,

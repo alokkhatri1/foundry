@@ -10,6 +10,7 @@ import ActivityDashboard from './components/ActivityDashboard';
 import RevealAt, { STAGE_META, stageReached } from './components/RevealAt';
 import { buildStageGuidance } from './data/stageGuidance';
 import PreferencesEditor from './components/PreferencesEditor';
+import RoleCapture from './components/RoleCapture';
 import {
   createStarterFolders,
   createStarterWorkflow,
@@ -199,7 +200,7 @@ function App() {
   const [workflowRuns, setWorkflowRuns] = useState(saved?.workflowRuns || []);
   const [networkError, setNetworkError] = useState(false);
   const [activeTab, setActiveTab] = useState('chat');
-  const [showSettings, setShowSettings] = useState(false);
+  const [showExitConfirm, setShowExitConfirm] = useState(false);
   const [showEducationalCues, setShowEducationalCues] = useState(() => {
     try { const v = localStorage.getItem('sandbox:show-edu-cues'); return v === null ? true : v === 'true'; } catch { return true; }
   });
@@ -222,6 +223,8 @@ function App() {
   const [currentStage, setCurrentStage] = useState('6');
   const [userPreferences, setUserPreferences] = useState('');
   const [showPreferences, setShowPreferences] = useState(false);
+  const [userRole, setUserRole] = useState('');
+  const [showRoleCapture, setShowRoleCapture] = useState(false);
   const [justRevealed, setJustRevealed] = useState(null);
   const previousStageRef = useRef(null);
   const [myParticipantId, setMyParticipantId] = useState(null);
@@ -262,6 +265,9 @@ function App() {
         if (authUser?.id) {
           const prefs = await sb.loadUserPreferences(authUser.id);
           setUserPreferences(prefs);
+          const role = await sb.loadUserRole(authUser.id);
+          setUserRole(role);
+          if (!role) setShowRoleCapture(true);
         }
         if (result.current_stage) {
           if (stageReached(result.current_stage, '3')) await sb.ensureStageFolder(roomId, '3');
@@ -471,6 +477,9 @@ function App() {
     if (authUserId) {
       const prefs = await sb.loadUserPreferences(authUserId);
       setUserPreferences(prefs);
+      const role = await sb.loadUserRole(authUserId);
+      setUserRole(role);
+      if (!role) setShowRoleCapture(true);
     }
     sb.trackPresence(name, color, handlePresenceSync);
     startRealtimeSync();
@@ -1309,7 +1318,7 @@ Be concise. Confirm actions after completing them.${knowledgeSection}`;
           <RevealAt stage="2" currentStage={currentStage}>
             <button className="header-btn" onClick={() => setShowPreferences(true)}>Preferences</button>
           </RevealAt>
-          <button className="header-btn" onClick={() => setShowSettings(!showSettings)}>Settings</button>
+          <button className="header-btn" onClick={() => setShowExitConfirm(true)}>Exit Workshop</button>
         </div>
       </header>
 
@@ -1332,17 +1341,28 @@ Be concise. Confirm actions after completing them.${knowledgeSection}`;
         />
       )}
 
-      {showSettings && (
-        <div className="modal-overlay" onClick={() => setShowSettings(false)}>
+      {showRoleCapture && (
+        <RoleCapture
+          onSave={async (role) => {
+            const user = await sb.getUser();
+            if (user?.id) await sb.saveUserRole(user.id, role);
+            setUserRole(role);
+            setShowRoleCapture(false);
+          }}
+        />
+      )}
+
+      {showExitConfirm && (
+        <div className="modal-overlay" onClick={() => setShowExitConfirm(false)}>
           <div className="modal-box" onClick={e => e.stopPropagation()}>
-            <h3>Settings</h3>
-            <div style={{ fontSize: 14, color: 'var(--text-body)', marginBottom: 16 }}>
-              <span style={{ fontWeight: 600 }}>{userName}</span> in <span style={{ fontWeight: 600 }}>{orgName}</span>
+            <h3>Are you sure you want to exit the workshop?</h3>
+            <div style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 8 }}>
+              You can come back using the same email that you logged in with.
             </div>
 
             <div className="modal-actions" style={{ marginTop: 24 }}>
-              <button className="modal-btn cancel" onClick={() => setShowSettings(false)}>Close</button>
-              <button className="modal-btn danger" onClick={handleLeave}>Leave Workshop</button>
+              <button className="modal-btn cancel" onClick={() => setShowExitConfirm(false)}>Cancel</button>
+              <button className="modal-btn danger" onClick={handleLeave}>Exit Workshop</button>
             </div>
           </div>
         </div>

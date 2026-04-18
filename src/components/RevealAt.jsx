@@ -1,4 +1,4 @@
-const STAGE_ORDER = ['1', '2', '3', '4', '5a', '5b', '5c', '6'];
+const STAGE_ORDER = ['1', '2', '3', '4', '5a', '5b', '6'];
 
 export function stageReached(currentStage, targetStage) {
   if (!currentStage) return false;
@@ -15,14 +15,13 @@ export function nextStage(currentStage) {
 }
 
 export const STAGE_META = {
-  '1':  { label: 'Chat',                       description: 'The default conversation surface.' },
-  '2':  { label: 'Preferences',                description: 'Personal context: AI shaped to me.' },
-  '3':  { label: 'Files as context',           description: 'Knowledge the AI draws from.' },
-  '4':  { label: 'Files as skills',            description: 'Reusable instructions that shape AI behavior.' },
-  '5a': { label: 'Coworker L1',                description: 'Bundle skill + context + identity.' },
-  '5b': { label: 'Coworker L2 (tools)',        description: 'The coworker can act, not just explain.' },
-  '5c': { label: 'Coworker L3 (orchestrator)', description: 'Coworker calls other coworkers + humans.' },
-  '6':  { label: 'Workflow + humans-in-loop',  description: 'Choreograph AI + human teams.' },
+  '1':  { label: 'Chat',                description: 'AI conversation + human DMs.' },
+  '2':  { label: 'Preferences',         description: 'Personal context: the AI shaped to me.' },
+  '3':  { label: 'Files as context',    description: 'Knowledge the AI can draw from.' },
+  '4':  { label: 'Files as skills',     description: 'Instructions that shape how the AI responds.' },
+  '5a': { label: 'AI Coworkers',        description: 'Build named AI teammates with their own instructions + knowledge.' },
+  '5b': { label: 'Coworker Tools',      description: 'Give coworkers capabilities — research, DM humans, process documents.' },
+  '6':  { label: 'Strategic Delegation', description: 'Input a strategy; see how work redistributes across humans + AI. The closing act.' },
 };
 
 export { STAGE_ORDER };

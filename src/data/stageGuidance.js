@@ -34,15 +34,10 @@ const STAGE_GUIDES = {
     invitation: 'Invite them to add a tool to a coworker. This is the jump from assistant to agent.',
     externalReference: 'The shift from "GPT" to "agent" — the AI gains hands. In Liberating Structures terms, the AI is now a peer doing work, not just reflecting.',
   },
-  '5c': {
-    nowAvailable: 'Orchestrator Coworker — a coworker that can call other coworkers and DM humans. It coordinates work rather than just doing one thing.',
-    invitation: 'Invite them to promote a coworker to orchestrator mode. Heavy idea: the "manager" role becomes delegable.',
-    externalReference: 'This is the moment agentic AI meets Liberating Structures: the coordinator role that was previously human becomes distributable.',
-  },
   '6': {
-    nowAvailable: 'Workflows — they can author explicit step-by-step processes combining AI tasks, human approval gates, and system actions.',
-    invitation: 'Invite them to build a workflow with a human-in-loop step. They\'ll see DMs triggered by workflow steps and flow resumption on response.',
-    externalReference: 'This closes the arc: humans + AI as choreographed teammates. Workflow = deterministic DAG; Orchestrator coworker = agentic. Same primitive, two modes.',
+    nowAvailable: 'Strategic Delegation — they can input a strategic intent and see how the work redistributes across the humans in the room and the AI coworkers they\'ve built. The closing act of the workshop.',
+    invitation: 'Invite them to describe a strategic goal (theirs or their organization\'s). The platform will generate a before/after delegation map — what used to be all-human, what could become AI-assisted, what stays human. Encourage them to edit the map and see their own role shift.',
+    externalReference: 'This is the Delegation Dilemma made visible — the paper\'s thesis that agentic AI adoption is organizational redesign, not a technical upgrade. The map answers the three questions: who decides, how do we coordinate, how do we stay accountable.',
   },
 };
 

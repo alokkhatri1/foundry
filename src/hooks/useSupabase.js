@@ -348,6 +348,25 @@ export default function useSupabase() {
     if (error) console.error('[sb] saveUserPreferences:', error.message);
   }, []);
 
+  const loadUserRole = useCallback(async (authUserId) => {
+    if (!isSupabaseConfigured || !authUserId) return '';
+    const { data } = await supabase.from('user_preferences')
+      .select('role')
+      .eq('auth_user_id', authUserId)
+      .maybeSingle();
+    return data?.role || '';
+  }, []);
+
+  const saveUserRole = useCallback(async (authUserId, role) => {
+    if (!isSupabaseConfigured || !authUserId) return;
+    const { error } = await supabase.from('user_preferences').upsert({
+      auth_user_id: authUserId,
+      role,
+      updated_at: new Date().toISOString(),
+    }, { onConflict: 'auth_user_id' });
+    if (error) console.error('[sb] saveUserRole:', error.message);
+  }, []);
+
   // ===== Direct messages =====
   const sendDm = useCallback(async (fromParticipantId, toParticipantId, content) => {
     if (!isSupabaseConfigured || !roomIdRef.current) {
@@ -651,7 +670,7 @@ export default function useSupabase() {
     // Room
     joinRoom, getRoomId,
     upsertParticipant, loadParticipants, findParticipantIdByName, getParticipantById,
-    loadUserPreferences, saveUserPreferences,
+    loadUserPreferences, saveUserPreferences, loadUserRole, saveUserRole,
     sendDm, fetchDmThread, subscribeToDms,
     loadFiles, saveFile, deleteFile, saveFilesBatch,
     loadCoworkers, saveCoworker, deleteCoworker,

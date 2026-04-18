@@ -35,9 +35,19 @@ const STAGE_GUIDES = {
     externalReference: 'The shift from "GPT" to "agent" — the AI gains hands. In Liberating Structures terms, the AI is now a peer doing work, not just reflecting.',
   },
   '6': {
-    nowAvailable: 'Strategic Delegation — they can input a strategic intent and see how the work redistributes across the humans in the room and the AI coworkers they\'ve built. The closing act of the workshop.',
-    invitation: 'Invite them to describe a strategic goal (theirs or their organization\'s). The platform will generate a before/after delegation map — what used to be all-human, what could become AI-assisted, what stays human. Encourage them to edit the map and see their own role shift.',
-    externalReference: 'This is the Delegation Dilemma made visible — the paper\'s thesis that agentic AI adoption is organizational redesign, not a technical upgrade. The map answers the three questions: who decides, how do we coordinate, how do we stay accountable.',
+    nowAvailable: 'Delegation — a new tab where they can describe a piece of work and see two panels side-by-side: how it looks staffed by humans only (roles + skills) vs. a mixed team of humans and AI coworkers.',
+    invitation: 'Invite them to open the Delegation tab and describe a real piece of work from their job. The two-panel view makes the routine-vs-creative split visible — what becomes AI, what stays human.',
+    externalReference: 'This is the Delegation Dilemma made visible — agentic AI adoption is organizational redesign, not a technical upgrade. The heuristic: work that can live in a document + knowledge base can be an AI coworker; work that requires dynamic, creative thinking stays human.',
+  },
+  '7': {
+    nowAvailable: 'Orchestration — the Orchestration tab (formerly Workflow) lets them chain AI coworkers, human approvals, and system actions into a multi-step process with human-in-loop checks.',
+    invitation: 'Invite them to take one slice of the Delegation map they just built and make it real — wire coworkers into a sequence, add an approval step where a human signs off.',
+    externalReference: 'Same primitive as Temporal, n8n, or Zapier — but with AI coworkers as first-class steps and humans pausing the flow for review.',
+  },
+  '8': {
+    nowAvailable: 'Observability — the Observability tab (formerly Activity) shows every orchestration run, approval, and tool call on the record. The audit trail for a mixed team.',
+    invitation: 'Invite them to look at what\'s already happened in the workshop — the runs, the approvals they gave, the tools that fired. This is how a mixed team stays accountable.',
+    externalReference: 'Same role as Datadog, OpenTelemetry, or Grafana in a software system — but for a team of humans and agents working together.',
   },
 };
 

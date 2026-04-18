@@ -37,14 +37,14 @@ export default function ActivityLog({ logs, showEducationalCues }) {
     <div className="activity-log">
       <div className="activity-log-header">
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <span>Activity Log</span>
+          <span>Observability Log</span>
           <EducationalCue cueId="activity-audit-log" show={showEducationalCues} />
         </div>
         <span>{logs.length} entries</span>
       </div>
       <div className="activity-log-body" ref={bodyRef}>
         {logs.length === 0 && (
-          <div style={{ color: '#5a5048', padding: '8px 0' }}>No activity yet. Run a workflow or send a message.</div>
+          <div style={{ color: '#5a5048', padding: '8px 0' }}>Nothing to observe yet. Run an orchestration or send a message.</div>
         )}
         {logs.map((entry, i) => (
           <LogEntry key={i} entry={entry} />

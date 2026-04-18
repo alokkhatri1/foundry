@@ -309,12 +309,12 @@ function WorkflowEditor({ workflow, onUpdateWorkflow, fileTree, coworkers, tools
   return (
     <div className="workflow-builder">
       <div className="workflow-header-bar">
-        <button className="files-back-btn" onClick={onBack}>{'\u2190'} All Workflows</button>
+        <button className="files-back-btn" onClick={onBack}>{'\u2190'} All Orchestrations</button>
         <input
           className="workflow-name-input"
           value={workflow.name}
           onChange={e => onUpdateWorkflow({ ...workflow, name: e.target.value })}
-          placeholder="Workflow name..."
+          placeholder="Orchestration name..."
         />
         <button className="run-btn" onClick={() => setShowSubmit(true)} disabled={isRunning || workflow.steps.length === 0}>
           {isRunning ? 'Running...' : '\uD83D\uDCE5 Submit Case'}
@@ -428,7 +428,7 @@ function WorkflowEditor({ workflow, onUpdateWorkflow, fileTree, coworkers, tools
                   setSubmitFiles([]);
                 }}
               >
-                Submit & Run Workflow
+                Submit & Run Orchestration
               </button>
             </div>
           </div>
@@ -496,7 +496,7 @@ function WorkflowCard({ workflow, coworkers, participants, onSelect, onDelete, o
   return (
     <div className="wf-card" onClick={() => onSelect(workflow.id)}>
       <div className="wf-card-top">
-        <div className="wf-card-name">{workflow.name || 'Untitled Workflow'}</div>
+        <div className="wf-card-name">{workflow.name || 'Untitled Orchestration'}</div>
         {isRunning && <span className="wf-card-running">Running</span>}
       </div>
       {/* Mini flow preview */}
@@ -538,7 +538,7 @@ export default function WorkflowBuilder({ workflows, onUpdateWorkflows, fileTree
   }
 
   function handleCreateWorkflow() {
-    const newWf = { id: genWfId(), name: 'New Workflow', steps: [] };
+    const newWf = { id: genWfId(), name: 'New Orchestration', steps: [] };
     onUpdateWorkflows([...workflows, newWf]);
     setSelectedWorkflowId(newWf.id);
   }
@@ -586,18 +586,18 @@ export default function WorkflowBuilder({ workflows, onUpdateWorkflows, fileTree
       <div className="wf-list">
         <div className="wf-list-header">
           <div>
-            <h2 className="wf-list-title">Workflows</h2>
+            <h2 className="wf-list-title">Orchestrations</h2>
             <p className="wf-list-subtitle">Multi-step processes with AI coworkers, human approvals, and system actions.</p>
             <EducationalCue cueId="workflow-overview" show={showEducationalCues} />
           </div>
-          <button className="wf-create-btn" onClick={handleCreateWorkflow}>+ New Workflow</button>
+          <button className="wf-create-btn" onClick={handleCreateWorkflow}>+ New Orchestration</button>
         </div>
         <div className="wf-list-grid">
           {workflows.length === 0 && (
             <div className="wf-list-empty">
-              <p>No workflows yet.</p>
+              <p>No orchestrations yet.</p>
               <button className="setup-btn-primary" onClick={handleCreateWorkflow} style={{ marginTop: 16 }}>
-                + Create your first workflow
+                + Create your first orchestration
                 <span className="btn-arrow">&#x2197;</span>
               </button>
             </div>

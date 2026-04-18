@@ -1314,14 +1314,14 @@ Be concise. Confirm actions after completing them.${knowledgeSection}`;
               Delegation
             </button>
           </RevealAt>
-          <RevealAt stage="6" currentStage={currentStage}>
-            <button className={`tab-nav-item${activeTab === 'workflow' ? ' active' : ''}`} onClick={() => { setActiveTab('workflow'); setWorkflowBadge(false); }}>
-              Workflow{hasActiveRuns && <span className="tab-running-dot" />}
+          <RevealAt stage="7" currentStage={currentStage}>
+            <button className={`tab-nav-item${activeTab === 'workflow' ? ' active' : ''}`} onClick={() => setActiveTab('workflow')}>
+              Orchestration{hasActiveRuns && <span className="tab-running-dot" />}
             </button>
           </RevealAt>
-          <RevealAt stage="6" currentStage={currentStage}>
+          <RevealAt stage="8" currentStage={currentStage}>
             <button className={`tab-nav-item${activeTab === 'activity' ? ' active' : ''}`} onClick={() => setActiveTab('activity')}>
-              Activity{activeRuns.length > 0 && activeTab !== 'activity' && <span className="tab-count">{activeRuns.length}</span>}
+              Observability{activeRuns.length > 0 && activeTab !== 'activity' && <span className="tab-count">{activeRuns.length}</span>}
             </button>
           </RevealAt>
         </nav>

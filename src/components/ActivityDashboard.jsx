@@ -227,8 +227,8 @@ export default function ActivityDashboard({ workflowRuns, logs, onApprovalAction
         <div className="adash-body">
           {workflowRuns.length === 0 && (
             <div className="adash-empty">
-              <p className="adash-empty-title">No workflow runs yet</p>
-              <p className="adash-empty-desc">Go to the Workflow tab and click Run to start a workflow. Active runs will appear here.</p>
+              <p className="adash-empty-title">No orchestration runs yet</p>
+              <p className="adash-empty-desc">Go to the Orchestration tab and click Run to start one. Active runs will appear here.</p>
             </div>
           )}
 

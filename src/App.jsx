@@ -7,7 +7,7 @@ import WorkflowBuilder from './components/WorkflowBuilder';
 import CoworkerBuilder from './components/CoworkerBuilder';
 import ChatPanel from './components/ChatPanel';
 import ActivityDashboard from './components/ActivityDashboard';
-import RevealAt, { STAGE_META } from './components/RevealAt';
+import RevealAt, { STAGE_META, stageReached } from './components/RevealAt';
 import PreferencesEditor from './components/PreferencesEditor';
 import {
   createStarterFolders,
@@ -1126,7 +1126,6 @@ function App() {
         addMessage({ type: 'error', content: result.error });
       }
     } else {
-      // Platform assistant mode — natural language control of the platform
       const contextFiles = (contextFileIds || []).map(id => findNode(fileTree, id)).filter(Boolean);
       const knowledgeSection = contextFiles.length > 0
         ? `\n\nThe user has selected these context files — use them to answer questions:\n${contextFiles.map(f => `### ${f.name}\n${f.content}`).join('\n\n')}`
@@ -1135,7 +1134,22 @@ function App() {
       const userPrefsForPlatform = userPreferences && userPreferences.trim()
         ? `## About the user\n${userPreferences.trim()}\n\n---\n\n`
         : '';
-      const platformSystemPrompt = `${userPrefsForPlatform}You are the Foundry platform assistant for ${orgName}. You help users build and manage their AI coworker platform through natural language.
+
+      if (!stageReached(currentStage, '5a')) {
+        // Pre-Stage-5a: simple chat mode. No platform features described, no
+        // platform-action tools attached. Just conversational AI.
+        const chatPrompt = `${userPrefsForPlatform}You are a helpful assistant. Have a conversation with the user. Be concise, warm, and helpful. Do not describe platform features, coworkers, files, workflows, or tools unless the user explicitly asks about them.${knowledgeSection}`;
+        const result = await callClaudeAPI(chatPrompt, userMessage);
+        updateActiveMessages(prev => prev.filter(m => m.id !== loadingId));
+        setIsLoading(false);
+        if (result.success) {
+          addMessage({ type: 'direct-response', content: result.content, label: 'Foundry' });
+        } else {
+          addMessage({ type: 'error', content: result.error });
+        }
+      } else {
+        // Stage 5a+: platform assistant with full tool access
+        const platformSystemPrompt = `${userPrefsForPlatform}You are the Foundry platform assistant for ${orgName}. You help users build and manage their AI coworker platform through natural language.
 
 The platform has these elements:
 - **Files**: Knowledge documents (policies, rules, reference) and instruction files (AI coworker behavior). Organized in department folders.
@@ -1147,19 +1161,20 @@ When building something, create dependencies first: files before coworkers that 
 When answering questions, check current state with list/read tools if needed.
 Be concise. Confirm actions after completing them.${knowledgeSection}`;
 
-      const result = await callClaudeWithPlatformActions({
-        systemPrompt: platformSystemPrompt,
-        userMessage,
-        onToolExecution: (execData) => addMessage({ type: 'tool_execution', ...execData }),
-      });
-      updateActiveMessages(prev => prev.filter(m => m.id !== loadingId));
-      setIsLoading(false);
-      if (result.success) {
-        const textContent = result.content.filter(c => c.type === 'text').map(c => c.text).join('\n');
-        if (textContent) addMessage({ type: 'direct-response', content: textContent, label: 'Foundry' });
-      } else {
-        const errorText = result.content?.[0]?.text || 'Unknown error';
-        addMessage({ type: 'error', content: errorText });
+        const result = await callClaudeWithPlatformActions({
+          systemPrompt: platformSystemPrompt,
+          userMessage,
+          onToolExecution: (execData) => addMessage({ type: 'tool_execution', ...execData }),
+        });
+        updateActiveMessages(prev => prev.filter(m => m.id !== loadingId));
+        setIsLoading(false);
+        if (result.success) {
+          const textContent = result.content.filter(c => c.type === 'text').map(c => c.text).join('\n');
+          if (textContent) addMessage({ type: 'direct-response', content: textContent, label: 'Foundry' });
+        } else {
+          const errorText = result.content?.[0]?.text || 'Unknown error';
+          addMessage({ type: 'error', content: errorText });
+        }
       }
     }
   }

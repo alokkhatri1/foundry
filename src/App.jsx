@@ -1290,7 +1290,9 @@ Be concise. Confirm actions after completing them.${knowledgeSection}`;
             <div className="reveal-modal-eyebrow">New Stage Unlocked</div>
             <div className="reveal-modal-title">{STAGE_META[justRevealed]?.label || justRevealed}</div>
             {STAGE_META[justRevealed]?.description && (
-              <p className="reveal-modal-desc">{STAGE_META[justRevealed].description}</p>
+              <p className="reveal-modal-desc">
+                {STAGE_META[justRevealed].description.replace('{name}', (userName || 'friend').split(' ')[0])}
+              </p>
             )}
             <button className="reveal-modal-btn" onClick={() => setJustRevealed(null)}>Got it</button>
           </div>

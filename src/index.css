@@ -4037,11 +4037,16 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
 .dm-messages {
   flex: 1;
   overflow-y: auto;
-  padding: 20px;
+  padding: 0 24px;
+  min-height: 0;
+}
+.dm-messages-inner {
+  max-width: 768px;
+  margin: 0 auto;
+  padding: 20px 0 16px;
   display: flex;
   flex-direction: column;
   gap: 10px;
-  min-height: 0;
 }
 /* Flat DM layout — matches AI coworker chat style (no bubbles) */
 .cl-dm-flat {

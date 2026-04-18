@@ -4184,43 +4184,61 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
   border-color: #4a7fb5;
 }
 
-/* ===== Reveal banner (stage unlock) ===== */
-.reveal-banner {
-  position: fixed;
-  top: 0;
-  left: 50%;
-  transform: translateX(-50%);
+/* ===== Reveal modal (stage unlock) ===== */
+.reveal-modal-overlay {
+  z-index: 1000;
+  animation: revealOverlayFade 0.3s ease-out;
+}
+.reveal-modal {
   background: var(--accent-system, #5a9e6f);
   color: #fff;
-  padding: 12px 20px;
-  border-radius: 0 0 12px 12px;
+  padding: 40px 48px;
+  border-radius: var(--radius, 12px);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
   display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 14px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-  z-index: 1000;
-  animation: revealBannerDrop 0.45s ease-out;
-  max-width: 540px;
-  font-size: 14px;
+  gap: 16px;
+  max-width: 480px;
+  text-align: center;
+  animation: revealModalPop 0.45s cubic-bezier(0.2, 0.8, 0.4, 1.2);
 }
-@keyframes revealBannerDrop {
-  from { transform: translate(-50%, -100%); opacity: 0; }
-  to   { transform: translate(-50%, 0);     opacity: 1; }
-}
-.reveal-banner-dismiss {
-  background: transparent;
-  border: none;
-  color: #fff;
-  cursor: pointer;
-  font-size: 18px;
-  line-height: 1;
+.reveal-modal-eyebrow {
+  font-size: 13px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
   opacity: 0.85;
-  padding: 4px 8px;
-  border-radius: 4px;
+  font-weight: 600;
 }
-.reveal-banner-dismiss:hover {
-  background: rgba(255, 255, 255, 0.2);
-  opacity: 1;
+.reveal-modal-title {
+  font-size: 32px;
+  font-weight: 700;
+  line-height: 1.2;
+  margin: 4px 0 12px;
+}
+.reveal-modal-btn {
+  margin-top: 8px;
+  background: #fff;
+  color: var(--accent-system, #5a9e6f);
+  border: none;
+  padding: 10px 28px;
+  border-radius: var(--radius-pill, 999px);
+  font-weight: 600;
+  font-size: 14px;
+  cursor: pointer;
+  transition: transform 0.1s ease, box-shadow 0.15s ease;
+}
+.reveal-modal-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+@keyframes revealOverlayFade {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes revealModalPop {
+  from { transform: scale(0.85); opacity: 0; }
+  to   { transform: scale(1);    opacity: 1; }
 }
 
 /* ===== Journey recap stats (graduation screen) ===== */

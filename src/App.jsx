@@ -235,14 +235,13 @@ function App() {
   const activeDmRef = useRef(activeDm);
   useEffect(() => { activeDmRef.current = activeDm; }, [activeDm]);
 
-  // Detect live stage reveals — show banner only when stage CHANGES after initial load.
+  // Show a celebratory modal when the admin unlocks a new stage. Skip Stage 1
+  // (workshop start is not an "unlock") and skip the initial mount.
   useEffect(() => {
     const prev = previousStageRef.current;
     previousStageRef.current = currentStage;
-    if (prev !== null && prev !== currentStage) {
+    if (prev !== null && prev !== currentStage && currentStage !== '1') {
       setJustRevealed(currentStage);
-      const timer = setTimeout(() => setJustRevealed(null), 10000);
-      return () => clearTimeout(timer);
     }
   }, [currentStage]);
 
@@ -1286,9 +1285,12 @@ Be concise. Confirm actions after completing them.${knowledgeSection}`;
     <AuthGate onJoin={handleJoin} workshopCode={isJoined ? workshopCode : null}>
     <div className="app-shell">
       {justRevealed && (
-        <div className="reveal-banner" role="status">
-          <span>New capability unlocked: <strong>{STAGE_META[justRevealed]?.label || justRevealed}</strong></span>
-          <button className="reveal-banner-dismiss" onClick={() => setJustRevealed(null)} aria-label="Dismiss">{'\u00D7'}</button>
+        <div className="modal-overlay reveal-modal-overlay" onClick={() => setJustRevealed(null)}>
+          <div className="reveal-modal" role="status" onClick={e => e.stopPropagation()}>
+            <div className="reveal-modal-eyebrow">New capability unlocked</div>
+            <div className="reveal-modal-title">{STAGE_META[justRevealed]?.label || justRevealed}</div>
+            <button className="reveal-modal-btn" onClick={() => setJustRevealed(null)}>Got it</button>
+          </div>
         </div>
       )}
       <header className="app-header">

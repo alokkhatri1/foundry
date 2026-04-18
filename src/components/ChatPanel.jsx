@@ -591,7 +591,7 @@ export default function ChatPanel({ messages, onSendMessage, onApprovalAction, o
                         );
                       })}
                     </div>
-                  : <span className="cl-context-none">No context selected</span>
+                  : null
             }
           </div>
         </div>

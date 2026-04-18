@@ -4049,6 +4049,20 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
   flex-direction: column;
   gap: 4px;
   padding: 8px 0;
+  max-width: 70%;
+  align-self: flex-start;
+}
+.cl-dm-flat.mine {
+  align-self: flex-end;
+}
+.cl-dm-flat.mine .cl-dm-flat-header {
+  flex-direction: row-reverse;
+}
+.cl-dm-flat.mine .cl-dm-flat-body,
+.cl-dm-flat.mine .cl-dm-flat-time {
+  padding-left: 0;
+  padding-right: 28px;
+  text-align: right;
 }
 .cl-dm-flat-header {
   display: flex;

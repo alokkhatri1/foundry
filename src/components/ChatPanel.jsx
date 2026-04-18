@@ -677,7 +677,7 @@ export default function ChatPanel({ messages, onSendMessage, onApprovalAction, o
                   const senderName = isMine ? (currentUserName || 'Me') : activeDm.name;
                   const senderColor = isMine ? '#4a7fb5' : (activeDm.color || '#888');
                   return (
-                    <div key={m.id} className="cl-dm-flat">
+                    <div key={m.id} className={`cl-dm-flat${isMine ? ' mine' : ''}`}>
                       <div className="cl-dm-flat-header">
                         <span className="cl-dm-flat-avatar" style={{ background: senderColor }}>
                           {senderName?.charAt(0)?.toUpperCase()}

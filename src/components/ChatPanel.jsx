@@ -318,8 +318,8 @@ function ContextSidebar({ fileTree, selectedFileIds, onToggleFile, onToggleFolde
 
       <div className="sl-spacer" />
 
-      {/* AI Coworkers */}
-      {coworkers && coworkers.length > 0 && (
+      {/* AI Coworkers — Stage 5a */}
+      {stageReached(currentStage, '5a') && coworkers && coworkers.length > 0 && (
         <div className="sl-section sl-agents-section">
           <div className="sl-section-header" onClick={() => toggleSection('agents')}>
             <span className="sl-section-name">AI Coworkers</span>

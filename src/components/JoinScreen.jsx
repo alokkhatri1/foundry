@@ -11,7 +11,7 @@ export default function JoinScreen({ user, isAdmin, onJoin, onSignOut, onAdminDa
     if (!code.trim()) { setError('Please enter a workshop code.'); return; }
     setError('');
     setJoining(true);
-    const result = await onJoin(userName, code.trim().toUpperCase(), user?.id);
+    const result = await onJoin(userName, code.trim().toUpperCase(), user?.id, user?.email);
     if (result?.error) {
       const msg = result.error === 'not_found'
         ? 'Workshop code not found.'

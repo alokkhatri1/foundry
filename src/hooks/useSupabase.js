@@ -220,14 +220,15 @@ export default function useSupabase() {
   const getRoomId = useCallback(() => roomIdRef.current, []);
 
   // ===== Participant =====
-  const upsertParticipant = useCallback(async (name, color, authUserId) => {
+  const upsertParticipant = useCallback(async (name, color, authUserId, email) => {
     if (!isSupabaseConfigured || !roomIdRef.current) return null;
     const row = { room_id: roomIdRef.current, name, color, online: true, last_seen_at: new Date().toISOString() };
     if (authUserId) row.auth_user_id = authUserId;
+    if (email) row.email = email;
     const { data, error } = await supabase.from('participants').upsert(
       row,
-      { onConflict: 'room_id,name' }
-    ).select('id, name, color').single();
+      { onConflict: email ? 'room_id,email' : 'room_id,name' }
+    ).select('id, name, color, email').single();
     if (error) { console.error('[sb] upsertParticipant:', error.message); return null; }
     return data;
   }, []);

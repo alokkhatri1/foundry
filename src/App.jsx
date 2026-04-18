@@ -235,7 +235,7 @@ function App() {
 
         const myColor = participants.find(p => p.name === userName)?.color || COLORS[0];
         const authUser = await sb.getUser();
-        const me = await sb.upsertParticipant(userName, myColor, authUser?.id);
+        const me = await sb.upsertParticipant(userName, myColor, authUser?.id, authUser?.email);
         if (me?.id) setMyParticipantId(me.id);
 
         // Load state from granular tables
@@ -365,7 +365,7 @@ function App() {
     setActiveDm(null);
   }
 
-  async function handleJoin(name, code, authUserId) {
+  async function handleJoin(name, code, authUserId, email) {
     const result = await sb.joinRoom(code);
     if (result?.error) return result;
     const roomId = result.id;
@@ -414,7 +414,7 @@ function App() {
       ? existingParticipants.map(p => p.name === name ? { ...p, online: true, lastSeen: Date.now() } : p)
       : [...existingParticipants, { id: 'p-' + Date.now(), name, color, online: true, joinedAt: Date.now(), lastSeen: Date.now() }];
 
-    sb.upsertParticipant(name, color, authUserId).then(me => { if (me?.id) setMyParticipantId(me.id); });
+    sb.upsertParticipant(name, color, authUserId, email).then(me => { if (me?.id) setMyParticipantId(me.id); });
     sb.trackPresence(name, color, handlePresenceSync);
     startRealtimeSync();
 

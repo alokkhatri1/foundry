@@ -609,6 +609,7 @@ function App() {
     setActiveConvoId(newConvo.id);
     setActiveTab('chat');
     setChatBadge(false);
+    setActiveDm(null);
   }
 
   function handleCoworkerChange(cwId) {
@@ -639,6 +640,7 @@ function App() {
     setActiveConvoId(convoId);
     setActiveTab('chat');
     setChatBadge(false);
+    setActiveDm(null);
   }
 
   function handleDeleteConvo(convoId) {

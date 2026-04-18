@@ -414,7 +414,8 @@ function App() {
       ? existingParticipants.map(p => p.name === name ? { ...p, online: true, lastSeen: Date.now() } : p)
       : [...existingParticipants, { id: 'p-' + Date.now(), name, color, online: true, joinedAt: Date.now(), lastSeen: Date.now() }];
 
-    sb.upsertParticipant(name, color, authUserId, email).then(me => { if (me?.id) setMyParticipantId(me.id); });
+    const me = await sb.upsertParticipant(name, color, authUserId, email);
+    if (me?.id) setMyParticipantId(me.id);
     sb.trackPresence(name, color, handlePresenceSync);
     startRealtimeSync();
 

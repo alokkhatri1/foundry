@@ -11,6 +11,7 @@ import RevealAt, { STAGE_META, stageReached } from './components/RevealAt';
 import { buildStageGuidance } from './data/stageGuidance';
 import PreferencesEditor from './components/PreferencesEditor';
 import RoleCapture from './components/RoleCapture';
+import DelegationPanel from './components/DelegationPanel';
 import {
   createStarterFolders,
   createStarterWorkflow,
@@ -1303,6 +1304,11 @@ Be concise. Confirm actions after completing them.${knowledgeSection}`;
             </button>
           </RevealAt>
           <RevealAt stage="6" currentStage={currentStage}>
+            <button className={`tab-nav-item${activeTab === 'delegation' ? ' active' : ''}`} onClick={() => setActiveTab('delegation')}>
+              Delegation
+            </button>
+          </RevealAt>
+          <RevealAt stage="6" currentStage={currentStage}>
             <button className={`tab-nav-item${activeTab === 'workflow' ? ' active' : ''}`} onClick={() => { setActiveTab('workflow'); setWorkflowBadge(false); }}>
               Workflow{hasActiveRuns && <span className="tab-running-dot" />}
             </button>
@@ -1401,6 +1407,17 @@ Be concise. Confirm actions after completing them.${knowledgeSection}`;
 {activeTab === 'coworkers' && (
           <div className="tab-pane tab-pane-coworkers">
             <CoworkerBuilder coworkers={coworkers || []} onUpdateCoworkers={handleUpdateCoworkers} fileTree={fileTree} tools={tools || []} userName={userName} callClaudeAPI={callClaudeAPI} showEducationalCues={showEducationalCues} currentStage={currentStage} />
+          </div>
+        )}
+        {activeTab === 'delegation' && (
+          <div className="tab-pane tab-pane-delegation">
+            <DelegationPanel
+              sb={sb}
+              callClaudeAPI={callClaudeAPI}
+              userName={userName}
+              userRole={userRole}
+              coworkers={coworkers || []}
+            />
           </div>
         )}
         {activeTab === 'workflow' && (

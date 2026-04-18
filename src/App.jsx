@@ -1044,7 +1044,7 @@ function App() {
   }
 
   // ===== Direct Chat =====
-  async function handleSendMessage(text, contextFileIds, coworkerId, attachments) {
+  async function handleSendMessage(text, contextFileIds, coworkerId, attachments, skillFileIds = []) {
     // Build attachment info for message display
     const attachmentMeta = attachments?.map(a => ({ fileName: a.fileName || a.originalName, category: a.category })) || [];
     addMessage({ type: 'user', content: text, participantName: userName, attachments: attachmentMeta });
@@ -1070,9 +1070,19 @@ function App() {
         ...knowledge.map(k => `### ${k.name}\n${k.content}\n`),
       ].filter(Boolean).join('\n');
     } else if (contextFileIds && contextFileIds.length > 0) {
-      const contextFiles = contextFileIds.map(id => findNode(fileTree, id)).filter(Boolean);
-      const knowledgeContent = contextFiles.map(f => `### ${f.name}\n${f.content}`).join('\n\n');
-      systemPrompt = `You are an AI assistant at ${orgName}. Use the following knowledge documents to inform your responses. If the answer is not covered by these documents, say so clearly.\n\n${knowledgeContent}`;
+      const skillIdSet = new Set(skillFileIds || []);
+      const allFiles = contextFileIds.map(id => findNode(fileTree, id)).filter(Boolean);
+      const skillFiles = allFiles.filter(f => skillIdSet.has(f.id));
+      const contextFiles = allFiles.filter(f => !skillIdSet.has(f.id));
+      const parts = [`You are an AI assistant at ${orgName}.`];
+      if (skillFiles.length > 0) {
+        parts.push(`\n\n## Instructions — how to respond\n${skillFiles.map(f => `### ${f.name}\n${f.content}`).join('\n\n')}`);
+      }
+      if (contextFiles.length > 0) {
+        parts.push(`\n\n## Knowledge — reference material\n${contextFiles.map(f => `### ${f.name}\n${f.content}`).join('\n\n')}`);
+      }
+      parts.push(`\n\nIf the answer is not covered by the provided material, say so clearly.`);
+      systemPrompt = parts.join('');
     }
 
     // Stage 2 — inject personal preferences (global per user) into every system prompt.
@@ -1345,6 +1355,7 @@ Be concise. Confirm actions after completing them.${knowledgeSection}`;
               onSelectConvo={handleSelectConvo}
               onDeleteConvo={handleDeleteConvo}
               onCoworkerChange={handleCoworkerChange}
+              currentStage={currentStage}
               activeDm={activeDm}
               onOpenDm={handleOpenDm}
               onCloseDm={handleCloseDm}

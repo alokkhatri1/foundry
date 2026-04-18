@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useMemo } from 'react';
 import { parseFile, getFileCategory, getFileIcon } from '../utils/fileParser';
+import { stageReached } from './RevealAt';
 import ToolExecutionCard from './ToolExecutionCard';
 import EducationalCue from './EducationalCue';
 import RichText from './RichText';
@@ -402,7 +403,7 @@ function InlineEditor({ file, onUpdateContent, onClose }) {
 }
 
 // ===== Main ChatPanel =====
-export default function ChatPanel({ messages, onSendMessage, onApprovalAction, onRetry, isLoading, participants, currentUserName, fileTree, onUpdateFileContent, coworkers, showEducationalCues, conversations, activeConvoId, onNewChat, onSelectConvo, onDeleteConvo, onCoworkerChange, activeDm, onOpenDm, onCloseDm, myParticipantId, sb, unreadDmCounts }) {
+export default function ChatPanel({ messages, onSendMessage, onApprovalAction, onRetry, isLoading, participants, currentUserName, fileTree, onUpdateFileContent, coworkers, showEducationalCues, conversations, activeConvoId, onNewChat, onSelectConvo, onDeleteConvo, onCoworkerChange, currentStage, activeDm, onOpenDm, onCloseDm, myParticipantId, sb, unreadDmCounts }) {
   const [input, setInput] = useState('');
   const [selectedFileIds, setSelectedFileIds] = useState([]);
   const [editingFileId, setEditingFileId] = useState(null);
@@ -410,6 +411,7 @@ export default function ChatPanel({ messages, onSendMessage, onApprovalAction, o
   const [attachedFiles, setAttachedFiles] = useState([]);
   const [parsingFiles, setParsingFiles] = useState(false);
   const [dmMessages, setDmMessages] = useState([]);
+  const [skillFileIds, setSkillFileIds] = useState([]);
   const messagesRef = useRef(null);
   const greeting = useMemo(() => {
     const firstName = (currentUserName || '').split(' ')[0] || 'there';
@@ -479,9 +481,13 @@ export default function ChatPanel({ messages, onSendMessage, onApprovalAction, o
       }
       return;
     }
-    onSendMessage(text, selectedFileIds, activeCoworkerId, attachedFiles);
+    onSendMessage(text, selectedFileIds, activeCoworkerId, attachedFiles, skillFileIds);
     setInput('');
     setAttachedFiles([]);
+  }
+
+  function toggleSkillRole(fileId) {
+    setSkillFileIds(prev => prev.includes(fileId) ? prev.filter(id => id !== fileId) : [...prev, fileId]);
   }
 
   async function handleFileSelect(e) {
@@ -560,8 +566,19 @@ export default function ChatPanel({ messages, onSendMessage, onApprovalAction, o
                       {selectedFileIds.map(id => {
                         const node = findNode(fileTree, id);
                         if (!node) return null;
+                        const isSkill = skillFileIds.includes(id);
+                        const stage4Open = stageReached(currentStage, '4');
                         return (
-                          <span key={id} className="cl-context-file-chip">
+                          <span key={id} className={`cl-context-file-chip${isSkill ? ' skill' : ''}`}>
+                            {stage4Open && (
+                              <button
+                                className="cl-context-file-chip-role"
+                                onClick={e => { e.stopPropagation(); toggleSkillRole(id); }}
+                                title={isSkill ? 'Attached as skill (instructions). Click to use as context.' : 'Attached as context (knowledge). Click to use as skill.'}
+                              >
+                                {isSkill ? 'skill' : 'context'}
+                              </button>
+                            )}
                             <span className="cl-context-file-chip-name">{node.name.replace(/\.md$/, '')}</span>
                             <button className="cl-context-file-chip-remove" onClick={() => handleToggleFile(id)}>{'\u2715'}</button>
                           </span>

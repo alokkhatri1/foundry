@@ -10,7 +10,6 @@ import ActivityDashboard from './components/ActivityDashboard';
 import RevealAt, { STAGE_META, stageReached } from './components/RevealAt';
 import { buildStageGuidance } from './data/stageGuidance';
 import PreferencesEditor from './components/PreferencesEditor';
-import RoleCapture from './components/RoleCapture';
 import DelegationPanel from './components/DelegationPanel';
 import {
   createStarterFolders,
@@ -226,7 +225,6 @@ function App() {
   const [showPreferences, setShowPreferences] = useState(false);
   const [userRole, setUserRole] = useState('');
   const [userRoleLoaded, setUserRoleLoaded] = useState(false);
-  const [showRoleCapture, setShowRoleCapture] = useState(false);
   const [justRevealed, setJustRevealed] = useState(null);
   const previousStageRef = useRef(null);
   const [myParticipantId, setMyParticipantId] = useState(null);
@@ -244,15 +242,6 @@ function App() {
       setJustRevealed(currentStage);
     }
   }, [currentStage]);
-
-  // Role capture is ONLY required at Stage 6 (Strategic Delegation). Prompt
-  // the first time the participant hits a stage where their role is used.
-  useEffect(() => {
-    if (!userRoleLoaded) return;
-    if (!stageReached(currentStage, '6')) return;
-    if (userRole) return;
-    setShowRoleCapture(true);
-  }, [currentStage, userRole, userRoleLoaded]);
 
   const approvalResolversRef = useRef(new Map());
   const activeTabRef = useRef(activeTab);
@@ -1364,17 +1353,6 @@ Be concise. Confirm actions after completing them.${knowledgeSection}`;
         />
       )}
 
-      {showRoleCapture && (
-        <RoleCapture
-          onSave={async (role) => {
-            const user = await sb.getUser();
-            if (user?.id) await sb.saveUserRole(user.id, role);
-            setUserRole(role);
-            setShowRoleCapture(false);
-          }}
-        />
-      )}
-
       {showExitConfirm && (
         <div className="modal-overlay" onClick={() => setShowExitConfirm(false)}>
           <div className="modal-box" onClick={e => e.stopPropagation()}>
@@ -1433,6 +1411,12 @@ Be concise. Confirm actions after completing them.${knowledgeSection}`;
               callClaudeAPI={callClaudeAPI}
               userName={userName}
               userRole={userRole}
+              userRoleLoaded={userRoleLoaded}
+              onSaveRole={async (role) => {
+                const user = await sb.getUser();
+                if (user?.id) await sb.saveUserRole(user.id, role);
+                setUserRole(role);
+              }}
               coworkers={coworkers || []}
             />
           </div>

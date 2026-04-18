@@ -194,7 +194,7 @@ function findNode(tree, id) {
 }
 
 // ===== Slack-style Context Sidebar =====
-function ContextSidebar({ fileTree, selectedFileIds, onToggleFile, onToggleFolder, onOpenFile, editingFileId, participants, currentUserName, coworkers, activeCoworkerId, onSelectCoworker, showEducationalCues, conversations, activeConvoId, onNewChat, onSelectConvo, onDeleteConvo, onOpenDm, activeDm }) {
+function ContextSidebar({ fileTree, selectedFileIds, onToggleFile, onToggleFolder, onOpenFile, editingFileId, participants, currentUserName, coworkers, activeCoworkerId, onSelectCoworker, showEducationalCues, conversations, activeConvoId, onNewChat, onSelectConvo, onDeleteConvo, onOpenDm, activeDm, unreadDmCounts }) {
   const [collapsedSections, setCollapsedSections] = useState(() => {
     // Default all folders to collapsed
     const collapsed = {};
@@ -347,29 +347,33 @@ function ContextSidebar({ fileTree, selectedFileIds, onToggleFile, onToggleFolde
             {online.map(p => {
               const isMe = p.name === currentUserName;
               const isActive = activeDm?.name === p.name;
+              const unread = (unreadDmCounts && unreadDmCounts[p.name]) || 0;
               return (
                 <div
                   key={p.id}
-                  className={`sl-dm online${isActive ? ' active-agent' : ''}`}
+                  className={`sl-dm online${isActive ? ' active-agent' : ''}${unread > 0 ? ' has-unread' : ''}`}
                   style={{ cursor: isMe ? 'default' : 'pointer' }}
                   onClick={() => !isMe && onOpenDm && onOpenDm(p)}
                 >
                   <span className="sl-dm-status on"></span>
                   <span className="sl-dm-name">{p.name}{isMe ? ' (you)' : ''}</span>
+                  {unread > 0 && <span className="sl-dm-badge">{unread}</span>}
                 </div>
               );
             })}
             {offline.map(p => {
               const isActive = activeDm?.name === p.name;
+              const unread = (unreadDmCounts && unreadDmCounts[p.name]) || 0;
               return (
                 <div
                   key={p.id}
-                  className={`sl-dm${isActive ? ' active-agent' : ''}`}
+                  className={`sl-dm${isActive ? ' active-agent' : ''}${unread > 0 ? ' has-unread' : ''}`}
                   style={{ cursor: 'pointer' }}
                   onClick={() => onOpenDm && onOpenDm(p)}
                 >
                   <span className="sl-dm-status"></span>
                   <span className="sl-dm-name">{p.name}</span>
+                  {unread > 0 && <span className="sl-dm-badge">{unread}</span>}
                 </div>
               );
             })}
@@ -399,7 +403,7 @@ function InlineEditor({ file, onUpdateContent, onClose }) {
 }
 
 // ===== Main ChatPanel =====
-export default function ChatPanel({ messages, onSendMessage, onApprovalAction, onRetry, isLoading, participants, currentUserName, fileTree, onUpdateFileContent, coworkers, showEducationalCues, conversations, activeConvoId, onNewChat, onSelectConvo, onDeleteConvo, activeDm, onOpenDm, onCloseDm, myParticipantId, sb }) {
+export default function ChatPanel({ messages, onSendMessage, onApprovalAction, onRetry, isLoading, participants, currentUserName, fileTree, onUpdateFileContent, coworkers, showEducationalCues, conversations, activeConvoId, onNewChat, onSelectConvo, onDeleteConvo, activeDm, onOpenDm, onCloseDm, myParticipantId, sb, unreadDmCounts }) {
   const [input, setInput] = useState('');
   const [selectedFileIds, setSelectedFileIds] = useState([]);
   const [editingFileId, setEditingFileId] = useState(null);
@@ -579,6 +583,7 @@ export default function ChatPanel({ messages, onSendMessage, onApprovalAction, o
         onDeleteConvo={onDeleteConvo}
         onOpenDm={onOpenDm}
         activeDm={activeDm}
+        unreadDmCounts={unreadDmCounts}
       />
 
       {/* Middle: file editor (when open) */}

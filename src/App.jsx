@@ -219,6 +219,9 @@ function App() {
   const [workshopEnded, setWorkshopEnded] = useState(false);
   const [myParticipantId, setMyParticipantId] = useState(null);
   const [activeDm, setActiveDm] = useState(null);
+  const [unreadDmCounts, setUnreadDmCounts] = useState({});
+  const activeDmRef = useRef(activeDm);
+  useEffect(() => { activeDmRef.current = activeDm; }, [activeDm]);
 
   const approvalResolversRef = useRef(new Map());
   const activeTabRef = useRef(activeTab);
@@ -358,12 +361,40 @@ function App() {
     const supabaseId = await sb.findParticipantIdByName(participant.name);
     if (supabaseId) {
       setActiveDm({ id: supabaseId, name: participant.name, color: participant.color });
+      setUnreadDmCounts(prev => {
+        if (!prev[participant.name]) return prev;
+        const next = { ...prev };
+        delete next[participant.name];
+        return next;
+      });
     }
   }
 
   function handleCloseDm() {
     setActiveDm(null);
   }
+
+  // Subscribe to incoming DMs at app-level so notifications work outside the DM pane.
+  useEffect(() => {
+    if (!myParticipantId) return;
+    const unsub = sb.subscribeToDms(myParticipantId, async (dm) => {
+      if (dm.to_participant_id !== myParticipantId) return;
+      if (activeDmRef.current?.id === dm.from_participant_id) return;
+      const sender = await sb.getParticipantById(dm.from_participant_id);
+      if (!sender?.name) return;
+      setUnreadDmCounts(prev => ({
+        ...prev,
+        [sender.name]: (prev[sender.name] || 0) + 1,
+      }));
+    });
+    return unsub;
+  }, [myParticipantId, sb]);
+
+  // Reflect unread count in browser tab title.
+  useEffect(() => {
+    const total = Object.values(unreadDmCounts).reduce((a, b) => a + b, 0);
+    document.title = total > 0 ? `(${total}) Foundry` : 'Foundry';
+  }, [unreadDmCounts]);
 
   async function handleJoin(name, code, authUserId, email) {
     const result = await sb.joinRoom(code);
@@ -1203,6 +1234,7 @@ Be concise. Confirm actions after completing them.${knowledgeSection}`;
               onCloseDm={handleCloseDm}
               myParticipantId={myParticipantId}
               sb={sb}
+              unreadDmCounts={unreadDmCounts}
             />
           </div>
         )}

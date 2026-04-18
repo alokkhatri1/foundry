@@ -3958,6 +3958,21 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
   color: #8b6fb0;
 }
 
+/* ===== Unread DM badge in sidebar ===== */
+.sl-dm.has-unread .sl-dm-name { font-weight: 700; color: #fff; }
+.sl-dm-badge {
+  margin-left: auto;
+  background: #c45c5c;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 10px;
+  min-width: 18px;
+  text-align: center;
+  line-height: 1.4;
+}
+
 /* ===== Direct Message Thread ===== */
 .dm-thread {
   display: flex;

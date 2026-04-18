@@ -272,6 +272,15 @@ export default function useSupabase() {
     return data?.id || null;
   }, []);
 
+  const getParticipantById = useCallback(async (id) => {
+    if (!isSupabaseConfigured || !id) return null;
+    const { data } = await supabase.from('participants')
+      .select('id, name, color')
+      .eq('id', id)
+      .maybeSingle();
+    return data;
+  }, []);
+
   // ===== Direct messages =====
   const sendDm = useCallback(async (fromParticipantId, toParticipantId, content) => {
     if (!isSupabaseConfigured || !roomIdRef.current) {
@@ -571,7 +580,7 @@ export default function useSupabase() {
     seedWorkshopContent, subscribeToWorkshopPresence,
     // Room
     joinRoom, getRoomId,
-    upsertParticipant, loadParticipants, findParticipantIdByName,
+    upsertParticipant, loadParticipants, findParticipantIdByName, getParticipantById,
     sendDm, fetchDmThread, subscribeToDms,
     loadFiles, saveFile, deleteFile, saveFilesBatch,
     loadCoworkers, saveCoworker, deleteCoworker,

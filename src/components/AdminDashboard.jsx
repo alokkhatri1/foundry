@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { STAGE_ORDER, STAGE_META, stageReached, nextStage } from './RevealAt';
 
 export default function AdminDashboard({ sb, user, onBack }) {
   const [workshops, setWorkshops] = useState([]);
@@ -57,6 +58,15 @@ export default function AdminDashboard({ sb, user, onBack }) {
     if (!confirm('Deprecate this workshop? Participants will be moved to an ended screen. Data is preserved read-only as a past workshop.')) return;
     await sb.deprecateWorkshop(workshopId);
     if (selected?.id === workshopId) setSelected(null);
+    await loadWorkshops();
+  }
+
+  async function handleReveal(toStage) {
+    if (!selected) return;
+    const fromStage = selected.current_stage || '1';
+    if (!confirm(`Reveal Stage ${toStage} (${STAGE_META[toStage]?.label}) to all participants? This is one-way — reveal is monotonic.`)) return;
+    await sb.revealStage(selected.id, toStage, fromStage, user.id);
+    setSelected(prev => prev ? { ...prev, current_stage: toStage } : prev);
     await loadWorkshops();
   }
 
@@ -147,7 +157,7 @@ export default function AdminDashboard({ sb, user, onBack }) {
 
           {/* Tabs */}
           <div className="admin-tabs">
-            {['participants', 'content', 'activity'].map(tab => (
+            {['participants', 'content', 'activity', 'stages'].map(tab => (
               <button key={tab} className={`admin-tab${detailTab === tab ? ' active' : ''}`} onClick={() => setDetailTab(tab)}>
                 {tab.charAt(0).toUpperCase() + tab.slice(1)}
               </button>
@@ -218,6 +228,59 @@ export default function AdminDashboard({ sb, user, onBack }) {
                 ))}
                 {(content.workflows || []).length === 0 && <p className="admin-empty">No workflows created yet.</p>}
               </div>
+            </div>
+          )}
+
+          {detailTab === 'stages' && (
+            <div className="admin-tab-content">
+              <p style={{ marginBottom: 16, color: 'var(--text-muted, #888)', fontSize: 14 }}>
+                Reveal is monotonic — once a stage is revealed, it stays revealed. Sub-stages reveal in order. Current stage: <strong style={{ color: 'var(--text-body)' }}>{selected.current_stage || '1'}</strong>
+              </p>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {STAGE_ORDER.map(s => {
+                  const meta = STAGE_META[s];
+                  const current = selected.current_stage || '1';
+                  const isRevealed = stageReached(current, s);
+                  const isCurrent = current === s;
+                  const canReveal = s === nextStage(current);
+                  const isDeprecated = !!selected.deprecated_at;
+                  return (
+                    <div key={s} style={{
+                      display: 'flex', alignItems: 'center', gap: 12,
+                      padding: '10px 14px',
+                      border: '1px solid var(--border-color, #e0d6cc)',
+                      borderRadius: 8,
+                      opacity: isRevealed ? 1 : 0.55,
+                      background: isCurrent ? 'rgba(90, 158, 111, 0.08)' : 'transparent',
+                    }}>
+                      <span style={{
+                        fontSize: 11, fontWeight: 700, letterSpacing: '0.05em',
+                        minWidth: 28, textAlign: 'center',
+                        padding: '3px 6px', borderRadius: 4,
+                        background: isRevealed ? 'var(--accent-system, #5a9e6f)' : 'var(--border-color, #e0d6cc)',
+                        color: isRevealed ? '#fff' : 'var(--text-muted, #888)',
+                      }}>{s}</span>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontWeight: 600, fontSize: 14 }}>{meta?.label || s}</div>
+                        <div style={{ fontSize: 12, color: 'var(--text-muted, #888)' }}>{meta?.description}</div>
+                      </div>
+                      <div style={{ fontSize: 12, color: 'var(--text-muted, #888)', minWidth: 80, textAlign: 'right' }}>
+                        {isCurrent ? 'Current' : isRevealed ? 'Revealed' : canReveal ? '' : 'Locked'}
+                      </div>
+                      {canReveal && !isDeprecated && (
+                        <button className="landing-join-btn" style={{ width: 'auto', padding: '6px 16px', fontSize: 13 }} onClick={() => handleReveal(s)}>
+                          Reveal
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+              {selected.deprecated_at && (
+                <p style={{ marginTop: 12, fontSize: 12, color: 'var(--text-muted, #888)' }}>
+                  This workshop is deprecated — stages cannot be revealed further.
+                </p>
+              )}
             </div>
           )}
 

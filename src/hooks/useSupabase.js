@@ -62,7 +62,7 @@ export default function useSupabase() {
     if (!isSupabaseConfigured) return null;
     const code = Math.random().toString(36).slice(2, 8).toUpperCase();
     const { data, error } = await supabase.from('rooms')
-      .insert({ code, org_name: orgName || name, admin_id: adminId })
+      .insert({ code, org_name: orgName || name, admin_id: adminId, current_stage: '1' })
       .select('id, code')
       .single();
     if (error) { console.error('[sb] createWorkshop:', error.message); return null; }
@@ -72,7 +72,7 @@ export default function useSupabase() {
   const loadAdminWorkshops = useCallback(async (adminId) => {
     if (!isSupabaseConfigured) return [];
     const { data, error } = await supabase.from('rooms')
-      .select('id, code, org_name, created_at, deprecated_at')
+      .select('id, code, org_name, created_at, deprecated_at, current_stage')
       .eq('admin_id', adminId)
       .order('created_at', { ascending: false });
     if (error) { console.error('[sb] loadAdminWorkshops:', error.message); return []; }
@@ -98,6 +98,20 @@ export default function useSupabase() {
       .update({ deprecated_at: new Date().toISOString() })
       .eq('id', roomId);
     if (error) console.error('[sb] deprecateWorkshop:', error.message);
+  }, []);
+
+  const revealStage = useCallback(async (roomId, toStage, fromStage, actorUserId) => {
+    if (!isSupabaseConfigured) return;
+    await supabase.from('stage_events').insert({
+      room_id: roomId,
+      from_stage: fromStage || null,
+      to_stage: toStage,
+      actor: actorUserId || null,
+    });
+    const { error } = await supabase.from('rooms')
+      .update({ current_stage: toStage })
+      .eq('id', roomId);
+    if (error) console.error('[sb] revealStage:', error.message);
   }, []);
 
   const loadWorkshopStats = useCallback(async (roomId) => {
@@ -206,7 +220,7 @@ export default function useSupabase() {
     if (!isSupabaseConfigured) return { error: 'not_configured' };
     const { data: room, error } = await supabase
       .from('rooms')
-      .select('id, deprecated_at')
+      .select('id, deprecated_at, current_stage')
       .eq('code', code)
       .maybeSingle();
     if (error) { console.error('[sb] joinRoom:', error.message); return { error: 'db_error' }; }
@@ -214,7 +228,7 @@ export default function useSupabase() {
     if (room.deprecated_at) return { error: 'deprecated' };
     roomIdRef.current = room.id;
     console.log('[sb] joined room:', room.id);
-    return { id: room.id };
+    return { id: room.id, current_stage: room.current_stage };
   }, []);
 
   const getRoomId = useCallback(() => roomIdRef.current, []);
@@ -579,7 +593,7 @@ export default function useSupabase() {
     signOut, checkIsAdmin, onAuthStateChange,
     // Admin
     createWorkshop, loadAdminWorkshops, loadWorkshopParticipants,
-    deleteWorkshop, deprecateWorkshop, loadWorkshopStats, loadWorkshopContent, loadWorkshopActivity,
+    deleteWorkshop, deprecateWorkshop, revealStage, loadWorkshopStats, loadWorkshopContent, loadWorkshopActivity,
     seedWorkshopContent, subscribeToWorkshopPresence,
     // Room
     joinRoom, getRoomId,

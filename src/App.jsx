@@ -6,8 +6,8 @@ import FileEditor from './components/FileEditor';
 import WorkflowBuilder from './components/WorkflowBuilder';
 import CoworkerBuilder from './components/CoworkerBuilder';
 import ChatPanel from './components/ChatPanel';
-import DirectMessageThread from './components/DirectMessageThread';
 import ActivityDashboard from './components/ActivityDashboard';
+import RevealAt from './components/RevealAt';
 import {
   createStarterFolders,
   createStarterWorkflow,
@@ -217,6 +217,7 @@ function App() {
   const [participants, setParticipants] = useState(initParticipants);
   const [isJoined, setIsJoined] = useState(!!(saved?.userName && saved?.workshopCode && (saved?.fileTree || saved?.workflows)));
   const [workshopEnded, setWorkshopEnded] = useState(false);
+  const [currentStage, setCurrentStage] = useState('6');
   const [myParticipantId, setMyParticipantId] = useState(null);
   const [activeDm, setActiveDm] = useState(null);
   const [unreadDmCounts, setUnreadDmCounts] = useState({});
@@ -235,6 +236,7 @@ function App() {
         if (result?.error === 'deprecated') { setWorkshopEnded(true); return; }
         if (result?.error || !result?.id || !userName) return;
         const roomId = result.id;
+        if (result.current_stage) setCurrentStage(result.current_stage);
 
         const myColor = participants.find(p => p.name === userName)?.color || COLORS[0];
         const authUser = await sb.getUser();
@@ -352,6 +354,7 @@ function App() {
       },
       onRoomChange: (row) => {
         if (row?.deprecated_at) setWorkshopEnded(true);
+        if (row?.current_stage) setCurrentStage(row.current_stage);
       },
     });
   }
@@ -400,6 +403,7 @@ function App() {
     const result = await sb.joinRoom(code);
     if (result?.error) return result;
     const roomId = result.id;
+    if (result.current_stage) setCurrentStage(result.current_stage);
 
     // Load from Supabase granular tables
     let files, cws, tls, wfs, runs;
@@ -1188,18 +1192,26 @@ Be concise. Confirm actions after completing them.${knowledgeSection}`;
           <button className={`tab-nav-item${activeTab === 'chat' ? ' active' : ''}`} onClick={() => { setActiveTab('chat'); setChatBadge(false); }}>
             Chat{chatBadge && activeTab !== 'chat' && <span className="tab-badge" />}
           </button>
-          <button className={`tab-nav-item${activeTab === 'files' ? ' active' : ''}`} onClick={() => setActiveTab('files')}>
-            Files
-          </button>
-          <button className={`tab-nav-item${activeTab === 'coworkers' ? ' active' : ''}`} onClick={() => setActiveTab('coworkers')}>
-            Coworkers{coworkers && coworkers.length > 0 && <span className="tab-count">{coworkers.length}</span>}
-          </button>
-<button className={`tab-nav-item${activeTab === 'workflow' ? ' active' : ''}`} onClick={() => { setActiveTab('workflow'); setWorkflowBadge(false); }}>
-            Workflow{hasActiveRuns && <span className="tab-running-dot" />}
-          </button>
-          <button className={`tab-nav-item${activeTab === 'activity' ? ' active' : ''}`} onClick={() => setActiveTab('activity')}>
-            Activity{activeRuns.length > 0 && activeTab !== 'activity' && <span className="tab-count">{activeRuns.length}</span>}
-          </button>
+          <RevealAt stage="3" currentStage={currentStage}>
+            <button className={`tab-nav-item${activeTab === 'files' ? ' active' : ''}`} onClick={() => setActiveTab('files')}>
+              Files
+            </button>
+          </RevealAt>
+          <RevealAt stage="5a" currentStage={currentStage}>
+            <button className={`tab-nav-item${activeTab === 'coworkers' ? ' active' : ''}`} onClick={() => setActiveTab('coworkers')}>
+              Coworkers{coworkers && coworkers.length > 0 && <span className="tab-count">{coworkers.length}</span>}
+            </button>
+          </RevealAt>
+          <RevealAt stage="6" currentStage={currentStage}>
+            <button className={`tab-nav-item${activeTab === 'workflow' ? ' active' : ''}`} onClick={() => { setActiveTab('workflow'); setWorkflowBadge(false); }}>
+              Workflow{hasActiveRuns && <span className="tab-running-dot" />}
+            </button>
+          </RevealAt>
+          <RevealAt stage="6" currentStage={currentStage}>
+            <button className={`tab-nav-item${activeTab === 'activity' ? ' active' : ''}`} onClick={() => setActiveTab('activity')}>
+              Activity{activeRuns.length > 0 && activeTab !== 'activity' && <span className="tab-count">{activeRuns.length}</span>}
+            </button>
+          </RevealAt>
         </nav>
         <div className="app-header-right">
           <span className="header-user-name">{userName}</span>

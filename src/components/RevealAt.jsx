@@ -15,13 +15,13 @@ export function nextStage(currentStage) {
 }
 
 export const STAGE_META = {
-  '1':  { label: 'Chat',                description: 'AI conversation + human DMs.' },
-  '2':  { label: 'Preferences',         description: 'Personal context: the AI shaped to me.' },
-  '3':  { label: 'Files as context',    description: 'Knowledge the AI can draw from.' },
-  '4':  { label: 'Files as skills',     description: 'Instructions that shape how the AI responds.' },
-  '5a': { label: 'AI Coworkers',        description: 'Build named AI teammates with their own instructions + knowledge.' },
-  '5b': { label: 'Coworker Tools',      description: 'Give coworkers capabilities — research, DM humans, process documents.' },
-  '6':  { label: 'Strategic Delegation', description: 'Input a strategy; see how work redistributes across humans + AI. The closing act.' },
+  '1':  { label: 'Chat',                 description: 'Chat with AI and message the humans in the room.' },
+  '2':  { label: 'Preferences',          description: 'Teach the AI who you are and how you like to work.' },
+  '3':  { label: 'Files as context',     description: 'Add files the AI can draw from when it answers you.' },
+  '4':  { label: 'Files as skills',      description: 'Write files that shape how the AI thinks and responds.' },
+  '5a': { label: 'AI Coworkers',         description: 'Build named AI teammates with their own knowledge and style.' },
+  '5b': { label: 'Coworker Tools',       description: 'Give your coworkers tools to research, message, and take action.' },
+  '6':  { label: 'Strategic Delegation', description: 'Map a strategy and see how work redistributes across humans and AI.' },
 };
 
 export { STAGE_ORDER };

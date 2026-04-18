@@ -1287,8 +1287,11 @@ Be concise. Confirm actions after completing them.${knowledgeSection}`;
       {justRevealed && (
         <div className="modal-overlay reveal-modal-overlay" onClick={() => setJustRevealed(null)}>
           <div className="reveal-modal" role="status" onClick={e => e.stopPropagation()}>
-            <div className="reveal-modal-eyebrow">New capability unlocked</div>
+            <div className="reveal-modal-eyebrow">New Stage Unlocked</div>
             <div className="reveal-modal-title">{STAGE_META[justRevealed]?.label || justRevealed}</div>
+            {STAGE_META[justRevealed]?.description && (
+              <p className="reveal-modal-desc">{STAGE_META[justRevealed].description}</p>
+            )}
             <button className="reveal-modal-btn" onClick={() => setJustRevealed(null)}>Got it</button>
           </div>
         </div>

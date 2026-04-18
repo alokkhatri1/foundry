@@ -4230,7 +4230,14 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
   line-height: 1.1;
   letter-spacing: -0.02em;
   color: #fff;
-  margin: 0 0 32px;
+  margin: 0 0 16px;
+}
+.reveal-modal-desc {
+  font-size: 15px;
+  line-height: 1.55;
+  color: rgba(255, 255, 255, 0.8);
+  max-width: 340px;
+  margin: 0 0 28px;
 }
 .reveal-modal-btn {
   background: var(--accent-gold);

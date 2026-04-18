@@ -53,6 +53,13 @@ export default function AdminDashboard({ sb, user, onBack }) {
     await loadWorkshops();
   }
 
+  async function handleDeprecate(workshopId) {
+    if (!confirm('Deprecate this workshop? Participants will be moved to an ended screen. Data is preserved read-only as a past workshop.')) return;
+    await sb.deprecateWorkshop(workshopId);
+    if (selected?.id === workshopId) setSelected(null);
+    await loadWorkshops();
+  }
+
   async function handleSelect(workshop) {
     setSelected(workshop);
     setDetailTab('participants');
@@ -272,31 +279,65 @@ export default function AdminDashboard({ sb, user, onBack }) {
             </button>
           </div>
         ) : (
-          <div className="admin-grid">
-            {workshops.map(w => {
-              const s = stats[w.id] || {};
-              return (
-                <div key={w.id} className="admin-workshop-card">
-                  <div className="admin-card-top" onClick={() => handleSelect(w)}>
-                    <div className="admin-workshop-name">{w.org_name}</div>
-                    <div className="admin-workshop-code-display" onClick={e => { e.stopPropagation(); copyCode(w.code); }}>
-                      {w.code}
-                      <span className="admin-copy-hint">{copied === w.code ? 'Copied!' : 'Copy'}</span>
+          <>
+            {workshops.filter(w => !w.deprecated_at).length > 0 && (
+              <div className="admin-grid">
+                {workshops.filter(w => !w.deprecated_at).map(w => {
+                  const s = stats[w.id] || {};
+                  return (
+                    <div key={w.id} className="admin-workshop-card">
+                      <div className="admin-card-top" onClick={() => handleSelect(w)}>
+                        <div className="admin-workshop-name">{w.org_name}</div>
+                        <div className="admin-workshop-code-display" onClick={e => { e.stopPropagation(); copyCode(w.code); }}>
+                          {w.code}
+                          <span className="admin-copy-hint">{copied === w.code ? 'Copied!' : 'Copy'}</span>
+                        </div>
+                      </div>
+                      <div className="admin-card-stats" onClick={() => handleSelect(w)}>
+                        <span>{s.participants || 0} participants</span>
+                        <span>{s.files || 0} files</span>
+                        <span>{s.coworkers || 0} coworkers</span>
+                      </div>
+                      <div className="admin-card-footer">
+                        <span className="admin-workshop-date">{new Date(w.created_at).toLocaleDateString()}</span>
+                        <div style={{ display: 'flex', gap: 8 }}>
+                          <button className="admin-delete-btn" onClick={e => { e.stopPropagation(); handleDeprecate(w.id); }}>Deprecate</button>
+                          <button className="admin-delete-btn" onClick={e => { e.stopPropagation(); handleDelete(w.id); }}>Delete</button>
+                        </div>
+                      </div>
                     </div>
-                  </div>
-                  <div className="admin-card-stats" onClick={() => handleSelect(w)}>
-                    <span>{s.participants || 0} participants</span>
-                    <span>{s.files || 0} files</span>
-                    <span>{s.coworkers || 0} coworkers</span>
-                  </div>
-                  <div className="admin-card-footer">
-                    <span className="admin-workshop-date">{new Date(w.created_at).toLocaleDateString()}</span>
-                    <button className="admin-delete-btn" onClick={e => { e.stopPropagation(); handleDelete(w.id); }}>Delete</button>
-                  </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {workshops.filter(w => w.deprecated_at).length > 0 && (
+              <div style={{ marginTop: 40 }}>
+                <h2 className="admin-list-title" style={{ opacity: 0.7 }}>Past Workshops</h2>
+                <div className="admin-grid">
+                  {workshops.filter(w => w.deprecated_at).map(w => {
+                    const s = stats[w.id] || {};
+                    return (
+                      <div key={w.id} className="admin-workshop-card" style={{ opacity: 0.75 }}>
+                        <div className="admin-card-top" onClick={() => handleSelect(w)}>
+                          <div className="admin-workshop-name">{w.org_name}</div>
+                          <div className="admin-workshop-code-display">{w.code}</div>
+                        </div>
+                        <div className="admin-card-stats" onClick={() => handleSelect(w)}>
+                          <span>{s.participants || 0} participants</span>
+                          <span>{s.files || 0} files</span>
+                          <span>{s.coworkers || 0} coworkers</span>
+                        </div>
+                        <div className="admin-card-footer">
+                          <span className="admin-workshop-date">Delivered {new Date(w.deprecated_at).toLocaleDateString()}</span>
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
-              );
-            })}
-          </div>
+              </div>
+            )}
+          </>
         )}
       </div>
 

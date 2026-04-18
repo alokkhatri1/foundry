@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useMemo } from 'react';
+import DirectMessageThread from './DirectMessageThread';
 import { parseFile, getFileCategory, getFileIcon } from '../utils/fileParser';
 import ToolExecutionCard from './ToolExecutionCard';
 import EducationalCue from './EducationalCue';
@@ -193,7 +194,7 @@ function findNode(tree, id) {
 }
 
 // ===== Slack-style Context Sidebar =====
-function ContextSidebar({ fileTree, selectedFileIds, onToggleFile, onToggleFolder, onOpenFile, editingFileId, participants, currentUserName, coworkers, activeCoworkerId, onSelectCoworker, showEducationalCues, conversations, activeConvoId, onNewChat, onSelectConvo, onDeleteConvo }) {
+function ContextSidebar({ fileTree, selectedFileIds, onToggleFile, onToggleFolder, onOpenFile, editingFileId, participants, currentUserName, coworkers, activeCoworkerId, onSelectCoworker, showEducationalCues, conversations, activeConvoId, onNewChat, onSelectConvo, onDeleteConvo, onOpenDm, activeDm }) {
   const [collapsedSections, setCollapsedSections] = useState(() => {
     // Default all folders to collapsed
     const collapsed = {};
@@ -319,7 +320,7 @@ function ContextSidebar({ fileTree, selectedFileIds, onToggleFile, onToggleFolde
       {coworkers && coworkers.length > 0 && (
         <div className="sl-section sl-agents-section">
           <div className="sl-section-header" onClick={() => toggleSection('agents')}>
-            <span className="sl-section-name">AI Co-workers</span>
+            <span className="sl-section-name">AI Coworkers</span>
             <span className="sl-section-count">{coworkers.length}</span>
           </div>
           {!collapsedSections['agents'] && coworkers.map(cw => (
@@ -338,23 +339,40 @@ function ContextSidebar({ fileTree, selectedFileIds, onToggleFile, onToggleFolde
       {/* Co-workers / People */}
       <div className="sl-section sl-people-section">
         <div className="sl-section-header" onClick={() => toggleSection('people')}>
-          <span className="sl-section-name">Co-workers</span>
+          <span className="sl-section-name">Coworkers</span>
           <span className="sl-section-count">{online.length}</span>
         </div>
         {!collapsedSections['people'] && (
           <>
-            {online.map(p => (
-              <div key={p.id} className="sl-dm online">
-                <span className="sl-dm-status on"></span>
-                <span className="sl-dm-name">{p.name}{p.name === currentUserName ? ' (you)' : ''}</span>
-              </div>
-            ))}
-            {offline.map(p => (
-              <div key={p.id} className="sl-dm">
-                <span className="sl-dm-status"></span>
-                <span className="sl-dm-name">{p.name}</span>
-              </div>
-            ))}
+            {online.map(p => {
+              const isMe = p.name === currentUserName;
+              const isActive = activeDm?.name === p.name;
+              return (
+                <div
+                  key={p.id}
+                  className={`sl-dm online${isActive ? ' active-agent' : ''}`}
+                  style={{ cursor: isMe ? 'default' : 'pointer' }}
+                  onClick={() => !isMe && onOpenDm && onOpenDm(p)}
+                >
+                  <span className="sl-dm-status on"></span>
+                  <span className="sl-dm-name">{p.name}{isMe ? ' (you)' : ''}</span>
+                </div>
+              );
+            })}
+            {offline.map(p => {
+              const isActive = activeDm?.name === p.name;
+              return (
+                <div
+                  key={p.id}
+                  className={`sl-dm${isActive ? ' active-agent' : ''}`}
+                  style={{ cursor: 'pointer' }}
+                  onClick={() => onOpenDm && onOpenDm(p)}
+                >
+                  <span className="sl-dm-status"></span>
+                  <span className="sl-dm-name">{p.name}</span>
+                </div>
+              );
+            })}
           </>
         )}
       </div>
@@ -381,7 +399,7 @@ function InlineEditor({ file, onUpdateContent, onClose }) {
 }
 
 // ===== Main ChatPanel =====
-export default function ChatPanel({ messages, onSendMessage, onApprovalAction, onRetry, isLoading, participants, currentUserName, fileTree, onUpdateFileContent, coworkers, showEducationalCues, conversations, activeConvoId, onNewChat, onSelectConvo, onDeleteConvo }) {
+export default function ChatPanel({ messages, onSendMessage, onApprovalAction, onRetry, isLoading, participants, currentUserName, fileTree, onUpdateFileContent, coworkers, showEducationalCues, conversations, activeConvoId, onNewChat, onSelectConvo, onDeleteConvo, activeDm, onOpenDm, onCloseDm, myParticipantId, sb }) {
   const [input, setInput] = useState('');
   const [selectedFileIds, setSelectedFileIds] = useState([]);
   const [editingFileId, setEditingFileId] = useState(null);
@@ -559,6 +577,8 @@ export default function ChatPanel({ messages, onSendMessage, onApprovalAction, o
         onNewChat={onNewChat}
         onSelectConvo={onSelectConvo}
         onDeleteConvo={onDeleteConvo}
+        onOpenDm={onOpenDm}
+        activeDm={activeDm}
       />
 
       {/* Middle: file editor (when open) */}
@@ -570,7 +590,15 @@ export default function ChatPanel({ messages, onSendMessage, onApprovalAction, o
         />
       )}
 
-      {/* Right: chat */}
+      {/* Right: DM thread or chat */}
+      {activeDm ? (
+        <DirectMessageThread
+          myParticipantId={myParticipantId}
+          otherParticipant={activeDm}
+          sb={sb}
+          onBack={onCloseDm}
+        />
+      ) : (
       <div className="cl-chat-main">
         {isEmpty ? (
           <div className="cl-center-layout">
@@ -602,6 +630,7 @@ export default function ChatPanel({ messages, onSendMessage, onApprovalAction, o
           </>
         )}
       </div>
+      )}
     </div>
   );
 }

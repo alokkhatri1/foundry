@@ -6,6 +6,7 @@ import FileEditor from './components/FileEditor';
 import WorkflowBuilder from './components/WorkflowBuilder';
 import CoworkerBuilder from './components/CoworkerBuilder';
 import ChatPanel from './components/ChatPanel';
+import DirectMessageThread from './components/DirectMessageThread';
 import ActivityDashboard from './components/ActivityDashboard';
 import {
   createStarterFolders,
@@ -215,6 +216,9 @@ function App() {
 
   const [participants, setParticipants] = useState(initParticipants);
   const [isJoined, setIsJoined] = useState(!!(saved?.userName && saved?.workshopCode && (saved?.fileTree || saved?.workflows)));
+  const [workshopEnded, setWorkshopEnded] = useState(false);
+  const [myParticipantId, setMyParticipantId] = useState(null);
+  const [activeDm, setActiveDm] = useState(null);
 
   const approvalResolversRef = useRef(new Map());
   const activeTabRef = useRef(activeTab);
@@ -224,11 +228,15 @@ function App() {
   // On load: reconnect to Supabase, load state from granular tables, start presence + realtime
   useEffect(() => {
     if (isJoined && workshopCode) {
-      sb.joinRoom(workshopCode, orgName).then(async (roomId) => {
-        if (!roomId || !userName) return;
+      sb.joinRoom(workshopCode).then(async (result) => {
+        if (result?.error === 'deprecated') { setWorkshopEnded(true); return; }
+        if (result?.error || !result?.id || !userName) return;
+        const roomId = result.id;
 
         const myColor = participants.find(p => p.name === userName)?.color || COLORS[0];
-        sb.upsertParticipant(userName, myColor);
+        const authUser = await sb.getUser();
+        const me = await sb.upsertParticipant(userName, myColor, authUser?.id);
+        if (me?.id) setMyParticipantId(me.id);
 
         // Load state from granular tables
         const [files, cws, tls, wfs, dbParticipants] = await Promise.all([
@@ -339,11 +347,28 @@ function App() {
           });
         }
       },
+      onRoomChange: (row) => {
+        if (row?.deprecated_at) setWorkshopEnded(true);
+      },
     });
   }
 
-  async function handleJoin(name, code) {
-    const roomId = await sb.joinRoom(code, 'My Organization');
+  async function handleOpenDm(participant) {
+    if (!participant?.name || participant.name === userName) return;
+    const supabaseId = await sb.findParticipantIdByName(participant.name);
+    if (supabaseId) {
+      setActiveDm({ id: supabaseId, name: participant.name, color: participant.color });
+    }
+  }
+
+  function handleCloseDm() {
+    setActiveDm(null);
+  }
+
+  async function handleJoin(name, code, authUserId) {
+    const result = await sb.joinRoom(code);
+    if (result?.error) return result;
+    const roomId = result.id;
 
     // Load from Supabase granular tables
     let files, cws, tls, wfs, runs;
@@ -389,7 +414,7 @@ function App() {
       ? existingParticipants.map(p => p.name === name ? { ...p, online: true, lastSeen: Date.now() } : p)
       : [...existingParticipants, { id: 'p-' + Date.now(), name, color, online: true, joinedAt: Date.now(), lastSeen: Date.now() }];
 
-    sb.upsertParticipant(name, color);
+    sb.upsertParticipant(name, color, authUserId).then(me => { if (me?.id) setMyParticipantId(me.id); });
     sb.trackPresence(name, color, handlePresenceSync);
     startRealtimeSync();
 
@@ -1057,6 +1082,28 @@ Be concise. Confirm actions after completing them.${knowledgeSection}`;
   const activeRuns = workflowRuns.filter(r => r.status === 'running' || r.status === 'waiting_approval');
   const hasActiveRuns = activeRuns.length > 0;
 
+  if (workshopEnded) {
+    return (
+      <div className="landing">
+        <div className="landing-content" style={{ flexDirection: 'column', alignItems: 'center', gap: 24, textAlign: 'center', paddingTop: 80 }}>
+          <h1 className="landing-title">This workshop has ended</h1>
+          <p className="landing-subtitle" style={{ maxWidth: 480 }}>
+            Thanks for participating. All your work is preserved in the workshop archive.
+          </p>
+          <button className="landing-join-btn" style={{ width: 'auto', padding: '12px 32px' }} onClick={() => {
+            try { localStorage.removeItem('sandbox:state'); } catch {}
+            setIsJoined(false);
+            setWorkshopCode('');
+            setWorkshopEnded(false);
+            sb.signOut();
+          }}>
+            Sign Out
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <AuthGate onJoin={handleJoin} workshopCode={isJoined ? workshopCode : null}>
     <div className="app-shell">
@@ -1137,6 +1184,11 @@ Be concise. Confirm actions after completing them.${knowledgeSection}`;
               onNewChat={handleNewChat}
               onSelectConvo={handleSelectConvo}
               onDeleteConvo={handleDeleteConvo}
+              activeDm={activeDm}
+              onOpenDm={handleOpenDm}
+              onCloseDm={handleCloseDm}
+              myParticipantId={myParticipantId}
+              sb={sb}
             />
           </div>
         )}

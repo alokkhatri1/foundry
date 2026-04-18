@@ -11,7 +11,16 @@ export default function JoinScreen({ user, isAdmin, onJoin, onSignOut, onAdminDa
     if (!code.trim()) { setError('Please enter a workshop code.'); return; }
     setError('');
     setJoining(true);
-    await onJoin(userName, code.trim().toUpperCase());
+    const result = await onJoin(userName, code.trim().toUpperCase(), user?.id);
+    if (result?.error) {
+      const msg = result.error === 'not_found'
+        ? 'Workshop code not found.'
+        : result.error === 'deprecated'
+        ? 'This workshop has ended.'
+        : 'Could not join workshop.';
+      setError(msg);
+      setJoining(false);
+    }
   }
 
   return (

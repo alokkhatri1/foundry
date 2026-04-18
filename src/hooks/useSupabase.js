@@ -29,12 +29,6 @@ export default function useSupabase() {
     if (error) console.error('[sb] Google sign-in:', error.message);
   }, []);
 
-  const signInWithLinkedin = useCallback(async () => {
-    if (!isSupabaseConfigured) return;
-    const { error } = await supabase.auth.signInWithOAuth({ provider: 'linkedin_oidc' });
-    if (error) console.error('[sb] LinkedIn sign-in:', error.message);
-  }, []);
-
   const signInWithMagicLink = useCallback(async (email) => {
     if (!isSupabaseConfigured) return { error: { message: 'Supabase not configured' } };
     const redirectTo = window.location.origin || window.location.href.split('/').slice(0, 3).join('/');
@@ -78,7 +72,7 @@ export default function useSupabase() {
   const loadAdminWorkshops = useCallback(async (adminId) => {
     if (!isSupabaseConfigured) return [];
     const { data, error } = await supabase.from('rooms')
-      .select('id, code, org_name, created_at')
+      .select('id, code, org_name, created_at, deprecated_at')
       .eq('admin_id', adminId)
       .order('created_at', { ascending: false });
     if (error) { console.error('[sb] loadAdminWorkshops:', error.message); return []; }
@@ -96,6 +90,14 @@ export default function useSupabase() {
     // Cascade delete handled by foreign keys
     const { error } = await supabase.from('rooms').delete().eq('id', roomId);
     if (error) console.error('[sb] deleteWorkshop:', error.message);
+  }, []);
+
+  const deprecateWorkshop = useCallback(async (roomId) => {
+    if (!isSupabaseConfigured) return;
+    const { error } = await supabase.from('rooms')
+      .update({ deprecated_at: new Date().toISOString() })
+      .eq('id', roomId);
+    if (error) console.error('[sb] deprecateWorkshop:', error.message);
   }, []);
 
   const loadWorkshopStats = useCallback(async (roomId) => {
@@ -200,28 +202,34 @@ export default function useSupabase() {
   }, []);
 
   // ===== Room: create or join =====
-  const joinRoom = useCallback(async (code, orgName) => {
-    if (!isSupabaseConfigured) return null;
+  const joinRoom = useCallback(async (code) => {
+    if (!isSupabaseConfigured) return { error: 'not_configured' };
     const { data: room, error } = await supabase
       .from('rooms')
-      .upsert({ code, org_name: orgName }, { onConflict: 'code' })
-      .select('id')
-      .single();
-    if (error) { console.error('[sb] joinRoom:', error.message); return null; }
+      .select('id, deprecated_at')
+      .eq('code', code)
+      .maybeSingle();
+    if (error) { console.error('[sb] joinRoom:', error.message); return { error: 'db_error' }; }
+    if (!room) return { error: 'not_found' };
+    if (room.deprecated_at) return { error: 'deprecated' };
     roomIdRef.current = room.id;
     console.log('[sb] joined room:', room.id);
-    return room.id;
+    return { id: room.id };
   }, []);
 
   const getRoomId = useCallback(() => roomIdRef.current, []);
 
   // ===== Participant =====
-  const upsertParticipant = useCallback(async (name, color) => {
-    if (!isSupabaseConfigured || !roomIdRef.current) return;
-    await supabase.from('participants').upsert(
-      { room_id: roomIdRef.current, name, color, online: true, last_seen_at: new Date().toISOString() },
+  const upsertParticipant = useCallback(async (name, color, authUserId) => {
+    if (!isSupabaseConfigured || !roomIdRef.current) return null;
+    const row = { room_id: roomIdRef.current, name, color, online: true, last_seen_at: new Date().toISOString() };
+    if (authUserId) row.auth_user_id = authUserId;
+    const { data, error } = await supabase.from('participants').upsert(
+      row,
       { onConflict: 'room_id,name' }
-    );
+    ).select('id, name, color').single();
+    if (error) { console.error('[sb] upsertParticipant:', error.message); return null; }
+    return data;
   }, []);
 
   const loadParticipants = useCallback(async () => {
@@ -231,6 +239,58 @@ export default function useSupabase() {
       id: p.id, name: p.name, color: p.color, online: false,
       joinedAt: new Date(p.joined_at).getTime(), lastSeen: new Date(p.last_seen_at).getTime(),
     }));
+  }, []);
+
+  const findParticipantIdByName = useCallback(async (name) => {
+    if (!isSupabaseConfigured || !roomIdRef.current) return null;
+    const { data } = await supabase.from('participants')
+      .select('id')
+      .eq('room_id', roomIdRef.current)
+      .eq('name', name)
+      .maybeSingle();
+    return data?.id || null;
+  }, []);
+
+  // ===== Direct messages =====
+  const sendDm = useCallback(async (fromParticipantId, toParticipantId, content) => {
+    if (!isSupabaseConfigured || !roomIdRef.current) return null;
+    const { data, error } = await supabase.from('direct_messages').insert({
+      room_id: roomIdRef.current,
+      from_participant_id: fromParticipantId,
+      to_participant_id: toParticipantId,
+      content,
+    }).select().single();
+    if (error) { console.error('[sb] sendDm:', error.message); return null; }
+    return data;
+  }, []);
+
+  const fetchDmThread = useCallback(async (myParticipantId, otherParticipantId) => {
+    if (!isSupabaseConfigured || !roomIdRef.current) return [];
+    const { data, error } = await supabase.from('direct_messages')
+      .select('*')
+      .eq('room_id', roomIdRef.current)
+      .or(`and(from_participant_id.eq.${myParticipantId},to_participant_id.eq.${otherParticipantId}),and(from_participant_id.eq.${otherParticipantId},to_participant_id.eq.${myParticipantId})`)
+      .order('created_at', { ascending: true });
+    if (error) { console.error('[sb] fetchDmThread:', error.message); return []; }
+    return data || [];
+  }, []);
+
+  const subscribeToDms = useCallback((myParticipantId, onNewMessage) => {
+    if (!isSupabaseConfigured || !roomIdRef.current) return () => {};
+    const channel = supabase.channel(`dms:${roomIdRef.current}:${myParticipantId}`)
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'direct_messages',
+        filter: `room_id=eq.${roomIdRef.current}`,
+      }, (payload) => {
+        const dm = payload.new;
+        if (dm.from_participant_id === myParticipantId || dm.to_participant_id === myParticipantId) {
+          onNewMessage(dm);
+        }
+      })
+      .subscribe();
+    return () => supabase.removeChannel(channel);
   }, []);
 
   // ===== Files (granular) =====
@@ -419,6 +479,9 @@ export default function useSupabase() {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'workflows', filter: `room_id=eq.${roomIdRef.current}` }, (payload) => {
         if (handlers.onWorkflowChange) handlers.onWorkflowChange(payload.eventType, payload.new, payload.old);
       })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'rooms', filter: `id=eq.${roomIdRef.current}` }, (payload) => {
+        if (handlers.onRoomChange) handlers.onRoomChange(payload.new, payload.old);
+      })
       .subscribe();
 
     realtimeChannelRef.current = channel;
@@ -472,15 +535,16 @@ export default function useSupabase() {
   return {
     isConfigured: isSupabaseConfigured,
     // Auth
-    getSession, getUser, signInWithGoogle, signInWithLinkedin, signInWithMagicLink,
+    getSession, getUser, signInWithGoogle, signInWithMagicLink,
     signOut, checkIsAdmin, onAuthStateChange,
     // Admin
     createWorkshop, loadAdminWorkshops, loadWorkshopParticipants,
-    deleteWorkshop, loadWorkshopStats, loadWorkshopContent, loadWorkshopActivity,
+    deleteWorkshop, deprecateWorkshop, loadWorkshopStats, loadWorkshopContent, loadWorkshopActivity,
     seedWorkshopContent, subscribeToWorkshopPresence,
     // Room
     joinRoom, getRoomId,
-    upsertParticipant, loadParticipants,
+    upsertParticipant, loadParticipants, findParticipantIdByName,
+    sendDm, fetchDmThread, subscribeToDms,
     loadFiles, saveFile, deleteFile, saveFilesBatch,
     loadCoworkers, saveCoworker, deleteCoworker,
     loadTools, saveTool, deleteTool,

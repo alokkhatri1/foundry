@@ -4043,8 +4043,47 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
   gap: 10px;
   min-height: 0;
 }
-.dm-messages > :first-child {
-  margin-top: auto;
+/* Flat DM layout — matches AI coworker chat style (no bubbles) */
+.cl-dm-flat {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px 0;
+}
+.cl-dm-flat-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.cl-dm-flat-avatar {
+  width: 20px;
+  height: 20px;
+  border-radius: 5px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 700;
+  color: #fff;
+  flex-shrink: 0;
+}
+.cl-dm-flat-name {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: var(--text-body);
+}
+.cl-dm-flat-body {
+  color: var(--text-body);
+  line-height: 1.55;
+  padding-left: 28px;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+}
+.cl-dm-flat-time {
+  font-size: 11px;
+  color: var(--text-muted, #888);
+  padding-left: 28px;
 }
 .dm-empty {
   color: var(--text-muted, #888);

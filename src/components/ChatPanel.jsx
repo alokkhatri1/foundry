@@ -674,10 +674,18 @@ export default function ChatPanel({ messages, onSendMessage, onApprovalAction, o
               ) : (
                 dmMessages.map(m => {
                   const isMine = m.from_participant_id === myParticipantId;
+                  const senderName = isMine ? (currentUserName || 'Me') : activeDm.name;
+                  const senderColor = isMine ? '#4a7fb5' : (activeDm.color || '#888');
                   return (
-                    <div key={m.id} className={`dm-message${isMine ? ' mine' : ''}`}>
-                      <div className="dm-bubble">{m.content}</div>
-                      <div className="dm-time">{new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
+                    <div key={m.id} className="cl-dm-flat">
+                      <div className="cl-dm-flat-header">
+                        <span className="cl-dm-flat-avatar" style={{ background: senderColor }}>
+                          {senderName?.charAt(0)?.toUpperCase()}
+                        </span>
+                        <span className="cl-dm-flat-name">{senderName?.toUpperCase()}</span>
+                      </div>
+                      <div className="cl-dm-flat-body">{m.content}</div>
+                      <div className="cl-dm-flat-time">{new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
                     </div>
                   );
                 })

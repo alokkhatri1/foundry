@@ -194,7 +194,7 @@ function findNode(tree, id) {
 }
 
 // ===== Slack-style Context Sidebar =====
-function ContextSidebar({ fileTree, selectedFileIds, onToggleFile, onToggleFolder, onOpenFile, editingFileId, participants, currentUserName, coworkers, activeCoworkerId, onSelectCoworker, showEducationalCues, conversations, activeConvoId, onNewChat, onSelectConvo, onDeleteConvo, onOpenDm, activeDm, unreadDmCounts, currentStage }) {
+function ContextSidebar({ fileTree, selectedFileIds, onToggleFile, onToggleFolder, onOpenFile, editingFileId, participants, currentUserName, coworkers, activeCoworkerId, onSelectCoworker, showEducationalCues, conversations, activeConvoId, onNewChat, onSelectConvo, onDeleteConvo, onOpenDm, activeDm, unreadDmCounts, currentStage, sb }) {
   const [collapsedSections, setCollapsedSections] = useState(() => {
     // Default all folders to collapsed
     const collapsed = {};
@@ -235,8 +235,11 @@ function ContextSidebar({ fileTree, selectedFileIds, onToggleFile, onToggleFolde
   }
 
   const departments = getDepartments();
-  const online = (participants || []).filter(p => p.online);
-  const offline = (participants || []).filter(p => !p.online);
+  // Humans only — AI coworker mirror participants (kind='ai') are rendered
+  // via the separate AI Coworkers section.
+  const humanParticipants = (participants || []).filter(p => (p.kind || 'human') === 'human');
+  const online = humanParticipants.filter(p => p.online);
+  const offline = humanParticipants.filter(p => !p.online);
   const activeCount = selectedFileIds.length;
   const filterTerm = searchFilter.toLowerCase().trim();
 
@@ -325,16 +328,31 @@ function ContextSidebar({ fileTree, selectedFileIds, onToggleFile, onToggleFolde
             <span className="sl-section-name">AI Coworkers</span>
             <span className="sl-section-count">{coworkers.length}</span>
           </div>
-          {!collapsedSections['agents'] && coworkers.map(cw => (
-            <div
-              key={cw.id}
-              className={`sl-dm sl-agent-item${activeCoworkerId === cw.id ? ' active-agent' : ''}`}
-              onClick={() => onSelectCoworker(cw.id)}
-            >
-              <span className="sl-agent-emoji"><CoworkerGlyph avatar={cw.avatar} size={14} color="currentColor" /></span>
-              <span className="sl-dm-name">{cw.name}</span>
-            </div>
-          ))}
+          {!collapsedSections['agents'] && coworkers.map(cw => {
+            const unread = (unreadDmCounts && unreadDmCounts[cw.name]) || 0;
+            const canDm = stageReached(currentStage, '5c') && sb?.getCoworkerParticipantId;
+            const handleOpenAiDm = async (e) => {
+              e.stopPropagation();
+              const mirrorId = await sb.getCoworkerParticipantId(cw.id);
+              if (mirrorId && onOpenDm) {
+                onOpenDm({ id: mirrorId, name: cw.name, color: cw.color, kind: 'ai', coworkerId: cw.id });
+              }
+            };
+            return (
+              <div
+                key={cw.id}
+                className={`sl-dm sl-agent-item${activeCoworkerId === cw.id ? ' active-agent' : ''}${unread > 0 ? ' has-unread' : ''}`}
+                onClick={() => onSelectCoworker(cw.id)}
+              >
+                <span className="sl-agent-emoji"><CoworkerGlyph avatar={cw.avatar} size={14} color="currentColor" /></span>
+                <span className="sl-dm-name">{cw.name}</span>
+                {unread > 0 && <span className="sl-dm-badge">{unread}</span>}
+                {canDm && (
+                  <button className="sl-ai-dm-btn" onClick={handleOpenAiDm} title={`DM ${cw.name}`}>{'\u2709\uFE0F'}</button>
+                )}
+              </div>
+            );
+          })}
         </div>
       )}
 
@@ -651,6 +669,7 @@ export default function ChatPanel({ messages, onSendMessage, onApprovalAction, o
         activeDm={activeDm}
         unreadDmCounts={unreadDmCounts}
         currentStage={currentStage}
+        sb={sb}
       />
 
       {/* Middle: file editor (when open) */}

@@ -4308,6 +4308,21 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
   line-height: 1.4;
 }
 
+/* Stage 5c — compact DM button on AI coworker rows */
+.sl-ai-dm-btn {
+  margin-left: auto;
+  background: transparent;
+  border: none;
+  color: inherit;
+  padding: 2px 6px;
+  font-size: 12px;
+  cursor: pointer;
+  opacity: 0.6;
+  border-radius: 4px;
+}
+.sl-ai-dm-btn:hover { opacity: 1; background: rgba(255,255,255,0.08); }
+.sl-dm-badge + .sl-ai-dm-btn { margin-left: 4px; }
+
 /* ===== Direct Message Thread ===== */
 .dm-thread {
   display: flex;

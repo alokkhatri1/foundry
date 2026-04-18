@@ -135,6 +135,17 @@ const COMMUNICATE_TEMPLATES = {
       return await onSendDm(p.recipient_name, p.message);
     },
   },
+  ask_human: {
+    name: 'Ask Human',
+    parameters: [
+      { name: 'recipient_name', label: 'Recipient', type: 'string', required: true, description: 'Full name of an online workshop participant' },
+      { name: 'question', label: 'Question', type: 'string', required: true, description: 'The question or item to check with the human' },
+    ],
+    async execute(p, onMessage, onSendDm, onAskHuman) {
+      if (!onAskHuman) return { success: false, output: 'Asking humans is not available in this context.' };
+      return await onAskHuman(p.recipient_name, p.question);
+    },
+  },
   notify_person: {
     name: 'Notify Person',
     parameters: [
@@ -370,7 +381,7 @@ export async function executeTool(tool, input, fileTree, callClaudeAPI, callback
       case 'create':
         return template.execute(params, callbacks.onCreateFile);
       case 'communicate':
-        return await template.execute(params, callbacks.onMessage, callbacks.onSendDm);
+        return await template.execute(params, callbacks.onMessage, callbacks.onSendDm, callbacks.onAskHuman);
       case 'validate':
         return template.execute(params, tool.config);
       case 'connect':

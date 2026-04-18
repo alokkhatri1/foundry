@@ -34,6 +34,11 @@ const STAGE_GUIDES = {
     invitation: 'Invite them to add a tool to a coworker. This is the jump from assistant to agent.',
     externalReference: 'The shift from "GPT" to "agent" — the AI gains hands. In Liberating Structures terms, the AI is now a peer doing work, not just reflecting.',
   },
+  '5c': {
+    nowAvailable: 'Coworkers can now ask a human teammate for input mid-task. A new Ask Human tool is available to every coworker: the coworker pings a live participant, waits for the reply, and continues with the reply in its context.',
+    invitation: 'Invite them to give their coworker a task that genuinely needs a human\'s judgment, then watch the round-trip. The insight is felt when the human\'s words come back into the AI\'s work.',
+    externalReference: 'This is the foundational primitive of mixed-team work — what people call "human-in-the-loop" in agent systems. Before orchestration or delegation, AI and humans need a way to actually exchange work on one task.',
+  },
   '6': {
     nowAvailable: 'Delegation — a new tab where they can describe a piece of work and see two panels side-by-side: how it looks staffed by humans only (roles + skills) vs. a mixed team of humans and AI coworkers.',
     invitation: 'Invite them to open the Delegation tab and describe a real piece of work from their job. The two-panel view makes the routine-vs-creative split visible — what becomes AI, what stays human.',

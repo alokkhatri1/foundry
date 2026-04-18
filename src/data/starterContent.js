@@ -307,6 +307,22 @@ export const BUILTIN_TOOLS = [
     },
   },
   {
+    id: 'builtin-ask-human',
+    name: 'Ask Human',
+    type: 'communicate',
+    description: 'Ask a specific human teammate a question and wait for their reply. Use when you need a human\'s judgment, confirmation, or missing information to finish the task. The reply is returned to you so you can continue with it in context.',
+    icon: '\uD83D\uDC4B',
+    isBuiltin: true,
+    createdBy: 'System',
+    config: {
+      templateId: 'ask_human',
+      parameters: [
+        { name: 'recipient_name', label: 'Recipient', type: 'string', required: true, description: 'Full name of an online workshop participant' },
+        { name: 'question', label: 'Question', type: 'string', required: true, description: 'The specific question or item to check with them' },
+      ],
+    },
+  },
+  {
     id: 'builtin-process-doc',
     name: 'Process Document',
     type: 'process',

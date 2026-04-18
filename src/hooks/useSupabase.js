@@ -305,16 +305,34 @@ export default function useSupabase() {
     const { data } = await supabase.from('participants').select('*').eq('room_id', roomIdRef.current);
     return (data || []).map(p => ({
       id: p.id, name: p.name, color: p.color, online: false,
+      kind: p.kind || 'human',
+      coworkerId: p.coworker_id || null,
       joinedAt: new Date(p.joined_at).getTime(), lastSeen: new Date(p.last_seen_at).getTime(),
     }));
   }, []);
 
+  // Human-only lookup — used by send_dm (AI coworker DMing a human) and
+  // ask_human (AI picking a human recipient). AI mirror participants are
+  // excluded so an AI can't accidentally DM another AI via this path.
   const findParticipantIdByName = useCallback(async (name) => {
     if (!isSupabaseConfigured || !roomIdRef.current) return null;
     const { data } = await supabase.from('participants')
       .select('id')
       .eq('room_id', roomIdRef.current)
       .eq('name', name)
+      .eq('kind', 'human')
+      .maybeSingle();
+    return data?.id || null;
+  }, []);
+
+  // Resolve an AI coworker's mirror participant id so the coworker can act
+  // as a first-class DM sender/recipient.
+  const getCoworkerParticipantId = useCallback(async (coworkerId) => {
+    if (!isSupabaseConfigured || !roomIdRef.current || !coworkerId) return null;
+    const { data } = await supabase.from('participants')
+      .select('id')
+      .eq('room_id', roomIdRef.current)
+      .eq('coworker_id', coworkerId)
       .maybeSingle();
     return data?.id || null;
   }, []);
@@ -466,6 +484,25 @@ export default function useSupabase() {
     return () => supabase.removeChannel(channel);
   }, []);
 
+  // Subscribe to every DM in the room, regardless of participant. Used to route
+  // replies to pending ask_human calls whose resolver lives on this client (the
+  // participant who initiated the AI chat).
+  const subscribeToAllRoomDms = useCallback((onNewMessage) => {
+    if (!isSupabaseConfigured || !roomIdRef.current) return () => {};
+    const uniq = Math.random().toString(36).slice(2, 10);
+    const channel = supabase.channel(`dms-all:${roomIdRef.current}:${uniq}`)
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'direct_messages',
+        filter: `room_id=eq.${roomIdRef.current}`,
+      }, (payload) => {
+        onNewMessage(payload.new);
+      })
+      .subscribe();
+    return () => supabase.removeChannel(channel);
+  }, []);
+
   // ===== Files (granular) =====
   const loadFiles = useCallback(async () => {
     if (!isSupabaseConfigured || !roomIdRef.current) return [];
@@ -525,7 +562,31 @@ export default function useSupabase() {
       tool_ids: cw.toolIds || [],
       created_by: cw.createdBy, updated_at: new Date().toISOString(),
     }, { onConflict: 'id' });
-    if (error) console.error('[sb] saveCoworker:', error.message);
+    if (error) { console.error('[sb] saveCoworker:', error.message); return; }
+
+    // Mirror the coworker as a first-class `participants` row so it can
+    // appear as a DM sender/recipient (Stage 5c Collaboration).
+    const { data: existing } = await supabase.from('participants')
+      .select('id')
+      .eq('room_id', roomIdRef.current)
+      .eq('coworker_id', cw.id)
+      .maybeSingle();
+    if (existing?.id) {
+      await supabase.from('participants').update({
+        name: cw.name,
+        color: cw.color,
+        last_seen_at: new Date().toISOString(),
+      }).eq('id', existing.id);
+    } else {
+      await supabase.from('participants').insert({
+        room_id: roomIdRef.current,
+        kind: 'ai',
+        coworker_id: cw.id,
+        name: cw.name,
+        color: cw.color,
+        online: true,
+      });
+    }
   }, []);
 
   const deleteCoworker = useCallback(async (id) => {
@@ -716,10 +777,10 @@ export default function useSupabase() {
     seedWorkshopContent, subscribeToWorkshopPresence,
     // Room
     joinRoom, getRoomId,
-    upsertParticipant, loadParticipants, findParticipantIdByName, getParticipantById,
+    upsertParticipant, loadParticipants, findParticipantIdByName, getParticipantById, getCoworkerParticipantId,
     loadUserPreferences, saveUserPreferences, loadUserRole, saveUserRole,
     loadParticipantsWithRoles, saveDelegationMap, loadMyDelegationMaps,
-    sendDm, fetchDmThread, subscribeToDms,
+    sendDm, fetchDmThread, subscribeToDms, subscribeToAllRoomDms,
     loadFiles, saveFile, deleteFile, saveFilesBatch,
     loadCoworkers, saveCoworker, deleteCoworker,
     loadTools, saveTool, deleteTool,

@@ -244,6 +244,10 @@ function App() {
   }, [currentStage]);
 
   const approvalResolversRef = useRef(new Map());
+  // Pending ask_human resolvers, keyed by `${coworkerParticipantId}:${humanParticipantId}`.
+  // When a matching DM reply arrives, the resolver fires with the reply content
+  // and is removed. First-reply-wins.
+  const askHumanResolversRef = useRef(new Map());
   const activeTabRef = useRef(activeTab);
 
   useEffect(() => { activeTabRef.current = activeTab; }, [activeTab]);
@@ -391,7 +395,12 @@ function App() {
 
   async function handleOpenDm(participant) {
     if (!participant?.name || participant.name === userName) return;
-    const supabaseId = await sb.findParticipantIdByName(participant.name);
+    // AI mirror participants bring their supabase id along; humans may have
+    // a client-generated id so we re-resolve by name against kind='human'.
+    let supabaseId = (participant.kind === 'ai' || participant.coworkerId) ? participant.id : null;
+    if (!supabaseId) {
+      supabaseId = await sb.findParticipantIdByName(participant.name);
+    }
     if (supabaseId) {
       setActiveDm({ id: supabaseId, name: participant.name, color: participant.color });
       setUnreadDmCounts(prev => {
@@ -422,6 +431,24 @@ function App() {
     });
     return unsub;
   }, [myParticipantId, sb]);
+
+  // Route ask_human replies back to their waiting AI turn. We listen to every
+  // DM in the room because the reply comes FROM a human TO the AI coworker's
+  // mirror — neither side is the current participant, so the regular DM
+  // subscription filtered by myParticipantId would miss it. The resolver map
+  // is held on this client (the one that initiated the AI chat).
+  useEffect(() => {
+    if (!isJoined) return;
+    const unsub = sb.subscribeToAllRoomDms((dm) => {
+      const key = `${dm.to_participant_id}:${dm.from_participant_id}`;
+      const resolver = askHumanResolversRef.current.get(key);
+      if (resolver) {
+        askHumanResolversRef.current.delete(key);
+        resolver(dm.content);
+      }
+    });
+    return unsub;
+  }, [isJoined, sb]);
 
   // Reflect unread count in browser tab title.
   useEffect(() => {
@@ -731,7 +758,7 @@ function App() {
   }
 
   // ===== Claude with Tools (agentic loop) =====
-  async function callClaudeWithTools({ systemPrompt, userMessage, agentTools, onToolExecution }) {
+  async function callClaudeWithTools({ systemPrompt, userMessage, agentTools, onToolExecution, coworker }) {
     if (!apiKey) return { success: false, content: [{ type: 'text', text: 'No API key configured.' }] };
 
     const claudeTools = agentTools.map(t => toolToClaudeSchema(t));
@@ -810,6 +837,32 @@ function App() {
               const sent = await sb.sendDm(myParticipantId, toId, message);
               if (sent?.data) return { success: true, output: `Message sent to ${recipientName}.` };
               return { success: false, output: `Failed to send message: ${sent?.error || 'unknown error'}` };
+            },
+            onAskHuman: async (recipientName, question) => {
+              if (!coworker?.id) {
+                return { success: false, output: 'Ask Human is only available when a specific AI coworker is running the tool.' };
+              }
+              const coworkerParticipantId = await sb.getCoworkerParticipantId(coworker.id);
+              if (!coworkerParticipantId) {
+                return { success: false, output: 'AI coworker is not set up as a DM participant yet. Try again after saving the coworker.' };
+              }
+              const humanId = await sb.findParticipantIdByName(recipientName);
+              if (!humanId) {
+                return { success: false, output: `Could not find a workshop participant named "${recipientName}". Make sure the name matches exactly and they are in the workshop.` };
+              }
+              const online = participants.find(p => p.name === recipientName && p.online);
+              if (!online) {
+                return { success: false, output: `${recipientName} is not currently online. Ask someone who is live in the workshop right now.` };
+              }
+              const sent = await sb.sendDm(coworkerParticipantId, humanId, question);
+              if (!sent?.data) {
+                return { success: false, output: `Failed to send the question: ${sent?.error || 'unknown error'}.` };
+              }
+              const key = `${coworkerParticipantId}:${humanId}`;
+              const reply = await new Promise((resolve) => {
+                askHumanResolversRef.current.set(key, resolve);
+              });
+              return { success: true, output: `${recipientName} replied: ${reply}` };
             },
           });
 
@@ -1068,11 +1121,23 @@ function App() {
       // Build system prompt from role description + instruction files + knowledge files
       const instructions = (targetCoworker.instructionFileIds || []).map(id => findNode(fileTree, id)).filter(Boolean);
       const knowledge = (targetCoworker.knowledgeFileIds || []).map(id => findNode(fileTree, id)).filter(Boolean);
+      // Stage 5c — give the coworker a list of who is currently live and a
+      // hint about when to reach out. The names must match exactly for
+      // ask_human to route correctly.
+      let collabSection = '';
+      if (stageReached(currentStage, '5c')) {
+        const liveHumans = (participants || []).filter(p => p.online && (p.kind || 'human') === 'human' && p.name !== targetCoworker.name);
+        const list = liveHumans.length > 0
+          ? liveHumans.map(p => `- ${p.name}`).join('\n')
+          : '- (nobody is online right now — the ask_human tool will fail until someone joins)';
+        collabSection = `\n\n## Live humans you can ask\n${list}\n\nWhen you genuinely need a human's judgment, confirmation, or a missing piece of information, call the Ask Human tool with their exact name and a clear question. Wait for the reply; incorporate it before concluding. Use this sparingly — only when the task actually needs a human.`;
+      }
       systemPrompt = [
         targetCoworker.role ? `## Role\n${targetCoworker.role}\n` : '',
         ...instructions.map(f => f.content),
         knowledge.length > 0 ? '\n\n## Knowledge Documents\n' : '',
         ...knowledge.map(k => `### ${k.name}\n${k.content}\n`),
+        collabSection,
       ].filter(Boolean).join('\n');
     } else if (contextFileIds && contextFileIds.length > 0) {
       const skillIdSet = new Set(skillFileIds || []);
@@ -1123,9 +1188,18 @@ function App() {
       : (textAttachments.length > 0 ? userContentParts[0].text : text);
 
     // Build coworker tools: built-in capabilities (always) + any assigned connectors
-    const coworkerTools = targetCoworker
+    let coworkerTools = targetCoworker
       ? (targetCoworker.toolIds || []).map(tid => tools?.find(t => t.id === tid)).filter(Boolean)
       : [];
+
+    // Stage 5c Collaboration — every coworker gets the Ask Human tool so it
+    // can reach a live human mid-task and resume with the reply.
+    if (targetCoworker && stageReached(currentStage, '5c')) {
+      const askHumanTool = (tools || []).find(t => t.id === 'builtin-ask-human');
+      if (askHumanTool && !coworkerTools.some(t => t.id === 'builtin-ask-human')) {
+        coworkerTools = [...coworkerTools, askHumanTool];
+      }
+    }
 
     if (coworkerTools.length > 0) {
       const result = await callClaudeWithTools({
@@ -1133,6 +1207,7 @@ function App() {
         userMessage,
         agentTools: coworkerTools,
         onToolExecution: (execData) => addMessage({ type: 'tool_execution', ...execData }),
+        coworker: targetCoworker,
       });
       updateActiveMessages(prev => prev.filter(m => m.id !== loadingId));
       setIsLoading(false);

@@ -225,6 +225,7 @@ function App() {
   const [userPreferences, setUserPreferences] = useState('');
   const [showPreferences, setShowPreferences] = useState(false);
   const [userRole, setUserRole] = useState('');
+  const [userRoleLoaded, setUserRoleLoaded] = useState(false);
   const [showRoleCapture, setShowRoleCapture] = useState(false);
   const [justRevealed, setJustRevealed] = useState(null);
   const previousStageRef = useRef(null);
@@ -244,6 +245,15 @@ function App() {
       return () => clearTimeout(timer);
     }
   }, [currentStage]);
+
+  // Role capture is ONLY required at Stage 6 (Strategic Delegation). Prompt
+  // the first time the participant hits a stage where their role is used.
+  useEffect(() => {
+    if (!userRoleLoaded) return;
+    if (!stageReached(currentStage, '6')) return;
+    if (userRole) return;
+    setShowRoleCapture(true);
+  }, [currentStage, userRole, userRoleLoaded]);
 
   const approvalResolversRef = useRef(new Map());
   const activeTabRef = useRef(activeTab);
@@ -268,7 +278,7 @@ function App() {
           setUserPreferences(prefs);
           const role = await sb.loadUserRole(authUser.id);
           setUserRole(role);
-          if (!role) setShowRoleCapture(true);
+          setUserRoleLoaded(true);
         }
         if (result.current_stage) {
           if (stageReached(result.current_stage, '3')) await sb.ensureStageFolder(roomId, '3');
@@ -480,7 +490,7 @@ function App() {
       setUserPreferences(prefs);
       const role = await sb.loadUserRole(authUserId);
       setUserRole(role);
-      if (!role) setShowRoleCapture(true);
+      setUserRoleLoaded(true);
     }
     sb.trackPresence(name, color, handlePresenceSync);
     startRealtimeSync();

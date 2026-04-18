@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useMemo } from 'react';
 import { parseFile, getFileCategory, getFileIcon } from '../utils/fileParser';
-import { stageReached } from './RevealAt';
+import RevealAt, { stageReached } from './RevealAt';
 import ToolExecutionCard from './ToolExecutionCard';
 import EducationalCue from './EducationalCue';
 import RichText from './RichText';
@@ -194,7 +194,7 @@ function findNode(tree, id) {
 }
 
 // ===== Slack-style Context Sidebar =====
-function ContextSidebar({ fileTree, selectedFileIds, onToggleFile, onToggleFolder, onOpenFile, editingFileId, participants, currentUserName, coworkers, activeCoworkerId, onSelectCoworker, showEducationalCues, conversations, activeConvoId, onNewChat, onSelectConvo, onDeleteConvo, onOpenDm, activeDm, unreadDmCounts }) {
+function ContextSidebar({ fileTree, selectedFileIds, onToggleFile, onToggleFolder, onOpenFile, editingFileId, participants, currentUserName, coworkers, activeCoworkerId, onSelectCoworker, showEducationalCues, conversations, activeConvoId, onNewChat, onSelectConvo, onDeleteConvo, onOpenDm, activeDm, unreadDmCounts, currentStage }) {
   const [collapsedSections, setCollapsedSections] = useState(() => {
     // Default all folders to collapsed
     const collapsed = {};
@@ -247,7 +247,8 @@ function ContextSidebar({ fileTree, selectedFileIds, onToggleFile, onToggleFolde
 
   return (
     <div className="sl-sidebar">
-      {/* Files */}
+      {/* Files — Stage 3 */}
+      {stageReached(currentStage, '3') && (
       <div className="sl-section sl-context-section">
         <div className="sl-section-header">
           <span className="sl-section-name">Files</span>
@@ -287,6 +288,7 @@ function ContextSidebar({ fileTree, selectedFileIds, onToggleFile, onToggleFolde
           );
         })}
       </div>
+      )}
 
       {/* Chat History */}
       <div className="sl-section sl-chats-section">
@@ -644,6 +646,7 @@ export default function ChatPanel({ messages, onSendMessage, onApprovalAction, o
         onOpenDm={onOpenDm}
         activeDm={activeDm}
         unreadDmCounts={unreadDmCounts}
+        currentStage={currentStage}
       />
 
       {/* Middle: file editor (when open) */}

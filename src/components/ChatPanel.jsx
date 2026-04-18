@@ -668,22 +668,20 @@ export default function ChatPanel({ messages, onSendMessage, onApprovalAction, o
 
         {activeDm ? (
           <>
-            <div className="cl-messages" ref={messagesRef}>
-              <div className="cl-messages-inner">
-                {dmMessages.length === 0 ? (
-                  <div className="dm-empty">No messages yet. Send the first one.</div>
-                ) : (
-                  dmMessages.map(m => {
-                    const isMine = m.from_participant_id === myParticipantId;
-                    return (
-                      <div key={m.id} className={`dm-message${isMine ? ' mine' : ''}`}>
-                        <div className="dm-bubble">{m.content}</div>
-                        <div className="dm-time">{new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
-                      </div>
-                    );
-                  })
-                )}
-              </div>
+            <div className="dm-messages" ref={messagesRef}>
+              {dmMessages.length === 0 ? (
+                <div className="dm-empty">No messages yet. Send the first one.</div>
+              ) : (
+                dmMessages.map(m => {
+                  const isMine = m.from_participant_id === myParticipantId;
+                  return (
+                    <div key={m.id} className={`dm-message${isMine ? ' mine' : ''}`}>
+                      <div className="dm-bubble">{m.content}</div>
+                      <div className="dm-time">{new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
+                    </div>
+                  );
+                })
+              )}
             </div>
             {renderInputArea()}
           </>

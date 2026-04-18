@@ -4048,6 +4048,15 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
   margin-top: 3px;
   padding: 0 4px;
 }
+.dm-error {
+  margin: 8px 16px 0;
+  padding: 10px 12px;
+  background: rgba(196, 92, 92, 0.12);
+  border: 1px solid rgba(196, 92, 92, 0.4);
+  color: #7a2c2c;
+  border-radius: 8px;
+  font-size: 13px;
+}
 .dm-input-row {
   display: flex;
   gap: 8px;

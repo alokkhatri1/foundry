@@ -4,6 +4,7 @@ export default function DirectMessageThread({ myParticipantId, otherParticipant,
   const [messages, setMessages] = useState([]);
   const [inputValue, setInputValue] = useState('');
   const [sending, setSending] = useState(false);
+  const [error, setError] = useState('');
   const messagesEndRef = useRef(null);
 
   useEffect(() => {
@@ -29,12 +30,23 @@ export default function DirectMessageThread({ myParticipantId, otherParticipant,
   async function handleSend() {
     const text = inputValue.trim();
     if (!text || sending) return;
+    setError('');
+    if (!myParticipantId) {
+      setError('Still joining the workshop — please wait a moment and try again.');
+      return;
+    }
+    if (!otherParticipant?.id) {
+      setError('Cannot find this person in the workshop database.');
+      return;
+    }
     setSending(true);
     const result = await sb.sendDm(myParticipantId, otherParticipant.id, text);
     setSending(false);
     if (result) {
       setInputValue('');
       setMessages(prev => prev.some(m => m.id === result.id) ? prev : [...prev, result]);
+    } else {
+      setError('Send failed. Check the browser console for the specific error.');
     }
   }
 
@@ -70,6 +82,9 @@ export default function DirectMessageThread({ myParticipantId, otherParticipant,
         )}
         <div ref={messagesEndRef} />
       </div>
+      {error && (
+        <div className="dm-error">{error}</div>
+      )}
       <div className="dm-input-row">
         <textarea
           className="dm-input"

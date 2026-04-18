@@ -4187,58 +4187,75 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
 /* ===== Reveal modal (stage unlock) ===== */
 .reveal-modal-overlay {
   z-index: 1000;
+  background: rgba(26, 26, 26, 0.55);
+  backdrop-filter: blur(4px);
   animation: revealOverlayFade 0.3s ease-out;
 }
 .reveal-modal {
-  background: var(--accent-system, #5a9e6f);
+  background: var(--text-dark);
   color: #fff;
-  padding: 40px 48px;
-  border-radius: var(--radius, 12px);
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  padding: 48px 56px 40px;
+  border-radius: var(--radius);
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.45);
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 16px;
-  max-width: 480px;
+  max-width: 460px;
   text-align: center;
-  animation: revealModalPop 0.45s cubic-bezier(0.2, 0.8, 0.4, 1.2);
+  position: relative;
+  overflow: hidden;
+  animation: revealModalPop 0.5s cubic-bezier(0.2, 0.8, 0.3, 1.1);
+}
+.reveal-modal::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, transparent, var(--accent-gold), transparent);
 }
 .reveal-modal-eyebrow {
-  font-size: 13px;
-  letter-spacing: 0.08em;
+  font-size: 11px;
+  letter-spacing: 0.22em;
   text-transform: uppercase;
-  opacity: 0.85;
-  font-weight: 600;
+  font-weight: 700;
+  color: var(--accent-gold);
+  margin-bottom: 18px;
 }
 .reveal-modal-title {
-  font-size: 32px;
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: 40px;
   font-weight: 700;
-  line-height: 1.2;
-  margin: 4px 0 12px;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+  color: #fff;
+  margin: 0 0 32px;
 }
 .reveal-modal-btn {
-  margin-top: 8px;
-  background: #fff;
-  color: var(--accent-system, #5a9e6f);
+  background: var(--accent-gold);
+  color: var(--text-dark);
   border: none;
-  padding: 10px 28px;
-  border-radius: var(--radius-pill, 999px);
+  padding: 11px 32px;
+  border-radius: var(--radius-pill);
   font-weight: 600;
   font-size: 14px;
+  letter-spacing: 0.01em;
   cursor: pointer;
-  transition: transform 0.1s ease, box-shadow 0.15s ease;
+  transition: transform 0.15s ease, box-shadow 0.2s ease, background 0.15s ease;
 }
 .reveal-modal-btn:hover {
   transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  background: #d4a078;
+  box-shadow: 0 6px 20px rgba(200, 149, 108, 0.35);
 }
 @keyframes revealOverlayFade {
   from { opacity: 0; }
   to   { opacity: 1; }
 }
 @keyframes revealModalPop {
-  from { transform: scale(0.85); opacity: 0; }
-  to   { transform: scale(1);    opacity: 1; }
+  from { transform: scale(0.9) translateY(8px); opacity: 0; }
+  to   { transform: scale(1) translateY(0);     opacity: 1; }
 }
 
 /* ===== Journey recap stats (graduation screen) ===== */

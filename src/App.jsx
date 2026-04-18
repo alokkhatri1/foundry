@@ -8,6 +8,7 @@ import CoworkerBuilder from './components/CoworkerBuilder';
 import ChatPanel from './components/ChatPanel';
 import ActivityDashboard from './components/ActivityDashboard';
 import RevealAt from './components/RevealAt';
+import PreferencesEditor from './components/PreferencesEditor';
 import {
   createStarterFolders,
   createStarterWorkflow,
@@ -218,6 +219,8 @@ function App() {
   const [isJoined, setIsJoined] = useState(!!(saved?.userName && saved?.workshopCode && (saved?.fileTree || saved?.workflows)));
   const [workshopEnded, setWorkshopEnded] = useState(false);
   const [currentStage, setCurrentStage] = useState('6');
+  const [userPreferences, setUserPreferences] = useState('');
+  const [showPreferences, setShowPreferences] = useState(false);
   const [myParticipantId, setMyParticipantId] = useState(null);
   const [activeDm, setActiveDm] = useState(null);
   const [unreadDmCounts, setUnreadDmCounts] = useState({});
@@ -242,6 +245,10 @@ function App() {
         const authUser = await sb.getUser();
         const me = await sb.upsertParticipant(userName, myColor, authUser?.id, authUser?.email);
         if (me?.id) setMyParticipantId(me.id);
+        if (authUser?.id) {
+          const prefs = await sb.loadUserPreferences(authUser.id);
+          setUserPreferences(prefs);
+        }
 
         // Load state from granular tables
         const [files, cws, tls, wfs, dbParticipants] = await Promise.all([
@@ -451,6 +458,10 @@ function App() {
 
     const me = await sb.upsertParticipant(name, color, authUserId, email);
     if (me?.id) setMyParticipantId(me.id);
+    if (authUserId) {
+      const prefs = await sb.loadUserPreferences(authUserId);
+      setUserPreferences(prefs);
+    }
     sb.trackPresence(name, color, handlePresenceSync);
     startRealtimeSync();
 
@@ -1051,6 +1062,12 @@ function App() {
       systemPrompt = `You are an AI assistant at ${orgName}. Use the following knowledge documents to inform your responses. If the answer is not covered by these documents, say so clearly.\n\n${knowledgeContent}`;
     }
 
+    // Stage 2 — inject personal preferences (global per user) into every system prompt.
+    if (userPreferences && userPreferences.trim()) {
+      const prefsSection = `## About the user\n${userPreferences.trim()}\n\n---\n\n`;
+      systemPrompt = systemPrompt ? prefsSection + systemPrompt : prefsSection;
+    }
+
     // Build user message content — text + attachments
     const userContentParts = [];
 
@@ -1115,7 +1132,10 @@ function App() {
         ? `\n\nThe user has selected these context files — use them to answer questions:\n${contextFiles.map(f => `### ${f.name}\n${f.content}`).join('\n\n')}`
         : '';
 
-      const platformSystemPrompt = `You are the Foundry platform assistant for ${orgName}. You help users build and manage their AI coworker platform through natural language.
+      const userPrefsForPlatform = userPreferences && userPreferences.trim()
+        ? `## About the user\n${userPreferences.trim()}\n\n---\n\n`
+        : '';
+      const platformSystemPrompt = `${userPrefsForPlatform}You are the Foundry platform assistant for ${orgName}. You help users build and manage their AI coworker platform through natural language.
 
 The platform has these elements:
 - **Files**: Knowledge documents (policies, rules, reference) and instruction files (AI coworker behavior). Organized in department folders.
@@ -1215,6 +1235,9 @@ Be concise. Confirm actions after completing them.${knowledgeSection}`;
         </nav>
         <div className="app-header-right">
           <span className="header-user-name">{userName}</span>
+          <RevealAt stage="2" currentStage={currentStage}>
+            <button className="header-btn" onClick={() => setShowPreferences(true)}>Preferences</button>
+          </RevealAt>
           <button className="header-btn" onClick={() => setShowSettings(!showSettings)}>Settings</button>
         </div>
       </header>
@@ -1224,6 +1247,18 @@ Be concise. Confirm actions after completing them.${knowledgeSection}`;
           <span>Network error detected.</span>
           <button onClick={() => setNetworkError(false)}>Dismiss</button>
         </div>
+      )}
+
+      {showPreferences && (
+        <PreferencesEditor
+          initialContent={userPreferences}
+          onSave={async (content) => {
+            const user = await sb.getUser();
+            if (user?.id) await sb.saveUserPreferences(user.id, content);
+            setUserPreferences(content);
+          }}
+          onClose={() => setShowPreferences(false)}
+        />
       )}
 
       {showSettings && (

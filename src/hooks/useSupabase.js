@@ -295,6 +295,26 @@ export default function useSupabase() {
     return data;
   }, []);
 
+  // ===== User preferences (global per user) =====
+  const loadUserPreferences = useCallback(async (authUserId) => {
+    if (!isSupabaseConfigured || !authUserId) return '';
+    const { data } = await supabase.from('user_preferences')
+      .select('content')
+      .eq('auth_user_id', authUserId)
+      .maybeSingle();
+    return data?.content || '';
+  }, []);
+
+  const saveUserPreferences = useCallback(async (authUserId, content) => {
+    if (!isSupabaseConfigured || !authUserId) return;
+    const { error } = await supabase.from('user_preferences').upsert({
+      auth_user_id: authUserId,
+      content,
+      updated_at: new Date().toISOString(),
+    }, { onConflict: 'auth_user_id' });
+    if (error) console.error('[sb] saveUserPreferences:', error.message);
+  }, []);
+
   // ===== Direct messages =====
   const sendDm = useCallback(async (fromParticipantId, toParticipantId, content) => {
     if (!isSupabaseConfigured || !roomIdRef.current) {
@@ -598,6 +618,7 @@ export default function useSupabase() {
     // Room
     joinRoom, getRoomId,
     upsertParticipant, loadParticipants, findParticipantIdByName, getParticipantById,
+    loadUserPreferences, saveUserPreferences,
     sendDm, fetchDmThread, subscribeToDms,
     loadFiles, saveFile, deleteFile, saveFilesBatch,
     loadCoworkers, saveCoworker, deleteCoworker,

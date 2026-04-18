@@ -1322,10 +1322,6 @@ Be concise. Confirm actions after completing them.${knowledgeSection}`;
             <div style={{ fontSize: 14, color: 'var(--text-body)', marginBottom: 16 }}>
               <span style={{ fontWeight: 600 }}>{userName}</span> in <span style={{ fontWeight: 600 }}>{orgName}</span>
             </div>
-            <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, color: 'var(--text-body)', cursor: 'pointer' }}>
-              <input type="checkbox" checked={showEducationalCues} onChange={handleToggleEducationalCues} />
-              Show learning tips
-            </label>
 
             <div className="modal-actions" style={{ marginTop: 24 }}>
               <button className="modal-btn cancel" onClick={() => setShowSettings(false)}>Close</button>

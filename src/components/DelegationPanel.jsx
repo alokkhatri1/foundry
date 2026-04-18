@@ -132,24 +132,14 @@ function DelegationMapCard({ map, onSave, saving, saved }) {
   );
 }
 
-export default function DelegationPanel({ sb, callClaudeAPI, userName, userRole, userRoleLoaded, onSaveRole, coworkers }) {
+export default function DelegationPanel({ sb, callClaudeAPI, userName, userRole, coworkers }) {
   const [input, setInput] = useState('');
   const [thread, setThread] = useState([]);
   const [isThinking, setIsThinking] = useState(false);
   const [participants, setParticipants] = useState([]);
   const [savingId, setSavingId] = useState(null);
   const [savedIds, setSavedIds] = useState(new Set());
-  const [roleInput, setRoleInput] = useState('');
-  const [savingRole, setSavingRole] = useState(false);
   const scrollRef = useRef(null);
-
-  async function handleSubmitRole() {
-    const trimmed = roleInput.trim();
-    if (!trimmed || savingRole) return;
-    setSavingRole(true);
-    await onSaveRole(trimmed);
-    setSavingRole(false);
-  }
 
   useEffect(() => {
     let cancelled = false;
@@ -204,45 +194,6 @@ export default function DelegationPanel({ sb, callClaudeAPI, userName, userRole,
     await sb.saveDelegationMap(authUser?.id, userName, strategy, map);
     setSavingId(null);
     setSavedIds(prev => new Set([...prev, messageId]));
-  }
-
-  if (userRoleLoaded && !userRole) {
-    const firstName = (userName || 'friend').split(' ')[0];
-    return (
-      <div className="del-panel">
-        <div className="del-intro">
-          <h2 className="del-title">Strategic Delegation</h2>
-          <p className="del-sub">
-            Before we map how work redistributes, tell me where you sit in your own organization. I'll place you in the map so the delegation feels real to you.
-          </p>
-        </div>
-        <div className="del-role-capture">
-          <label className="del-role-label" htmlFor="del-role-input">
-            {firstName}, what's your role at work?
-          </label>
-          <input
-            id="del-role-input"
-            className="del-role-input"
-            type="text"
-            value={roleInput}
-            onChange={e => setRoleInput(e.target.value)}
-            onKeyDown={e => { if (e.key === 'Enter') handleSubmitRole(); }}
-            placeholder="e.g., Credit Manager, Product Lead, ICU Nurse, Head of Legal"
-            autoFocus
-          />
-          <p className="del-role-hint">
-            Stored once on your account — you won't be asked again.
-          </p>
-          <button
-            className="del-role-btn"
-            onClick={handleSubmitRole}
-            disabled={!roleInput.trim() || savingRole}
-          >
-            {savingRole ? 'Saving...' : 'Continue'}
-          </button>
-        </div>
-      </div>
-    );
   }
 
   return (

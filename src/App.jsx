@@ -1411,12 +1411,6 @@ Be concise. Confirm actions after completing them.${knowledgeSection}`;
               callClaudeAPI={callClaudeAPI}
               userName={userName}
               userRole={userRole}
-              userRoleLoaded={userRoleLoaded}
-              onSaveRole={async (role) => {
-                const user = await sb.getUser();
-                if (user?.id) await sb.saveUserRole(user.id, role);
-                setUserRole(role);
-              }}
               coworkers={coworkers || []}
             />
           </div>

@@ -8,7 +8,6 @@ export default function AdminDashboard({ sb, user, onBack }) {
   const [showCreate, setShowCreate] = useState(false);
   const [newName, setNewName] = useState('');
   const [newOrg, setNewOrg] = useState('');
-  const [seedContent, setSeedContent] = useState(true);
   const [creating, setCreating] = useState(false);
   const [selected, setSelected] = useState(null);
   const [participants, setParticipants] = useState([]);
@@ -38,7 +37,6 @@ export default function AdminDashboard({ sb, user, onBack }) {
     setCreating(true);
     const result = await sb.createWorkshop(newName.trim(), newOrg.trim() || newName.trim(), user.id);
     if (result) {
-      if (seedContent) await sb.seedWorkshopContent(result.id);
       setShowCreate(false);
       setNewName('');
       setNewOrg('');
@@ -427,10 +425,6 @@ export default function AdminDashboard({ sb, user, onBack }) {
                 placeholder="e.g., Apex Bank"
               />
             </div>
-            <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, color: 'var(--text-body)', marginBottom: 16, cursor: 'pointer' }}>
-              <input type="checkbox" checked={seedContent} onChange={e => setSeedContent(e.target.checked)} />
-              Include starter content (files, coworkers, workflow)
-            </label>
             <div className="modal-actions">
               <button className="modal-btn cancel" onClick={() => setShowCreate(false)}>Cancel</button>
               <button className="landing-join-btn" style={{ width: 'auto', padding: '10px 24px' }} onClick={handleCreate} disabled={!newName.trim() || creating}>

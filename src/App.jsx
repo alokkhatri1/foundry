@@ -433,35 +433,22 @@ function App() {
       ]);
     }
 
-    // If Supabase has data, use it. Otherwise seed from localStorage or defaults.
+    // No starter content — new workshops start empty. Stages reveal capabilities;
+    // content is built by participants (or loaded from a scenario later).
     if (files && files.length > 0) {
       setFlatFiles(files);
-      setCoworkers(cws.length > 0 ? cws : createStarterCoworkers());
-      setTools(tls.length > 0 ? tls : ensurePrebuiltTools(null));
-      setWorkflows(wfs.length > 0 ? wfs : [createStarterWorkflow()]);
+      setCoworkers(cws || []);
+      setTools(tls && tls.length > 0 ? tls : ensurePrebuiltTools(null));
+      setWorkflows(wfs || []);
     } else {
-      // Seed from localStorage or create fresh
-      const tree = saved?.fileTree || createStarterFolders('My Organization');
-      const seedFiles = flattenTree(tree, roomId);
-      setFlatFiles(seedFiles.map(mapFileRow));
-      // Seed to Supabase
-      if (roomId) sb.saveFilesBatch(seedFiles);
-
-      const seedCws = saved?.coworkers || createStarterCoworkers();
-      setCoworkers(seedCws);
-      if (roomId) seedCws.forEach(cw => sb.saveCoworker(cw));
-
-      const seedTls = ensurePrebuiltTools(saved?.tools);
-      setTools(seedTls);
-      if (roomId) seedTls.forEach(t => sb.saveTool(t));
-
-      const seedWfs = saved?.workflows || [createStarterWorkflow()];
-      setWorkflows(seedWfs);
-      if (roomId) seedWfs.forEach(wf => sb.saveWorkflow(wf));
+      setFlatFiles([]);
+      setCoworkers([]);
+      setTools(ensurePrebuiltTools(null));
+      setWorkflows([]);
     }
 
-    runs = saved?.workflowRuns || [createStarterRun()];
-    const starterLogs = saved?.workflowRuns ? [] : createStarterLogs();
+    runs = saved?.workflowRuns || [];
+    const starterLogs = [];
     const existingParticipants = saved?.participants || [];
     const color = COLORS[existingParticipants.length % COLORS.length];
     const alreadyIn = existingParticipants.find(p => p.name === name);
@@ -502,26 +489,16 @@ function App() {
   }
 
   function handleReset() {
-    if (!confirm('This will replace all content with the default example. Continue?')) return;
-    const tree = createStarterFolders(orgName);
-    const wfs = [createStarterWorkflow()];
-    const cws = createStarterCoworkers();
-    const newFlat = flattenTree(tree, sb.getRoomId()).map(mapFileRow);
-    setFlatFiles(newFlat);
-    sb.saveFilesBatch(flattenTree(tree, sb.getRoomId()));
-    setWorkflows(wfs);
-    setCoworkers(cws);
+    if (!confirm('This will clear all your local content (files, coworkers, workflows, chats). Continue?')) return;
+    setFlatFiles([]);
+    setWorkflows([]);
+    setCoworkers([]);
     setSelectedFileId(null);
-    setSelectedDeptId('dept-credit');
     setConversations([]);
     setActiveConvoId(null);
     setLogs([]);
     setWorkflowRuns([]);
-    const tls = createStarterTools();
-    setTools(tls);
-    wfs.forEach(wf => sb.saveWorkflow(wf));
-    cws.forEach(cw => sb.saveCoworker(cw));
-    tls.forEach(t => sb.saveTool(t));
+    setTools(ensurePrebuiltTools(null));
     localStorage.removeItem('sandbox:conversations');
   }
 

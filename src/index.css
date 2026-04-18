@@ -3958,7 +3958,7 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
   color: #8b6fb0;
 }
 
-/* ===== File chip role toggle (Stage 4 — files-as-skills) ===== */
+/* ===== File chip role badge (Stage 4 — derived from folder) ===== */
 .cl-context-file-chip-role {
   display: inline-flex;
   align-items: center;
@@ -3971,13 +3971,8 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
   border: 1px solid var(--border-color, #e0d6cc);
   background: var(--bg-warm, #fdf9f4);
   color: var(--text-muted, #888);
-  cursor: pointer;
   margin-right: 6px;
   line-height: 1.3;
-  transition: background 0.15s, color 0.15s, border-color 0.15s;
-}
-.cl-context-file-chip-role:hover {
-  border-color: var(--text-muted);
 }
 .cl-context-file-chip.skill .cl-context-file-chip-role {
   background: #4a7fb5;

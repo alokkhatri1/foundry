@@ -413,8 +413,20 @@ export default function ChatPanel({ messages, onSendMessage, onApprovalAction, o
   const [attachedFiles, setAttachedFiles] = useState([]);
   const [parsingFiles, setParsingFiles] = useState(false);
   const [dmMessages, setDmMessages] = useState([]);
-  const [skillFileIds, setSkillFileIds] = useState([]);
   const messagesRef = useRef(null);
+
+  // Derive which files are skills (under top-level "Instructions" folder) vs context.
+  const skillFileIds = useMemo(() => {
+    const instructions = (fileTree?.children || []).find(n => n.type === 'folder' && n.name === 'Instructions');
+    if (!instructions) return [];
+    const ids = [];
+    const walk = (n) => {
+      if (n.type === 'file') ids.push(n.id);
+      (n.children || []).forEach(walk);
+    };
+    walk(instructions);
+    return ids;
+  }, [fileTree]);
   const greeting = useMemo(() => {
     const firstName = (currentUserName || '').split(' ')[0] || 'there';
     const hour = new Date().getHours();
@@ -486,10 +498,6 @@ export default function ChatPanel({ messages, onSendMessage, onApprovalAction, o
     onSendMessage(text, selectedFileIds, activeCoworkerId, attachedFiles, skillFileIds);
     setInput('');
     setAttachedFiles([]);
-  }
-
-  function toggleSkillRole(fileId) {
-    setSkillFileIds(prev => prev.includes(fileId) ? prev.filter(id => id !== fileId) : [...prev, fileId]);
   }
 
   async function handleFileSelect(e) {
@@ -573,13 +581,9 @@ export default function ChatPanel({ messages, onSendMessage, onApprovalAction, o
                         return (
                           <span key={id} className={`cl-context-file-chip${isSkill ? ' skill' : ''}`}>
                             {stage4Open && (
-                              <button
-                                className="cl-context-file-chip-role"
-                                onClick={e => { e.stopPropagation(); toggleSkillRole(id); }}
-                                title={isSkill ? 'Attached as skill (instructions). Click to use as context.' : 'Attached as context (knowledge). Click to use as skill.'}
-                              >
+                              <span className="cl-context-file-chip-role" title={isSkill ? 'Skill file (from Instructions folder)' : 'Context file'}>
                                 {isSkill ? 'skill' : 'context'}
-                              </button>
+                              </span>
                             )}
                             <span className="cl-context-file-chip-name">{node.name.replace(/\.md$/, '')}</span>
                             <button className="cl-context-file-chip-remove" onClick={() => handleToggleFile(id)}>{'\u2715'}</button>

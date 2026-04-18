@@ -263,6 +263,10 @@ function App() {
           const prefs = await sb.loadUserPreferences(authUser.id);
           setUserPreferences(prefs);
         }
+        if (result.current_stage) {
+          if (stageReached(result.current_stage, '3')) await sb.ensureStageFolder(roomId, '3');
+          if (stageReached(result.current_stage, '4')) await sb.ensureStageFolder(roomId, '4');
+        }
 
         // Load state from granular tables
         const [files, cws, tls, wfs, dbParticipants] = await Promise.all([
@@ -425,6 +429,11 @@ function App() {
     if (result?.error) return result;
     const roomId = result.id;
     if (result.current_stage) setCurrentStage(result.current_stage);
+    // Backfill stage-specific folders for legacy workshops (default stage '6').
+    if (result.current_stage) {
+      if (stageReached(result.current_stage, '3')) await sb.ensureStageFolder(roomId, '3');
+      if (stageReached(result.current_stage, '4')) await sb.ensureStageFolder(roomId, '4');
+    }
 
     // Load from Supabase granular tables
     let files, cws, tls, wfs, runs;

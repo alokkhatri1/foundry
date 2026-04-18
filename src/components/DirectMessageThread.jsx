@@ -42,11 +42,13 @@ export default function DirectMessageThread({ myParticipantId, otherParticipant,
     setSending(true);
     const result = await sb.sendDm(myParticipantId, otherParticipant.id, text);
     setSending(false);
-    if (result) {
+    if (result?.data) {
       setInputValue('');
-      setMessages(prev => prev.some(m => m.id === result.id) ? prev : [...prev, result]);
+      setMessages(prev => prev.some(m => m.id === result.data.id) ? prev : [...prev, result.data]);
     } else {
-      setError('Send failed. Check the browser console for the specific error.');
+      const detail = result?.details ? ` — ${result.details}` : '';
+      const code = result?.code ? ` [${result.code}]` : '';
+      setError(`Send failed: ${result?.error || 'unknown error'}${code}${detail}`);
     }
   }
 

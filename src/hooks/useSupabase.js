@@ -275,19 +275,21 @@ export default function useSupabase() {
   // ===== Direct messages =====
   const sendDm = useCallback(async (fromParticipantId, toParticipantId, content) => {
     if (!isSupabaseConfigured || !roomIdRef.current) {
-      console.error('[sb] sendDm aborted: supabase not configured or no room');
-      return null;
+      return { error: 'supabase not configured or no room' };
     }
-    if (!fromParticipantId) { console.error('[sb] sendDm aborted: missing fromParticipantId (myParticipantId is null)'); return null; }
-    if (!toParticipantId) { console.error('[sb] sendDm aborted: missing toParticipantId'); return null; }
+    if (!fromParticipantId) return { error: 'missing fromParticipantId (myParticipantId is null)' };
+    if (!toParticipantId) return { error: 'missing toParticipantId' };
     const { data, error } = await supabase.from('direct_messages').insert({
       room_id: roomIdRef.current,
       from_participant_id: fromParticipantId,
       to_participant_id: toParticipantId,
       content,
     }).select().single();
-    if (error) { console.error('[sb] sendDm:', error.message); return null; }
-    return data;
+    if (error) {
+      console.error('[sb] sendDm:', error.message, error);
+      return { error: error.message, code: error.code, details: error.details, hint: error.hint };
+    }
+    return { data };
   }, []);
 
   const fetchDmThread = useCallback(async (myParticipantId, otherParticipantId) => {

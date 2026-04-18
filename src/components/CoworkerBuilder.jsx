@@ -1,6 +1,7 @@
 import { useState, useRef } from 'react';
 import EducationalCue from './EducationalCue';
 import Icon, { COWORKER_ICONS, hasIcon } from './Icon';
+import RevealAt from './RevealAt';
 
 let cwCounter = Date.now();
 function genCwId() { return 'cw-' + (cwCounter++); }
@@ -274,7 +275,7 @@ function CoworkerCard({ coworker, onSelect, onDelete }) {
 }
 
 // ===== Coworker Editor =====
-function CoworkerEditor({ coworker, onUpdate, onBack, fileTree, callClaudeAPI, showEducationalCues }) {
+function CoworkerEditor({ coworker, onUpdate, onBack, fileTree, callClaudeAPI, showEducationalCues, tools, currentStage }) {
   const [showAvatarPicker, setShowAvatarPicker] = useState(false);
 
   return (
@@ -347,6 +348,41 @@ function CoworkerEditor({ coworker, onUpdate, onBack, fileTree, callClaudeAPI, s
             />
           </div>
 
+          {/* Tools — Stage 5b */}
+          <RevealAt stage="5b" currentStage={currentStage}>
+            <div className="cwb-section">
+              <h3 className="cwb-section-title">Tools</h3>
+              <p className="cwb-section-desc">Capabilities this coworker can invoke during a conversation. Pick which tools they can use.</p>
+              <div className="cwb-tools-list">
+                {(tools || []).filter(t => t.isBuiltin).map(tool => {
+                  const checked = (coworker.toolIds || []).includes(tool.id);
+                  return (
+                    <label key={tool.id} className={`cwb-tool-row${checked ? ' checked' : ''}`}>
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={e => {
+                          const ids = new Set(coworker.toolIds || []);
+                          if (e.target.checked) ids.add(tool.id);
+                          else ids.delete(tool.id);
+                          onUpdate({ ...coworker, toolIds: Array.from(ids) });
+                        }}
+                      />
+                      <span className="cwb-tool-icon">{tool.icon}</span>
+                      <div className="cwb-tool-info">
+                        <span className="cwb-tool-name">{tool.name}</span>
+                        <span className="cwb-tool-desc">{tool.description}</span>
+                      </div>
+                    </label>
+                  );
+                })}
+                {(tools || []).filter(t => t.isBuiltin).length === 0 && (
+                  <p style={{ fontSize: 13, color: 'var(--text-muted, #888)', padding: 8 }}>No tools available yet.</p>
+                )}
+              </div>
+            </div>
+          </RevealAt>
+
         </div>
       </div>
     </div>
@@ -354,7 +390,7 @@ function CoworkerEditor({ coworker, onUpdate, onBack, fileTree, callClaudeAPI, s
 }
 
 // ===== Main Export =====
-export default function CoworkerBuilder({ coworkers, onUpdateCoworkers, fileTree, tools, userName, callClaudeAPI, showEducationalCues }) {
+export default function CoworkerBuilder({ coworkers, onUpdateCoworkers, fileTree, tools, userName, callClaudeAPI, showEducationalCues, currentStage }) {
   const [selectedCwId, setSelectedCwId] = useState(null);
   const selectedCw = selectedCwId ? coworkers.find(c => c.id === selectedCwId) : null;
 
@@ -388,7 +424,7 @@ export default function CoworkerBuilder({ coworkers, onUpdateCoworkers, fileTree
   if (selectedCw) {
     return (
       <div className="panel panel-center">
-        <CoworkerEditor coworker={selectedCw} onUpdate={handleUpdate} onBack={() => setSelectedCwId(null)} fileTree={fileTree} callClaudeAPI={callClaudeAPI} showEducationalCues={showEducationalCues} />
+        <CoworkerEditor coworker={selectedCw} onUpdate={handleUpdate} onBack={() => setSelectedCwId(null)} fileTree={fileTree} callClaudeAPI={callClaudeAPI} showEducationalCues={showEducationalCues} tools={tools} currentStage={currentStage} />
       </div>
     );
   }

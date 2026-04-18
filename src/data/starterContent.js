@@ -275,6 +275,53 @@ export const BUILTIN_TOOLS = [
       ],
     },
   },
+  {
+    id: 'builtin-research',
+    name: 'Research',
+    type: 'research',
+    description: 'Research a topic and return a concise brief. Uses the underlying AI\'s training knowledge — no live web lookup.',
+    icon: '\uD83D\uDD2C',
+    isBuiltin: true,
+    createdBy: 'System',
+    config: {
+      templateId: 'claude_research',
+      parameters: [
+        { name: 'topic', label: 'Topic', type: 'string', required: true, description: 'The topic to research' },
+      ],
+    },
+  },
+  {
+    id: 'builtin-dm',
+    name: 'Send Message',
+    type: 'communicate',
+    description: 'Send a direct message to a workshop participant on the user\'s behalf. Use when you need to hand something off to a human teammate.',
+    icon: '\u2709\uFE0F',
+    isBuiltin: true,
+    createdBy: 'System',
+    config: {
+      templateId: 'dm_participant',
+      parameters: [
+        { name: 'recipient_name', label: 'Recipient', type: 'string', required: true, description: 'Full name of the workshop participant to message' },
+        { name: 'message', label: 'Message', type: 'string', required: true, description: 'The message to send' },
+      ],
+    },
+  },
+  {
+    id: 'builtin-process-doc',
+    name: 'Process Document',
+    type: 'process',
+    description: 'Take a document from the workspace plus an instruction (e.g., summarize, extract key points, translate) and return an AI-generated result.',
+    icon: '\uD83D\uDCC4',
+    isBuiltin: true,
+    createdBy: 'System',
+    config: {
+      templateId: 'claude_process_document',
+      parameters: [
+        { name: 'file_name', label: 'File Name', type: 'string', required: true, description: 'Name of the file in the workspace' },
+        { name: 'instruction', label: 'Instruction', type: 'string', required: true, description: 'What to do with the document (e.g., summarize, extract key points, translate)' },
+      ],
+    },
+  },
 ];
 
 // Starter external connectors — real, free, no-auth APIs for workshop demos

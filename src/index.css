@@ -3958,6 +3958,55 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
   color: #8b6fb0;
 }
 
+/* ===== Coworker tools picker (Stage 5b) ===== */
+.cwb-tools-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 8px;
+}
+.cwb-tool-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--border-color, #e0d6cc);
+  border-radius: 10px;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+.cwb-tool-row:hover {
+  border-color: var(--text-muted, #888);
+}
+.cwb-tool-row.checked {
+  border-color: var(--accent-system, #5a9e6f);
+  background: rgba(90, 158, 111, 0.06);
+}
+.cwb-tool-row input[type="checkbox"] {
+  margin-top: 2px;
+  flex-shrink: 0;
+}
+.cwb-tool-icon {
+  font-size: 18px;
+  flex-shrink: 0;
+}
+.cwb-tool-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+}
+.cwb-tool-name {
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--text-body);
+}
+.cwb-tool-desc {
+  font-size: 12px;
+  color: var(--text-muted, #888);
+  line-height: 1.4;
+}
+
 /* ===== File chip role badge (Stage 4 — derived from folder) ===== */
 .cl-context-file-chip-role {
   display: inline-flex;

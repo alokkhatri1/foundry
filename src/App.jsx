@@ -795,6 +795,14 @@ function App() {
               }
               handleUpdateTree(newTree);
             },
+            onSendDm: async (recipientName, message) => {
+              if (!myParticipantId) return { success: false, output: 'Your participant record is not ready — try again in a moment.' };
+              const toId = await sb.findParticipantIdByName(recipientName);
+              if (!toId) return { success: false, output: `Could not find a workshop participant named "${recipientName}".` };
+              const sent = await sb.sendDm(myParticipantId, toId, message);
+              if (sent?.data) return { success: true, output: `Message sent to ${recipientName}.` };
+              return { success: false, output: `Failed to send message: ${sent?.error || 'unknown error'}` };
+            },
           });
 
           if (onToolExecution) {
@@ -1108,7 +1116,7 @@ function App() {
 
     // Build coworker tools: built-in capabilities (always) + any assigned connectors
     const coworkerTools = targetCoworker
-      ? [...BUILTIN_TOOLS, ...(targetCoworker.toolIds || []).map(tid => tools?.find(t => t.id === tid)).filter(Boolean)]
+      ? (targetCoworker.toolIds || []).map(tid => tools?.find(t => t.id === tid)).filter(Boolean)
       : [];
 
     if (coworkerTools.length > 0) {
@@ -1372,7 +1380,7 @@ Be concise. Confirm actions after completing them.${knowledgeSection}`;
         )}
 {activeTab === 'coworkers' && (
           <div className="tab-pane tab-pane-coworkers">
-            <CoworkerBuilder coworkers={coworkers || []} onUpdateCoworkers={handleUpdateCoworkers} fileTree={fileTree} tools={tools || []} userName={userName} callClaudeAPI={callClaudeAPI} showEducationalCues={showEducationalCues} />
+            <CoworkerBuilder coworkers={coworkers || []} onUpdateCoworkers={handleUpdateCoworkers} fileTree={fileTree} tools={tools || []} userName={userName} callClaudeAPI={callClaudeAPI} showEducationalCues={showEducationalCues} currentStage={currentStage} />
           </div>
         )}
         {activeTab === 'workflow' && (

@@ -124,6 +124,17 @@ const COMMUNICATE_TEMPLATES = {
       return { success: true, output: `Message sent: "${p.message}"` };
     },
   },
+  dm_participant: {
+    name: 'DM Participant',
+    parameters: [
+      { name: 'recipient_name', label: 'Recipient', type: 'string', required: true },
+      { name: 'message', label: 'Message', type: 'string', required: true },
+    ],
+    async execute(p, onMessage, onSendDm) {
+      if (!onSendDm) return { success: false, output: 'Direct messaging is not available in this context.' };
+      return await onSendDm(p.recipient_name, p.message);
+    },
+  },
   notify_person: {
     name: 'Notify Person',
     parameters: [
@@ -236,6 +247,60 @@ const CONNECT_TEMPLATES = {
   },
 };
 
+// ===== RESEARCH Templates =====
+const RESEARCH_TEMPLATES = {
+  claude_research: {
+    name: 'Claude Research',
+    parameters: [
+      { name: 'topic', label: 'Topic', type: 'string', required: true, description: 'The topic to research' },
+    ],
+    async execute(p, callClaudeAPI) {
+      if (!callClaudeAPI) return { success: false, output: 'Research unavailable (no API).' };
+      const systemPrompt = 'You are a research assistant. Produce a concise research brief on the topic below. Use markdown with clear sections (Overview, Key Points, Notes). Be accurate and specific. Do not fabricate sources.';
+      const result = await callClaudeAPI(systemPrompt, `Research topic: ${p.topic}`);
+      return {
+        success: !!result.success,
+        output: result.success ? result.content : `Research failed: ${result.error || 'unknown'}`,
+      };
+    },
+  },
+};
+
+// ===== PROCESS Templates =====
+const PROCESS_TEMPLATES = {
+  claude_process_document: {
+    name: 'Process Document',
+    parameters: [
+      { name: 'file_name', label: 'File Name', type: 'string', required: true },
+      { name: 'instruction', label: 'Instruction', type: 'string', required: true },
+    ],
+    async execute(p, fileTree, callClaudeAPI) {
+      function findByName(node, name) {
+        if (!node) return null;
+        if (node.type === 'file' && node.name === name) return node;
+        if (node.children) {
+          for (const c of node.children) {
+            const found = findByName(c, name);
+            if (found) return found;
+          }
+        }
+        return null;
+      }
+      const file = findByName(fileTree, p.file_name);
+      if (!file) return { success: false, output: `File not found: ${p.file_name}` };
+      if (!file.content) return { success: false, output: `File is empty: ${p.file_name}` };
+      if (!callClaudeAPI) return { success: false, output: 'Processing unavailable (no API).' };
+      const systemPrompt = 'You process documents. Given a document and an instruction, follow the instruction precisely on the document and return the result. Stay focused on the instruction.';
+      const userMsg = `Instruction: ${p.instruction}\n\nDocument (${file.name}):\n${file.content}`;
+      const result = await callClaudeAPI(systemPrompt, userMsg);
+      return {
+        success: !!result.success,
+        output: result.success ? result.content : `Processing failed: ${result.error || 'unknown'}`,
+      };
+    },
+  },
+};
+
 // ===== All Templates Registry =====
 const ALL_TEMPLATES = {
   calculate: CALCULATE_TEMPLATES,
@@ -244,6 +309,8 @@ const ALL_TEMPLATES = {
   communicate: COMMUNICATE_TEMPLATES,
   validate: VALIDATE_TEMPLATES,
   connect: CONNECT_TEMPLATES,
+  research: RESEARCH_TEMPLATES,
+  process: PROCESS_TEMPLATES,
 };
 
 // ===== Get template for a tool =====
@@ -303,11 +370,15 @@ export async function executeTool(tool, input, fileTree, callClaudeAPI, callback
       case 'create':
         return template.execute(params, callbacks.onCreateFile);
       case 'communicate':
-        return template.execute(params, callbacks.onMessage);
+        return await template.execute(params, callbacks.onMessage, callbacks.onSendDm);
       case 'validate':
         return template.execute(params, tool.config);
       case 'connect':
         return await template.execute(params, tool.config);
+      case 'research':
+        return await template.execute(params, callClaudeAPI);
+      case 'process':
+        return await template.execute(params, fileTree, callClaudeAPI);
       default:
         return { success: false, output: `Unknown tool type: ${tool.type}` };
     }

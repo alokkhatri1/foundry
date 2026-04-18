@@ -418,6 +418,19 @@ function App() {
     sb.trackPresence(name, color, handlePresenceSync);
     startRealtimeSync();
 
+    // Safety net: load all participants from DB so peers appear even if presence lags.
+    sb.loadParticipants().then(dbParticipants => {
+      if (!dbParticipants || dbParticipants.length === 0) return;
+      setParticipants(prev => {
+        const byName = new Map();
+        for (const p of (prev || [])) byName.set(p.name, p);
+        for (const p of dbParticipants) {
+          if (!byName.has(p.name)) byName.set(p.name, p);
+        }
+        return [...byName.values()];
+      });
+    });
+
     setUserName(name);
     setWorkshopCode(code);
     setWorkflowRuns(runs);

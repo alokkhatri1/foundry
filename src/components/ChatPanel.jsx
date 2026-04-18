@@ -546,10 +546,14 @@ export default function ChatPanel({ messages, onSendMessage, onApprovalAction, o
       <div className="cl-input-area">
         <input type="file" ref={fileInputRef} style={{ display: 'none' }} multiple onChange={handleFileSelect}
           accept=".pdf,.doc,.docx,.xls,.xlsx,.csv,.txt,.md,.json,.png,.jpg,.jpeg,.gif,.webp" />
-        {!activeDm && (
-          <div className="cl-input-row">
-            <div className="cl-context-info">
-              {activeCoworker
+        <div className="cl-input-row">
+          <div className="cl-context-info">
+            {activeDm
+              ? <span className="cl-context-active">
+                  <span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: '50%', background: activeDm.color || '#888', marginRight: 6, verticalAlign: 'middle' }}></span>
+                  Talking to {activeDm.name}
+                </span>
+              : activeCoworker
                 ? <span className="cl-context-active"><CoworkerGlyph avatar={activeCoworker.avatar} size={14} color="currentColor" /> Talking to {activeCoworker.name}</span>
                 : activeContextCount > 0
                   ? <div className="cl-context-files-list">
@@ -565,10 +569,9 @@ export default function ChatPanel({ messages, onSendMessage, onApprovalAction, o
                       })}
                     </div>
                   : <span className="cl-context-none">No context selected</span>
-              }
-            </div>
+            }
           </div>
-        )}
+        </div>
         {attachedFiles.length > 0 && (
           <div className="cl-attached-files">
             <EducationalCue cueId="chat-attachment" show={showEducationalCues} />

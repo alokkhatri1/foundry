@@ -759,7 +759,7 @@ function App() {
   }
 
   // ===== Claude with Tools (agentic loop) =====
-  async function callClaudeWithTools({ systemPrompt, userMessage, agentTools, onToolExecution, coworker }) {
+  async function callClaudeWithTools({ systemPrompt, userMessage, agentTools, onToolExecution, onProgressText, coworker }) {
     if (!apiKey) return { success: false, content: [{ type: 'text', text: 'No API key configured.' }] };
 
     const claudeTools = agentTools.map(t => toolToClaudeSchema(t));
@@ -804,6 +804,15 @@ function App() {
             toolUseBlocks.push(block);
           }
         }
+
+        // Stream intermediate narration into the chat the moment it arrives,
+        // so the user sees the coworker's state transitions ("I'll check the
+        // policy first…", "Got Priya's reply, writing the summary now.")
+        // instead of silence between tool calls. Final text after the last
+        // tool use still arrives through onProgressText so the caller can
+        // render it without needing a separate end-of-flow concatenation.
+        const combinedText = textBlocks.join('\n').trim();
+        if (combinedText && onProgressText) onProgressText(combinedText);
 
         if (toolUseBlocks.length === 0 || data.stop_reason === 'end_turn') {
           break;
@@ -922,9 +931,22 @@ function App() {
               const sent = await sb.sendDm(coworkerParticipantId, humanId, question);
               if (!sent?.data) {
                 askHumanResolversRef.current.delete(key);
+                updateActiveMessages(prev => prev.map(m =>
+                  m.id === pickId ? { ...m, status: 'error', errorOutput: sent?.error || 'unknown error' } : m
+                ));
                 return { success: false, output: `Failed to send the question: ${sent?.error || 'unknown error'}.` };
               }
+              // Annotate the picker card with the sender/recipient ids so the
+              // Nudge button has what it needs to re-send the question.
+              updateActiveMessages(prev => prev.map(m =>
+                m.id === pickId ? { ...m, fromParticipantId: coworkerParticipantId, toParticipantId: humanId } : m
+              ));
               const reply = await replyPromise;
+              // Transition the card to "resolved" with the actual reply text
+              // so the whole round-trip is legible in the chat history.
+              updateActiveMessages(prev => prev.map(m =>
+                m.id === pickId ? { ...m, status: 'resolved', reply } : m
+              ));
               return { success: true, output: `${recipientName} replied: ${reply}` };
             },
           });
@@ -1159,10 +1181,29 @@ function App() {
     const resolver = pickRecipientResolversRef.current.get(pickId);
     if (!resolver) return;
     pickRecipientResolversRef.current.delete(pickId);
+    // Transition the picker card from "choose who" to "waiting for reply".
+    // The resolved recipient is stored on the message so subsequent state
+    // (sending → waiting → resolved) renders against the same card.
     updateActiveMessages(prev => prev.map(m =>
-      m.id === pickId ? { ...m, status: 'resolved', resolvedRecipient: recipientName } : m
+      m.id === pickId ? { ...m, status: 'waiting', resolvedRecipient: recipientName } : m
     ));
     resolver(recipientName);
+  }
+
+  async function handleNudgeRecipient(pickId) {
+    // Re-send the same question from the same sender to the same recipient
+    // with a "just checking in" prefix. Increments nudgeCount on the message
+    // so the UI can show how many times we've nudged.
+    const convo = conversations.find(c => c.id === activeConvoId);
+    const msg = (convo?.messages || []).find(m => m.id === pickId);
+    if (!msg || msg.status !== 'waiting' || !msg.fromParticipantId || !msg.toParticipantId) return;
+    const prefix = (msg.nudgeCount || 0) === 0
+      ? 'Just checking in — still need your input.'
+      : `Nudge ${((msg.nudgeCount || 0) + 1)} — still waiting.`;
+    await sb.sendDm(msg.fromParticipantId, msg.toParticipantId, `${prefix} Original question: ${msg.question}`);
+    updateActiveMessages(prev => prev.map(m =>
+      m.id === pickId ? { ...m, nudgeCount: (m.nudgeCount || 0) + 1 } : m
+    ));
   }
 
 
@@ -1207,12 +1248,29 @@ function App() {
           : '';
         collabSection = `\n\n## Reaching a human\n\nWhen you genuinely need a human's judgment, confirmation, or a missing piece of information, call the Ask Human tool with a clear, self-contained question. You do not pick who to ask — the user at the keyboard will pick a live human teammate for you. Wait for the reply; incorporate it before concluding. Use this sparingly — only when the task actually needs a human.${whenToAskLine}`;
       }
+
+      // When the coworker has both Ask Human AND Create File enabled, nudge it
+      // to chain: once the human's reply gives enough to conclude, produce the
+      // artifact instead of just summarising in chat.
+      let chainingHint = '';
+      const toolIdSet = new Set(targetCoworker.toolIds || []);
+      if (toolIdSet.has('builtin-ask-human') && toolIdSet.has('builtin-create-file')) {
+        chainingHint = `\n\n## Finishing a task\n\nWhen a teammate's reply gives you what you need to conclude, produce the final artifact with the Create File tool rather than just summarising in chat. The file is how the organisation keeps what you've done.`;
+      }
+
+      // Narration habit: short "what I'm doing now" lines between tool calls.
+      // The UI streams these to the chat the moment they arrive, so the user
+      // sees the coworker's state transitions instead of silence.
+      const narrationHint = `\n\n## How you narrate\n\nBefore each tool call, write one short line of plain text saying what you're about to do (e.g., "I'll check with Priya on the 2024 exception first."). After a tool returns, write one short line saying what the result means before deciding the next step. Keep it crisp — this is how the user sees your progress.`;
+
       systemPrompt = [
         targetCoworker.role ? `## Role\n${targetCoworker.role}\n` : '',
         ...instructions.map(f => f.content),
         knowledge.length > 0 ? '\n\n## Knowledge Documents\n' : '',
         ...knowledge.map(k => `### ${k.name}\n${k.content}\n`),
         collabSection,
+        chainingHint,
+        narrationHint,
       ].filter(Boolean).join('\n');
     } else if (contextFileIds && contextFileIds.length > 0) {
       const skillIdSet = new Set(skillFileIds || []);
@@ -1282,14 +1340,20 @@ function App() {
         userMessage,
         agentTools: coworkerTools,
         onToolExecution: (execData) => addMessage({ type: 'tool_execution', ...execData }),
+        // Stream narration the moment each model turn produces text, so the
+        // user sees the coworker's state transitions live instead of one
+        // lumped reply after all tool calls resolve.
+        onProgressText: (text) => addMessage({
+          type: 'direct-response',
+          content: text,
+          label: targetCoworker?.name,
+          coworkerAvatar: targetCoworker?.avatar,
+        }),
         coworker: targetCoworker,
       });
       updateActiveMessages(prev => prev.filter(m => m.id !== loadingId));
       setIsLoading(false);
-      if (result.success) {
-        const textContent = result.content.filter(c => c.type === 'text').map(c => c.text).join('\n');
-        if (textContent) addMessage({ type: 'direct-response', content: textContent, label: targetCoworker?.name, coworkerAvatar: targetCoworker?.avatar });
-      } else {
+      if (!result.success) {
         const errorText = result.content?.[0]?.text || 'Unknown error';
         addMessage({ type: 'error', content: errorText });
       }
@@ -1527,6 +1591,7 @@ Be concise. Confirm actions after completing them.${knowledgeSection}`;
               onSendMessage={handleSendMessage}
               onApprovalAction={handleApprovalAction}
               onPickRecipient={handlePickRecipient}
+              onNudgeRecipient={handleNudgeRecipient}
               isLoading={isLoading}
               participants={participants}
               currentUserName={userName}

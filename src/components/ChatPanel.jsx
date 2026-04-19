@@ -45,7 +45,7 @@ function AssistantAvatar({ label, coworkerAvatar }) {
   return <div className="cl-avatar cl-avatar-ai">{letter}</div>;
 }
 
-function ChatMessage({ msg, onApprovalAction, onPickRecipient, onRetry, participants, currentUserName, showEducationalCues }) {
+function ChatMessage({ msg, onApprovalAction, onPickRecipient, onNudgeRecipient, onRetry, participants, currentUserName, showEducationalCues }) {
   const [comment, setComment] = useState('');
   const sender = msg.participantName ? participants?.find(p => p.name === msg.participantName) : null;
 
@@ -162,7 +162,7 @@ function ChatMessage({ msg, onApprovalAction, onPickRecipient, onRetry, particip
   }
 
   if (msg.type === 'recipient-picker') {
-    const isResolved = msg.status === 'resolved';
+    const status = msg.status || 'pending';
     const allowedSet = msg.allowedParticipantIds && msg.allowedParticipantIds.length > 0
       ? new Set(msg.allowedParticipantIds)
       : null;
@@ -176,13 +176,19 @@ function ChatMessage({ msg, onApprovalAction, onPickRecipient, onRetry, particip
       <div className="cl-row cl-row-ai">
         <AssistantAvatar label={msg.coworkerName || 'AI'} coworkerAvatar={msg.coworkerAvatar} />
         <div className="cl-bubble cl-bubble-approval">
-          <div className="cl-bubble-label approval">{msg.coworkerName || 'Coworker'} needs a human</div>
+          <div className="cl-bubble-label approval">
+            {status === 'pending' && `${msg.coworkerName || 'Coworker'} needs a human`}
+            {status === 'waiting' && `${msg.coworkerName || 'Coworker'} is waiting on ${msg.resolvedRecipient}`}
+            {status === 'resolved' && `${msg.resolvedRecipient} replied to ${msg.coworkerName || 'Coworker'}`}
+            {status === 'error' && `Couldn't reach ${msg.resolvedRecipient || 'recipient'}`}
+          </div>
           <div className="cl-bubble-content">{msg.question}</div>
-          {!isResolved && (
+
+          {status === 'pending' && (
             <>
               <div className="cl-picker-prompt">Pick who to ask:</div>
               {onlineHumans.length === 0 ? (
-                <div className="cl-picker-empty">No humans are currently online.</div>
+                <div className="cl-picker-empty">No allowed humans are currently online.</div>
               ) : (
                 <div className="cl-picker-list">
                   {onlineHumans.map(p => (
@@ -200,8 +206,34 @@ function ChatMessage({ msg, onApprovalAction, onPickRecipient, onRetry, particip
               )}
             </>
           )}
-          {isResolved && (
-            <div className="cl-approval-resolved">Asked {msg.resolvedRecipient}</div>
+
+          {status === 'waiting' && (
+            <>
+              <div className="cl-picker-prompt">
+                DM sent to <strong>{msg.resolvedRecipient}</strong>. Waiting for their reply
+                {msg.nudgeCount > 0 && <> · nudged {msg.nudgeCount}×</>}…
+              </div>
+              <div className="cl-picker-list">
+                <button
+                  className="cl-picker-chip"
+                  onClick={() => onNudgeRecipient && onNudgeRecipient(msg.id)}
+                  title="Re-send the question with a nudge"
+                >
+                  Nudge {msg.resolvedRecipient}
+                </button>
+              </div>
+            </>
+          )}
+
+          {status === 'resolved' && msg.reply && (
+            <div className="cl-picker-reply">
+              <div className="cl-picker-reply-label">{msg.resolvedRecipient} said</div>
+              <div className="cl-picker-reply-text">{msg.reply}</div>
+            </div>
+          )}
+
+          {status === 'error' && (
+            <div className="cl-approval-resolved">{msg.errorOutput || 'Could not send the question.'}</div>
           )}
         </div>
       </div>
@@ -483,7 +515,7 @@ function InlineEditor({ file, onUpdateContent, onClose }) {
 }
 
 // ===== Main ChatPanel =====
-export default function ChatPanel({ messages, onSendMessage, onApprovalAction, onPickRecipient, onRetry, isLoading, participants, currentUserName, fileTree, onUpdateFileContent, coworkers, showEducationalCues, conversations, activeConvoId, onNewChat, onSelectConvo, onDeleteConvo, onCoworkerChange, currentStage, activeDm, onOpenDm, onCloseDm, myParticipantId, sb, unreadDmCounts }) {
+export default function ChatPanel({ messages, onSendMessage, onApprovalAction, onPickRecipient, onNudgeRecipient, onRetry, isLoading, participants, currentUserName, fileTree, onUpdateFileContent, coworkers, showEducationalCues, conversations, activeConvoId, onNewChat, onSelectConvo, onDeleteConvo, onCoworkerChange, currentStage, activeDm, onOpenDm, onCloseDm, myParticipantId, sb, unreadDmCounts }) {
   const [input, setInput] = useState('');
   const [selectedFileIds, setSelectedFileIds] = useState([]);
   const [editingFileId, setEditingFileId] = useState(null);
@@ -821,7 +853,7 @@ export default function ChatPanel({ messages, onSendMessage, onApprovalAction, o
                   if ((m.type === 'approval' || m.type === 'workflow_start' || m.type === 'workflow_end') && !stageReached(currentStage, '7')) return false;
                   return true;
                 }).map((msg, i) => (
-                  <ChatMessage key={msg.id || i} msg={msg} onApprovalAction={onApprovalAction} onPickRecipient={onPickRecipient} onRetry={onRetry} participants={participants} currentUserName={currentUserName} showEducationalCues={showEducationalCues} />
+                  <ChatMessage key={msg.id || i} msg={msg} onApprovalAction={onApprovalAction} onPickRecipient={onPickRecipient} onNudgeRecipient={onNudgeRecipient} onRetry={onRetry} participants={participants} currentUserName={currentUserName} showEducationalCues={showEducationalCues} />
                 ))}
               </div>
             </div>

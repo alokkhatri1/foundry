@@ -637,8 +637,8 @@ export default function ChatPanel({ messages, onSendMessage, onApprovalAction, o
                         return (
                           <span key={id} className={`cl-context-file-chip${isSkill ? ' skill' : ''}`}>
                             {stage4Open && (
-                              <span className="cl-context-file-chip-role" title={isSkill ? 'Skill file (from Instructions folder)' : 'Context file'}>
-                                {isSkill ? 'skill' : 'context'}
+                              <span className="cl-context-file-chip-role" title={isSkill ? 'Skill file (from skills folder)' : 'Knowledge file (from knowledge folder)'}>
+                                {isSkill ? 'skill' : 'knowledge'}
                               </span>
                             )}
                             <span className="cl-context-file-chip-name">{node.name.replace(/\.md$/, '')}</span>

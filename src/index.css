@@ -2792,6 +2792,9 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
 .sl-channel-dot.on::after { transform: translateX(12px); background: white; }
 .sl-channel-dot:hover { background: rgba(255,255,255,0.2); }
 .sl-channel-dot.on:hover { background: #4db86a; }
+.sl-channel-dot.partial { background: rgba(90, 158, 111, 0.55); }
+.sl-channel-dot.partial::after { transform: translateX(6px); background: white; }
+.sl-channel-dot.partial:hover { background: rgba(90, 158, 111, 0.75); }
 
 /* People items */
 .sl-dm {
@@ -4924,6 +4927,30 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
 }
 .cl-context-file-chip.skill {
   border-color: #4a7fb5;
+}
+.cl-context-file-chip.folder {
+  background: rgba(90, 158, 111, 0.18);
+  border-color: rgba(90, 158, 111, 0.5);
+}
+.cl-context-file-chip.folder .cl-context-file-chip-role {
+  background: var(--accent-system);
+  color: #fff;
+  border-color: var(--accent-system);
+  min-width: 20px;
+  justify-content: center;
+}
+.cl-context-file-chip.folder .cl-context-file-chip-name {
+  font-style: italic;
+}
+.cl-context-warning {
+  font-size: 12px;
+  color: #a87c2c;
+  background: rgba(214, 168, 66, 0.12);
+  border: 1px solid rgba(214, 168, 66, 0.35);
+  border-radius: 8px;
+  padding: 6px 10px;
+  margin-top: 6px;
+  line-height: 1.4;
 }
 
 /* ===== Reveal modal (stage unlock) ===== */

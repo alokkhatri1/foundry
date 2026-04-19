@@ -94,8 +94,8 @@ function ChatMessage({ msg, onApprovalAction, onPickRecipient, onNudgeRecipient,
       <div className="cl-row cl-row-ai">
         <AssistantAvatar label="!" />
         <div className="cl-bubble cl-bubble-approval">
-          <div className="cl-bubble-label approval">Approval Gate</div>
-          <div className="cl-bubble-content">{msg.prompt}</div>
+          <div className="cl-bubble-label approval">Review step</div>
+          <div className="cl-bubble-content">{msg.prompt || 'Review the upstream output and approve or reject with feedback.'}</div>
           <EducationalCue cueId="chat-approval-gate" show={showEducationalCues} />
           {msg.previousOutput && (
             <div className="cl-approval-context">
@@ -104,20 +104,24 @@ function ChatMessage({ msg, onApprovalAction, onPickRecipient, onNudgeRecipient,
           )}
           {isActive && (
             <>
-              <textarea className="cl-approval-comment" placeholder="Add a comment (optional)..." value={comment} onChange={e => setComment(e.target.value)} rows={2} />
+              <textarea className="cl-approval-comment" placeholder="Feedback (required if rejecting)..." value={comment} onChange={e => setComment(e.target.value)} rows={2} />
               <EducationalCue cueId="chat-approval-actions" show={showEducationalCues} />
               <div className="cl-approval-actions">
-                {(msg.actions || ['Approve', 'Reject', 'Request Correction', 'Escalate']).map(action => {
-                  const cls = action === 'Approve' ? 'approve' : action === 'Reject' ? 'reject' : action === 'Request Correction' ? 'correction' : 'escalate';
-                  const disabled = action === 'Request Correction' && msg.correctionsRemaining <= 0;
-                  return (
-                    <button key={action} className={`cl-approval-btn ${cls}`} disabled={disabled} onClick={() => onApprovalAction(msg.runId, msg.id, action, comment)}>
-                      {action}{action === 'Request Correction' && msg.maxCorrections && ` (${msg.correctionsRemaining}/${msg.maxCorrections})`}
-                    </button>
-                  );
-                })}
+                <button
+                  className="cl-send-btn-approve"
+                  onClick={() => onApprovalAction(msg.runId, msg.id, 'Approve', comment)}
+                >
+                  Approve
+                </button>
+                <button
+                  className="cl-send-btn-cancel"
+                  disabled={!comment.trim()}
+                  title={comment.trim() ? '' : 'Add feedback before rejecting'}
+                  onClick={() => onApprovalAction(msg.runId, msg.id, 'Reject', comment)}
+                >
+                  Reject with feedback
+                </button>
               </div>
-              {msg.correctionsRemaining <= 0 && <div className="cl-approval-max">Maximum corrections reached.</div>}
             </>
           )}
           {msg.resolved && (
@@ -447,11 +451,22 @@ function ContextSidebar({ fileTree, selectedFileIds, onToggleFile, onToggleFolde
               </div>
               {!isDeptCollapsed && dept.subfolders.map(subfolder => {
                 const isCollapsed = collapsedSections[subfolder.id];
+                const subfolderFileIds = subfolder.files.map(f => f.id);
+                const selectedInFolder = subfolderFileIds.filter(id => selectedFileIds.includes(id)).length;
+                const folderAllOn = subfolderFileIds.length > 0 && selectedInFolder === subfolderFileIds.length;
+                const folderPartial = selectedInFolder > 0 && !folderAllOn;
                 return (
                   <div key={subfolder.id} className="sl-channel-group">
                     <div className="sl-group-header" onClick={() => toggleSection(subfolder.id)}>
                       <span className={`sl-group-caret${!isCollapsed ? ' open' : ''}`}>{'\u25B6'}</span>
                       <span className="sl-group-name">{subfolder.name}</span>
+                      {subfolderFileIds.length > 0 && (
+                        <span
+                          className={`sl-channel-dot${folderAllOn ? ' on' : ''}${folderPartial ? ' partial' : ''}`}
+                          onClick={e => { e.stopPropagation(); handleToggleSubfolder(subfolderFileIds); }}
+                          title={folderAllOn ? 'Remove folder from context' : folderPartial ? `Add the remaining ${subfolderFileIds.length - selectedInFolder} file${subfolderFileIds.length - selectedInFolder === 1 ? '' : 's'}` : `Add all ${subfolderFileIds.length} file${subfolderFileIds.length === 1 ? '' : 's'} as context`}
+                        ></span>
+                      )}
                     </div>
                     {!isCollapsed && subfolder.files.map(file => {
                       const isActive = selectedFileIds.includes(file.id);
@@ -895,6 +910,13 @@ export default function ChatPanel({ messages, onSendMessage, onApprovalAction, o
     else setSelectedFileIds(prev => [...new Set([...prev, ...folderFileIds])]);
   }
 
+  function handleToggleSubfolder(fileIds) {
+    if (!fileIds || fileIds.length === 0) return;
+    const allSelected = fileIds.every(id => selectedFileIds.includes(id));
+    if (allSelected) setSelectedFileIds(prev => prev.filter(id => !fileIds.includes(id)));
+    else setSelectedFileIds(prev => [...new Set([...prev, ...fileIds])]);
+  }
+
   function handleOpenFile(fileId) {
     setEditingFileId(editingFileId === fileId ? null : fileId);
   }
@@ -923,28 +945,71 @@ export default function ChatPanel({ messages, onSendMessage, onApprovalAction, o
                 ? <span className="cl-context-active"><CoworkerGlyph avatar={activeCoworker.avatar} size={14} color="currentColor" /> Talking to {activeCoworker.name}</span>
                 : activeContextCount > 0
                   ? <div className="cl-context-files-list">
-                      {selectedFileIds.map(id => {
-                        const node = findNode(fileTree, id);
-                        if (!node) return null;
-                        const isSkill = skillFileIds.includes(id);
+                      {(() => {
+                        const handled = new Set();
+                        const chips = [];
+                        departments.forEach(dept => {
+                          dept.subfolders.forEach(sub => {
+                            const ids = sub.files.map(f => f.id);
+                            if (ids.length === 0) return;
+                            const allSelected = ids.every(id => selectedFileIds.includes(id));
+                            if (allSelected) {
+                              chips.push({ kind: 'folder', key: `folder-${sub.id}`, name: sub.name, count: ids.length, fileIds: ids });
+                              ids.forEach(id => handled.add(id));
+                            }
+                          });
+                        });
+                        selectedFileIds.forEach(id => {
+                          if (handled.has(id)) return;
+                          const node = findNode(fileTree, id);
+                          if (!node) return;
+                          chips.push({ kind: 'file', key: id, id, node });
+                        });
                         const stage4Open = stageReached(currentStage, '4');
-                        return (
-                          <span key={id} className={`cl-context-file-chip${isSkill ? ' skill' : ''}`}>
-                            {stage4Open && (
-                              <span className="cl-context-file-chip-role" title={isSkill ? 'Skill file (from skills folder)' : 'Knowledge file (from knowledge folder)'}>
-                                {isSkill ? 'skill' : 'knowledge'}
+                        return chips.map(chip => {
+                          if (chip.kind === 'folder') {
+                            return (
+                              <span key={chip.key} className="cl-context-file-chip folder" title={`All ${chip.count} file${chip.count === 1 ? '' : 's'} in ${chip.name}/ attached`}>
+                                <span className="cl-context-file-chip-role">{chip.count}</span>
+                                <span className="cl-context-file-chip-name">{chip.name}/</span>
+                                <button className="cl-context-file-chip-remove" onClick={() => handleToggleSubfolder(chip.fileIds)}>{'\u2715'}</button>
                               </span>
-                            )}
-                            <span className="cl-context-file-chip-name">{node.name.replace(/\.md$/, '')}</span>
-                            <button className="cl-context-file-chip-remove" onClick={() => handleToggleFile(id)}>{'\u2715'}</button>
-                          </span>
-                        );
-                      })}
+                            );
+                          }
+                          const isSkill = skillFileIds.includes(chip.id);
+                          return (
+                            <span key={chip.key} className={`cl-context-file-chip${isSkill ? ' skill' : ''}`}>
+                              {stage4Open && (
+                                <span className="cl-context-file-chip-role" title={isSkill ? 'Skill file (from skills folder)' : 'Knowledge file (from knowledge folder)'}>
+                                  {isSkill ? 'skill' : 'knowledge'}
+                                </span>
+                              )}
+                              <span className="cl-context-file-chip-name">{chip.node.name.replace(/\.md$/, '')}</span>
+                              <button className="cl-context-file-chip-remove" onClick={() => handleToggleFile(chip.id)}>{'\u2715'}</button>
+                            </span>
+                          );
+                        });
+                      })()}
                     </div>
                   : null
             }
           </div>
         </div>
+        {(() => {
+          if (activeContextCount === 0) return null;
+          const totalChars = selectedFileIds.reduce((sum, id) => {
+            const node = findNode(fileTree, id);
+            return sum + (node?.content?.length || 0);
+          }, 0);
+          const CONTEXT_WARN_CHARS = 80000;
+          if (totalChars < CONTEXT_WARN_CHARS) return null;
+          const approxTokens = Math.round(totalChars / 4000);
+          return (
+            <div className="cl-context-warning" title="The AI sees everything you attach. Very large contexts can slow replies or hit the model's context limit.">
+              Heads up — {activeContextCount} file{activeContextCount === 1 ? '' : 's'} attached, roughly {approxTokens}k tokens. Consider unselecting some to keep answers snappy.
+            </div>
+          );
+        })()}
         {attachedFiles.length > 0 && (
           <div className="cl-attached-files">
             <EducationalCue cueId="chat-attachment" show={showEducationalCues} />

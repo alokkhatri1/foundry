@@ -2145,7 +2145,8 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
 .cl-review-pane {
   display: flex;
   flex-direction: column;
-  height: 100%;
+  flex: 1;
+  min-height: 0;
   background: var(--bg-white);
 }
 .cl-review-pane-header {
@@ -2204,6 +2205,7 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
 }
 .cl-review-pane-body {
   flex: 1;
+  min-height: 0;
   overflow-y: auto;
   padding: 32px 48px 48px;
 }

@@ -1308,13 +1308,14 @@ function App() {
       // hint about when to reach out. The names must match exactly for
       // ask_human to route correctly.
       let collabSection = '';
-      if (stageReached(currentStage, '5c')) {
+      const hasRequestReview = (targetCoworker.toolIds || []).includes('builtin-request-review');
+      if (stageReached(currentStage, '5c') && hasRequestReview) {
         const reviewCfg = targetCoworker.toolConfigs?.['builtin-request-review'];
         const customGuidance = reviewCfg?.instructions?.trim();
         const whoSignsOffLine = customGuidance
           ? `\n\n### Who signs off (set by the user)\n${customGuidance}`
           : '';
-        collabSection = `\n\n## Finishing your work\n\nWhen your task has a concrete output — a summary, a memo, a plan — don't just reply in chat. Draft the whole file in your head, then call the Request Review tool with the title and the full markdown content. The user at the keyboard will pick a reviewer for you. The reviewer sees your draft (and your reasoning) and either approves or rejects. On approval the file is saved to the workspace automatically. On rejection you'll get feedback — revise and request another review. Don't finalise work without review once you have this tool.${whoSignsOffLine}`;
+        collabSection = `\n\n## Finishing your work — review is mandatory\n\nYou DO NOT have access to Create File directly. Every artifact you produce must go through human review.\n\nWorkflow:\n1. Process the task — read your knowledge, think it through, narrate your steps in short lines.\n2. Draft the full file in your head — title + full markdown content.\n3. Call the Request Review tool with that title and content. The user at the keyboard will pick a reviewer for you.\n4. The reviewer sees your draft AND your reasoning, then approves or rejects.\n5. On approve: the file is saved to the workspace automatically — you don't call any other tool.\n6. On reject: you'll receive the reviewer's feedback as the tool result. Revise the draft and call Request Review again.\n\nNever try to substitute a chat summary for a reviewed file. If the task has a concrete output, it goes through review.${whoSignsOffLine}`;
       }
 
       // Narration habit: short "what I'm doing now" lines between tool calls.
@@ -1383,13 +1384,13 @@ function App() {
       ? (targetCoworker.toolIds || []).map(tid => tools?.find(t => t.id === tid)).filter(Boolean)
       : [];
 
-    // Stage 5c Collaboration — every coworker gets the Ask Human tool so it
-    // can reach a live human mid-task and resume with the reply.
-    if (targetCoworker && stageReached(currentStage, '5c')) {
-      const askHumanTool = (tools || []).find(t => t.id === 'builtin-ask-human');
-      if (askHumanTool && !coworkerTools.some(t => t.id === 'builtin-ask-human')) {
-        coworkerTools = [...coworkerTools, askHumanTool];
-      }
+    // When Request Review is ticked, it takes precedence over direct Create
+    // File — the coworker must go through human approval to produce any
+    // artifact. Strip Create File from the exposed toolset so Claude can't
+    // short-circuit the review gate. The underlying writeCoworkerFile helper
+    // stays in scope so Request Review can still write the file on approval.
+    if (coworkerTools.some(t => t.id === 'builtin-request-review')) {
+      coworkerTools = coworkerTools.filter(t => t.id !== 'builtin-create-file');
     }
 
     if (coworkerTools.length > 0) {

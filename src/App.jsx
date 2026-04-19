@@ -911,14 +911,20 @@ function App() {
               if (!humanId) {
                 return { success: false, output: `Could not find a workshop participant named "${recipientName}".` };
               }
-              const sent = await sb.sendDm(coworkerParticipantId, humanId, question);
-              if (!sent?.data) {
-                return { success: false, output: `Failed to send the question: ${sent?.error || 'unknown error'}.` };
-              }
+              // Register the reply resolver BEFORE sending the DM. Otherwise a
+              // fast human reply can race with Supabase realtime and arrive at
+              // our subscribe callback before the resolver exists — dropping
+              // the reply and hanging the coworker forever.
               const key = `${coworkerParticipantId}:${humanId}`;
-              const reply = await new Promise((resolve) => {
+              const replyPromise = new Promise((resolve) => {
                 askHumanResolversRef.current.set(key, resolve);
               });
+              const sent = await sb.sendDm(coworkerParticipantId, humanId, question);
+              if (!sent?.data) {
+                askHumanResolversRef.current.delete(key);
+                return { success: false, output: `Failed to send the question: ${sent?.error || 'unknown error'}.` };
+              }
+              const reply = await replyPromise;
               return { success: true, output: `${recipientName} replied: ${reply}` };
             },
           });

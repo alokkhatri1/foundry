@@ -45,8 +45,10 @@ function AssistantAvatar({ label, coworkerAvatar }) {
   return <div className="cl-avatar cl-avatar-ai">{letter}</div>;
 }
 
-function ChatMessage({ msg, onApprovalAction, onPickRecipient, onNudgeRecipient, onRetry, participants, currentUserName, showEducationalCues }) {
+function ChatMessage({ msg, onApprovalAction, onPickRecipient, onNudgeRecipient, onSenderApproval, onViewDraft, onRetry, participants, currentUserName, showEducationalCues }) {
   const [comment, setComment] = useState('');
+  const [senderRejecting, setSenderRejecting] = useState(false);
+  const [senderFeedback, setSenderFeedback] = useState('');
   const sender = msg.participantName ? participants?.find(p => p.name === msg.participantName) : null;
 
   if (msg.type === 'status') return <div className="cl-status"><span>{msg.content}</span></div>;
@@ -163,6 +165,7 @@ function ChatMessage({ msg, onApprovalAction, onPickRecipient, onNudgeRecipient,
 
   if (msg.type === 'recipient-picker') {
     const status = msg.status || 'pending';
+    const isReview = msg.kind === 'review';
     const allowedSet = msg.allowedParticipantIds && msg.allowedParticipantIds.length > 0
       ? new Set(msg.allowedParticipantIds)
       : null;
@@ -172,21 +175,60 @@ function ChatMessage({ msg, onApprovalAction, onPickRecipient, onNudgeRecipient,
       && p.name !== currentUserName
       && (!allowedSet || allowedSet.has(p.id))
     );
+    const coworkerLabel = msg.coworkerName || 'Coworker';
+
+    const label =
+      status === 'pending' && isReview ? `${coworkerLabel} wants a review on "${msg.draftTitle || msg.question}"`
+      : status === 'pending' ? `${coworkerLabel} needs a human`
+      : status === 'waiting_reviewer' ? `${coworkerLabel} is waiting on ${msg.resolvedRecipient}`
+      : status === 'waiting' ? `${coworkerLabel} is waiting on ${msg.resolvedRecipient}`
+      : status === 'reviewer_rejected' ? `${msg.resolvedRecipient} rejected the draft — ${coworkerLabel} is revising`
+      : status === 'sender_gate' ? `${msg.resolvedRecipient} approved. Your turn to confirm.`
+      : status === 'sender_rejected' ? `You rejected the draft — ${coworkerLabel} is revising`
+      : status === 'done' ? `Approved by ${msg.resolvedRecipient} and you — file saved`
+      : status === 'resolved' ? `${msg.resolvedRecipient} replied to ${coworkerLabel}`
+      : status === 'error' ? `Couldn't reach ${msg.resolvedRecipient || 'recipient'}`
+      : '';
+
+    const ViewerRow = () => (isReview ? (
+      <div className="cl-dm-review-viewers">
+        {msg.draftContent && (
+          <button
+            className="cl-dm-review-viewer-btn"
+            onClick={() => onViewDraft && onViewDraft({ title: msg.draftTitle || 'Draft', body: msg.draftContent })}
+          >
+            View full draft
+          </button>
+        )}
+        {msg.reasoning && (
+          <button
+            className="cl-dm-review-viewer-btn"
+            onClick={() => onViewDraft && onViewDraft({ title: `${coworkerLabel}'s reasoning`, body: msg.reasoning })}
+          >
+            View AI reasoning
+          </button>
+        )}
+      </div>
+    ) : null);
+
     return (
       <div className="cl-row cl-row-ai">
-        <AssistantAvatar label={msg.coworkerName || 'AI'} coworkerAvatar={msg.coworkerAvatar} />
+        <AssistantAvatar label={coworkerLabel} coworkerAvatar={msg.coworkerAvatar} />
         <div className="cl-bubble cl-bubble-approval">
-          <div className="cl-bubble-label approval">
-            {status === 'pending' && `${msg.coworkerName || 'Coworker'} needs a human`}
-            {status === 'waiting' && `${msg.coworkerName || 'Coworker'} is waiting on ${msg.resolvedRecipient}`}
-            {status === 'resolved' && `${msg.resolvedRecipient} replied to ${msg.coworkerName || 'Coworker'}`}
-            {status === 'error' && `Couldn't reach ${msg.resolvedRecipient || 'recipient'}`}
-          </div>
-          <div className="cl-bubble-content">{msg.question}</div>
+          <div className="cl-bubble-label approval">{label}</div>
+          {!isReview && <div className="cl-bubble-content">{msg.question}</div>}
+          {isReview && msg.draftContent && (
+            <div className="cl-picker-reply">
+              <div className="cl-picker-reply-label">Draft preview</div>
+              <div className="cl-picker-reply-text">
+                {msg.draftContent.slice(0, 240)}{msg.draftContent.length > 240 ? '…' : ''}
+              </div>
+            </div>
+          )}
 
           {status === 'pending' && (
             <>
-              <div className="cl-picker-prompt">Pick who to ask:</div>
+              <div className="cl-picker-prompt">{isReview ? 'Pick a reviewer:' : 'Pick who to ask:'}</div>
               {onlineHumans.length === 0 ? (
                 <div className="cl-picker-empty">No allowed humans are currently online.</div>
               ) : (
@@ -207,10 +249,11 @@ function ChatMessage({ msg, onApprovalAction, onPickRecipient, onNudgeRecipient,
             </>
           )}
 
-          {status === 'waiting' && (
+          {(status === 'waiting_reviewer' || status === 'waiting') && (
             <>
+              <ViewerRow />
               <div className="cl-picker-prompt">
-                DM sent to <strong>{msg.resolvedRecipient}</strong>. Waiting for their reply
+                DM sent to <strong>{msg.resolvedRecipient}</strong>. Waiting for their decision
                 {msg.nudgeCount > 0 && <> · nudged {msg.nudgeCount}×</>}…
               </div>
               <div className="cl-picker-list">
@@ -223,6 +266,82 @@ function ChatMessage({ msg, onApprovalAction, onPickRecipient, onNudgeRecipient,
                 </button>
               </div>
             </>
+          )}
+
+          {status === 'sender_gate' && (
+            <>
+              <ViewerRow />
+              <div className="cl-picker-prompt">
+                <strong>{msg.resolvedRecipient}</strong> approved the draft. Your sign-off is the last step — the file lands in the workspace only when you approve.
+              </div>
+              {!senderRejecting && (
+                <div className="cl-dm-review-actions">
+                  <button
+                    className="cl-send-btn-approve"
+                    onClick={() => onSenderApproval && onSenderApproval(msg.id, 'approved')}
+                  >
+                    Approve &amp; save
+                  </button>
+                  <button
+                    className="cl-send-btn-cancel"
+                    onClick={() => { setSenderRejecting(true); setSenderFeedback(''); }}
+                  >
+                    Reject with feedback
+                  </button>
+                </div>
+              )}
+              {senderRejecting && (
+                <div className="cl-dm-review-reject">
+                  <textarea
+                    className="cwb-tool-config-textarea"
+                    value={senderFeedback}
+                    onChange={e => setSenderFeedback(e.target.value)}
+                    placeholder="What's wrong? (feedback goes back to the coworker for revision)"
+                    rows={3}
+                    autoFocus
+                  />
+                  <div className="cl-dm-review-actions">
+                    <button
+                      className="cl-send-btn-approve"
+                      disabled={!senderFeedback.trim()}
+                      onClick={() => {
+                        onSenderApproval && onSenderApproval(msg.id, 'rejected', senderFeedback.trim());
+                        setSenderRejecting(false);
+                        setSenderFeedback('');
+                      }}
+                    >
+                      Send rejection
+                    </button>
+                    <button
+                      className="cl-send-btn-cancel"
+                      onClick={() => { setSenderRejecting(false); setSenderFeedback(''); }}
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+
+          {status === 'reviewer_rejected' && (
+            <div className="cl-picker-reply">
+              <div className="cl-picker-reply-label">{msg.resolvedRecipient}'s feedback</div>
+              <div className="cl-picker-reply-text">{msg.reviewerFeedback || '(no feedback given)'}</div>
+            </div>
+          )}
+
+          {status === 'sender_rejected' && (
+            <div className="cl-picker-reply">
+              <div className="cl-picker-reply-label">Your feedback</div>
+              <div className="cl-picker-reply-text">{msg.senderFeedback || '(no feedback given)'}</div>
+            </div>
+          )}
+
+          {status === 'done' && (
+            <div className="cl-approval-resolved">
+              Saved as <strong>{msg.savedFileName}</strong>
+            </div>
           )}
 
           {status === 'resolved' && msg.reply && (
@@ -531,7 +650,7 @@ function ReviewViewerModal({ title, body, onClose }) {
   );
 }
 
-export default function ChatPanel({ messages, onSendMessage, onApprovalAction, onPickRecipient, onNudgeRecipient, onReviewRespond, onRetry, isLoading, participants, currentUserName, fileTree, onUpdateFileContent, coworkers, showEducationalCues, conversations, activeConvoId, onNewChat, onSelectConvo, onDeleteConvo, onCoworkerChange, currentStage, activeDm, onOpenDm, onCloseDm, myParticipantId, sb, unreadDmCounts }) {
+export default function ChatPanel({ messages, onSendMessage, onApprovalAction, onPickRecipient, onNudgeRecipient, onReviewRespond, onSenderApproval, onRetry, isLoading, participants, currentUserName, fileTree, onUpdateFileContent, coworkers, showEducationalCues, conversations, activeConvoId, onNewChat, onSelectConvo, onDeleteConvo, onCoworkerChange, currentStage, activeDm, onOpenDm, onCloseDm, myParticipantId, sb, unreadDmCounts }) {
   const [input, setInput] = useState('');
   const [selectedFileIds, setSelectedFileIds] = useState([]);
   const [editingFileId, setEditingFileId] = useState(null);
@@ -998,7 +1117,7 @@ export default function ChatPanel({ messages, onSendMessage, onApprovalAction, o
                   if ((m.type === 'approval' || m.type === 'workflow_start' || m.type === 'workflow_end') && !stageReached(currentStage, '7')) return false;
                   return true;
                 }).map((msg, i) => (
-                  <ChatMessage key={msg.id || i} msg={msg} onApprovalAction={onApprovalAction} onPickRecipient={onPickRecipient} onNudgeRecipient={onNudgeRecipient} onRetry={onRetry} participants={participants} currentUserName={currentUserName} showEducationalCues={showEducationalCues} />
+                  <ChatMessage key={msg.id || i} msg={msg} onApprovalAction={onApprovalAction} onPickRecipient={onPickRecipient} onNudgeRecipient={onNudgeRecipient} onSenderApproval={onSenderApproval} onViewDraft={setViewerOpen} onRetry={onRetry} participants={participants} currentUserName={currentUserName} showEducationalCues={showEducationalCues} />
                 ))}
               </div>
             </div>

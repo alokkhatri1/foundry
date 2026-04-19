@@ -252,6 +252,9 @@ function App() {
   // Pending request_review resolvers. Same key format as ask_human but the
   // resolver fires with the review_response metadata ({ action, feedback }).
   const reviewResolversRef = useRef(new Map());
+  // Stage-5c second gate: after the reviewer approves, the sender still has
+  // to sign off in their own chat. Keyed by the picker message id.
+  const senderApprovalResolversRef = useRef(new Map());
   // Pending recipient-picker resolvers, keyed by picker message id. When the
   // user clicks a human in the picker, the resolver fires with that name.
   const pickRecipientResolversRef = useRef(new Map());
@@ -984,21 +987,43 @@ function App() {
                 return { success: false, output: `Failed to send the review: ${sent?.error || 'unknown error'}.` };
               }
               updateActiveMessages(prev => prev.map(m =>
-                m.id === pickId ? { ...m, fromParticipantId: coworkerParticipantId, toParticipantId: humanId } : m
+                m.id === pickId ? { ...m, status: 'waiting_reviewer', fromParticipantId: coworkerParticipantId, toParticipantId: humanId } : m
               ));
               const response = await responsePromise;
-              const action = response?.action || 'approved';
-              const feedback = response?.feedback || '';
-              updateActiveMessages(prev => prev.map(m =>
-                m.id === pickId ? { ...m, status: 'resolved', reviewAction: action, reviewFeedback: feedback } : m
-              ));
-              if (action === 'approved') {
-                const fileName = (title || 'draft').toLowerCase().replace(/[^a-z0-9]+/g, '-') + '.md';
-                const md = `# ${title}\n\n${content}`;
-                const written = writeCoworkerFile(fileName, md);
-                return { success: true, output: `${recipientName} approved. File saved as ${written?.name || fileName}.` };
+              const reviewerAction = response?.action || 'approved';
+              const reviewerFeedback = response?.feedback || '';
+
+              if (reviewerAction !== 'approved') {
+                updateActiveMessages(prev => prev.map(m =>
+                  m.id === pickId ? { ...m, status: 'reviewer_rejected', reviewerAction, reviewerFeedback } : m
+                ));
+                return { success: false, output: `${recipientName} rejected the draft.${reviewerFeedback ? ' Feedback: ' + reviewerFeedback : ''} Revise the draft and call Request Review again.` };
               }
-              return { success: false, output: `${recipientName} rejected the draft.${feedback ? ' Feedback: ' + feedback : ''} Revise and request another review.` };
+
+              // Reviewer approved — hand off to the sender for final sign-off.
+              updateActiveMessages(prev => prev.map(m =>
+                m.id === pickId ? { ...m, status: 'sender_gate', reviewerAction, reviewerFeedback } : m
+              ));
+              const senderDecision = await new Promise((resolve) => {
+                senderApprovalResolversRef.current.set(pickId, resolve);
+              });
+              const senderAction = senderDecision?.action || 'approved';
+              const senderFeedback = senderDecision?.feedback || '';
+
+              if (senderAction !== 'approved') {
+                updateActiveMessages(prev => prev.map(m =>
+                  m.id === pickId ? { ...m, status: 'sender_rejected', senderAction, senderFeedback } : m
+                ));
+                return { success: false, output: `The user (the original sender) rejected the draft after ${recipientName} approved it.${senderFeedback ? ' Feedback: ' + senderFeedback : ''} Revise and call Request Review again — the reviewer will see it fresh.` };
+              }
+
+              const fileName = (title || 'draft').toLowerCase().replace(/[^a-z0-9]+/g, '-') + '.md';
+              const md = `# ${title}\n\n${content}`;
+              const written = writeCoworkerFile(fileName, md);
+              updateActiveMessages(prev => prev.map(m =>
+                m.id === pickId ? { ...m, status: 'done', senderAction, savedFileName: written?.name || fileName } : m
+              ));
+              return { success: true, output: `${recipientName} approved and the user confirmed. File saved as ${written?.name || fileName}.` };
             },
           });
 
@@ -1241,6 +1266,13 @@ function App() {
     resolver(recipientName);
   }
 
+  function handleSenderApproval(pickId, action, feedback) {
+    const resolver = senderApprovalResolversRef.current.get(pickId);
+    if (!resolver) return;
+    senderApprovalResolversRef.current.delete(pickId);
+    resolver({ action, feedback: feedback || '' });
+  }
+
   async function handleReviewRespond(reviewDm, action, feedback) {
     if (!myParticipantId || !reviewDm?.from_participant_id) return false;
     const humanReplySummary = action === 'approved'
@@ -1315,7 +1347,7 @@ function App() {
         const whoSignsOffLine = customGuidance
           ? `\n\n### Who signs off (set by the user)\n${customGuidance}`
           : '';
-        collabSection = `\n\n## Finishing your work — review is mandatory\n\nYou DO NOT have access to Create File directly. Every artifact you produce must go through human review.\n\nWorkflow:\n1. Process the task — read your knowledge, think it through, narrate your steps in short lines.\n2. Draft the full file in your head — title + full markdown content.\n3. Call the Request Review tool with that title and content. The user at the keyboard will pick a reviewer for you.\n4. The reviewer sees your draft AND your reasoning, then approves or rejects.\n5. On approve: the file is saved to the workspace automatically — you don't call any other tool.\n6. On reject: you'll receive the reviewer's feedback as the tool result. Revise the draft and call Request Review again.\n\nNever try to substitute a chat summary for a reviewed file. If the task has a concrete output, it goes through review.${whoSignsOffLine}`;
+        collabSection = `\n\n## Finishing your work — review is mandatory\n\nYou DO NOT have access to Create File directly. Every artifact you produce must go through two gates: the reviewer AND the original sender.\n\nWorkflow:\n1. Process the task — read your knowledge, think it through, narrate your steps in short lines.\n2. Draft the full file in your head — title + full markdown content.\n3. Call Request Review with that title and content. The sender picks a reviewer for you.\n4. The reviewer sees your draft and your reasoning, then approves or rejects.\n   - On reviewer reject: the tool returns their feedback. Revise and call Request Review again.\n5. If the reviewer approves, the sender gets a final sign-off gate in their own chat.\n   - On sender approve: the file is saved to the workspace. The tool returns success — you're done, don't call anything else.\n   - On sender reject: the tool returns their feedback. Revise and call Request Review again — the reviewer will see it fresh on the next round.\n\nRepeat until both the reviewer and the sender have approved the same draft. Never finalise without both gates saying yes. Never substitute a chat summary for a reviewed file.${whoSignsOffLine}`;
       }
 
       // Narration habit: short "what I'm doing now" lines between tool calls.
@@ -1652,6 +1684,7 @@ Be concise. Confirm actions after completing them.${knowledgeSection}`;
               onPickRecipient={handlePickRecipient}
               onNudgeRecipient={handleNudgeRecipient}
               onReviewRespond={handleReviewRespond}
+              onSenderApproval={handleSenderApproval}
               isLoading={isLoading}
               participants={participants}
               currentUserName={userName}

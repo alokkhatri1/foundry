@@ -2010,6 +2010,29 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
   line-height: 1.45;
 }
 
+/* Approve / Reject pill buttons — used inside review cards and sender_gate */
+.cl-send-btn-approve, .cl-send-btn-cancel {
+  border: none;
+  border-radius: var(--radius-pill, 999px);
+  padding: 7px 18px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.12s, background 0.12s, border-color 0.12s;
+}
+.cl-send-btn-approve {
+  background: var(--accent-system, #5a9e6f);
+  color: #fff;
+}
+.cl-send-btn-approve:hover { opacity: 0.88; }
+.cl-send-btn-approve:disabled { opacity: 0.45; cursor: not-allowed; }
+.cl-send-btn-cancel {
+  background: transparent;
+  border: 1px solid var(--border-color);
+  color: var(--text-body);
+}
+.cl-send-btn-cancel:hover { border-color: var(--text-muted); color: var(--text-dark); }
+
 /* Review request card inside a DM thread */
 .cl-dm-review {
   border: 1.5px solid var(--accent-approval, #b88b3a);

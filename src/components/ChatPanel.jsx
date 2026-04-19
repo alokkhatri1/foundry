@@ -980,9 +980,6 @@ export default function ChatPanel({ messages, onSendMessage, onApprovalAction, o
                               <div className="cl-dm-review-title">{meta.title || 'Untitled draft'}</div>
                             </div>
                           </div>
-                          <div className="cl-dm-review-preview">
-                            {(meta.content || '').slice(0, 240)}{(meta.content || '').length > 240 ? '…' : ''}
-                          </div>
                           <div className="cl-dm-review-viewers">
                             <button
                               className="cl-dm-review-viewer-btn"
@@ -1063,23 +1060,11 @@ export default function ChatPanel({ messages, onSendMessage, onApprovalAction, o
                       );
                     }
 
-                    // Review response — render a compact confirmation line.
-                    if (m.kind === 'review_response') {
-                      const meta = m.metadata || {};
-                      const actionLabel = meta.action === 'rejected' ? 'rejected' : 'approved';
-                      return (
-                        <div key={m.id} className="cl-dm-review-response">
-                          <span className="cl-dm-flat-avatar" style={{ background: senderColor }}>
-                            {senderName?.charAt(0)?.toUpperCase()}
-                          </span>
-                          <span className="cl-dm-review-response-text">
-                            {isMine ? `You ${actionLabel} the draft` : `${senderName} ${actionLabel} the draft`}
-                            {meta.feedback && <>: <em>{meta.feedback}</em></>}
-                          </span>
-                          <span className="cl-dm-flat-time">{new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-                        </div>
-                      );
-                    }
+                    // Review response is metadata plumbing, not conversation —
+                    // the review card above transitions to a resolved state
+                    // that already says "You approved/rejected this draft",
+                    // so rendering a separate bubble would just duplicate.
+                    if (m.kind === 'review_response') return null;
 
                     return (
                       <div key={m.id} className={`cl-dm-flat${isMine ? ' mine' : ''}`}>

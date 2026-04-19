@@ -1009,6 +1009,7 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
   font-size: 14px;
   font-weight: 500;
   color: var(--text-body);
+  text-transform: capitalize;
   padding: 4px 8px;
   border-radius: 6px;
   transition: background 0.15s, color 0.15s;
@@ -1128,6 +1129,7 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
   width: 36px;
   height: 44px;
 }
+.drive-card-folder .drive-card-name { text-transform: capitalize; }
 .drive-card-name {
   font-size: 13px;
   font-weight: 600;

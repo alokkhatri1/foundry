@@ -135,14 +135,15 @@ const COMMUNICATE_TEMPLATES = {
       return await onSendDm(p.recipient_name, p.message);
     },
   },
-  ask_human: {
-    name: 'Ask Human',
+  request_review: {
+    name: 'Request Review',
     parameters: [
-      { name: 'question', label: 'Question', type: 'string', required: true, description: 'The question or item to check with the human' },
+      { name: 'title', label: 'File Title', type: 'string', required: true, description: 'Short title for the draft file' },
+      { name: 'content', label: 'Content', type: 'string', required: true, description: 'Full markdown content of the draft' },
     ],
-    async execute(p, onMessage, onSendDm, onAskHuman) {
-      if (!onAskHuman) return { success: false, output: 'Asking humans is not available in this context.' };
-      return await onAskHuman(p.question);
+    async execute(p, onMessage, onSendDm, onAskHuman, onRequestReview) {
+      if (!onRequestReview) return { success: false, output: 'Review-gated drafts are not available in this context.' };
+      return await onRequestReview({ title: p.title, content: p.content });
     },
   },
   notify_person: {
@@ -380,7 +381,7 @@ export async function executeTool(tool, input, fileTree, callClaudeAPI, callback
       case 'create':
         return template.execute(params, callbacks.onCreateFile);
       case 'communicate':
-        return await template.execute(params, callbacks.onMessage, callbacks.onSendDm, callbacks.onAskHuman);
+        return await template.execute(params, callbacks.onMessage, callbacks.onSendDm, callbacks.onAskHuman, callbacks.onRequestReview);
       case 'validate':
         return template.execute(params, tool.config);
       case 'connect':

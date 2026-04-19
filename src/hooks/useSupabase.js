@@ -405,18 +405,21 @@ export default function useSupabase() {
   }, []);
 
   // ===== Direct messages =====
-  const sendDm = useCallback(async (fromParticipantId, toParticipantId, content) => {
+  const sendDm = useCallback(async (fromParticipantId, toParticipantId, content, options = {}) => {
     if (!isSupabaseConfigured || !roomIdRef.current) {
       return { error: 'supabase not configured or no room' };
     }
     if (!fromParticipantId) return { error: 'missing fromParticipantId (myParticipantId is null)' };
     if (!toParticipantId) return { error: 'missing toParticipantId' };
-    const { data, error } = await supabase.from('direct_messages').insert({
+    const row = {
       room_id: roomIdRef.current,
       from_participant_id: fromParticipantId,
       to_participant_id: toParticipantId,
       content,
-    }).select().single();
+    };
+    if (options.kind && options.kind !== 'chat') row.kind = options.kind;
+    if (options.metadata) row.metadata = options.metadata;
+    const { data, error } = await supabase.from('direct_messages').insert(row).select().single();
     if (error) {
       console.error('[sb] sendDm:', error.message, error);
       return { error: error.message, code: error.code, details: error.details, hint: error.hint };

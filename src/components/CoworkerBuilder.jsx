@@ -5,7 +5,7 @@ import RevealAt, { stageReached } from './RevealAt';
 
 const TOOL_REVEAL_STAGE = {
   'builtin-create-file': '5b',
-  'builtin-ask-human': '5c',
+  'builtin-request-review': '5c',
 };
 
 let cwCounter = Date.now();
@@ -233,8 +233,8 @@ function CreateFileConfig({ fileTree, currentStage, config, onChange }) {
   );
 }
 
-// ===== Ask Human tool config =====
-function AskHumanConfig({ participants, config, onChange }) {
+// ===== Request Review tool config =====
+function RequestReviewConfig({ participants, config, onChange }) {
   const instructions = config?.instructions || '';
   const allowed = config?.allowedParticipantIds || [];
   const humans = (participants || []).filter(p => (p.kind || 'human') === 'human');
@@ -248,12 +248,12 @@ function AskHumanConfig({ participants, config, onChange }) {
 
   return (
     <div className="cwb-tool-config">
-      <div className="cwb-tool-config-title">When should this coworker ask a human?</div>
+      <div className="cwb-tool-config-title">Who signs off on this coworker's work?</div>
       <textarea
         className="cwb-tool-config-textarea"
         value={instructions}
         onChange={e => onChange({ instructions: e.target.value, allowedParticipantIds: allowed })}
-        placeholder="e.g., Ask Priya when a loan needs a legal ruling. Ask the team lead for anything involving the 2024 exception."
+        placeholder="e.g., Priya approves credit risk memos. The team lead approves anything flagging the 2024 exception."
         rows={3}
       />
       <div className="cwb-tool-config-row cwb-tool-config-col">
@@ -515,15 +515,15 @@ function CoworkerEditor({ coworker, onUpdate, onBack, fileTree, callClaudeAPI, s
                           })}
                         />
                       )}
-                      {checked && tool.id === 'builtin-ask-human' && (
-                        <AskHumanConfig
+                      {checked && tool.id === 'builtin-request-review' && (
+                        <RequestReviewConfig
                           participants={participants}
-                          config={coworker.toolConfigs?.['builtin-ask-human']}
+                          config={coworker.toolConfigs?.['builtin-request-review']}
                           onChange={next => onUpdate({
                             ...coworker,
                             toolConfigs: {
                               ...(coworker.toolConfigs || {}),
-                              'builtin-ask-human': next,
+                              'builtin-request-review': next,
                             },
                           })}
                         />

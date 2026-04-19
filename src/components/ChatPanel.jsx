@@ -515,13 +515,37 @@ function InlineEditor({ file, onUpdateContent, onClose }) {
 }
 
 // ===== Main ChatPanel =====
-export default function ChatPanel({ messages, onSendMessage, onApprovalAction, onPickRecipient, onNudgeRecipient, onRetry, isLoading, participants, currentUserName, fileTree, onUpdateFileContent, coworkers, showEducationalCues, conversations, activeConvoId, onNewChat, onSelectConvo, onDeleteConvo, onCoworkerChange, currentStage, activeDm, onOpenDm, onCloseDm, myParticipantId, sb, unreadDmCounts }) {
+function ReviewViewerModal({ title, body, onClose }) {
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-box cl-review-viewer" onClick={e => e.stopPropagation()}>
+        <div className="cl-review-viewer-header">
+          <h3>{title}</h3>
+          <button className="cl-review-viewer-close" onClick={onClose} title="Close">{'\u2715'}</button>
+        </div>
+        <div className="cl-review-viewer-body">
+          <RichText content={body} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export default function ChatPanel({ messages, onSendMessage, onApprovalAction, onPickRecipient, onNudgeRecipient, onReviewRespond, onRetry, isLoading, participants, currentUserName, fileTree, onUpdateFileContent, coworkers, showEducationalCues, conversations, activeConvoId, onNewChat, onSelectConvo, onDeleteConvo, onCoworkerChange, currentStage, activeDm, onOpenDm, onCloseDm, myParticipantId, sb, unreadDmCounts }) {
   const [input, setInput] = useState('');
   const [selectedFileIds, setSelectedFileIds] = useState([]);
   const [editingFileId, setEditingFileId] = useState(null);
   const [attachedFiles, setAttachedFiles] = useState([]);
   const [parsingFiles, setParsingFiles] = useState(false);
   const [dmMessages, setDmMessages] = useState([]);
+  // Local state for the reviewer's approval flow inside a DM thread. Tracks
+  // which review-request DMs the user has already responded to (so the buttons
+  // swap to a resolved state without a round-trip) and which one currently has
+  // its "Reject with feedback" form open.
+  const [respondedReviews, setRespondedReviews] = useState(() => new Map()); // dmId → {action, feedback}
+  const [rejectingReviewId, setRejectingReviewId] = useState(null);
+  const [rejectFeedback, setRejectFeedback] = useState('');
+  const [viewerOpen, setViewerOpen] = useState(null); // {title, body} or null
   const messagesRef = useRef(null);
 
   // Single source of truth: the active conversation owns its coworker. Deriving
@@ -817,6 +841,127 @@ export default function ChatPanel({ messages, onSendMessage, onApprovalAction, o
                     const isMine = m.from_participant_id === myParticipantId;
                     const senderName = isMine ? (currentUserName || 'Me') : activeDm.name;
                     const senderColor = isMine ? '#4a7fb5' : (activeDm.color || '#888');
+
+                    // Review request landed in this DM. Render an approval
+                    // card with viewer buttons + Approve / Reject controls.
+                    // Only the recipient (not the sending coworker) sees the
+                    // actionable buttons.
+                    if (m.kind === 'review_request' && !isMine) {
+                      const meta = m.metadata || {};
+                      const responded = respondedReviews.get(m.id);
+                      const isRejecting = rejectingReviewId === m.id;
+                      return (
+                        <div key={m.id} className="cl-dm-review">
+                          <div className="cl-dm-review-header">
+                            <span className="cl-dm-flat-avatar" style={{ background: senderColor }}>
+                              {senderName?.charAt(0)?.toUpperCase()}
+                            </span>
+                            <div>
+                              <div className="cl-dm-review-label">Review request from {senderName}</div>
+                              <div className="cl-dm-review-title">{meta.title || 'Untitled draft'}</div>
+                            </div>
+                          </div>
+                          <div className="cl-dm-review-preview">
+                            {(meta.content || '').slice(0, 240)}{(meta.content || '').length > 240 ? '…' : ''}
+                          </div>
+                          <div className="cl-dm-review-viewers">
+                            <button
+                              className="cl-dm-review-viewer-btn"
+                              onClick={() => setViewerOpen({ title: meta.title || 'Draft', body: meta.content || '' })}
+                            >
+                              View full draft
+                            </button>
+                            {meta.reasoning && (
+                              <button
+                                className="cl-dm-review-viewer-btn"
+                                onClick={() => setViewerOpen({ title: `${senderName}'s reasoning`, body: meta.reasoning })}
+                              >
+                                View AI reasoning
+                              </button>
+                            )}
+                          </div>
+                          {!responded && !isRejecting && (
+                            <div className="cl-dm-review-actions">
+                              <button
+                                className="cl-send-btn-approve"
+                                onClick={async () => {
+                                  const ok = await onReviewRespond?.(m, 'approved');
+                                  if (ok) setRespondedReviews(prev => new Map(prev).set(m.id, { action: 'approved' }));
+                                }}
+                              >
+                                Approve
+                              </button>
+                              <button
+                                className="cl-send-btn-cancel"
+                                onClick={() => { setRejectingReviewId(m.id); setRejectFeedback(''); }}
+                              >
+                                Reject with feedback
+                              </button>
+                            </div>
+                          )}
+                          {isRejecting && (
+                            <div className="cl-dm-review-reject">
+                              <textarea
+                                className="cwb-tool-config-textarea"
+                                value={rejectFeedback}
+                                onChange={e => setRejectFeedback(e.target.value)}
+                                placeholder="Why is this not right? (feedback goes back to the coworker)"
+                                rows={3}
+                                autoFocus
+                              />
+                              <div className="cl-dm-review-actions">
+                                <button
+                                  className="cl-send-btn-approve"
+                                  disabled={!rejectFeedback.trim()}
+                                  onClick={async () => {
+                                    const ok = await onReviewRespond?.(m, 'rejected', rejectFeedback.trim());
+                                    if (ok) {
+                                      setRespondedReviews(prev => new Map(prev).set(m.id, { action: 'rejected', feedback: rejectFeedback.trim() }));
+                                      setRejectingReviewId(null);
+                                      setRejectFeedback('');
+                                    }
+                                  }}
+                                >
+                                  Send rejection
+                                </button>
+                                <button
+                                  className="cl-send-btn-cancel"
+                                  onClick={() => { setRejectingReviewId(null); setRejectFeedback(''); }}
+                                >
+                                  Cancel
+                                </button>
+                              </div>
+                            </div>
+                          )}
+                          {responded && (
+                            <div className="cl-approval-resolved">
+                              You {responded.action === 'approved' ? 'approved this draft' : 'rejected this draft'}
+                              {responded.feedback && <span className="cl-approval-resolved-comment"> — "{responded.feedback}"</span>}
+                            </div>
+                          )}
+                          <div className="cl-dm-flat-time">{new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
+                        </div>
+                      );
+                    }
+
+                    // Review response — render a compact confirmation line.
+                    if (m.kind === 'review_response') {
+                      const meta = m.metadata || {};
+                      const actionLabel = meta.action === 'rejected' ? 'rejected' : 'approved';
+                      return (
+                        <div key={m.id} className="cl-dm-review-response">
+                          <span className="cl-dm-flat-avatar" style={{ background: senderColor }}>
+                            {senderName?.charAt(0)?.toUpperCase()}
+                          </span>
+                          <span className="cl-dm-review-response-text">
+                            {isMine ? `You ${actionLabel} the draft` : `${senderName} ${actionLabel} the draft`}
+                            {meta.feedback && <>: <em>{meta.feedback}</em></>}
+                          </span>
+                          <span className="cl-dm-flat-time">{new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                        </div>
+                      );
+                    }
+
                     return (
                       <div key={m.id} className={`cl-dm-flat${isMine ? ' mine' : ''}`}>
                         <div className="cl-dm-flat-header">
@@ -861,6 +1006,13 @@ export default function ChatPanel({ messages, onSendMessage, onApprovalAction, o
           </>
         )}
       </div>
+      {viewerOpen && (
+        <ReviewViewerModal
+          title={viewerOpen.title}
+          body={viewerOpen.body}
+          onClose={() => setViewerOpen(null)}
+        />
+      )}
     </div>
   );
 }

@@ -246,8 +246,12 @@ function App() {
   const approvalResolversRef = useRef(new Map());
   // Pending ask_human resolvers, keyed by `${coworkerParticipantId}:${humanParticipantId}`.
   // When a matching DM reply arrives, the resolver fires with the reply content
-  // and is removed. First-reply-wins.
+  // and is removed. First-reply-wins. Retained for any legacy coworker still
+  // referencing the retired builtin-ask-human tool; no fresh call path.
   const askHumanResolversRef = useRef(new Map());
+  // Pending request_review resolvers. Same key format as ask_human but the
+  // resolver fires with the review_response metadata ({ action, feedback }).
+  const reviewResolversRef = useRef(new Map());
   // Pending recipient-picker resolvers, keyed by picker message id. When the
   // user clicks a human in the picker, the resolver fires with that name.
   const pickRecipientResolversRef = useRef(new Map());
@@ -439,6 +443,14 @@ function App() {
     if (!isJoined) return;
     const unsub = sb.subscribeToAllRoomDms((dm) => {
       const key = `${dm.to_participant_id}:${dm.from_participant_id}`;
+      if (dm.kind === 'review_response') {
+        const resolver = reviewResolversRef.current.get(key);
+        if (resolver) {
+          reviewResolversRef.current.delete(key);
+          resolver(dm.metadata || { action: 'approved' });
+        }
+        return;
+      }
       const resolver = askHumanResolversRef.current.get(key);
       if (resolver) {
         askHumanResolversRef.current.delete(key);
@@ -829,46 +841,45 @@ function App() {
             continue;
           }
 
+          // Shared helper: write a file into the coworker's configured
+          // destination (or the sensible fallback) and persist the tree.
+          const writeCoworkerFile = (name, content) => {
+            const newTree = JSON.parse(JSON.stringify(fileTree));
+            newTree.children = newTree.children || [];
+            const newFile = {
+              id: 'f-' + Date.now() + '-' + Math.random().toString(36).slice(2, 7),
+              name,
+              type: 'file',
+              content,
+            };
+            const cfg = coworker?.toolConfigs?.['builtin-create-file'];
+            const configuredFolder = cfg?.folderId
+              ? newTree.children.find(c => c.id === cfg.folderId && c.type === 'folder')
+              : null;
+            const targetFolder = configuredFolder
+              || newTree.children.find(c => c.type === 'folder');
+            const subName = cfg?.subfolder === 'skills' ? 'skills' : 'knowledge';
+            if (targetFolder) {
+              targetFolder.children = targetFolder.children || [];
+              const sub = targetFolder.children.find(c => c.type === 'folder' && c.name === subName);
+              if (sub) {
+                sub.children = sub.children || [];
+                sub.children.push(newFile);
+              } else {
+                targetFolder.children.push(newFile);
+              }
+            } else {
+              newTree.children.push(newFile);
+            }
+            handleUpdateTree(newTree);
+            return newFile;
+          };
+
           const result = await executeTool(tool, toolUse.input, fileTree, callClaudeAPI, {
             onMessage: addMessage,
-            onCreateFile: (name, content) => {
-              const newTree = JSON.parse(JSON.stringify(fileTree));
-              newTree.children = newTree.children || [];
-              const newFile = {
-                id: 'f-' + Date.now() + '-' + Math.random().toString(36).slice(2, 7),
-                name,
-                type: 'file',
-                content,
-              };
-              // Destination precedence:
-              //   1. coworker.toolConfigs['builtin-create-file'].folderId + subfolder
-              //   2. first top-level folder's knowledge subfolder (fallback)
-              //   3. top level (no folders exist yet)
-              const cfg = coworker?.toolConfigs?.['builtin-create-file'];
-              const configuredFolder = cfg?.folderId
-                ? newTree.children.find(c => c.id === cfg.folderId && c.type === 'folder')
-                : null;
-              const targetFolder = configuredFolder
-                || newTree.children.find(c => c.type === 'folder');
-              const subName = cfg?.subfolder === 'skills' ? 'skills' : 'knowledge';
-              if (targetFolder) {
-                targetFolder.children = targetFolder.children || [];
-                const sub = targetFolder.children.find(c => c.type === 'folder' && c.name === subName);
-                if (sub) {
-                  sub.children = sub.children || [];
-                  sub.children.push(newFile);
-                } else {
-                  targetFolder.children.push(newFile);
-                }
-              } else {
-                newTree.children.push(newFile);
-              }
-              handleUpdateTree(newTree);
-            },
-            // onSendDm is retained so the dormant dm_participant template in
-            // toolExecutor doesn't blow up if ever invoked, but no builtin tool
-            // exposes it to coworkers anymore — Ask Human is the whole 5c
-            // lesson.
+            onCreateFile: writeCoworkerFile,
+            // onSendDm is retained so dormant communicate templates don't blow
+            // up if ever invoked; no live builtin tool exposes it at 5c.
             onSendDm: async (recipientName, message) => {
               if (!myParticipantId) return { success: false, output: 'Your participant record is not ready — try again in a moment.' };
               const toId = await sb.findParticipantIdByName(recipientName);
@@ -882,29 +893,62 @@ function App() {
               if (sent?.data) return { success: true, output: `Message sent to ${recipientName}.` };
               return { success: false, output: `Failed to send message: ${sent?.error || 'unknown error'}` };
             },
+            // onAskHuman retained for backwards compat — any legacy coworker
+            // still ticked to the retired builtin-ask-human continues to work.
             onAskHuman: async (question) => {
-              if (!coworker?.id) {
-                return { success: false, output: 'Ask Human is only available when a specific AI coworker is running the tool.' };
-              }
+              if (!coworker?.id) return { success: false, output: 'Ask Human is only available when a specific AI coworker is running the tool.' };
               const coworkerParticipantId = await sb.getCoworkerParticipantId(coworker.id);
-              if (!coworkerParticipantId) {
-                return { success: false, output: 'AI coworker is not set up as a DM participant yet. Try again after saving the coworker.' };
-              }
-              // Read the coworker's Ask Human whitelist. Empty => tool fails
-              // early with a clear message; user was supposed to pick at least
-              // one participant when configuring the tool.
+              if (!coworkerParticipantId) return { success: false, output: 'AI coworker is not set up as a DM participant yet.' };
               const cfg = coworker.toolConfigs?.['builtin-ask-human'];
               const allowedIds = cfg?.allowedParticipantIds || [];
-              if (allowedIds.length === 0) {
-                return { success: false, output: 'This coworker\'s Ask Human tool has no allowed recipients configured. Open the coworker editor and pick at least one participant who can be asked.' };
-              }
-              // Surface a picker in the chat — user chooses which online human
-              // to ask from the configured whitelist.
+              if (allowedIds.length === 0) return { success: false, output: 'No allowed recipients configured for Ask Human.' };
               const pickId = 'pick-' + Date.now() + '-' + Math.random().toString(36).slice(2, 7);
+              addMessage({ id: pickId, type: 'recipient-picker', question, coworkerName: coworker.name, coworkerAvatar: coworker.avatar, allowedParticipantIds: allowedIds, status: 'pending' });
+              const recipientName = await new Promise((resolve) => { pickRecipientResolversRef.current.set(pickId, resolve); });
+              if (!recipientName) return { success: false, output: 'No recipient was picked.' };
+              const humanId = await sb.findParticipantIdByName(recipientName);
+              if (!humanId) return { success: false, output: `Could not find a workshop participant named "${recipientName}".` };
+              const key = `${coworkerParticipantId}:${humanId}`;
+              const replyPromise = new Promise((resolve) => { askHumanResolversRef.current.set(key, resolve); });
+              const sent = await sb.sendDm(coworkerParticipantId, humanId, question);
+              if (!sent?.data) {
+                askHumanResolversRef.current.delete(key);
+                updateActiveMessages(prev => prev.map(m => m.id === pickId ? { ...m, status: 'error', errorOutput: sent?.error || 'unknown error' } : m));
+                return { success: false, output: `Failed to send the question: ${sent?.error || 'unknown error'}.` };
+              }
+              updateActiveMessages(prev => prev.map(m => m.id === pickId ? { ...m, fromParticipantId: coworkerParticipantId, toParticipantId: humanId } : m));
+              const reply = await replyPromise;
+              updateActiveMessages(prev => prev.map(m => m.id === pickId ? { ...m, status: 'resolved', reply } : m));
+              return { success: true, output: `${recipientName} replied: ${reply}` };
+            },
+            // Stage 5c — the draft-and-review primitive. Coworker drafts the
+            // full file, picks a reviewer, sends the draft as a review_request
+            // DM carrying title/content/reasoning as metadata. On approve, the
+            // file is written to the coworker's configured destination and
+            // success flows back to Claude. On reject, the feedback flows back
+            // so the coworker can revise and try again.
+            onRequestReview: async ({ title, content }) => {
+              if (!coworker?.id) return { success: false, output: 'Request Review is only available when a specific AI coworker is running the tool.' };
+              const coworkerParticipantId = await sb.getCoworkerParticipantId(coworker.id);
+              if (!coworkerParticipantId) return { success: false, output: 'AI coworker is not set up as a DM participant yet. Try again after saving the coworker.' };
+              const cfg = coworker.toolConfigs?.['builtin-request-review'];
+              const allowedIds = cfg?.allowedParticipantIds || [];
+              if (allowedIds.length === 0) {
+                return { success: false, output: 'This coworker has no reviewers configured. Open the editor and pick at least one reviewer.' };
+              }
+              // Reasoning = the narration text this coworker has emitted in
+              // the current turn so far. Reviewer can open it in a viewer.
+              const reasoning = allContent.filter(c => c.type === 'text').map(c => c.text).join('\n\n');
+
+              const pickId = 'review-' + Date.now() + '-' + Math.random().toString(36).slice(2, 7);
               addMessage({
                 id: pickId,
                 type: 'recipient-picker',
-                question,
+                kind: 'review',
+                question: title,
+                draftTitle: title,
+                draftContent: content,
+                reasoning,
                 coworkerName: coworker.name,
                 coworkerAvatar: coworker.avatar,
                 allowedParticipantIds: allowedIds,
@@ -913,41 +957,48 @@ function App() {
               const recipientName = await new Promise((resolve) => {
                 pickRecipientResolversRef.current.set(pickId, resolve);
               });
-              if (!recipientName) {
-                return { success: false, output: 'No recipient was picked.' };
-              }
+              if (!recipientName) return { success: false, output: 'No reviewer was picked.' };
+
               const humanId = await sb.findParticipantIdByName(recipientName);
-              if (!humanId) {
-                return { success: false, output: `Could not find a workshop participant named "${recipientName}".` };
-              }
-              // Register the reply resolver BEFORE sending the DM. Otherwise a
-              // fast human reply can race with Supabase realtime and arrive at
-              // our subscribe callback before the resolver exists — dropping
-              // the reply and hanging the coworker forever.
+              if (!humanId) return { success: false, output: `Could not find a reviewer named "${recipientName}".` };
+
+              // Register the review response resolver BEFORE sending — same
+              // race as Ask Human if the reviewer clicks Approve instantly.
               const key = `${coworkerParticipantId}:${humanId}`;
-              const replyPromise = new Promise((resolve) => {
-                askHumanResolversRef.current.set(key, resolve);
+              const responsePromise = new Promise((resolve) => {
+                reviewResolversRef.current.set(key, resolve);
               });
-              const sent = await sb.sendDm(coworkerParticipantId, humanId, question);
+              const sent = await sb.sendDm(coworkerParticipantId, humanId, `Review request: ${title}`, {
+                kind: 'review_request',
+                metadata: {
+                  title,
+                  content,
+                  reasoning,
+                  coworkerName: coworker.name,
+                  coworkerId: coworker.id,
+                },
+              });
               if (!sent?.data) {
-                askHumanResolversRef.current.delete(key);
-                updateActiveMessages(prev => prev.map(m =>
-                  m.id === pickId ? { ...m, status: 'error', errorOutput: sent?.error || 'unknown error' } : m
-                ));
-                return { success: false, output: `Failed to send the question: ${sent?.error || 'unknown error'}.` };
+                reviewResolversRef.current.delete(key);
+                updateActiveMessages(prev => prev.map(m => m.id === pickId ? { ...m, status: 'error', errorOutput: sent?.error || 'unknown error' } : m));
+                return { success: false, output: `Failed to send the review: ${sent?.error || 'unknown error'}.` };
               }
-              // Annotate the picker card with the sender/recipient ids so the
-              // Nudge button has what it needs to re-send the question.
               updateActiveMessages(prev => prev.map(m =>
                 m.id === pickId ? { ...m, fromParticipantId: coworkerParticipantId, toParticipantId: humanId } : m
               ));
-              const reply = await replyPromise;
-              // Transition the card to "resolved" with the actual reply text
-              // so the whole round-trip is legible in the chat history.
+              const response = await responsePromise;
+              const action = response?.action || 'approved';
+              const feedback = response?.feedback || '';
               updateActiveMessages(prev => prev.map(m =>
-                m.id === pickId ? { ...m, status: 'resolved', reply } : m
+                m.id === pickId ? { ...m, status: 'resolved', reviewAction: action, reviewFeedback: feedback } : m
               ));
-              return { success: true, output: `${recipientName} replied: ${reply}` };
+              if (action === 'approved') {
+                const fileName = (title || 'draft').toLowerCase().replace(/[^a-z0-9]+/g, '-') + '.md';
+                const md = `# ${title}\n\n${content}`;
+                const written = writeCoworkerFile(fileName, md);
+                return { success: true, output: `${recipientName} approved. File saved as ${written?.name || fileName}.` };
+              }
+              return { success: false, output: `${recipientName} rejected the draft.${feedback ? ' Feedback: ' + feedback : ''} Revise and request another review.` };
             },
           });
 
@@ -1190,6 +1241,23 @@ function App() {
     resolver(recipientName);
   }
 
+  async function handleReviewRespond(reviewDm, action, feedback) {
+    if (!myParticipantId || !reviewDm?.from_participant_id) return false;
+    const humanReplySummary = action === 'approved'
+      ? 'Approved'
+      : `Rejected${feedback ? `: ${feedback}` : ''}`;
+    const sent = await sb.sendDm(
+      myParticipantId,
+      reviewDm.from_participant_id,
+      humanReplySummary,
+      {
+        kind: 'review_response',
+        metadata: { action, feedback: feedback || '', reviewRequestDmId: reviewDm.id },
+      }
+    );
+    return !!sent?.data;
+  }
+
   async function handleNudgeRecipient(pickId) {
     // Re-send the same question from the same sender to the same recipient
     // with a "just checking in" prefix. Increments nudgeCount on the message
@@ -1241,21 +1309,12 @@ function App() {
       // ask_human to route correctly.
       let collabSection = '';
       if (stageReached(currentStage, '5c')) {
-        const askCfg = targetCoworker.toolConfigs?.['builtin-ask-human'];
-        const customGuidance = askCfg?.instructions?.trim();
-        const whenToAskLine = customGuidance
-          ? `\n\n### When to ask (set by the user)\n${customGuidance}`
+        const reviewCfg = targetCoworker.toolConfigs?.['builtin-request-review'];
+        const customGuidance = reviewCfg?.instructions?.trim();
+        const whoSignsOffLine = customGuidance
+          ? `\n\n### Who signs off (set by the user)\n${customGuidance}`
           : '';
-        collabSection = `\n\n## Reaching a human\n\nWhen you genuinely need a human's judgment, confirmation, or a missing piece of information, call the Ask Human tool with a clear, self-contained question. You do not pick who to ask — the user at the keyboard will pick a live human teammate for you. Wait for the reply; incorporate it before concluding. Use this sparingly — only when the task actually needs a human.${whenToAskLine}`;
-      }
-
-      // When the coworker has both Ask Human AND Create File enabled, nudge it
-      // to chain: once the human's reply gives enough to conclude, produce the
-      // artifact instead of just summarising in chat.
-      let chainingHint = '';
-      const toolIdSet = new Set(targetCoworker.toolIds || []);
-      if (toolIdSet.has('builtin-ask-human') && toolIdSet.has('builtin-create-file')) {
-        chainingHint = `\n\n## Finishing a task\n\nWhen a teammate's reply gives you what you need to conclude, produce the final artifact with the Create File tool rather than just summarising in chat. The file is how the organisation keeps what you've done.`;
+        collabSection = `\n\n## Finishing your work\n\nWhen your task has a concrete output — a summary, a memo, a plan — don't just reply in chat. Draft the whole file in your head, then call the Request Review tool with the title and the full markdown content. The user at the keyboard will pick a reviewer for you. The reviewer sees your draft (and your reasoning) and either approves or rejects. On approval the file is saved to the workspace automatically. On rejection you'll get feedback — revise and request another review. Don't finalise work without review once you have this tool.${whoSignsOffLine}`;
       }
 
       // Narration habit: short "what I'm doing now" lines between tool calls.
@@ -1269,7 +1328,6 @@ function App() {
         knowledge.length > 0 ? '\n\n## Knowledge Documents\n' : '',
         ...knowledge.map(k => `### ${k.name}\n${k.content}\n`),
         collabSection,
-        chainingHint,
         narrationHint,
       ].filter(Boolean).join('\n');
     } else if (contextFileIds && contextFileIds.length > 0) {
@@ -1592,6 +1650,7 @@ Be concise. Confirm actions after completing them.${knowledgeSection}`;
               onApprovalAction={handleApprovalAction}
               onPickRecipient={handlePickRecipient}
               onNudgeRecipient={handleNudgeRecipient}
+              onReviewRespond={handleReviewRespond}
               isLoading={isLoading}
               participants={participants}
               currentUserName={userName}

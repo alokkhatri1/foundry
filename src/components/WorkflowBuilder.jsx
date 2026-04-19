@@ -725,6 +725,15 @@ function WorkflowEditor({ workflow, onUpdateWorkflow, fileTree, coworkers, tools
           onChange={e => onUpdateWorkflow({ ...workflow, name: e.target.value })}
           placeholder="Orchestration name..."
         />
+        <div className="add-step-dropdown">
+          <button className="add-step-btn" onClick={() => setShowAddMenu(!showAddMenu)} disabled={isRunning}>+ Add Step</button>
+          {showAddMenu && (
+            <div className="add-step-menu">
+              <button className="add-step-option" onClick={() => addStep('agent')}><span className="dot agent"></span> Coworker Step</button>
+              <button className="add-step-option" onClick={() => addStep('approval')}><span className="dot approval"></span> Human Review</button>
+            </div>
+          )}
+        </div>
         <button
           className="run-btn"
           onClick={handleRun}
@@ -783,17 +792,6 @@ function WorkflowEditor({ workflow, onUpdateWorkflow, fileTree, coworkers, tools
         onSaveCoworkerToLibrary={onSaveCoworkerToLibrary}
       />
 
-      <div className="workflow-actions-bar">
-        <div className="add-step-dropdown">
-          <button className="add-step-btn" onClick={() => setShowAddMenu(!showAddMenu)} disabled={isRunning}>+ Add Step</button>
-          {showAddMenu && (
-            <div className="add-step-menu">
-              <button className="add-step-option" onClick={() => addStep('agent')}><span className="dot agent"></span> Coworker Step</button>
-              <button className="add-step-option" onClick={() => addStep('approval')}><span className="dot approval"></span> Human Review</button>
-            </div>
-          )}
-        </div>
-      </div>
     </div>
   );
 }

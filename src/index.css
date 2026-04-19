@@ -1682,19 +1682,23 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
   display: flex; gap: 8px; padding: 12px 20px;
   border-top: 1px solid var(--border-color); flex-shrink: 0;
 }
-.add-step-dropdown { position: relative; flex: 1; }
+.add-step-dropdown { position: relative; }
 .add-step-btn {
-  width: 100%; padding: 10px; border-radius: var(--radius-pill);
+  padding: 10px 20px; border-radius: var(--radius-pill);
   font-weight: 600; font-size: 14px;
   border: 1.5px dashed var(--border-color); color: var(--text-muted);
+  background: transparent;
   transition: all 0.15s;
+  white-space: nowrap;
 }
 .add-step-btn:hover { border-color: var(--text-dark); color: var(--text-dark); }
+/* Dropdown opens below the button — the dropdown lives in the workflow
+   header bar so there's canvas space below it to accept the menu. */
 .add-step-menu {
-  position: absolute; bottom: 100%; left: 0; right: 0;
+  position: absolute; top: 100%; right: 0; min-width: 180px;
   background: var(--bg-white); border: 1px solid var(--border-color);
   border-radius: var(--radius); box-shadow: var(--shadow-md);
-  margin-bottom: 4px; z-index: 10; overflow: hidden;
+  margin-top: 4px; z-index: 10; overflow: hidden;
 }
 .add-step-option {
   display: flex; align-items: center; gap: 10px;

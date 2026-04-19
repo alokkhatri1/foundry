@@ -8,8 +8,6 @@
 // auto-creation logic) become siblings of the real dept folders instead of
 // overtaking the breadcrumb — and the breadcrumb always starts from "files".
 export function buildTree(flatFiles) {
-  if (!flatFiles || flatFiles.length === 0) return null;
-
   const map = new Map();
   const syntheticRoot = {
     id: 'root',
@@ -19,6 +17,16 @@ export function buildTree(flatFiles) {
     _sort: -1,
     _parentId: null,
   };
+
+  // When there are no files yet, still return a valid empty root so the
+  // Files tab renders an empty state instead of crashing on fileTree.id.
+  // Previously returned null → FileExplorer's useState(fileTree.id) threw
+  // a TypeError and blanked the tab.
+  if (!flatFiles || flatFiles.length === 0) {
+    delete syntheticRoot._sort;
+    delete syntheticRoot._parentId;
+    return syntheticRoot;
+  }
 
   // First pass: create node objects
   for (const f of flatFiles) {

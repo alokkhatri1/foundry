@@ -953,7 +953,7 @@ export default function ChatPanel({ messages, onSendMessage, onApprovalAction, o
                             const ids = ((sub.children) || []).filter(c => c.type === 'file').map(f => f.id);
                             if (ids.length === 0) return;
                             const allSelected = ids.every(id => selectedFileIds.includes(id));
-                            if (allSelected) {
+                            if (allSelected && ids.length > 1) {
                               chips.push({ kind: 'folder', key: `folder-${sub.id}`, name: `${dept.name}/${sub.name}`, count: ids.length, fileIds: ids });
                               ids.forEach(id => handled.add(id));
                             }

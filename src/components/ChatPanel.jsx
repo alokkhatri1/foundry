@@ -45,7 +45,7 @@ function AssistantAvatar({ label, coworkerAvatar }) {
   return <div className="cl-avatar cl-avatar-ai">{letter}</div>;
 }
 
-function ChatMessage({ msg, onApprovalAction, onPickRecipient, onConfirmSendMessage, onRetry, participants, currentUserName, showEducationalCues }) {
+function ChatMessage({ msg, onApprovalAction, onPickRecipient, onRetry, participants, currentUserName, showEducationalCues }) {
   const [comment, setComment] = useState('');
   const sender = msg.participantName ? participants?.find(p => p.name === msg.participantName) : null;
 
@@ -159,41 +159,6 @@ function ChatMessage({ msg, onApprovalAction, onPickRecipient, onConfirmSendMess
 
   if (msg.type === 'tool_execution') {
     return <ToolExecutionCard msg={msg} />;
-  }
-
-  if (msg.type === 'send-message-confirm') {
-    const isResolved = msg.status === 'resolved';
-    const wasSent = msg.resolvedAction === 'send';
-    return (
-      <div className="cl-row cl-row-ai">
-        <AssistantAvatar label={msg.coworkerName || 'AI'} coworkerAvatar={msg.coworkerAvatar} />
-        <div className="cl-bubble cl-bubble-approval">
-          <div className="cl-bubble-label approval">
-            {msg.coworkerName || 'Coworker'} wants to message {msg.recipientName}
-          </div>
-          <div className="cl-send-preview">{msg.message}</div>
-          {!isResolved && (
-            <div className="cl-send-actions">
-              <button
-                className="cl-send-btn-approve"
-                onClick={() => onConfirmSendMessage && onConfirmSendMessage(msg.id, 'send')}
-              >
-                Send
-              </button>
-              <button
-                className="cl-send-btn-cancel"
-                onClick={() => onConfirmSendMessage && onConfirmSendMessage(msg.id, 'cancel')}
-              >
-                Cancel
-              </button>
-            </div>
-          )}
-          {isResolved && (
-            <div className="cl-approval-resolved">{wasSent ? `Sent to ${msg.recipientName}` : 'Cancelled'}</div>
-          )}
-        </div>
-      </div>
-    );
   }
 
   if (msg.type === 'recipient-picker') {
@@ -497,7 +462,7 @@ function InlineEditor({ file, onUpdateContent, onClose }) {
 }
 
 // ===== Main ChatPanel =====
-export default function ChatPanel({ messages, onSendMessage, onApprovalAction, onPickRecipient, onConfirmSendMessage, onRetry, isLoading, participants, currentUserName, fileTree, onUpdateFileContent, coworkers, showEducationalCues, conversations, activeConvoId, onNewChat, onSelectConvo, onDeleteConvo, onCoworkerChange, currentStage, activeDm, onOpenDm, onCloseDm, myParticipantId, sb, unreadDmCounts }) {
+export default function ChatPanel({ messages, onSendMessage, onApprovalAction, onPickRecipient, onRetry, isLoading, participants, currentUserName, fileTree, onUpdateFileContent, coworkers, showEducationalCues, conversations, activeConvoId, onNewChat, onSelectConvo, onDeleteConvo, onCoworkerChange, currentStage, activeDm, onOpenDm, onCloseDm, myParticipantId, sb, unreadDmCounts }) {
   const [input, setInput] = useState('');
   const [selectedFileIds, setSelectedFileIds] = useState([]);
   const [editingFileId, setEditingFileId] = useState(null);
@@ -835,7 +800,7 @@ export default function ChatPanel({ messages, onSendMessage, onApprovalAction, o
                   if ((m.type === 'approval' || m.type === 'workflow_start' || m.type === 'workflow_end') && !stageReached(currentStage, '7')) return false;
                   return true;
                 }).map((msg, i) => (
-                  <ChatMessage key={msg.id || i} msg={msg} onApprovalAction={onApprovalAction} onPickRecipient={onPickRecipient} onConfirmSendMessage={onConfirmSendMessage} onRetry={onRetry} participants={participants} currentUserName={currentUserName} showEducationalCues={showEducationalCues} />
+                  <ChatMessage key={msg.id || i} msg={msg} onApprovalAction={onApprovalAction} onPickRecipient={onPickRecipient} onRetry={onRetry} participants={participants} currentUserName={currentUserName} showEducationalCues={showEducationalCues} />
                 ))}
               </div>
             </div>

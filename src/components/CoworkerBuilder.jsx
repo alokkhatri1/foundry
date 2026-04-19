@@ -5,7 +5,6 @@ import RevealAt, { stageReached } from './RevealAt';
 
 const TOOL_REVEAL_STAGE = {
   'builtin-create-file': '5b',
-  'builtin-dm': '5c',
   'builtin-ask-human': '5c',
 };
 

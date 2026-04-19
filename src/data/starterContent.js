@@ -279,22 +279,6 @@ export const BUILTIN_TOOLS = [
     },
   },
   {
-    id: 'builtin-dm',
-    name: 'Send Message',
-    type: 'communicate',
-    description: 'Send a direct message to a workshop participant on the user\'s behalf. Use when you need to hand something off to a human teammate.',
-    icon: '\u2709\uFE0F',
-    isBuiltin: true,
-    createdBy: 'System',
-    config: {
-      templateId: 'dm_participant',
-      parameters: [
-        { name: 'recipient_name', label: 'Recipient', type: 'string', required: true, description: 'Full name of the workshop participant to message' },
-        { name: 'message', label: 'Message', type: 'string', required: true, description: 'The message to send' },
-      ],
-    },
-  },
-  {
     id: 'builtin-ask-human',
     name: 'Ask Human',
     type: 'communicate',

@@ -251,9 +251,6 @@ function App() {
   // Pending recipient-picker resolvers, keyed by picker message id. When the
   // user clicks a human in the picker, the resolver fires with that name.
   const pickRecipientResolversRef = useRef(new Map());
-  // Pending send-message-confirm resolvers, keyed by confirm message id. When
-  // the user clicks Send or Cancel, the resolver fires with true/false.
-  const sendMessageResolversRef = useRef(new Map());
   const activeTabRef = useRef(activeTab);
 
   useEffect(() => { activeTabRef.current = activeTab; }, [activeTab]);
@@ -859,36 +856,14 @@ function App() {
               }
               handleUpdateTree(newTree);
             },
+            // onSendDm is retained so the dormant dm_participant template in
+            // toolExecutor doesn't blow up if ever invoked, but no builtin tool
+            // exposes it to coworkers anymore — Ask Human is the whole 5c
+            // lesson.
             onSendDm: async (recipientName, message) => {
               if (!myParticipantId) return { success: false, output: 'Your participant record is not ready — try again in a moment.' };
-              // When a coworker is running the tool, surface a confirm card so
-              // the user sees the message before it goes out in their name (or
-              // in the coworker's name). Skip the gate outside a coworker
-              // context — no current call path exercises that, but keeping it
-              // safe.
-              if (coworker?.id) {
-                const confirmId = 'send-confirm-' + Date.now() + '-' + Math.random().toString(36).slice(2, 7);
-                addMessage({
-                  id: confirmId,
-                  type: 'send-message-confirm',
-                  recipientName,
-                  message,
-                  coworkerName: coworker.name,
-                  coworkerAvatar: coworker.avatar,
-                  status: 'pending',
-                });
-                const approved = await new Promise((resolve) => {
-                  sendMessageResolversRef.current.set(confirmId, resolve);
-                });
-                if (!approved) {
-                  return { success: false, output: `User cancelled the message to ${recipientName}.` };
-                }
-              }
               const toId = await sb.findParticipantIdByName(recipientName);
               if (!toId) return { success: false, output: `Could not find a workshop participant named "${recipientName}".` };
-              // Send from the coworker's mirror participant when one exists, so
-              // the message reaches the recipient with the coworker as sender —
-              // matches Ask Human and the Stage 5c pedagogy.
               let fromId = myParticipantId;
               if (coworker?.id) {
                 const coworkerParticipantId = await sb.getCoworkerParticipantId(coworker.id);
@@ -1174,15 +1149,6 @@ function App() {
     resolver(recipientName);
   }
 
-  function handleConfirmSendMessage(confirmId, action) {
-    const resolver = sendMessageResolversRef.current.get(confirmId);
-    if (!resolver) return;
-    sendMessageResolversRef.current.delete(confirmId);
-    updateActiveMessages(prev => prev.map(m =>
-      m.id === confirmId ? { ...m, status: 'resolved', resolvedAction: action } : m
-    ));
-    resolver(action === 'send');
-  }
 
   function handleNudge(runId) {
     const run = workflowRuns.find(r => r.id === runId);
@@ -1540,7 +1506,6 @@ Be concise. Confirm actions after completing them.${knowledgeSection}`;
               onSendMessage={handleSendMessage}
               onApprovalAction={handleApprovalAction}
               onPickRecipient={handlePickRecipient}
-              onConfirmSendMessage={handleConfirmSendMessage}
               isLoading={isLoading}
               participants={participants}
               currentUserName={userName}

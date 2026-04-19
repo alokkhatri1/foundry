@@ -599,18 +599,41 @@ function ContextSidebar({ fileTree, selectedFileIds, onToggleFile, onToggleFolde
 
 // ===== Inline File Editor =====
 function InlineEditor({ file, onUpdateContent, onClose }) {
+  const [mode, setMode] = useState('view');
+  const isEmpty = !file.content || file.content.trim() === '';
+
   return (
     <div className="ctx-editor">
       <div className="ctx-editor-header">
         <span className="ctx-editor-filename">{file.name}</span>
+        <div className="file-editor-modes">
+          <button
+            className={`file-editor-mode${mode === 'view' ? ' active' : ''}`}
+            onClick={() => setMode('view')}
+          >View</button>
+          <button
+            className={`file-editor-mode${mode === 'edit' ? ' active' : ''}`}
+            onClick={() => setMode('edit')}
+          >Edit</button>
+        </div>
         <button className="ctx-editor-close" onClick={onClose}>{'\u2715'}</button>
       </div>
-      <textarea
-        className="ctx-editor-textarea"
-        value={file.content || ''}
-        onChange={e => onUpdateContent(file.id, e.target.value)}
-        spellCheck={false}
-      />
+      {mode === 'view' ? (
+        <div className="ctx-editor-view md-doc">
+          {isEmpty ? (
+            <p style={{ color: 'var(--text-muted)', fontStyle: 'italic' }}>This file is empty. Click Edit to add content.</p>
+          ) : (
+            <RichText content={file.content} />
+          )}
+        </div>
+      ) : (
+        <textarea
+          className="ctx-editor-textarea"
+          value={file.content || ''}
+          onChange={e => onUpdateContent(file.id, e.target.value)}
+          spellCheck={false}
+        />
+      )}
     </div>
   );
 }

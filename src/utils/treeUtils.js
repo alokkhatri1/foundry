@@ -103,6 +103,20 @@ export function flattenTree(tree, roomId) {
   return rows;
 }
 
+// Preserve a local coworker's toolConfigs when the DB-sourced version comes
+// back empty. Covers three sync paths — realtime echo, initial room load,
+// and handleJoin — where migration 013 not being applied would otherwise
+// strip the user's Create File destination / Request Review whitelist on
+// every sync. If the incoming has any configs, it wins (normal case).
+export function preserveToolConfigs(incoming, previous) {
+  if (!incoming) return incoming;
+  const hasIncoming = incoming.toolConfigs && Object.keys(incoming.toolConfigs).length > 0;
+  if (hasIncoming) return incoming;
+  const localConfigs = previous?.toolConfigs;
+  if (!localConfigs || Object.keys(localConfigs).length === 0) return incoming;
+  return { ...incoming, toolConfigs: localConfigs };
+}
+
 // Map a Supabase DB row to the flat file format used internally
 export function mapFileRow(row) {
   return {

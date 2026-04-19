@@ -119,20 +119,9 @@ const COMMUNICATE_TEMPLATES = {
     parameters: [
       { name: 'message', label: 'Message', type: 'string', required: true, description: 'Message to post to the shared chat' },
     ],
-    execute(p, onMessage) {
+    execute(p, { onMessage }) {
       if (onMessage) onMessage({ type: 'system', content: `[Notification] ${p.message}` });
       return { success: true, output: `Message sent: "${p.message}"` };
-    },
-  },
-  dm_participant: {
-    name: 'DM Participant',
-    parameters: [
-      { name: 'recipient_name', label: 'Recipient', type: 'string', required: true },
-      { name: 'message', label: 'Message', type: 'string', required: true },
-    ],
-    async execute(p, onMessage, onSendDm) {
-      if (!onSendDm) return { success: false, output: 'Direct messaging is not available in this context.' };
-      return await onSendDm(p.recipient_name, p.message);
     },
   },
   request_review: {
@@ -141,7 +130,7 @@ const COMMUNICATE_TEMPLATES = {
       { name: 'title', label: 'File Title', type: 'string', required: true, description: 'Short title for the draft file' },
       { name: 'content', label: 'Content', type: 'string', required: true, description: 'Full markdown content of the draft' },
     ],
-    async execute(p, onMessage, onSendDm, onAskHuman, onRequestReview) {
+    async execute(p, { onRequestReview }) {
       if (!onRequestReview) return { success: false, output: 'Review-gated drafts are not available in this context.' };
       return await onRequestReview({ title: p.title, content: p.content });
     },
@@ -152,7 +141,7 @@ const COMMUNICATE_TEMPLATES = {
       { name: 'recipient', label: 'Recipient Name', type: 'string', required: true },
       { name: 'message', label: 'Message', type: 'string', required: true },
     ],
-    execute(p, onMessage) {
+    execute(p, { onMessage }) {
       if (onMessage) onMessage({ type: 'system', content: `[To: ${p.recipient}] ${p.message}` });
       return { success: true, output: `Notification sent to ${p.recipient}: "${p.message}"` };
     },
@@ -381,7 +370,7 @@ export async function executeTool(tool, input, fileTree, callClaudeAPI, callback
       case 'create':
         return template.execute(params, callbacks.onCreateFile);
       case 'communicate':
-        return await template.execute(params, callbacks.onMessage, callbacks.onSendDm, callbacks.onAskHuman, callbacks.onRequestReview);
+        return await template.execute(params, callbacks);
       case 'validate':
         return template.execute(params, tool.config);
       case 'connect':

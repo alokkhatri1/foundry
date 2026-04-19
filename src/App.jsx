@@ -26,7 +26,7 @@ import { executeWorkflowRun } from './utils/runWorkflowAsync';
 import { executeTool, toolToClaudeSchema, toolFromClaudeName } from './utils/toolExecutor';
 import { PLATFORM_TOOL_SCHEMAS, TOOL_DISPLAY_NAMES, TOOL_ICONS, executePlatformAction } from './utils/platformActions';
 import useSupabase from './hooks/useSupabase';
-import { buildTree, flattenTree, mapFileRow, mapCoworkerRow, mapToolRow, mapWorkflowRow } from './utils/treeUtils';
+import { buildTree, flattenTree, mapFileRow, mapCoworkerRow, mapToolRow, mapWorkflowRow, preserveToolConfigs } from './utils/treeUtils';
 
 const STORAGE_KEY = 'sandbox:state';
 
@@ -244,13 +244,9 @@ function App() {
   }, [currentStage]);
 
   const approvalResolversRef = useRef(new Map());
-  // Pending ask_human resolvers, keyed by `${coworkerParticipantId}:${humanParticipantId}`.
-  // When a matching DM reply arrives, the resolver fires with the reply content
-  // and is removed. First-reply-wins. Retained for any legacy coworker still
-  // referencing the retired builtin-ask-human tool; no fresh call path.
-  const askHumanResolversRef = useRef(new Map());
-  // Pending request_review resolvers. Same key format as ask_human but the
-  // resolver fires with the review_response metadata ({ action, feedback }).
+  // Pending request_review resolvers, keyed by `${coworkerParticipantId}:${humanParticipantId}`.
+  // When a matching review_response DM lands, the resolver fires with the
+  // metadata ({ action, feedback }) and is removed. First-reply-wins.
   const reviewResolversRef = useRef(new Map());
   // Stage-5c second gate: after the reviewer approves, the sender still has
   // to sign off in their own chat. Keyed by the picker message id.
@@ -289,16 +285,9 @@ function App() {
 
         if (files.length > 0) setFlatFiles(files);
         if (cws.length > 0) {
-          // Merge with any locally-held state so toolConfigs survive even if
-          // the DB row is missing them (e.g., migration 013 not yet applied).
           setCoworkers(prev => {
             const prevById = new Map((prev || []).map(c => [c.id, c]));
-            return cws.map(cw => {
-              const local = prevById.get(cw.id);
-              const hasIncomingConfigs = cw.toolConfigs && Object.keys(cw.toolConfigs).length > 0;
-              if (hasIncomingConfigs) return cw;
-              return { ...cw, toolConfigs: local?.toolConfigs || {} };
-            });
+            return cws.map(cw => preserveToolConfigs(cw, prevById.get(cw.id)));
           });
         }
         if (tls.length > 0) setTools(tls);
@@ -376,16 +365,7 @@ function App() {
             const list = prev || [];
             const idx = list.findIndex(c => c.id === mapped.id);
             if (idx < 0) return [...list, mapped];
-            const existing = list[idx];
-            // Preserve local toolConfigs if the DB echo is empty. Covers the
-            // case where migration 013 hasn't been applied (tool_configs
-            // column missing from the row) or a save raced and arrived
-            // stripped — we never want a sync to blow away the user's
-            // Create File destination or Request Review reviewer list.
-            const merged = { ...mapped };
-            if (!mapped.toolConfigs || Object.keys(mapped.toolConfigs).length === 0) {
-              merged.toolConfigs = existing.toolConfigs || {};
-            }
+            const merged = preserveToolConfigs(mapped, list[idx]);
             return list.map(c => c.id === mapped.id ? merged : c);
           });
         }
@@ -468,19 +448,12 @@ function App() {
   useEffect(() => {
     if (!isJoined) return;
     const unsub = sb.subscribeToAllRoomDms((dm) => {
+      if (dm.kind !== 'review_response') return;
       const key = `${dm.to_participant_id}:${dm.from_participant_id}`;
-      if (dm.kind === 'review_response') {
-        const resolver = reviewResolversRef.current.get(key);
-        if (resolver) {
-          reviewResolversRef.current.delete(key);
-          resolver(dm.metadata || { action: 'approved' });
-        }
-        return;
-      }
-      const resolver = askHumanResolversRef.current.get(key);
+      const resolver = reviewResolversRef.current.get(key);
       if (resolver) {
-        askHumanResolversRef.current.delete(key);
-        resolver(dm.content);
+        reviewResolversRef.current.delete(key);
+        resolver(dm.metadata || { action: 'approved' });
       }
     });
     return unsub;
@@ -510,16 +483,9 @@ function App() {
     // content is built by participants (or loaded from a scenario later).
     if (files && files.length > 0) {
       setFlatFiles(files);
-      // Merge: preserve local toolConfigs if the DB returned empty for any
-      // coworker (e.g. migration 013 not yet applied on this Supabase).
       setCoworkers(prev => {
         const prevById = new Map((prev || []).map(c => [c.id, c]));
-        return (cws || []).map(cw => {
-          const hasConfigs = cw.toolConfigs && Object.keys(cw.toolConfigs).length > 0;
-          if (hasConfigs) return cw;
-          const local = prevById.get(cw.id);
-          return { ...cw, toolConfigs: local?.toolConfigs || {} };
-        });
+        return (cws || []).map(cw => preserveToolConfigs(cw, prevById.get(cw.id)));
       });
       setTools(tls && tls.length > 0 ? tls : ensurePrebuiltTools(null));
       setWorkflows(wfs || []);
@@ -914,49 +880,6 @@ function App() {
           const result = await executeTool(tool, toolUse.input, fileTree, callClaudeAPI, {
             onMessage: addMessage,
             onCreateFile: writeCoworkerFile,
-            // onSendDm is retained so dormant communicate templates don't blow
-            // up if ever invoked; no live builtin tool exposes it at 5c.
-            onSendDm: async (recipientName, message) => {
-              if (!myParticipantId) return { success: false, output: 'Your participant record is not ready — try again in a moment.' };
-              const toId = await sb.findParticipantIdByName(recipientName);
-              if (!toId) return { success: false, output: `Could not find a workshop participant named "${recipientName}".` };
-              let fromId = myParticipantId;
-              if (coworker?.id) {
-                const coworkerParticipantId = await sb.getCoworkerParticipantId(coworker.id);
-                if (coworkerParticipantId) fromId = coworkerParticipantId;
-              }
-              const sent = await sb.sendDm(fromId, toId, message);
-              if (sent?.data) return { success: true, output: `Message sent to ${recipientName}.` };
-              return { success: false, output: `Failed to send message: ${sent?.error || 'unknown error'}` };
-            },
-            // onAskHuman retained for backwards compat — any legacy coworker
-            // still ticked to the retired builtin-ask-human continues to work.
-            onAskHuman: async (question) => {
-              if (!coworker?.id) return { success: false, output: 'Ask Human is only available when a specific AI coworker is running the tool.' };
-              const coworkerParticipantId = await sb.getCoworkerParticipantId(coworker.id);
-              if (!coworkerParticipantId) return { success: false, output: 'AI coworker is not set up as a DM participant yet.' };
-              const cfg = coworker.toolConfigs?.['builtin-ask-human'];
-              const allowedIds = cfg?.allowedParticipantIds || [];
-              if (allowedIds.length === 0) return { success: false, output: 'No allowed recipients configured for Ask Human.' };
-              const pickId = 'pick-' + Date.now() + '-' + Math.random().toString(36).slice(2, 7);
-              addMessage({ id: pickId, type: 'recipient-picker', question, coworkerName: coworker.name, coworkerAvatar: coworker.avatar, allowedParticipantIds: allowedIds, status: 'pending' });
-              const recipientName = await new Promise((resolve) => { pickRecipientResolversRef.current.set(pickId, resolve); });
-              if (!recipientName) return { success: false, output: 'No recipient was picked.' };
-              const humanId = await sb.findParticipantIdByName(recipientName);
-              if (!humanId) return { success: false, output: `Could not find a workshop participant named "${recipientName}".` };
-              const key = `${coworkerParticipantId}:${humanId}`;
-              const replyPromise = new Promise((resolve) => { askHumanResolversRef.current.set(key, resolve); });
-              const sent = await sb.sendDm(coworkerParticipantId, humanId, question);
-              if (!sent?.data) {
-                askHumanResolversRef.current.delete(key);
-                updateActiveMessages(prev => prev.map(m => m.id === pickId ? { ...m, status: 'error', errorOutput: sent?.error || 'unknown error' } : m));
-                return { success: false, output: `Failed to send the question: ${sent?.error || 'unknown error'}.` };
-              }
-              updateActiveMessages(prev => prev.map(m => m.id === pickId ? { ...m, fromParticipantId: coworkerParticipantId, toParticipantId: humanId } : m));
-              const reply = await replyPromise;
-              updateActiveMessages(prev => prev.map(m => m.id === pickId ? { ...m, status: 'resolved', reply } : m));
-              return { success: true, output: `${recipientName} replied: ${reply}` };
-            },
             // Stage 5c — the draft-and-review primitive. Coworker drafts the
             // full file, picks a reviewer, sends the draft as a review_request
             // DM carrying title/content/reasoning as metadata. On approve, the

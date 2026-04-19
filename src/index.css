@@ -1946,6 +1946,43 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
   color: var(--text-muted);
 }
 
+/* Send Message confirm */
+.cl-send-preview {
+  margin-top: 10px;
+  padding: 10px 12px;
+  border-left: 3px solid var(--accent-approval, #b88b3a);
+  background: rgba(184, 139, 58, 0.06);
+  border-radius: 6px;
+  font-size: 13px;
+  color: var(--text-body);
+  white-space: pre-wrap;
+}
+.cl-send-actions {
+  margin-top: 12px;
+  display: flex;
+  gap: 8px;
+}
+.cl-send-btn-approve, .cl-send-btn-cancel {
+  border: none;
+  border-radius: var(--radius-pill, 999px);
+  padding: 6px 16px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.12s, background 0.12s;
+}
+.cl-send-btn-approve {
+  background: var(--text-dark);
+  color: #fff;
+}
+.cl-send-btn-approve:hover { opacity: 0.88; }
+.cl-send-btn-cancel {
+  background: transparent;
+  border: 1px solid var(--border-color);
+  color: var(--text-body);
+}
+.cl-send-btn-cancel:hover { border-color: var(--text-muted); color: var(--text-dark); }
+
 /* Recipient picker (Ask Human) */
 .cl-picker-prompt {
   margin-top: 12px;

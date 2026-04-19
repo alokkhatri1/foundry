@@ -251,6 +251,9 @@ function App() {
   // Pending recipient-picker resolvers, keyed by picker message id. When the
   // user clicks a human in the picker, the resolver fires with that name.
   const pickRecipientResolversRef = useRef(new Map());
+  // Pending send-message-confirm resolvers, keyed by confirm message id. When
+  // the user clicks Send or Cancel, the resolver fires with true/false.
+  const sendMessageResolversRef = useRef(new Map());
   const activeTabRef = useRef(activeTab);
 
   useEffect(() => { activeTabRef.current = activeTab; }, [activeTab]);
@@ -833,9 +836,40 @@ function App() {
             },
             onSendDm: async (recipientName, message) => {
               if (!myParticipantId) return { success: false, output: 'Your participant record is not ready — try again in a moment.' };
+              // When a coworker is running the tool, surface a confirm card so
+              // the user sees the message before it goes out in their name (or
+              // in the coworker's name). Skip the gate outside a coworker
+              // context — no current call path exercises that, but keeping it
+              // safe.
+              if (coworker?.id) {
+                const confirmId = 'send-confirm-' + Date.now() + '-' + Math.random().toString(36).slice(2, 7);
+                addMessage({
+                  id: confirmId,
+                  type: 'send-message-confirm',
+                  recipientName,
+                  message,
+                  coworkerName: coworker.name,
+                  coworkerAvatar: coworker.avatar,
+                  status: 'pending',
+                });
+                const approved = await new Promise((resolve) => {
+                  sendMessageResolversRef.current.set(confirmId, resolve);
+                });
+                if (!approved) {
+                  return { success: false, output: `User cancelled the message to ${recipientName}.` };
+                }
+              }
               const toId = await sb.findParticipantIdByName(recipientName);
               if (!toId) return { success: false, output: `Could not find a workshop participant named "${recipientName}".` };
-              const sent = await sb.sendDm(myParticipantId, toId, message);
+              // Send from the coworker's mirror participant when one exists, so
+              // the message reaches the recipient with the coworker as sender —
+              // matches Ask Human and the Stage 5c pedagogy.
+              let fromId = myParticipantId;
+              if (coworker?.id) {
+                const coworkerParticipantId = await sb.getCoworkerParticipantId(coworker.id);
+                if (coworkerParticipantId) fromId = coworkerParticipantId;
+              }
+              const sent = await sb.sendDm(fromId, toId, message);
               if (sent?.data) return { success: true, output: `Message sent to ${recipientName}.` };
               return { success: false, output: `Failed to send message: ${sent?.error || 'unknown error'}` };
             },
@@ -1113,6 +1147,16 @@ function App() {
       m.id === pickId ? { ...m, status: 'resolved', resolvedRecipient: recipientName } : m
     ));
     resolver(recipientName);
+  }
+
+  function handleConfirmSendMessage(confirmId, action) {
+    const resolver = sendMessageResolversRef.current.get(confirmId);
+    if (!resolver) return;
+    sendMessageResolversRef.current.delete(confirmId);
+    updateActiveMessages(prev => prev.map(m =>
+      m.id === confirmId ? { ...m, status: 'resolved', resolvedAction: action } : m
+    ));
+    resolver(action === 'send');
   }
 
   function handleNudge(runId) {
@@ -1471,6 +1515,7 @@ Be concise. Confirm actions after completing them.${knowledgeSection}`;
               onSendMessage={handleSendMessage}
               onApprovalAction={handleApprovalAction}
               onPickRecipient={handlePickRecipient}
+              onConfirmSendMessage={handleConfirmSendMessage}
               isLoading={isLoading}
               participants={participants}
               currentUserName={userName}

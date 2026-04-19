@@ -379,17 +379,30 @@ function ContextSidebar({ fileTree, selectedFileIds, onToggleFile, onToggleFolde
             const unread = (unreadDmCounts && unreadDmCounts[cw.name]) || 0;
             const canDm = stageReached(currentStage, '5c') && sb?.getCoworkerParticipantId;
             const handleOpenAiDm = async (e) => {
-              e.stopPropagation();
+              if (e) e.stopPropagation();
               const mirrorId = await sb.getCoworkerParticipantId(cw.id);
               if (mirrorId && onOpenDm) {
                 onOpenDm({ id: mirrorId, name: cw.name, color: cw.color, kind: 'ai', coworkerId: cw.id });
+              }
+            };
+            // An AI coworker with an unread DM has reached out to this user
+            // (typically via Ask Human from someone else's coworker). Clicking
+            // the row in that state should open the DM thread so the reply
+            // lands in direct_messages — the only path that routes back to the
+            // pending ask_human resolver. Without this, replies become regular
+            // chat messages and the coworker hangs.
+            const handleRowClick = () => {
+              if (unread > 0 && canDm) {
+                handleOpenAiDm();
+              } else {
+                onSelectCoworker(cw.id);
               }
             };
             return (
               <div
                 key={cw.id}
                 className={`sl-dm sl-agent-item${activeCoworkerId === cw.id ? ' active-agent' : ''}${unread > 0 ? ' has-unread' : ''}`}
-                onClick={() => onSelectCoworker(cw.id)}
+                onClick={handleRowClick}
               >
                 <span className="sl-agent-emoji"><CoworkerGlyph avatar={cw.avatar} size={14} color="currentColor" /></span>
                 <span className="sl-dm-name">{cw.name}</span>

@@ -32,13 +32,22 @@ export function buildTree(flatFiles) {
     });
   }
 
+  // Heal: a previous bug wrote a phantom row with id='root' and reparented
+  // real top-level folders under it. Drop that row and promote its children
+  // back to the true top level so the breadcrumb doesn't grow an extra "files"
+  // layer for rooms that experienced the bug.
+  map.delete('root');
+
   // Second pass: wire parent-child. Every parent-less node hangs off the
   // synthetic root, preserving legacy data without corrupting the hierarchy.
+  // Anything pointing at the deleted phantom 'root' is also treated as
+  // parent-less.
   for (const [, node] of map) {
-    if (node._parentId === null) {
+    const pid = node._parentId === 'root' ? null : node._parentId;
+    if (pid === null) {
       syntheticRoot.children.push(node);
     } else {
-      const parent = map.get(node._parentId);
+      const parent = map.get(pid);
       if (parent && parent.children) {
         parent.children.push(node);
       }
@@ -60,35 +69,17 @@ export function buildTree(flatFiles) {
 }
 
 // Nested tree → flat rows (for seeding DB)
-export function flattenTree(tree, roomId, parentId = null) {
+//
+// The synthetic root (id='root', name='files') is UI-only — it must never be
+// written to the DB. If the incoming tree is the synthetic root, flatten its
+// children directly as parent-less top-level rows. Writing the synthetic root
+// would create a phantom 'root' row that everything else points to, which
+// breaks on reload.
+export function flattenTree(tree, roomId) {
   if (!tree) return [];
   const rows = [];
-  let sortOrder = 0;
 
-  function walk(node, parentId) {
-    rows.push({
-      id: node.id,
-      room_id: roomId,
-      parent_id: parentId,
-      name: node.name,
-      type: node.type,
-      content: node.content || null,
-      sort_order: sortOrder++,
-    });
-    if (node.children) {
-      let childOrder = 0;
-      for (const child of node.children) {
-        // Reset sort order per parent for proper ordering
-        rows[rows.length] = undefined; // placeholder
-        rows.pop();
-        walk(child, node.id);
-      }
-    }
-  }
-
-  // Simpler version: just walk and assign global order
-  rows.length = 0;
-  function walkSimple(node, pid, order) {
+  function walk(node, pid, order) {
     rows.push({
       id: node.id,
       room_id: roomId,
@@ -99,10 +90,15 @@ export function flattenTree(tree, roomId, parentId = null) {
       sort_order: order,
     });
     if (node.children) {
-      node.children.forEach((child, i) => walkSimple(child, node.id, i));
+      node.children.forEach((child, i) => walk(child, node.id, i));
     }
   }
-  walkSimple(tree, null, 0);
+
+  if (tree.id === 'root') {
+    (tree.children || []).forEach((child, i) => walk(child, null, i));
+  } else {
+    walk(tree, null, 0);
+  }
 
   return rows;
 }

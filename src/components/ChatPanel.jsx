@@ -378,7 +378,7 @@ function findNode(tree, id) {
 }
 
 // ===== Slack-style Context Sidebar =====
-function ContextSidebar({ fileTree, selectedFileIds, onToggleFile, onToggleFolder, onOpenFile, editingFileId, participants, currentUserName, coworkers, activeCoworkerId, onSelectCoworker, showEducationalCues, conversations, activeConvoId, onNewChat, onSelectConvo, onDeleteConvo, onOpenDm, activeDm, unreadDmCounts, currentStage, sb }) {
+function ContextSidebar({ fileTree, selectedFileIds, onToggleFile, onToggleFolder, onToggleSubfolder, onOpenFile, editingFileId, participants, currentUserName, coworkers, activeCoworkerId, onSelectCoworker, showEducationalCues, conversations, activeConvoId, onNewChat, onSelectConvo, onDeleteConvo, onOpenDm, activeDm, unreadDmCounts, currentStage, sb }) {
   const [collapsedSections, setCollapsedSections] = useState(() => {
     // Default all folders to collapsed
     const collapsed = {};
@@ -463,7 +463,7 @@ function ContextSidebar({ fileTree, selectedFileIds, onToggleFile, onToggleFolde
                       {subfolderFileIds.length > 0 && (
                         <span
                           className={`sl-channel-dot${folderAllOn ? ' on' : ''}${folderPartial ? ' partial' : ''}`}
-                          onClick={e => { e.stopPropagation(); handleToggleSubfolder(subfolderFileIds); }}
+                          onClick={e => { e.stopPropagation(); onToggleSubfolder(subfolderFileIds); }}
                           title={folderAllOn ? 'Remove folder from context' : folderPartial ? `Add the remaining ${subfolderFileIds.length - selectedInFolder} file${subfolderFileIds.length - selectedInFolder === 1 ? '' : 's'}` : `Add all ${subfolderFileIds.length} file${subfolderFileIds.length === 1 ? '' : 's'} as context`}
                         ></span>
                       )}
@@ -948,9 +948,9 @@ export default function ChatPanel({ messages, onSendMessage, onApprovalAction, o
                       {(() => {
                         const handled = new Set();
                         const chips = [];
-                        departments.forEach(dept => {
-                          dept.subfolders.forEach(sub => {
-                            const ids = sub.files.map(f => f.id);
+                        ((fileTree && fileTree.children) || []).forEach(dept => {
+                          ((dept.children) || []).forEach(sub => {
+                            const ids = ((sub.children) || []).filter(c => c.type === 'file').map(f => f.id);
                             if (ids.length === 0) return;
                             const allSelected = ids.every(id => selectedFileIds.includes(id));
                             if (allSelected) {
@@ -1049,6 +1049,7 @@ export default function ChatPanel({ messages, onSendMessage, onApprovalAction, o
         selectedFileIds={selectedFileIds}
         onToggleFile={handleToggleFile}
         onToggleFolder={handleToggleFolder}
+        onToggleSubfolder={handleToggleSubfolder}
         onOpenFile={handleOpenFile}
         editingFileId={editingFileId}
         participants={participants}

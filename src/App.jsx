@@ -1685,6 +1685,7 @@ Be concise. Confirm actions after completing them.${knowledgeSection}`;
               onNudgeRecipient={handleNudgeRecipient}
               onReviewRespond={handleReviewRespond}
               onSenderApproval={handleSenderApproval}
+              onGoToFiles={() => setActiveTab('files')}
               isLoading={isLoading}
               participants={participants}
               currentUserName={userName}

@@ -45,10 +45,8 @@ function AssistantAvatar({ label, coworkerAvatar }) {
   return <div className="cl-avatar cl-avatar-ai">{letter}</div>;
 }
 
-function ChatMessage({ msg, onApprovalAction, onPickRecipient, onNudgeRecipient, onSenderApproval, onViewDraft, onRetry, participants, currentUserName, showEducationalCues }) {
+function ChatMessage({ msg, onApprovalAction, onPickRecipient, onNudgeRecipient, onSenderApproval, onOpenReviewPane, onGoToFiles, onRetry, participants, currentUserName, showEducationalCues }) {
   const [comment, setComment] = useState('');
-  const [senderRejecting, setSenderRejecting] = useState(false);
-  const [senderFeedback, setSenderFeedback] = useState('');
   const sender = msg.participantName ? participants?.find(p => p.name === msg.participantName) : null;
 
   if (msg.type === 'status') return <div className="cl-status"><span>{msg.content}</span></div>;
@@ -190,26 +188,25 @@ function ChatMessage({ msg, onApprovalAction, onPickRecipient, onNudgeRecipient,
       : status === 'error' ? `Couldn't reach ${msg.resolvedRecipient || 'recipient'}`
       : '';
 
-    const ViewerRow = () => (isReview ? (
-      <div className="cl-dm-review-viewers">
-        {msg.draftContent && (
-          <button
-            className="cl-dm-review-viewer-btn"
-            onClick={() => onViewDraft && onViewDraft({ title: msg.draftTitle || 'Draft', body: msg.draftContent })}
-          >
-            View full draft
-          </button>
-        )}
-        {msg.reasoning && (
-          <button
-            className="cl-dm-review-viewer-btn"
-            onClick={() => onViewDraft && onViewDraft({ title: `${coworkerLabel}'s reasoning`, body: msg.reasoning })}
-          >
-            View AI reasoning
-          </button>
-        )}
-      </div>
-    ) : null);
+    const openReviewPane = (canAct) => {
+      if (!onOpenReviewPane || !isReview) return;
+      onOpenReviewPane({
+        title: msg.draftTitle || msg.question || 'Draft',
+        draftContent: msg.draftContent || '',
+        reasoning: msg.reasoning || '',
+        canAct: !!canAct,
+        status,
+        savedFileName: msg.savedFileName,
+        onApprove: async () => {
+          onSenderApproval?.(msg.id, 'approved');
+          return true;
+        },
+        onReject: async (fb) => {
+          onSenderApproval?.(msg.id, 'rejected', fb);
+          return true;
+        },
+      });
+    };
 
     return (
       <div className="cl-row cl-row-ai">
@@ -217,14 +214,6 @@ function ChatMessage({ msg, onApprovalAction, onPickRecipient, onNudgeRecipient,
         <div className="cl-bubble cl-bubble-approval">
           <div className="cl-bubble-label approval">{label}</div>
           {!isReview && <div className="cl-bubble-content">{msg.question}</div>}
-          {isReview && msg.draftContent && (
-            <div className="cl-picker-reply">
-              <div className="cl-picker-reply-label">Draft preview</div>
-              <div className="cl-picker-reply-text">
-                {msg.draftContent.slice(0, 240)}{msg.draftContent.length > 240 ? '…' : ''}
-              </div>
-            </div>
-          )}
 
           {status === 'pending' && (
             <>
@@ -251,12 +240,16 @@ function ChatMessage({ msg, onApprovalAction, onPickRecipient, onNudgeRecipient,
 
           {(status === 'waiting_reviewer' || status === 'waiting') && (
             <>
-              <ViewerRow />
               <div className="cl-picker-prompt">
                 DM sent to <strong>{msg.resolvedRecipient}</strong>. Waiting for their decision
                 {msg.nudgeCount > 0 && <> · nudged {msg.nudgeCount}×</>}…
               </div>
-              <div className="cl-picker-list">
+              <div className="cl-dm-review-actions">
+                {isReview && (
+                  <button className="cl-send-btn-cancel" onClick={() => openReviewPane(false)}>
+                    View draft &amp; reasoning
+                  </button>
+                )}
                 <button
                   className="cl-picker-chip"
                   onClick={() => onNudgeRecipient && onNudgeRecipient(msg.id)}
@@ -270,78 +263,67 @@ function ChatMessage({ msg, onApprovalAction, onPickRecipient, onNudgeRecipient,
 
           {status === 'sender_gate' && (
             <>
-              <ViewerRow />
               <div className="cl-picker-prompt">
                 <strong>{msg.resolvedRecipient}</strong> approved the draft. Your sign-off is the last step — the file lands in the workspace only when you approve.
               </div>
-              {!senderRejecting && (
+              <div className="cl-dm-review-actions">
+                <button className="cl-send-btn-approve" onClick={() => openReviewPane(true)}>
+                  Open for review
+                </button>
+              </div>
+            </>
+          )}
+
+          {status === 'reviewer_rejected' && (
+            <>
+              <div className="cl-picker-reply">
+                <div className="cl-picker-reply-label">{msg.resolvedRecipient}'s feedback</div>
+                <div className="cl-picker-reply-text">{msg.reviewerFeedback || '(no feedback given)'}</div>
+              </div>
+              {isReview && (
                 <div className="cl-dm-review-actions">
-                  <button
-                    className="cl-send-btn-approve"
-                    onClick={() => onSenderApproval && onSenderApproval(msg.id, 'approved')}
-                  >
-                    Approve &amp; save
+                  <button className="cl-send-btn-cancel" onClick={() => openReviewPane(false)}>
+                    View rejected draft
                   </button>
-                  <button
-                    className="cl-send-btn-cancel"
-                    onClick={() => { setSenderRejecting(true); setSenderFeedback(''); }}
-                  >
-                    Reject with feedback
-                  </button>
-                </div>
-              )}
-              {senderRejecting && (
-                <div className="cl-dm-review-reject">
-                  <textarea
-                    className="cwb-tool-config-textarea"
-                    value={senderFeedback}
-                    onChange={e => setSenderFeedback(e.target.value)}
-                    placeholder="What's wrong? (feedback goes back to the coworker for revision)"
-                    rows={3}
-                    autoFocus
-                  />
-                  <div className="cl-dm-review-actions">
-                    <button
-                      className="cl-send-btn-approve"
-                      disabled={!senderFeedback.trim()}
-                      onClick={() => {
-                        onSenderApproval && onSenderApproval(msg.id, 'rejected', senderFeedback.trim());
-                        setSenderRejecting(false);
-                        setSenderFeedback('');
-                      }}
-                    >
-                      Send rejection
-                    </button>
-                    <button
-                      className="cl-send-btn-cancel"
-                      onClick={() => { setSenderRejecting(false); setSenderFeedback(''); }}
-                    >
-                      Cancel
-                    </button>
-                  </div>
                 </div>
               )}
             </>
           )}
 
-          {status === 'reviewer_rejected' && (
-            <div className="cl-picker-reply">
-              <div className="cl-picker-reply-label">{msg.resolvedRecipient}'s feedback</div>
-              <div className="cl-picker-reply-text">{msg.reviewerFeedback || '(no feedback given)'}</div>
-            </div>
-          )}
-
           {status === 'sender_rejected' && (
-            <div className="cl-picker-reply">
-              <div className="cl-picker-reply-label">Your feedback</div>
-              <div className="cl-picker-reply-text">{msg.senderFeedback || '(no feedback given)'}</div>
-            </div>
+            <>
+              <div className="cl-picker-reply">
+                <div className="cl-picker-reply-label">Your feedback</div>
+                <div className="cl-picker-reply-text">{msg.senderFeedback || '(no feedback given)'}</div>
+              </div>
+              {isReview && (
+                <div className="cl-dm-review-actions">
+                  <button className="cl-send-btn-cancel" onClick={() => openReviewPane(false)}>
+                    View rejected draft
+                  </button>
+                </div>
+              )}
+            </>
           )}
 
           {status === 'done' && (
-            <div className="cl-approval-resolved">
-              Saved as <strong>{msg.savedFileName}</strong>
-            </div>
+            <>
+              <div className="cl-approval-resolved">
+                Saved as <strong>{msg.savedFileName}</strong>
+              </div>
+              <div className="cl-dm-review-actions">
+                {isReview && (
+                  <button className="cl-send-btn-cancel" onClick={() => openReviewPane(false)}>
+                    View saved draft
+                  </button>
+                )}
+                {onGoToFiles && (
+                  <button className="cl-send-btn-cancel" onClick={() => onGoToFiles(msg.savedFileName)}>
+                    Open in Files tab
+                  </button>
+                )}
+              </div>
+            </>
           )}
 
           {status === 'resolved' && msg.reply && (
@@ -634,23 +616,93 @@ function InlineEditor({ file, onUpdateContent, onClose }) {
 }
 
 // ===== Main ChatPanel =====
-function ReviewViewerModal({ title, body, onClose }) {
+function ReviewPane({ pane, onBack, onGoToFiles }) {
+  const [tab, setTab] = useState('draft');
+  const [rejecting, setRejecting] = useState(false);
+  const [feedback, setFeedback] = useState('');
+
+  const { title, draftContent, reasoning, canAct, status, savedFileName, onApprove, onReject } = pane;
+  const body = tab === 'draft'
+    ? (draftContent || '*(no draft content)*')
+    : (reasoning || '*(no reasoning was captured for this draft)*');
+
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-box cl-review-viewer" onClick={e => e.stopPropagation()}>
-        <div className="cl-review-viewer-header">
-          <h3>{title}</h3>
-          <button className="cl-review-viewer-close" onClick={onClose} title="Close">{'\u2715'}</button>
-        </div>
-        <div className="cl-review-viewer-body">
-          <RichText content={body} />
-        </div>
+    <div className="cl-review-pane">
+      <div className="cl-review-pane-header">
+        <button className="cl-review-pane-back" onClick={onBack}>{'\u2190'} Back to chat</button>
+        <div className="cl-review-pane-title">{title || 'Draft'}</div>
+        {status === 'done' && savedFileName && onGoToFiles && (
+          <button className="cl-send-btn-cancel" onClick={onGoToFiles}>Open in Files tab</button>
+        )}
       </div>
+      <div className="cl-review-pane-tabs">
+        <button
+          className={`cl-review-pane-tab${tab === 'draft' ? ' active' : ''}`}
+          onClick={() => setTab('draft')}
+        >
+          Draft
+        </button>
+        <button
+          className={`cl-review-pane-tab${tab === 'reasoning' ? ' active' : ''}`}
+          onClick={() => setTab('reasoning')}
+        >
+          AI reasoning
+        </button>
+      </div>
+      <div className="cl-review-pane-body">
+        <RichText content={body} />
+      </div>
+      {canAct && (
+        <div className="cl-review-pane-footer">
+          {!rejecting ? (
+            <>
+              <button
+                className="cl-send-btn-approve"
+                onClick={async () => { if (await onApprove?.()) { /* pane closes from caller */ } }}
+              >
+                Approve
+              </button>
+              <button
+                className="cl-send-btn-cancel"
+                onClick={() => { setRejecting(true); setFeedback(''); }}
+              >
+                Reject with feedback
+              </button>
+            </>
+          ) : (
+            <div className="cl-review-pane-reject">
+              <textarea
+                className="cwb-tool-config-textarea"
+                value={feedback}
+                onChange={e => setFeedback(e.target.value)}
+                placeholder="What's not right? Feedback goes back to the coworker for revision."
+                rows={3}
+                autoFocus
+              />
+              <div className="cl-review-pane-reject-actions">
+                <button
+                  className="cl-send-btn-approve"
+                  disabled={!feedback.trim()}
+                  onClick={async () => { if (await onReject?.(feedback.trim())) { setRejecting(false); setFeedback(''); } }}
+                >
+                  Send rejection
+                </button>
+                <button
+                  className="cl-send-btn-cancel"
+                  onClick={() => { setRejecting(false); setFeedback(''); }}
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
 
-export default function ChatPanel({ messages, onSendMessage, onApprovalAction, onPickRecipient, onNudgeRecipient, onReviewRespond, onSenderApproval, onRetry, isLoading, participants, currentUserName, fileTree, onUpdateFileContent, coworkers, showEducationalCues, conversations, activeConvoId, onNewChat, onSelectConvo, onDeleteConvo, onCoworkerChange, currentStage, activeDm, onOpenDm, onCloseDm, myParticipantId, sb, unreadDmCounts }) {
+export default function ChatPanel({ messages, onSendMessage, onApprovalAction, onPickRecipient, onNudgeRecipient, onReviewRespond, onSenderApproval, onGoToFiles, onRetry, isLoading, participants, currentUserName, fileTree, onUpdateFileContent, coworkers, showEducationalCues, conversations, activeConvoId, onNewChat, onSelectConvo, onDeleteConvo, onCoworkerChange, currentStage, activeDm, onOpenDm, onCloseDm, myParticipantId, sb, unreadDmCounts }) {
   const [input, setInput] = useState('');
   const [selectedFileIds, setSelectedFileIds] = useState([]);
   const [editingFileId, setEditingFileId] = useState(null);
@@ -662,9 +714,9 @@ export default function ChatPanel({ messages, onSendMessage, onApprovalAction, o
   // swap to a resolved state without a round-trip) and which one currently has
   // its "Reject with feedback" form open.
   const [respondedReviews, setRespondedReviews] = useState(() => new Map()); // dmId → {action, feedback}
-  const [rejectingReviewId, setRejectingReviewId] = useState(null);
-  const [rejectFeedback, setRejectFeedback] = useState('');
-  const [viewerOpen, setViewerOpen] = useState(null); // {title, body} or null
+  // Full-page review surface state. Replaces the chat area when open.
+  // Shape: { title, draftContent, reasoning, canAct, status, savedFileName, onApprove, onReject }
+  const [reviewPane, setReviewPane] = useState(null);
   const messagesRef = useRef(null);
 
   // Single source of truth: the active conversation owns its coworker. Deriving
@@ -923,6 +975,13 @@ export default function ChatPanel({ messages, onSendMessage, onApprovalAction, o
 
       {/* Right: main chat area — one interface; context swaps via banner */}
       <div className="cl-chat-main">
+        {reviewPane ? (
+          <ReviewPane
+            pane={reviewPane}
+            onBack={() => setReviewPane(null)}
+            onGoToFiles={reviewPane.savedFileName && onGoToFiles ? () => onGoToFiles(reviewPane.savedFileName) : null}
+          />
+        ) : (<>
         {(activeDm || activeCoworker) && (
           <div className="cl-agent-banner">
             {activeDm ? (
@@ -968,7 +1027,28 @@ export default function ChatPanel({ messages, onSendMessage, onApprovalAction, o
                     if (m.kind === 'review_request' && !isMine) {
                       const meta = m.metadata || {};
                       const responded = respondedReviews.get(m.id);
-                      const isRejecting = rejectingReviewId === m.id;
+                      const openReviewPane = () => setReviewPane({
+                        title: meta.title || 'Untitled draft',
+                        draftContent: meta.content || '',
+                        reasoning: meta.reasoning || '',
+                        canAct: !responded,
+                        onApprove: async () => {
+                          const ok = await onReviewRespond?.(m, 'approved');
+                          if (ok) {
+                            setRespondedReviews(prev => new Map(prev).set(m.id, { action: 'approved' }));
+                            setReviewPane(null);
+                          }
+                          return ok;
+                        },
+                        onReject: async (feedback) => {
+                          const ok = await onReviewRespond?.(m, 'rejected', feedback);
+                          if (ok) {
+                            setRespondedReviews(prev => new Map(prev).set(m.id, { action: 'rejected', feedback }));
+                            setReviewPane(null);
+                          }
+                          return ok;
+                        },
+                      });
                       return (
                         <div key={m.id} className="cl-dm-review">
                           <div className="cl-dm-review-header">
@@ -980,79 +1060,22 @@ export default function ChatPanel({ messages, onSendMessage, onApprovalAction, o
                               <div className="cl-dm-review-title">{meta.title || 'Untitled draft'}</div>
                             </div>
                           </div>
-                          <div className="cl-dm-review-viewers">
-                            <button
-                              className="cl-dm-review-viewer-btn"
-                              onClick={() => setViewerOpen({ title: meta.title || 'Draft', body: meta.content || '' })}
-                            >
-                              View full draft
-                            </button>
-                            {meta.reasoning && (
-                              <button
-                                className="cl-dm-review-viewer-btn"
-                                onClick={() => setViewerOpen({ title: `${senderName}'s reasoning`, body: meta.reasoning })}
-                              >
-                                View AI reasoning
-                              </button>
-                            )}
-                          </div>
-                          {!responded && !isRejecting && (
+                          {!responded && (
                             <div className="cl-dm-review-actions">
-                              <button
-                                className="cl-send-btn-approve"
-                                onClick={async () => {
-                                  const ok = await onReviewRespond?.(m, 'approved');
-                                  if (ok) setRespondedReviews(prev => new Map(prev).set(m.id, { action: 'approved' }));
-                                }}
-                              >
-                                Approve
+                              <button className="cl-send-btn-approve" onClick={openReviewPane}>
+                                Open for review
                               </button>
-                              <button
-                                className="cl-send-btn-cancel"
-                                onClick={() => { setRejectingReviewId(m.id); setRejectFeedback(''); }}
-                              >
-                                Reject with feedback
-                              </button>
-                            </div>
-                          )}
-                          {isRejecting && (
-                            <div className="cl-dm-review-reject">
-                              <textarea
-                                className="cwb-tool-config-textarea"
-                                value={rejectFeedback}
-                                onChange={e => setRejectFeedback(e.target.value)}
-                                placeholder="Why is this not right? (feedback goes back to the coworker)"
-                                rows={3}
-                                autoFocus
-                              />
-                              <div className="cl-dm-review-actions">
-                                <button
-                                  className="cl-send-btn-approve"
-                                  disabled={!rejectFeedback.trim()}
-                                  onClick={async () => {
-                                    const ok = await onReviewRespond?.(m, 'rejected', rejectFeedback.trim());
-                                    if (ok) {
-                                      setRespondedReviews(prev => new Map(prev).set(m.id, { action: 'rejected', feedback: rejectFeedback.trim() }));
-                                      setRejectingReviewId(null);
-                                      setRejectFeedback('');
-                                    }
-                                  }}
-                                >
-                                  Send rejection
-                                </button>
-                                <button
-                                  className="cl-send-btn-cancel"
-                                  onClick={() => { setRejectingReviewId(null); setRejectFeedback(''); }}
-                                >
-                                  Cancel
-                                </button>
-                              </div>
                             </div>
                           )}
                           {responded && (
-                            <div className="cl-approval-resolved">
-                              You {responded.action === 'approved' ? 'approved this draft' : 'rejected this draft'}
-                              {responded.feedback && <span className="cl-approval-resolved-comment"> — "{responded.feedback}"</span>}
+                            <div className="cl-dm-review-actions">
+                              <div className="cl-approval-resolved">
+                                You {responded.action === 'approved' ? 'approved this draft' : 'rejected this draft'}
+                                {responded.feedback && <span className="cl-approval-resolved-comment"> — "{responded.feedback}"</span>}
+                              </div>
+                              <button className="cl-send-btn-cancel" onClick={openReviewPane}>
+                                Reopen
+                              </button>
                             </div>
                           )}
                           <div className="cl-dm-flat-time">{new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
@@ -1102,21 +1125,15 @@ export default function ChatPanel({ messages, onSendMessage, onApprovalAction, o
                   if ((m.type === 'approval' || m.type === 'workflow_start' || m.type === 'workflow_end') && !stageReached(currentStage, '7')) return false;
                   return true;
                 }).map((msg, i) => (
-                  <ChatMessage key={msg.id || i} msg={msg} onApprovalAction={onApprovalAction} onPickRecipient={onPickRecipient} onNudgeRecipient={onNudgeRecipient} onSenderApproval={onSenderApproval} onViewDraft={setViewerOpen} onRetry={onRetry} participants={participants} currentUserName={currentUserName} showEducationalCues={showEducationalCues} />
+                  <ChatMessage key={msg.id || i} msg={msg} onApprovalAction={onApprovalAction} onPickRecipient={onPickRecipient} onNudgeRecipient={onNudgeRecipient} onSenderApproval={onSenderApproval} onOpenReviewPane={setReviewPane} onGoToFiles={onGoToFiles} onRetry={onRetry} participants={participants} currentUserName={currentUserName} showEducationalCues={showEducationalCues} />
                 ))}
               </div>
             </div>
             {renderInputArea()}
           </>
         )}
+        </>)}
       </div>
-      {viewerOpen && (
-        <ReviewViewerModal
-          title={viewerOpen.title}
-          body={viewerOpen.body}
-          onClose={() => setViewerOpen(null)}
-        />
-      )}
     </div>
   );
 }

@@ -152,13 +152,24 @@ export default function FileExplorer({ fileTree, selectedFileId, onSelectFile, o
     }
     if (dirty) onUpdateTree(updated);
   }, [skillsRevealed, fileTree, onUpdateTree]);
+  const isRoot = currentFolder.id === fileTree.id;
   // Stage 4 reveals the skills subfolder. Before that, hide it even if present
   // in the data — the reveal is additive: at stage 3 each dept shows only its
   // knowledge folder; at stage 4 skills joins it as a sibling.
-  const items = skillsRevealed ? rawItems : rawItems.filter(c => !(c.type === 'folder' && c.name === 'skills'));
+  //
+  // Also hide legacy top-level folders named exactly "Knowledge" or
+  // "Instructions" when they're empty — these are leftover cruft from the
+  // removed ensureStageFolder auto-creator. Non-empty ones stay visible so no
+  // data is ever lost silently.
+  const items = rawItems.filter(c => {
+    if (!skillsRevealed && c.type === 'folder' && c.name === 'skills') return false;
+    if (isRoot && c.type === 'folder'
+        && (c.name === 'Knowledge' || c.name === 'Instructions')
+        && (!c.children || c.children.length === 0)) return false;
+    return true;
+  });
   const isKnowledgeFolder = currentFolder.name === 'knowledge';
   const isSkillsFolder = currentFolder.name === 'skills';
-  const isRoot = currentFolder.id === fileTree.id;
 
   function navigateTo(folderId) {
     setCurrentFolderId(folderId);

@@ -1968,35 +1968,39 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
   border-color: #c45c5c;
 }
 
-/* Compact layout for the inline Coworker editor on canvas. The same
-   editor pieces (About, Skills, Knowledge) also render in the full-size
-   Coworkers tab — we only shrink them here, not globally. Consistent
-   rhythm: tight section padding, 10px gaps between sections, one-line
-   descriptions, smaller avatar/name in the identity row. */
+/* Compact layout for the inline Coworker editor on canvas. Same editor
+   pieces as the Coworkers tab, but shrunk aggressively so a node stays
+   scannable at zoom 1. Section descriptions are hidden here — the section
+   titles (ABOUT, SKILLS, KNOWLEDGE) are self-explanatory on this surface. */
 .wf-canvas-node .cwb-section {
-  padding: 12px 14px;
+  padding: 10px 12px;
   border-radius: 8px;
   background: var(--bg-warm);
   border: none;
 }
-.wf-canvas-node .cwb-section + .cwb-section { margin-top: 10px; }
-.wf-canvas-node .cwb-section-title { font-size: 11px; margin-bottom: 0; }
-.wf-canvas-node .cwb-section-desc { font-size: 11px; margin: 2px 0 8px; line-height: 1.35; color: var(--text-muted); }
-.wf-canvas-node .cwb-section-identity { padding: 8px 12px; }
-.wf-canvas-node .cwb-identity { gap: 10px; }
-.wf-canvas-node .cwb-identity-avatar-btn { width: 34px; height: 34px; border-radius: 8px; }
-.wf-canvas-node .cwb-name-input { font-size: 14px; font-weight: 700; }
-.wf-canvas-node .cwb-desc-gen { margin-top: 6px; display: flex; flex-direction: column; gap: 6px; }
-/* Force textarea to a short initial height regardless of the rows attribute.
-   User can still resize down/up via the textarea's corner grip. */
+.wf-canvas-node .cwb-section + .cwb-section { margin-top: 8px; }
+.wf-canvas-node .cwb-section-title { font-size: 11px; margin-bottom: 6px; }
+.wf-canvas-node .cwb-section-desc { display: none; }
+
+/* Identity row — compact: small square avatar flush against the name
+   input, no extra airy padding above/below. */
+.wf-canvas-node .cwb-section-identity { padding: 6px 10px; }
+.wf-canvas-node .cwb-identity { gap: 10px; align-items: center; }
+.wf-canvas-node .cwb-identity-avatar-btn { width: 30px !important; height: 30px !important; border-radius: 7px; font-size: 16px; }
+.wf-canvas-node .cwb-identity-avatar-btn > div { width: 30px !important; height: 30px !important; border-radius: 7px !important; }
+.wf-canvas-node .cwb-name-input { font-size: 14px; font-weight: 700; padding: 2px 0; }
+
+/* About — textarea forced to a short initial height that ignores the
+   rows={8} attribute. User can drag the corner grip to get more room. */
+.wf-canvas-node .cwb-desc-gen { margin-top: 0; display: flex; flex-direction: column; gap: 6px; }
 .wf-canvas-node .cwb-desc-input {
-  height: 72px;
-  min-height: 56px;
+  height: 60px !important;
+  min-height: 48px !important;
   padding: 8px 10px;
   font-size: 13px;
   line-height: 1.45;
 }
-.wf-canvas-node .cwb-desc-gen-btn { padding: 6px 12px; font-size: 12px; align-self: flex-start; }
+.wf-canvas-node .cwb-desc-gen-btn { padding: 5px 12px; font-size: 12px; align-self: flex-start; }
 .wf-canvas-node .ftp-selected { gap: 6px; }
 .validation-error { color: var(--accent-error); font-size: 12px; margin-top: 4px; padding: 4px 8px; background: #fdf0f0; border-radius: 4px; }
 

@@ -233,6 +233,60 @@ function CreateFileConfig({ fileTree, currentStage, config, onChange }) {
   );
 }
 
+// ===== Ask Human tool config =====
+function AskHumanConfig({ participants, config, onChange }) {
+  const instructions = config?.instructions || '';
+  const allowed = config?.allowedParticipantIds || [];
+  const humans = (participants || []).filter(p => (p.kind || 'human') === 'human');
+
+  function toggleParticipant(pid) {
+    const next = allowed.includes(pid)
+      ? allowed.filter(id => id !== pid)
+      : [...allowed, pid];
+    onChange({ instructions, allowedParticipantIds: next });
+  }
+
+  return (
+    <div className="cwb-tool-config">
+      <div className="cwb-tool-config-title">When should this coworker ask a human?</div>
+      <textarea
+        className="cwb-tool-config-textarea"
+        value={instructions}
+        onChange={e => onChange({ instructions: e.target.value, allowedParticipantIds: allowed })}
+        placeholder="e.g., Ask Priya when a loan needs a legal ruling. Ask the team lead for anything involving the 2024 exception."
+        rows={3}
+      />
+      <div className="cwb-tool-config-row cwb-tool-config-col">
+        <label className="cwb-tool-config-label">Who can be asked</label>
+        {humans.length === 0 ? (
+          <div className="cwb-tool-config-hint">No workshop participants yet — the picker will have nothing to show at runtime.</div>
+        ) : (
+          <div className="cwb-tool-config-checklist">
+            {humans.map(p => (
+              <label key={p.id} className={`cwb-tool-config-checkitem${allowed.includes(p.id) ? ' on' : ''}`}>
+                <input
+                  type="checkbox"
+                  checked={allowed.includes(p.id)}
+                  onChange={() => toggleParticipant(p.id)}
+                />
+                <span
+                  className="cwb-tool-config-dot"
+                  style={{ background: p.color || '#888', opacity: p.online ? 1 : 0.35 }}
+                  title={p.online ? 'Online' : 'Offline'}
+                />
+                <span className="cwb-tool-config-checkname">{p.name}</span>
+              </label>
+            ))}
+          </div>
+        )}
+        {humans.length > 0 && allowed.length === 0 && (
+          <div className="cwb-tool-config-warning">Pick at least one — the tool won't fire with an empty whitelist.</div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ===== File Picker =====
 function FilePicker({ fileTree, selectedIds, onChange, folderName }) {
   const [open, setOpen] = useState(false);
@@ -344,7 +398,7 @@ function CoworkerCard({ coworker, onStartChat, onEdit, onDelete }) {
 }
 
 // ===== Coworker Editor =====
-function CoworkerEditor({ coworker, onUpdate, onBack, fileTree, callClaudeAPI, showEducationalCues, tools, currentStage }) {
+function CoworkerEditor({ coworker, onUpdate, onBack, fileTree, callClaudeAPI, showEducationalCues, tools, currentStage, participants }) {
   const [showAvatarPicker, setShowAvatarPicker] = useState(false);
 
   return (
@@ -461,6 +515,19 @@ function CoworkerEditor({ coworker, onUpdate, onBack, fileTree, callClaudeAPI, s
                           })}
                         />
                       )}
+                      {checked && tool.id === 'builtin-ask-human' && (
+                        <AskHumanConfig
+                          participants={participants}
+                          config={coworker.toolConfigs?.['builtin-ask-human']}
+                          onChange={next => onUpdate({
+                            ...coworker,
+                            toolConfigs: {
+                              ...(coworker.toolConfigs || {}),
+                              'builtin-ask-human': next,
+                            },
+                          })}
+                        />
+                      )}
                     </div>
                   );
                 })}
@@ -478,7 +545,7 @@ function CoworkerEditor({ coworker, onUpdate, onBack, fileTree, callClaudeAPI, s
 }
 
 // ===== Main Export =====
-export default function CoworkerBuilder({ coworkers, onUpdateCoworkers, fileTree, tools, userName, callClaudeAPI, showEducationalCues, currentStage, onStartChat }) {
+export default function CoworkerBuilder({ coworkers, onUpdateCoworkers, fileTree, tools, userName, callClaudeAPI, showEducationalCues, currentStage, onStartChat, participants }) {
   const [selectedCwId, setSelectedCwId] = useState(null);
   const selectedCw = selectedCwId ? coworkers.find(c => c.id === selectedCwId) : null;
 
@@ -516,7 +583,7 @@ export default function CoworkerBuilder({ coworkers, onUpdateCoworkers, fileTree
   if (selectedCw) {
     return (
       <div className="panel panel-center">
-        <CoworkerEditor coworker={selectedCw} onUpdate={handleUpdate} onBack={() => setSelectedCwId(null)} fileTree={fileTree} callClaudeAPI={callClaudeAPI} showEducationalCues={showEducationalCues} tools={tools} currentStage={currentStage} />
+        <CoworkerEditor coworker={selectedCw} onUpdate={handleUpdate} onBack={() => setSelectedCwId(null)} fileTree={fileTree} callClaudeAPI={callClaudeAPI} showEducationalCues={showEducationalCues} tools={tools} currentStage={currentStage} participants={participants} />
       </div>
     );
   }

@@ -163,7 +163,15 @@ function ChatMessage({ msg, onApprovalAction, onPickRecipient, onRetry, particip
 
   if (msg.type === 'recipient-picker') {
     const isResolved = msg.status === 'resolved';
-    const onlineHumans = (participants || []).filter(p => p.online && (p.kind || 'human') === 'human' && p.name !== currentUserName);
+    const allowedSet = msg.allowedParticipantIds && msg.allowedParticipantIds.length > 0
+      ? new Set(msg.allowedParticipantIds)
+      : null;
+    const onlineHumans = (participants || []).filter(p =>
+      p.online
+      && (p.kind || 'human') === 'human'
+      && p.name !== currentUserName
+      && (!allowedSet || allowedSet.has(p.id))
+    );
     return (
       <div className="cl-row cl-row-ai">
         <AssistantAvatar label={msg.coworkerName || 'AI'} coworkerAvatar={msg.coworkerAvatar} />

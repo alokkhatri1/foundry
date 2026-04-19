@@ -881,7 +881,16 @@ function App() {
               if (!coworkerParticipantId) {
                 return { success: false, output: 'AI coworker is not set up as a DM participant yet. Try again after saving the coworker.' };
               }
-              // Surface a picker in the chat — user chooses which online human to ask.
+              // Read the coworker's Ask Human whitelist. Empty => tool fails
+              // early with a clear message; user was supposed to pick at least
+              // one participant when configuring the tool.
+              const cfg = coworker.toolConfigs?.['builtin-ask-human'];
+              const allowedIds = cfg?.allowedParticipantIds || [];
+              if (allowedIds.length === 0) {
+                return { success: false, output: 'This coworker\'s Ask Human tool has no allowed recipients configured. Open the coworker editor and pick at least one participant who can be asked.' };
+              }
+              // Surface a picker in the chat — user chooses which online human
+              // to ask from the configured whitelist.
               const pickId = 'pick-' + Date.now() + '-' + Math.random().toString(36).slice(2, 7);
               addMessage({
                 id: pickId,
@@ -889,6 +898,7 @@ function App() {
                 question,
                 coworkerName: coworker.name,
                 coworkerAvatar: coworker.avatar,
+                allowedParticipantIds: allowedIds,
                 status: 'pending',
               });
               const recipientName = await new Promise((resolve) => {
@@ -1184,7 +1194,12 @@ function App() {
       // ask_human to route correctly.
       let collabSection = '';
       if (stageReached(currentStage, '5c')) {
-        collabSection = `\n\n## Reaching a human\n\nWhen you genuinely need a human's judgment, confirmation, or a missing piece of information, call the Ask Human tool with a clear, self-contained question. You do not pick who to ask — the user at the keyboard will pick a live human teammate for you. Wait for the reply; incorporate it before concluding. Use this sparingly — only when the task actually needs a human.`;
+        const askCfg = targetCoworker.toolConfigs?.['builtin-ask-human'];
+        const customGuidance = askCfg?.instructions?.trim();
+        const whenToAskLine = customGuidance
+          ? `\n\n### When to ask (set by the user)\n${customGuidance}`
+          : '';
+        collabSection = `\n\n## Reaching a human\n\nWhen you genuinely need a human's judgment, confirmation, or a missing piece of information, call the Ask Human tool with a clear, self-contained question. You do not pick who to ask — the user at the keyboard will pick a live human teammate for you. Wait for the reply; incorporate it before concluding. Use this sparingly — only when the task actually needs a human.${whenToAskLine}`;
       }
       systemPrompt = [
         targetCoworker.role ? `## Role\n${targetCoworker.role}\n` : '',
@@ -1531,7 +1546,7 @@ Be concise. Confirm actions after completing them.${knowledgeSection}`;
         )}
 {activeTab === 'coworkers' && (
           <div className="tab-pane tab-pane-coworkers">
-            <CoworkerBuilder coworkers={coworkers || []} onUpdateCoworkers={handleUpdateCoworkers} fileTree={fileTree} tools={tools || []} userName={userName} callClaudeAPI={callClaudeAPI} showEducationalCues={showEducationalCues} currentStage={currentStage} onStartChat={cwId => { handleCoworkerChange(cwId); setActiveTab('chat'); }} />
+            <CoworkerBuilder coworkers={coworkers || []} onUpdateCoworkers={handleUpdateCoworkers} fileTree={fileTree} tools={tools || []} userName={userName} callClaudeAPI={callClaudeAPI} showEducationalCues={showEducationalCues} currentStage={currentStage} onStartChat={cwId => { handleCoworkerChange(cwId); setActiveTab('chat'); }} participants={participants} />
           </div>
         )}
         {activeTab === 'delegation' && (

@@ -4607,6 +4607,53 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
   color: var(--text-muted, #888);
   font-style: italic;
 }
+.cwb-tool-config-warning {
+  font-size: 12px;
+  color: var(--accent-error, #c45c5c);
+  font-weight: 600;
+}
+.cwb-tool-config-col { flex-direction: column; align-items: stretch; gap: 6px; }
+.cwb-tool-config-textarea {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--border-color, #e0d6cc);
+  border-radius: 6px;
+  font-size: 13px;
+  font-family: inherit;
+  background: var(--bg-white, #fff);
+  color: var(--text-dark);
+  resize: vertical;
+  line-height: 1.4;
+}
+.cwb-tool-config-checklist {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 180px;
+  overflow-y: auto;
+  padding: 4px 0;
+}
+.cwb-tool-config-checkitem {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-size: 13px;
+  color: var(--text-body);
+  cursor: pointer;
+  transition: background 0.1s;
+}
+.cwb-tool-config-checkitem:hover { background: rgba(90, 158, 111, 0.06); }
+.cwb-tool-config-checkitem.on { color: var(--text-dark); font-weight: 600; }
+.cwb-tool-config-checkitem input { accent-color: var(--accent-system, #5a9e6f); }
+.cwb-tool-config-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.cwb-tool-config-checkname { flex: 1; }
 
 /* ===== File chip role badge (Stage 4 — derived from folder) ===== */
 .cl-context-file-chip-role {

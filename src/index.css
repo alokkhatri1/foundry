@@ -3348,6 +3348,22 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
 .cwb-card-status { display: flex; align-items: center; gap: 5px; }
 .cwb-card-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--border-color); }
 .cwb-card-status.ready .cwb-card-dot { background: var(--accent-system); }
+.cwb-card-edit {
+  background: transparent;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-pill, 999px);
+  padding: 4px 12px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-body);
+  cursor: pointer;
+  transition: all 0.12s;
+}
+.cwb-card-edit:hover {
+  border-color: var(--text-muted);
+  color: var(--text-dark);
+  background: var(--bg-warm);
+}
 .cwb-card-delete {
   position: absolute; top: 8px; right: 8px; width: 22px; height: 22px;
   display: flex; align-items: center; justify-content: center; font-size: 11px;

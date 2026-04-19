@@ -1496,7 +1496,7 @@ Be concise. Confirm actions after completing them.${knowledgeSection}`;
         )}
 {activeTab === 'coworkers' && (
           <div className="tab-pane tab-pane-coworkers">
-            <CoworkerBuilder coworkers={coworkers || []} onUpdateCoworkers={handleUpdateCoworkers} fileTree={fileTree} tools={tools || []} userName={userName} callClaudeAPI={callClaudeAPI} showEducationalCues={showEducationalCues} currentStage={currentStage} />
+            <CoworkerBuilder coworkers={coworkers || []} onUpdateCoworkers={handleUpdateCoworkers} fileTree={fileTree} tools={tools || []} userName={userName} callClaudeAPI={callClaudeAPI} showEducationalCues={showEducationalCues} currentStage={currentStage} onStartChat={cwId => { handleCoworkerChange(cwId); setActiveTab('chat'); }} />
           </div>
         )}
         {activeTab === 'delegation' && (

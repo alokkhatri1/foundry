@@ -257,12 +257,12 @@ function FilePicker({ fileTree, selectedIds, onChange, folderName }) {
 }
 
 // ===== Coworker Card =====
-function CoworkerCard({ coworker, onSelect, onDelete }) {
+function CoworkerCard({ coworker, onStartChat, onEdit, onDelete }) {
   const instrCount = coworker.instructionFileIds?.length || 0;
   const isReady = instrCount > 0;
 
   return (
-    <div className="cwb-card" onClick={() => onSelect(coworker.id)}>
+    <div className="cwb-card" onClick={() => onStartChat(coworker.id)} title="Click to chat">
       <div className="cwb-card-top">
         <AvatarDisplay avatar={coworker.avatar} color={coworker.color} size={42} />
         <div className="cwb-card-info">
@@ -275,6 +275,13 @@ function CoworkerCard({ coworker, onSelect, onDelete }) {
           <span className="cwb-card-dot" />
           {isReady ? 'Ready' : 'Needs setup'}
         </span>
+        <button
+          className="cwb-card-edit"
+          onClick={e => { e.stopPropagation(); onEdit(coworker.id); }}
+          title="Edit"
+        >
+          Edit
+        </button>
       </div>
       <button className="cwb-card-delete" onClick={e => { e.stopPropagation(); onDelete(coworker.id); }} title="Delete">{'\u2715'}</button>
     </div>
@@ -400,7 +407,7 @@ function CoworkerEditor({ coworker, onUpdate, onBack, fileTree, callClaudeAPI, s
 }
 
 // ===== Main Export =====
-export default function CoworkerBuilder({ coworkers, onUpdateCoworkers, fileTree, tools, userName, callClaudeAPI, showEducationalCues, currentStage }) {
+export default function CoworkerBuilder({ coworkers, onUpdateCoworkers, fileTree, tools, userName, callClaudeAPI, showEducationalCues, currentStage, onStartChat }) {
   const [selectedCwId, setSelectedCwId] = useState(null);
   const selectedCw = selectedCwId ? coworkers.find(c => c.id === selectedCwId) : null;
 
@@ -419,6 +426,10 @@ export default function CoworkerBuilder({ coworkers, onUpdateCoworkers, fileTree
     };
     onUpdateCoworkers([...coworkers, newCw]);
     setSelectedCwId(newCw.id);
+  }
+
+  function handleStartChat(cwId) {
+    if (onStartChat) onStartChat(cwId);
   }
 
   function handleUpdate(updatedCw) {
@@ -460,7 +471,13 @@ export default function CoworkerBuilder({ coworkers, onUpdateCoworkers, fileTree
             </div>
           )}
           {coworkers.map(cw => (
-            <CoworkerCard key={cw.id} coworker={cw} onSelect={setSelectedCwId} onDelete={handleDelete} />
+            <CoworkerCard
+              key={cw.id}
+              coworker={cw}
+              onStartChat={handleStartChat}
+              onEdit={setSelectedCwId}
+              onDelete={handleDelete}
+            />
           ))}
         </div>
       </div>

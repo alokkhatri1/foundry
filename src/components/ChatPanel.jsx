@@ -466,11 +466,17 @@ export default function ChatPanel({ messages, onSendMessage, onApprovalAction, o
   const [input, setInput] = useState('');
   const [selectedFileIds, setSelectedFileIds] = useState([]);
   const [editingFileId, setEditingFileId] = useState(null);
-  const [activeCoworkerId, setActiveCoworkerId] = useState(null);
   const [attachedFiles, setAttachedFiles] = useState([]);
   const [parsingFiles, setParsingFiles] = useState(false);
   const [dmMessages, setDmMessages] = useState([]);
   const messagesRef = useRef(null);
+
+  // Single source of truth: the active conversation owns its coworker. Deriving
+  // activeCoworkerId from the conversation avoids a two-state race where the
+  // "clear on convo change" effect used to wipe a local coworker selection the
+  // moment App created a new convo for that coworker — which cost the user a
+  // second click to get into the chat.
+  const activeCoworkerId = (conversations || []).find(c => c.id === activeConvoId)?.coworkerId || null;
 
   // Derive which files are skills (anywhere inside a `skills` subfolder) vs context.
   const skillFileIds = useMemo(() => {
@@ -503,10 +509,10 @@ export default function ChatPanel({ messages, onSendMessage, onApprovalAction, o
   const fileInputRef = useRef(null);
   const activeCoworker = activeCoworkerId ? coworkers?.find(c => c.id === activeCoworkerId) : null;
 
-  // Clear context when switching conversations
+  // Clear context when switching conversations (activeCoworkerId is derived
+  // from the conversation itself, so it doesn't need to be reset here).
   useEffect(() => {
     setSelectedFileIds([]);
-    setActiveCoworkerId(null);
     setAttachedFiles([]);
     setInput('');
   }, [activeConvoId]);
@@ -518,7 +524,6 @@ export default function ChatPanel({ messages, onSendMessage, onApprovalAction, o
   // When entering DM mode: clear AI-side selections so the UI stays simple.
   useEffect(() => {
     if (activeDm) {
-      setActiveCoworkerId(null);
       setAttachedFiles([]);
       setSelectedFileIds([]);
     }
@@ -579,9 +584,10 @@ export default function ChatPanel({ messages, onSendMessage, onApprovalAction, o
   }
 
   function handleSelectCoworker(cwId) {
-    const newId = activeCoworkerId === cwId ? null : cwId;
-    setActiveCoworkerId(newId);
-    if (onCoworkerChange) onCoworkerChange(newId);
+    // Clicking a coworker always activates it. Closing happens via the banner
+    // X. App resolves or creates the conversation; activeCoworkerId is derived
+    // from the resulting conversation, so a single click is enough.
+    if (onCoworkerChange) onCoworkerChange(cwId);
   }
 
   function handleToggleFile(fileId) {
@@ -741,7 +747,7 @@ export default function ChatPanel({ messages, onSendMessage, onApprovalAction, o
                 <div className="cl-agent-banner-info">
                   <span className="cl-agent-banner-name">Talking to {activeCoworker.name}</span>
                 </div>
-                <button className="cl-agent-banner-close" onClick={() => { setActiveCoworkerId(null); if (onCoworkerChange) onCoworkerChange(null); }}>{'\u2715'}</button>
+                <button className="cl-agent-banner-close" onClick={() => { if (onNewChat) onNewChat(); }} title="Close chat">{'\u2715'}</button>
               </>
             )}
           </div>

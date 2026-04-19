@@ -651,6 +651,20 @@ export default function useSupabase() {
     return data || [];
   }, []);
 
+  // Load every approval across the room. Used by the graduation scorecard
+  // to compute reviews-resolved counts per participant without having to
+  // open each run's detail view first.
+  const loadAllRoomApprovals = useCallback(async () => {
+    if (!isSupabaseConfigured || !roomIdRef.current) return [];
+    const { data, error } = await supabase
+      .from('approvals')
+      .select('*')
+      .eq('room_id', roomIdRef.current)
+      .order('resolved_at', { ascending: true });
+    if (error) { console.error('[sb] loadAllRoomApprovals:', error.message); return []; }
+    return data || [];
+  }, []);
+
   const logToolCall = useCallback(async (data) => {
     if (!isSupabaseConfigured || !roomIdRef.current) return;
     await supabase.from('tool_calls').insert({
@@ -767,7 +781,7 @@ export default function useSupabase() {
     loadCoworkers, saveCoworker, deleteCoworker,
     loadTools, saveTool, deleteTool,
     loadWorkflows, saveWorkflow, deleteWorkflow,
-    saveMessage, saveWorkflowRun, loadWorkflowRuns, loadApprovals, logToolCall, logApproval,
+    saveMessage, saveWorkflowRun, loadWorkflowRuns, loadApprovals, loadAllRoomApprovals, logToolCall, logApproval,
     subscribeToRoom, trackPresence, leavePresence,
   };
 }

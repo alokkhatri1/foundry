@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useMemo } from 'react';
 import './App.css';
 import AuthGate from './components/AuthGate';
+import GraduationScreen from './components/GraduationScreen';
 import FileExplorer from './components/FileExplorer';
 import FileEditor from './components/FileEditor';
 import WorkflowBuilder from './components/WorkflowBuilder';
@@ -1611,49 +1612,24 @@ Be concise. Confirm actions after completing them.${knowledgeSection}`;
   const hasActiveRuns = activeRuns.length > 0;
 
   if (workshopEnded) {
-    const totalMessages = (conversations || []).reduce((sum, c) => sum + (c.messages?.length || 0), 0);
-    const filesCount = (flatFiles || []).filter(f => f.type === 'file').length;
-    const coworkersCount = (coworkers || []).length;
-    const runsCount = (workflowRuns || []).length;
     return (
-      <div className="landing">
-        <div className="landing-content" style={{ flexDirection: 'column', alignItems: 'center', gap: 24, textAlign: 'center', paddingTop: 80 }}>
-          <h1 className="landing-title">Thanks for participating</h1>
-          <p className="landing-subtitle" style={{ maxWidth: 480 }}>
-            Your journey in this workshop:
-          </p>
-          <div className="journey-stats">
-            <div className="journey-stat">
-              <div className="journey-stat-num">{totalMessages}</div>
-              <div className="journey-stat-label">messages</div>
-            </div>
-            <div className="journey-stat">
-              <div className="journey-stat-num">{filesCount}</div>
-              <div className="journey-stat-label">files</div>
-            </div>
-            <div className="journey-stat">
-              <div className="journey-stat-num">{coworkersCount}</div>
-              <div className="journey-stat-label">coworkers</div>
-            </div>
-            <div className="journey-stat">
-              <div className="journey-stat-num">{runsCount}</div>
-              <div className="journey-stat-label">workflow runs</div>
-            </div>
-          </div>
-          <p className="landing-subtitle" style={{ maxWidth: 480, opacity: 0.8, fontSize: 14 }}>
-            All your work is preserved in the workshop archive.
-          </p>
-          <button className="landing-join-btn" style={{ width: 'auto', padding: '12px 32px' }} onClick={() => {
-            try { localStorage.removeItem('sandbox:state'); } catch {}
-            setIsJoined(false);
-            setWorkshopCode('');
-            setWorkshopEnded(false);
-            sb.signOut();
-          }}>
-            Sign Out
-          </button>
-        </div>
-      </div>
+      <GraduationScreen
+        userName={userName}
+        conversations={conversations}
+        coworkers={coworkers}
+        workflows={workflows}
+        workflowRuns={workflowRuns}
+        flatFiles={flatFiles}
+        participants={participants}
+        loadAllRoomApprovals={sb.loadAllRoomApprovals}
+        onSignOut={() => {
+          try { localStorage.removeItem('sandbox:state'); } catch {}
+          setIsJoined(false);
+          setWorkshopCode('');
+          setWorkshopEnded(false);
+          sb.signOut();
+        }}
+      />
     );
   }
 

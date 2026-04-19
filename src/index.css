@@ -4951,6 +4951,9 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
 }
 .cl-context-file-chip.folder .cl-context-file-chip-name {
   font-style: italic;
+  max-width: none;
+  overflow: visible;
+  white-space: normal;
 }
 .cl-context-warning {
   font-size: 12px;

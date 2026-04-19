@@ -1,24 +1,3 @@
-function generateRefId(type) {
-  const now = new Date();
-  const y = now.getFullYear();
-  const m = String(now.getMonth() + 1).padStart(2, '0');
-  const seq = String(Math.floor(Math.random() * 99999)).padStart(5, '0');
-  return `${type.toUpperCase()}-${y}-${m}-${seq}`;
-}
-
-function formatTimestamp() {
-  return new Date().toISOString().replace('T', ' ').slice(0, 19);
-}
-
-const SYSTEM_SIMULATIONS = {
-  create_account: () => `Account ${generateRefId('ACC')} created. Timestamp: ${formatTimestamp()}`,
-  disburse_funds: () => `Transaction ${generateRefId('TXN')} processed. Amount disbursed. Timestamp: ${formatTimestamp()}`,
-  send_notification: () => `Notification ${generateRefId('NTF')} delivered. Timestamp: ${formatTimestamp()}`,
-  update_status: () => `Status updated. Reference: ${generateRefId('STS')}. Timestamp: ${formatTimestamp()}`,
-  generate_document: () => `Document ${generateRefId('DOC')} generated. Timestamp: ${formatTimestamp()}`,
-  flag_for_review: () => `Flagged for review. Queue reference: ${generateRefId('REV')}. Timestamp: ${formatTimestamp()}`,
-};
-
 function findNode(tree, id) {
   if (!tree) return null;
   if (tree.id === id) return tree;
@@ -51,6 +30,7 @@ export async function executeWorkflowRun({
   removeLoadingMessages, // () => void
   onLog,                // (entry) => void
   getApprovalDecision,  // (runId, stepId, config) => Promise<{action, comment}>
+  onSaveFinalOutput,    // ({name, content, destination}) => void — auto-save the accumulated output on completion
 }) {
   const previousOutputs = [];
 
@@ -175,32 +155,25 @@ export async function executeWorkflowRun({
         stepIndex++;
       }
 
-    } else if (step.type === 'system' || step.type === 'tool') {
-      // Try tool execution first, fall back to system simulations
-      const tool = step.toolId ? tools?.find(t => t.id === step.toolId) : null;
-
-      if (tool && executeToolFn) {
-        onMessage({ type: 'loading', label: tool.name });
-        const toolInput = previousOutputs.length > 0 ? previousOutputs[previousOutputs.length - 1] : caseInput;
-        const result = await executeToolFn(tool, toolInput, fileTree, callClaudeAPI);
-        removeLoadingMessages();
-        const output = result.output || 'No output';
-        onStepUpdate(runId, stepIndex, { status: result.success ? 'completed' : 'error', output, completedAt: Date.now() });
-        onMessage({ type: 'system', content: `${tool.icon || '\u2699\uFE0F'} ${tool.name}: ${output}` });
-        onLog({ type: 'system', message: `tool: ${tool.name} | ${result.success ? 'SUCCESS' : 'ERROR'}` });
-        if (!result.success) {
-          onRunUpdate(runId, { status: 'error', completedAt: Date.now() });
-          return;
-        }
-      } else {
-        // Legacy system simulation fallback
-        const simulator = SYSTEM_SIMULATIONS[step.action] || SYSTEM_SIMULATIONS.update_status;
-        const output = simulator();
-        onStepUpdate(runId, stepIndex, { status: 'completed', output, completedAt: Date.now() });
-        onMessage({ type: 'system', content: `${step.name}: ${output}` });
-        onLog({ type: 'system', message: `${step.action || 'action'} | ${output.match(/[A-Z]+-\d{4}-\d{2}-\d{5}/)?.[0] || 'N/A'} | SUCCESS` });
-      }
+    } else {
+      // Unknown step type (legacy tool/system). Skip silently — leftovers
+      // from a previous schema that shouldn't exist in new workflows.
       stepIndex++;
+    }
+  }
+
+  // Workflow completed — save the final accumulated output to the workflow's
+  // destination folder so the artifact is part of organizational knowledge.
+  if (onSaveFinalOutput && previousOutputs.length > 0) {
+    const finalOutput = previousOutputs.join('\n\n');
+    const fileName = (workflow.name || 'workflow-output').toLowerCase().replace(/[^a-z0-9]+/g, '-') + '-' + new Date().toISOString().slice(0, 10) + '.md';
+    const md = `# ${workflow.name}\n\n_Run completed ${new Date().toISOString()}_\n\n${finalOutput}`;
+    try {
+      onSaveFinalOutput({ name: fileName, content: md, destination: workflow.destination });
+      onMessage({ type: 'status', content: `Final output saved as ${fileName}` });
+      onLog({ type: 'workflow', message: `final output saved: ${fileName}` });
+    } catch (e) {
+      onLog({ type: 'error', message: `failed to save final output: ${e.message}` });
     }
   }
 

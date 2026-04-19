@@ -1415,6 +1415,20 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
   background: var(--bg-warm);
   border-radius: var(--radius-sm);
 }
+.wf-destination-select {
+  padding: 6px 10px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  background: var(--bg-white);
+  color: var(--text-dark);
+  cursor: pointer;
+}
+.wf-destination-subfolder {
+  display: inline-flex;
+  gap: 4px;
+  margin-left: 4px;
+}
 .knowledge-checkboxes { display: flex; flex-direction: column; gap: 6px; margin-top: 4px; }
 .knowledge-checkboxes label { display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 400; color: var(--text-dark); cursor: pointer; }
 .workflow-actions-bar {

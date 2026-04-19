@@ -20,15 +20,6 @@ function getAllFolders(tree, path = []) {
   return folders;
 }
 
-const SYSTEM_ACTIONS = [
-  { value: 'create_account', label: 'Create Account' },
-  { value: 'disburse_funds', label: 'Disburse Funds' },
-  { value: 'send_notification', label: 'Send Notification' },
-  { value: 'update_status', label: 'Update Status' },
-  { value: 'generate_document', label: 'Generate Document' },
-  { value: 'flag_for_review', label: 'Flag for Review' },
-];
-
 // ===== Visual Flow Summary =====
 function FlowSummary({ steps, coworkers, participants }) {
   if (steps.length === 0) return null;
@@ -175,27 +166,6 @@ function StepCard({ step, index, coworkers, tools, participants, onUpdate, onDel
               </>
             )}
 
-            {(step.type === 'system' || step.type === 'tool') && (
-              <>
-                <EducationalCue cueId="step-type-tool" show={showEducationalCues} />
-                <div className="step-config-row">
-                  <label>Tool</label>
-                  <select value={step.toolId || step.action || ''} onChange={e => onUpdate({ ...step, toolId: e.target.value })}>
-                    <option value="">Select a tool...</option>
-                    {(tools || []).map(t => (
-                      <option key={t.id} value={t.id}>{t.icon} {t.name} ({t.type})</option>
-                    ))}
-                    <optgroup label="Legacy System Actions">
-                      {SYSTEM_ACTIONS.map(a => <option key={a.value} value={a.value}>{a.label}</option>)}
-                    </optgroup>
-                  </select>
-                </div>
-                <div className="step-config-row">
-                  <label>Description</label>
-                  <textarea value={step.description || ''} onChange={e => onUpdate({ ...step, description: e.target.value })} placeholder="What should this tool do in this step?" />
-                </div>
-              </>
-            )}
           </div>
         )}
       </div>
@@ -264,11 +234,9 @@ function WorkflowEditor({ workflow, onUpdateWorkflow, fileTree, coworkers, tools
   function addStep(type) {
     const newStep = {
       id: genStepId(), type,
-      name: type === 'agent' ? 'New Agent Step' : type === 'approval' ? 'Human Review' : 'System Action',
+      name: type === 'agent' ? 'New Coworker Step' : 'Human Review',
       ...(type === 'agent' && { coworkerId: '', inputDescription: '' }),
       ...(type === 'approval' && { assigneeId: '', prompt: '', actions: ['Approve', 'Reject'] }),
-      ...(type === 'system' && { toolId: '', description: '' }),
-      ...(type === 'tool' && { toolId: '', description: '' }),
     };
     onUpdateWorkflow({ ...workflow, steps: [...workflow.steps, newStep] });
     setShowAddMenu(false);
@@ -330,6 +298,43 @@ function WorkflowEditor({ workflow, onUpdateWorkflow, fileTree, coworkers, tools
           <span className="wf-trigger-note-sim">In Foundry, use "Submit Case" to simulate this trigger.</span>
         </div>
       )}
+      {/* Destination for final output — set once per workflow, used to auto-save on completion */}
+      <div className="wf-trigger-bar">
+        <span className="wf-trigger-label">Saves to:</span>
+        <select
+          className="wf-destination-select"
+          value={workflow.destination?.folderId || ''}
+          onChange={e => onUpdateWorkflow({
+            ...workflow,
+            destination: { ...(workflow.destination || {}), folderId: e.target.value },
+          })}
+        >
+          <option value="">First available folder</option>
+          {(fileTree?.children || []).filter(c => c.type === 'folder').map(f => (
+            <option key={f.id} value={f.id}>{f.name}</option>
+          ))}
+        </select>
+        <div className="wf-destination-subfolder">
+          {['knowledge', 'skills'].map(sub => {
+            const active = (workflow.destination?.subfolder || 'knowledge') === sub;
+            return (
+              <label key={sub} className={`wf-trigger-pill${active ? ' active' : ''}`}>
+                <input
+                  type="radio"
+                  name="wf-destination-subfolder"
+                  checked={active}
+                  onChange={() => onUpdateWorkflow({
+                    ...workflow,
+                    destination: { ...(workflow.destination || {}), subfolder: sub },
+                  })}
+                  style={{ display: 'none' }}
+                />
+                {sub}
+              </label>
+            );
+          })}
+        </div>
+      </div>
       <div style={{ padding: '0 24px' }}>
         <EducationalCue cueId="workflow-triggers" show={showEducationalCues} />
         {(workflow.triggerType || 'manual') === 'manual' && <EducationalCue cueId="trigger-manual" show={showEducationalCues} />}
@@ -466,9 +471,8 @@ function WorkflowEditor({ workflow, onUpdateWorkflow, fileTree, coworkers, tools
           <button className="add-step-btn" onClick={() => setShowAddMenu(!showAddMenu)} disabled={isRunning}>+ Add Step</button>
           {showAddMenu && (
             <div className="add-step-menu">
-              <button className="add-step-option" onClick={() => addStep('agent')}><span className="dot agent"></span> Agent Step</button>
+              <button className="add-step-option" onClick={() => addStep('agent')}><span className="dot agent"></span> Coworker Step</button>
               <button className="add-step-option" onClick={() => addStep('approval')}><span className="dot approval"></span> Human Review</button>
-              <button className="add-step-option" onClick={() => addStep('tool')}><span className="dot system"></span> Tool Action</button>
             </div>
           )}
         </div>

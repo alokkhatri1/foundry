@@ -1191,6 +1191,38 @@ function App() {
           approvalResolversRef.current.set(rId, resolve);
         });
       },
+      onSaveFinalOutput: ({ name, content, destination }) => {
+        // Save the workflow's final accumulated output to the workflow's
+        // configured destination folder (or first-available knowledge folder
+        // as fallback). Mirrors the Create File / Request Review file-writing
+        // logic — workflows are just longer-form artifact factories.
+        const newTree = JSON.parse(JSON.stringify(fileTree));
+        newTree.children = newTree.children || [];
+        const newFile = {
+          id: 'f-' + Date.now() + '-' + Math.random().toString(36).slice(2, 7),
+          name,
+          type: 'file',
+          content,
+        };
+        const configuredFolder = destination?.folderId
+          ? newTree.children.find(c => c.id === destination.folderId && c.type === 'folder')
+          : null;
+        const targetFolder = configuredFolder || newTree.children.find(c => c.type === 'folder');
+        const subName = destination?.subfolder === 'skills' ? 'skills' : 'knowledge';
+        if (targetFolder) {
+          targetFolder.children = targetFolder.children || [];
+          const sub = targetFolder.children.find(c => c.type === 'folder' && c.name === subName);
+          if (sub) {
+            sub.children = sub.children || [];
+            sub.children.push(newFile);
+          } else {
+            targetFolder.children.push(newFile);
+          }
+        } else {
+          newTree.children.push(newFile);
+        }
+        handleUpdateTree(newTree);
+      },
     }).catch(err => {
       updateRun(runId, { status: 'error', completedAt: Date.now() });
       addMessage({ type: 'error', content: `Workflow error: ${err.message}` });

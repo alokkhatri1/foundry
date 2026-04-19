@@ -1,11 +1,24 @@
 // Convert between flat DB rows and nested tree structure
 
 // Flat rows → nested tree (for rendering)
+//
+// Always returns a single synthetic root labelled "files". All rows with
+// parent_id = null are hung directly off this root, so legacy top-level
+// folders (e.g. a stray "Instructions" or "Knowledge" from removed
+// auto-creation logic) become siblings of the real dept folders instead of
+// overtaking the breadcrumb — and the breadcrumb always starts from "files".
 export function buildTree(flatFiles) {
   if (!flatFiles || flatFiles.length === 0) return null;
 
   const map = new Map();
-  let root = null;
+  const syntheticRoot = {
+    id: 'root',
+    name: 'files',
+    type: 'folder',
+    children: [],
+    _sort: -1,
+    _parentId: null,
+  };
 
   // First pass: create node objects
   for (const f of flatFiles) {
@@ -19,10 +32,11 @@ export function buildTree(flatFiles) {
     });
   }
 
-  // Second pass: wire parent-child
+  // Second pass: wire parent-child. Every parent-less node hangs off the
+  // synthetic root, preserving legacy data without corrupting the hierarchy.
   for (const [, node] of map) {
     if (node._parentId === null) {
-      root = node;
+      syntheticRoot.children.push(node);
     } else {
       const parent = map.get(node._parentId);
       if (parent && parent.children) {
@@ -40,9 +54,9 @@ export function buildTree(flatFiles) {
     delete node._sort;
     delete node._parentId;
   }
-  if (root) clean(root);
+  clean(syntheticRoot);
 
-  return root;
+  return syntheticRoot;
 }
 
 // Nested tree → flat rows (for seeding DB)

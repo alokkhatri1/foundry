@@ -158,9 +158,13 @@ Provide your assessment with these sections:
 export const DEFAULT_TEST_CASE = `New case submitted by Greenfield Solutions Ltd., a mid-size consulting firm. They are requesting approval for a partnership expansion project valued at $250,000. The company has been operating for 3 years with steady growth. Documents submitted: company registration, financial statements (1 year), project proposal, client references (2), team qualifications summary.`;
 
 export function createStarterFolders(orgName) {
+  // orgName is retained in the signature for historical callers but the root
+  // label is fixed as "files" so the breadcrumb reads `files / <dept> / ...`
+  // regardless of workshop name.
+  void orgName;
   return {
     id: 'root',
-    name: orgName,
+    name: 'files',
     type: 'folder',
     children: [
       {
@@ -470,9 +474,10 @@ export function createStarterLogs() {
 }
 
 export function createEmptyFolders(orgName) {
+  void orgName;
   return {
     id: 'root',
-    name: orgName,
+    name: 'files',
     type: 'folder',
     children: [
       {

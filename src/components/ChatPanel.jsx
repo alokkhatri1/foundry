@@ -954,7 +954,7 @@ export default function ChatPanel({ messages, onSendMessage, onApprovalAction, o
                             if (ids.length === 0) return;
                             const allSelected = ids.every(id => selectedFileIds.includes(id));
                             if (allSelected) {
-                              chips.push({ kind: 'folder', key: `folder-${sub.id}`, name: sub.name, count: ids.length, fileIds: ids });
+                              chips.push({ kind: 'folder', key: `folder-${sub.id}`, name: `${dept.name}/${sub.name}`, count: ids.length, fileIds: ids });
                               ids.forEach(id => handled.add(id));
                             }
                           });
@@ -969,9 +969,9 @@ export default function ChatPanel({ messages, onSendMessage, onApprovalAction, o
                         return chips.map(chip => {
                           if (chip.kind === 'folder') {
                             return (
-                              <span key={chip.key} className="cl-context-file-chip folder" title={`All ${chip.count} file${chip.count === 1 ? '' : 's'} in ${chip.name}/ attached`}>
+                              <span key={chip.key} className="cl-context-file-chip folder" title={`All ${chip.count} file${chip.count === 1 ? '' : 's'} in ${chip.name} attached`}>
                                 <span className="cl-context-file-chip-role">{chip.count}</span>
-                                <span className="cl-context-file-chip-name">{chip.name}/</span>
+                                <span className="cl-context-file-chip-name">{chip.name}</span>
                                 <button className="cl-context-file-chip-remove" onClick={() => handleToggleSubfolder(chip.fileIds)}>{'\u2715'}</button>
                               </span>
                             );

@@ -511,6 +511,7 @@ function ContextSidebar({ fileTree, selectedFileIds, onToggleFile, onToggleFolde
           {!collapsedSections['agents'] && coworkers.map(cw => {
             const unread = (unreadDmCounts && unreadDmCounts[cw.name]) || 0;
             const canDm = stageReached(currentStage, '5c') && sb?.getCoworkerParticipantId;
+            const isMine = cw.createdBy && cw.createdBy === currentUserName;
             const handleOpenAiDm = async (e) => {
               if (e) e.stopPropagation();
               const mirrorId = await sb.getCoworkerParticipantId(cw.id);
@@ -518,14 +519,17 @@ function ContextSidebar({ fileTree, selectedFileIds, onToggleFile, onToggleFolde
                 onOpenDm({ id: mirrorId, name: cw.name, color: cw.color, kind: 'ai', coworkerId: cw.id });
               }
             };
-            // An AI coworker with an unread DM has reached out to this user
-            // (typically via Ask Human from someone else's coworker). Clicking
-            // the row in that state should open the DM thread so the reply
-            // lands in direct_messages — the only path that routes back to the
-            // pending ask_human resolver. Without this, replies become regular
-            // chat messages and the coworker hangs.
+            // Row-click routing:
+            //   - My own coworker → main chat (the "Talking to X" flow)
+            //   - Someone else's coworker → DM thread (the persisted history
+            //     of everything that's happened between me and that coworker,
+            //     including review requests, approvals, and replies). Chat
+            //     mode for someone else's coworker would spin up an empty
+            //     conversation and make the real DM history look lost.
+            //   - An unread badge always forces DM so review_request replies
+            //     route back to direct_messages.
             const handleRowClick = () => {
-              if (unread > 0 && canDm) {
+              if (canDm && (unread > 0 || !isMine)) {
                 handleOpenAiDm();
               } else {
                 onSelectCoworker(cw.id);

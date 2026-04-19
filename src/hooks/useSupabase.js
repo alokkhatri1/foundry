@@ -563,6 +563,9 @@ export default function useSupabase() {
     const { error } = await supabase.from('workflows').upsert({
       id: wf.id, room_id: roomIdRef.current,
       name: wf.name, steps: wf.steps || [],
+      nodes: wf.nodes || null,
+      edges: wf.edges || null,
+      destination: wf.destination || null,
       created_by: wf.createdBy, updated_at: new Date().toISOString(),
     }, { onConflict: 'id' });
     if (error) console.error('[sb] saveWorkflow:', error.message);

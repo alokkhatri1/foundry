@@ -25,7 +25,7 @@ import { executeWorkflowRun } from './utils/runWorkflowAsync';
 import { executeTool, toolToClaudeSchema, toolFromClaudeName } from './utils/toolExecutor';
 import { PLATFORM_TOOL_SCHEMAS, TOOL_DISPLAY_NAMES, TOOL_ICONS, executePlatformAction } from './utils/platformActions';
 import useSupabase from './hooks/useSupabase';
-import { buildTree, flattenTree, mapFileRow, mapCoworkerRow, mapToolRow, mapWorkflowRow, preserveToolConfigs } from './utils/treeUtils';
+import { buildTree, flattenTree, mapFileRow, mapCoworkerRow, mapToolRow, mapWorkflowRow, preserveToolConfigs, ensureDagShape } from './utils/treeUtils';
 
 const STORAGE_KEY = 'sandbox:state';
 
@@ -174,7 +174,11 @@ function App() {
     return [];
   });
   const fileTree = useMemo(() => buildTree(flatFiles), [flatFiles]);
-  const [workflows, setWorkflows] = useState(saved?.workflows || (saved?.workflow ? [saved.workflow] : null));
+  const [workflows, setWorkflows] = useState(() => {
+    const raw = saved?.workflows || (saved?.workflow ? [saved.workflow] : null);
+    if (!raw) return raw;
+    return raw.map(ensureDagShape);
+  });
   const [coworkers, setCoworkers] = useState(saved?.coworkers || null);
   const [tools, setTools] = useState(saved?.tools || null);
   const [selectedFileId, setSelectedFileId] = useState(null);
@@ -595,9 +599,12 @@ function App() {
   }
 
   function handleUpdateWorkflows(newWorkflows) {
-    setWorkflows(newWorkflows);
-    // Save each changed workflow
-    for (const wf of newWorkflows) sb.saveWorkflow(wf);
+    // Always normalize to the DAG shape so nodes[]+edges[] ride alongside
+    // steps[] in local state and in the DB. Runtime still reads steps[] until
+    // Phase 5 rewires it onto the graph.
+    const normalized = (newWorkflows || []).map(ensureDagShape);
+    setWorkflows(normalized);
+    for (const wf of normalized) sb.saveWorkflow(wf);
     persistLocal({ workflows: newWorkflows });
   }
 

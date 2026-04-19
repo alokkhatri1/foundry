@@ -164,11 +164,45 @@ export function mapToolRow(row) {
 
 // Map a Supabase workflow row to JS shape
 export function mapWorkflowRow(row) {
-  return {
+  return ensureDagShape({
     id: row.id,
     name: row.name,
     steps: row.steps || [],
+    nodes: row.nodes || null,
+    edges: row.edges || null,
+    destination: row.destination || null,
     createdBy: row.created_by,
     createdAt: row.created_at ? new Date(row.created_at).getTime() : Date.now(),
-  };
+  });
+}
+
+// Phase 1 DAG migration — ensure every workflow has nodes[] + edges[] on top
+// of the legacy steps[] array. Linear workflows stack vertically with
+// sequential edges wired from one step's 'out' handle to the next step's
+// 'in' handle. The runtime still reads steps[] for now; nodes/edges ride
+// alongside until the DAG runtime replaces the sequential loop in phase 5.
+export function ensureDagShape(workflow) {
+  if (!workflow) return workflow;
+  const steps = workflow.steps || [];
+  const hasDag = Array.isArray(workflow.nodes) && workflow.nodes.length > 0;
+  if (hasDag) {
+    return { ...workflow, edges: Array.isArray(workflow.edges) ? workflow.edges : [] };
+  }
+  const nodes = steps.map((step, i) => ({
+    id: step.id,
+    type: step.type,
+    position: { x: 240, y: i * 220 },
+    data: { ...step },
+  }));
+  const edges = [];
+  for (let i = 0; i < steps.length - 1; i++) {
+    edges.push({
+      id: `edge-${steps[i].id}-${steps[i + 1].id}`,
+      source: steps[i].id,
+      target: steps[i + 1].id,
+      sourceHandle: 'out',
+      targetHandle: 'in',
+    });
+  }
+  return { ...workflow, nodes, edges };
 }

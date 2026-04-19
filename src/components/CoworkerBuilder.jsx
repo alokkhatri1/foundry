@@ -2,6 +2,7 @@ import { useState, useRef } from 'react';
 import EducationalCue from './EducationalCue';
 import Icon, { COWORKER_ICONS, hasIcon } from './Icon';
 import RevealAt, { stageReached } from './RevealAt';
+import RichText from './RichText';
 
 const TOOL_REVEAL_STAGE = {
   'builtin-create-file': '5b',
@@ -356,7 +357,9 @@ function FilePicker({ fileTree, selectedIds, onChange, folderName }) {
                 <span className="ftp-preview-name">{previewFile.name.replace(/\.md$/, '')}</span>
                 <button className="ftp-preview-close" onClick={() => setPreviewId(null)}>{'\u2715'}</button>
               </div>
-              <div className="ftp-preview-content">{previewFile.content || 'Empty file'}</div>
+              <div className="ftp-preview-content">
+                {previewFile.content ? <RichText content={previewFile.content} /> : <em style={{ color: 'var(--text-muted)' }}>Empty file</em>}
+              </div>
             </div>
           )}
         </div>

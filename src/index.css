@@ -1302,7 +1302,36 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
   flex-shrink: 0;
 }
 .file-editor-header h3 { font-size: 14px; display: flex; align-items: center; gap: 6px; }
+.file-editor-modes {
+  display: flex;
+  gap: 2px;
+  padding: 3px;
+  background: var(--bg-warm);
+  border-radius: var(--radius-pill, 999px);
+}
+.file-editor-mode {
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-pill, 999px);
+  padding: 4px 14px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s;
+}
+.file-editor-mode:hover { color: var(--text-body); }
+.file-editor-mode.active {
+  background: var(--bg-white);
+  color: var(--text-dark);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
 .file-editor-body { flex: 1; overflow: hidden; }
+.file-editor-view {
+  height: 100%;
+  overflow-y: auto;
+  padding: 32px 48px 48px;
+}
 .file-editor-body textarea {
   width: 100%;
   height: 100%;
@@ -2178,17 +2207,22 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
   overflow-y: auto;
   padding: 32px 48px 48px;
 }
-.cl-review-pane-body > * {
-  max-width: 780px;
-  margin-left: auto;
-  margin-right: auto;
-}
-.cl-review-pane-body {
+
+/* ===== .md-doc — shared document typography for any markdown viewing
+   surface (review pane, file editor's view mode, file-picker preview, etc.).
+   The existing .rt styles stay tuned for compact chat bubbles; this one is
+   for reading an actual document. ===== */
+.md-doc {
   font-size: 15px;
   line-height: 1.7;
   color: var(--text-body);
 }
-.cl-review-pane-body h1 {
+.md-doc > * {
+  max-width: 780px;
+  margin-left: auto;
+  margin-right: auto;
+}
+.md-doc h1, .md-doc .rt-h1 {
   font-size: 28px;
   font-weight: 800;
   letter-spacing: -0.01em;
@@ -2198,45 +2232,60 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
   border-bottom: 1px solid var(--border-color);
   color: var(--text-dark);
 }
-.cl-review-pane-body h1 + * { margin-top: 20px !important; }
-.cl-review-pane-body h2 {
+.md-doc h1 + *, .md-doc .rt-h1 + * { margin-top: 20px !important; }
+.md-doc h2, .md-doc .rt-h2 {
   font-size: 20px;
   font-weight: 700;
   line-height: 1.3;
   margin: 32px auto 12px;
   color: var(--text-dark);
 }
-.cl-review-pane-body h3 {
+.md-doc h3, .md-doc .rt-h3 {
   font-size: 16px;
   font-weight: 700;
   margin: 26px auto 10px;
   color: var(--text-dark);
 }
-.cl-review-pane-body p {
-  margin: 0 auto 14px;
+.md-doc h4, .md-doc .rt-h4 {
+  font-size: 14px;
+  font-weight: 700;
+  margin: 22px auto 8px;
+  color: var(--text-dark);
+  text-transform: none;
+  letter-spacing: 0;
 }
-.cl-review-pane-body ul,
-.cl-review-pane-body ol {
+.md-doc p, .md-doc .rt-p {
+  margin: 0 auto 14px;
+  font-size: 15px;
+  line-height: 1.7;
+  color: var(--text-body);
+}
+.md-doc ul, .md-doc ol,
+.md-doc .rt-ul, .md-doc .rt-ol {
   margin: 0 auto 16px;
   padding-left: 24px;
   max-width: 756px;
+  font-size: 15px;
+  line-height: 1.7;
+  color: var(--text-body);
 }
-.cl-review-pane-body li {
-  margin-bottom: 6px;
-}
-.cl-review-pane-body li::marker { color: var(--accent-gold, #c8956c); }
-.cl-review-pane-body strong {
+.md-doc .rt-ul { list-style: disc; padding-left: 24px; }
+.md-doc .rt-ul > li { position: static; padding-left: 0; margin-bottom: 6px; }
+.md-doc .rt-ul > li::before { display: none; }
+.md-doc .rt-ol > li { margin-bottom: 6px; }
+.md-doc li { margin-bottom: 6px; }
+.md-doc li::marker { color: var(--accent-gold, #c8956c); }
+.md-doc strong { color: var(--text-dark); font-weight: 700; }
+.md-doc em { color: var(--text-body); }
+.md-doc code, .md-doc .rt-inline-code {
+  background: rgba(200, 149, 108, 0.12);
   color: var(--text-dark);
-  font-weight: 700;
-}
-.cl-review-pane-body em { color: var(--text-body); }
-.cl-review-pane-body code {
-  background: var(--bg-warm);
   padding: 2px 6px;
   border-radius: 4px;
   font-size: 0.92em;
+  font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
 }
-.cl-review-pane-body pre {
+.md-doc pre, .md-doc .rt-pre {
   background: var(--bg-warm);
   padding: 14px 16px;
   border-radius: 8px;
@@ -2245,19 +2294,19 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
   font-size: 13px;
   line-height: 1.55;
 }
-.cl-review-pane-body blockquote {
+.md-doc blockquote {
   border-left: 3px solid var(--border-color);
   padding: 4px 0 4px 16px;
   color: var(--text-muted);
   margin: 0 auto 16px;
   font-style: italic;
 }
-.cl-review-pane-body hr {
+.md-doc hr, .md-doc .rt-hr {
   border: 0;
   border-top: 1px solid var(--border-color);
   margin: 24px auto;
 }
-.cl-review-pane-body a {
+.md-doc a {
   color: var(--accent-approval, #b88b3a);
   text-decoration: underline;
   text-underline-offset: 2px;

@@ -649,7 +649,7 @@ function ReviewPane({ pane, onBack, onGoToFiles }) {
           AI reasoning
         </button>
       </div>
-      <div className="cl-review-pane-body">
+      <div className="cl-review-pane-body md-doc">
         <RichText content={body} />
       </div>
       {canAct && (

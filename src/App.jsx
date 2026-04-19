@@ -288,7 +288,19 @@ function App() {
         ]);
 
         if (files.length > 0) setFlatFiles(files);
-        if (cws.length > 0) setCoworkers(cws);
+        if (cws.length > 0) {
+          // Merge with any locally-held state so toolConfigs survive even if
+          // the DB row is missing them (e.g., migration 013 not yet applied).
+          setCoworkers(prev => {
+            const prevById = new Map((prev || []).map(c => [c.id, c]));
+            return cws.map(cw => {
+              const local = prevById.get(cw.id);
+              const hasIncomingConfigs = cw.toolConfigs && Object.keys(cw.toolConfigs).length > 0;
+              if (hasIncomingConfigs) return cw;
+              return { ...cw, toolConfigs: local?.toolConfigs || {} };
+            });
+          });
+        }
         if (tls.length > 0) setTools(tls);
         if (wfs.length > 0) setWorkflows(wfs);
         if (dbParticipants.length > 0) {
@@ -363,7 +375,18 @@ function App() {
           setCoworkers(prev => {
             const list = prev || [];
             const idx = list.findIndex(c => c.id === mapped.id);
-            return idx >= 0 ? list.map(c => c.id === mapped.id ? mapped : c) : [...list, mapped];
+            if (idx < 0) return [...list, mapped];
+            const existing = list[idx];
+            // Preserve local toolConfigs if the DB echo is empty. Covers the
+            // case where migration 013 hasn't been applied (tool_configs
+            // column missing from the row) or a save raced and arrived
+            // stripped — we never want a sync to blow away the user's
+            // Create File destination or Request Review reviewer list.
+            const merged = { ...mapped };
+            if (!mapped.toolConfigs || Object.keys(mapped.toolConfigs).length === 0) {
+              merged.toolConfigs = existing.toolConfigs || {};
+            }
+            return list.map(c => c.id === mapped.id ? merged : c);
           });
         }
       },
@@ -487,7 +510,17 @@ function App() {
     // content is built by participants (or loaded from a scenario later).
     if (files && files.length > 0) {
       setFlatFiles(files);
-      setCoworkers(cws || []);
+      // Merge: preserve local toolConfigs if the DB returned empty for any
+      // coworker (e.g. migration 013 not yet applied on this Supabase).
+      setCoworkers(prev => {
+        const prevById = new Map((prev || []).map(c => [c.id, c]));
+        return (cws || []).map(cw => {
+          const hasConfigs = cw.toolConfigs && Object.keys(cw.toolConfigs).length > 0;
+          if (hasConfigs) return cw;
+          const local = prevById.get(cw.id);
+          return { ...cw, toolConfigs: local?.toolConfigs || {} };
+        });
+      });
       setTools(tls && tls.length > 0 ? tls : ensurePrebuiltTools(null));
       setWorkflows(wfs || []);
     } else {

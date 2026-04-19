@@ -653,23 +653,37 @@ function App() {
 
   function handleUpdateWorkflows(newWorkflows) {
     // Always normalize to the DAG shape so nodes[]+edges[] ride alongside
-    // steps[] in local state and in the DB. Runtime still reads steps[] until
-    // Phase 5 rewires it onto the graph.
+    // steps[] in local state and in the DB. Diff against previous state so
+    // removed workflows get hard-deleted from Supabase — otherwise a deleted
+    // workflow reappears on the next reload/realtime sync because its row
+    // still exists in the DB.
     const normalized = (newWorkflows || []).map(ensureDagShape);
+    const prevIds = new Set((workflows || []).map(w => w.id));
+    const nextIds = new Set(normalized.map(w => w.id));
+    const removedIds = [...prevIds].filter(id => !nextIds.has(id));
     setWorkflows(normalized);
     for (const wf of normalized) sb.saveWorkflow(wf);
+    for (const id of removedIds) sb.deleteWorkflow(id);
     persistLocal({ workflows: newWorkflows });
   }
 
   function handleUpdateTools(newTools) {
+    const prevIds = new Set((tools || []).map(t => t.id));
+    const nextIds = new Set((newTools || []).map(t => t.id));
+    const removedIds = [...prevIds].filter(id => !nextIds.has(id));
     setTools(newTools);
     for (const t of newTools) sb.saveTool(t);
+    for (const id of removedIds) sb.deleteTool(id);
     persistLocal({ tools: newTools });
   }
 
   function handleUpdateCoworkers(newCoworkers) {
+    const prevIds = new Set((coworkers || []).map(c => c.id));
+    const nextIds = new Set((newCoworkers || []).map(c => c.id));
+    const removedIds = [...prevIds].filter(id => !nextIds.has(id));
     setCoworkers(newCoworkers);
     for (const cw of newCoworkers) sb.saveCoworker(cw);
+    for (const id of removedIds) sb.deleteCoworker(id);
     persistLocal({ coworkers: newCoworkers });
   }
 

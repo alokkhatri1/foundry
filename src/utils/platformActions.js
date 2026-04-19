@@ -60,11 +60,14 @@ function findNodeById(tree, id) {
 
 function findFolderByType(tree, folderType, deptName) {
   if (!tree || !tree.children) return null;
+  // Accept legacy "instructions" as an alias for the renamed "skills" folder
+  // so LLM tool calls referencing the old term still resolve.
+  const target = folderType.toLowerCase() === 'instructions' ? 'skills' : folderType.toLowerCase();
   for (const dept of tree.children) {
     if (deptName && !dept.name.toLowerCase().includes(deptName.toLowerCase())) continue;
     if (dept.children) {
       for (const subfolder of dept.children) {
-        if (subfolder.name.toLowerCase() === folderType.toLowerCase()) {
+        if (subfolder.name.toLowerCase() === target) {
           return subfolder;
         }
       }
@@ -110,13 +113,13 @@ export const TOOL_ICONS = {
 export const PLATFORM_TOOL_SCHEMAS = [
   {
     name: 'list_files',
-    description: 'List all files in the platform organized by department and folder type (knowledge/instructions). Use this to see what exists before creating or referencing files.',
+    description: 'List all files in the platform organized by department and folder type (knowledge/skills). Use this to see what exists before creating or referencing files.',
     input_schema: {
       type: 'object',
       properties: {
         folder_type: {
           type: 'string',
-          description: 'Optional filter: "knowledge" or "instructions". Omit to list all files.',
+          description: 'Optional filter: "knowledge" or "skills". Omit to list all files.',
         },
       },
       required: [],
@@ -138,13 +141,13 @@ export const PLATFORM_TOOL_SCHEMAS = [
   },
   {
     name: 'create_file',
-    description: 'Create a new file. Knowledge files contain policies, rules, and reference material. Instruction files define how an AI coworker should behave.',
+    description: 'Create a new file. Knowledge files contain policies, rules, and reference material. Skill files define how an AI coworker should behave.',
     input_schema: {
       type: 'object',
       properties: {
         name: { type: 'string', description: 'File name ending in .md (e.g., "lending-policy.md")' },
         content: { type: 'string', description: 'Full file content in markdown format' },
-        folder_type: { type: 'string', description: '"knowledge" or "instructions"', enum: ['knowledge', 'instructions'] },
+        folder_type: { type: 'string', description: '"knowledge" or "skills"', enum: ['knowledge', 'skills'] },
         department: { type: 'string', description: 'Department name. If omitted, uses the first department.' },
       },
       required: ['name', 'content', 'folder_type'],
@@ -260,7 +263,8 @@ export function executePlatformAction(toolName, input, ctx) {
     case 'list_files': {
       const files = collectFiles(ctx.fileTree);
       if (files.length === 0) return 'No files found in the platform.';
-      const filterType = input.folder_type?.toLowerCase();
+      const rawFilter = input.folder_type?.toLowerCase();
+      const filterType = rawFilter === 'instructions' ? 'skills' : rawFilter;
       const filtered = filterType
         ? files.filter(f => f.path.toLowerCase().includes(filterType))
         : files;

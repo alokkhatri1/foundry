@@ -189,7 +189,7 @@ export function createStarterFolders(orgName) {
           },
           {
             id: 'ops-instructions',
-            name: 'instructions',
+            name: 'skills',
             type: 'folder',
             children: [
               {
@@ -488,7 +488,7 @@ export function createEmptyFolders(orgName) {
           },
           {
             id: 'new-instructions',
-            name: 'instructions',
+            name: 'skills',
             type: 'folder',
             children: [],
           },

@@ -331,15 +331,15 @@ function CoworkerEditor({ coworker, onUpdate, onBack, fileTree, callClaudeAPI, s
             callClaudeAPI={callClaudeAPI}
           />
 
-          {/* Instructions */}
+          {/* Skills */}
           <div className="cwb-section">
-            <h3 className="cwb-section-title">Instructions</h3>
+            <h3 className="cwb-section-title">Skills</h3>
             <p className="cwb-section-desc">How this coworker behaves — its process and output format.</p>
             <FilePicker
               fileTree={fileTree}
               selectedIds={coworker.instructionFileIds || []}
               onChange={ids => onUpdate({ ...coworker, instructionFileIds: ids })}
-              folderName="instructions"
+              folderName="skills"
             />
           </div>
 

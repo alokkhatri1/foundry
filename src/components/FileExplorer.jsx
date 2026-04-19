@@ -2,6 +2,9 @@ import { useState, useRef } from 'react';
 import { KNOWLEDGE_TEMPLATE, INSTRUCTION_TEMPLATE } from '../data/starterContent';
 import { parseFile, getFileIcon, getFileCategory } from '../utils/fileParser';
 import EducationalCue from './EducationalCue';
+import { stageReached } from './RevealAt';
+
+const SKILL_TEMPLATE = INSTRUCTION_TEMPLATE;
 
 let nextId = Date.now();
 function genId() { return 'id-' + (nextId++); }
@@ -103,17 +106,17 @@ function FileIcon() {
 
 function getFolderColor(name) {
   if (name === 'knowledge') return '#5a9e6f';
-  if (name === 'instructions') return '#4a7fb5';
+  if (name === 'skills') return '#4a7fb5';
   return '#c8956c';
 }
 
 function getFolderDescription(name) {
   if (name === 'knowledge') return 'Policies, rules & context for AI';
-  if (name === 'instructions') return 'Agent behavior definitions';
+  if (name === 'skills') return 'Reusable instructions the AI follows';
   return null;
 }
 
-export default function FileExplorer({ fileTree, selectedFileId, onSelectFile, onUpdateTree, onSelectDepartment, showEducationalCues }) {
+export default function FileExplorer({ fileTree, selectedFileId, onSelectFile, onUpdateTree, onSelectDepartment, showEducationalCues, currentStage }) {
   const [currentFolderId, setCurrentFolderId] = useState(fileTree.id);
   const [showModal, setShowModal] = useState(false);
   const [modalMode, setModalMode] = useState('folder');
@@ -127,9 +130,14 @@ export default function FileExplorer({ fileTree, selectedFileId, onSelectFile, o
 
   const currentFolder = findNode(fileTree, currentFolderId) || fileTree;
   const breadcrumb = buildPath(fileTree, currentFolderId);
-  const items = currentFolder.children || [];
+  const rawItems = currentFolder.children || [];
+  const skillsRevealed = stageReached(currentStage, '4');
+  // Stage 4 reveals the skills subfolder. Before that, hide it even if present
+  // in the data — the reveal is additive: at stage 3 each dept shows only its
+  // knowledge folder; at stage 4 skills joins it as a sibling.
+  const items = skillsRevealed ? rawItems : rawItems.filter(c => !(c.type === 'folder' && c.name === 'skills'));
   const isKnowledgeFolder = currentFolder.name === 'knowledge';
-  const isInstructionsFolder = currentFolder.name === 'instructions';
+  const isSkillsFolder = currentFolder.name === 'skills';
   const isRoot = currentFolder.id === fileTree.id;
 
   function navigateTo(folderId) {
@@ -167,11 +175,22 @@ export default function FileExplorer({ fileTree, selectedFileId, onSelectFile, o
     if (!parent || parent.type !== 'folder') return;
 
     if (modalMode === 'folder') {
+      // New top-level folders auto-get a `knowledge` subfolder always and a
+      // `skills` subfolder once stage 4 is reached. Inside a dept folder we
+      // keep the existing single-folder behavior.
+      const isTopLevelCreate = parent.id === fileTree.id;
+      const children = [];
+      if (isTopLevelCreate) {
+        children.push({ id: genId(), name: 'knowledge', type: 'folder', children: [] });
+        if (skillsRevealed) {
+          children.push({ id: genId(), name: 'skills', type: 'folder', children: [] });
+        }
+      }
       parent.children.push({
         id: genId(),
         name: newName.trim(),
         type: 'folder',
-        children: [],
+        children,
       });
     } else {
       const fileName = newName.trim().endsWith('.md') ? newName.trim() : newName.trim() + '.md';
@@ -322,8 +341,8 @@ export default function FileExplorer({ fileTree, selectedFileId, onSelectFile, o
   }
 
   const canCreateFolder = isRoot;
-  const canCreateFile = isKnowledgeFolder || isInstructionsFolder;
-  const isLeafFolder = isKnowledgeFolder || isInstructionsFolder;
+  const canCreateFile = isKnowledgeFolder || isSkillsFolder;
+  const isLeafFolder = isKnowledgeFolder || isSkillsFolder;
 
   return (
     <div className="drive-explorer">
@@ -355,7 +374,7 @@ export default function FileExplorer({ fileTree, selectedFileId, onSelectFile, o
             {items.filter(i => i.type === 'folder').length} folders, {items.filter(i => i.type === 'file').length} files
           </span>
           {isKnowledgeFolder && items.length > 0 && <EducationalCue cueId="files-knowledge-base" show={showEducationalCues} />}
-          {isInstructionsFolder && items.length > 0 && <EducationalCue cueId="files-instructions" show={showEducationalCues} />}
+          {isSkillsFolder && items.length > 0 && <EducationalCue cueId="files-instructions" show={showEducationalCues} />}
         </div>
         <div className="drive-toolbar-right" style={{ position: 'relative' }}>
           <button className="drive-new-btn" onClick={() => setShowNewMenu(!showNewMenu)}>
@@ -375,7 +394,7 @@ export default function FileExplorer({ fileTree, selectedFileId, onSelectFile, o
                     <FileIcon />
                     <span>Empty File</span>
                   </button>
-                  <button className="drive-new-option" onClick={() => openCreateModal('file', isKnowledgeFolder ? KNOWLEDGE_TEMPLATE : INSTRUCTION_TEMPLATE)}>
+                  <button className="drive-new-option" onClick={() => openCreateModal('file', isKnowledgeFolder ? KNOWLEDGE_TEMPLATE : SKILL_TEMPLATE)}>
                     <FileIcon />
                     <span>From Template</span>
                   </button>
@@ -421,14 +440,14 @@ export default function FileExplorer({ fileTree, selectedFileId, onSelectFile, o
                 </div>
               </>
             )}
-            {isInstructionsFolder && (
+            {isSkillsFolder && (
               <>
                 <div className="drive-empty-icon"><FolderIcon color="#4a7fb5" /></div>
-                <p className="drive-empty-title">No instruction files yet</p>
-                <p className="drive-empty-desc">Define what your AI agent reads, analyzes, and returns.</p>
+                <p className="drive-empty-title">No skill files yet</p>
+                <p className="drive-empty-desc">Write reusable instructions that shape how the AI behaves.</p>
                 <EducationalCue cueId="files-instructions" show={showEducationalCues} />
                 <div className="drive-empty-actions">
-                  <button className="drive-empty-btn" onClick={() => openCreateModal('file', INSTRUCTION_TEMPLATE)}>
+                  <button className="drive-empty-btn" onClick={() => openCreateModal('file', SKILL_TEMPLATE)}>
                     + Create from template
                   </button>
                   <button className="drive-empty-btn drive-empty-btn-secondary" onClick={() => uploadInputRef.current?.click()}>
@@ -447,7 +466,7 @@ export default function FileExplorer({ fileTree, selectedFileId, onSelectFile, o
                 </button>
               </>
             )}
-            {!isRoot && !isKnowledgeFolder && !isInstructionsFolder && (
+            {!isRoot && !isKnowledgeFolder && !isSkillsFolder && (
               <>
                 <div className="drive-empty-icon"><FolderIcon /></div>
                 <p className="drive-empty-title">This folder is empty</p>
@@ -486,7 +505,7 @@ export default function FileExplorer({ fileTree, selectedFileId, onSelectFile, o
                   `${folder.children.filter(c => c.type === 'file').length} files`}
               </div>
             )}
-            {folder.name !== 'knowledge' && folder.name !== 'instructions' && (
+            {folder.name !== 'knowledge' && folder.name !== 'skills' && (
               <button className="drive-card-delete" onClick={e => handleDelete(e, folder.id)} title="Delete">{'\u2715'}</button>
             )}
           </div>
@@ -520,7 +539,9 @@ export default function FileExplorer({ fileTree, selectedFileId, onSelectFile, o
           <div className="modal-box" onClick={e => e.stopPropagation()}>
             <h3>{modalMode === 'folder' ? 'New Folder' : 'New File'}</h3>
             <p>{modalMode === 'folder'
-              ? 'Create a folder with knowledge and instructions subfolders.'
+              ? (skillsRevealed
+                  ? 'Create a folder with knowledge and skills subfolders.'
+                  : 'Create a folder with a knowledge subfolder.')
               : 'Create a new file in this folder.'
             }</p>
             <input

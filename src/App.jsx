@@ -275,11 +275,6 @@ function App() {
           setUserRole(role);
           setUserRoleLoaded(true);
         }
-        if (result.current_stage) {
-          if (stageReached(result.current_stage, '3')) await sb.ensureStageFolder(roomId, '3');
-          if (stageReached(result.current_stage, '4')) await sb.ensureStageFolder(roomId, '4');
-        }
-
         // Load state from granular tables
         const [files, cws, tls, wfs, dbParticipants] = await Promise.all([
           sb.loadFiles(), sb.loadCoworkers(), sb.loadTools(), sb.loadWorkflows(), sb.loadParticipants(),
@@ -464,11 +459,6 @@ function App() {
     if (result?.error) return result;
     const roomId = result.id;
     if (result.current_stage) setCurrentStage(result.current_stage);
-    // Backfill stage-specific folders for legacy workshops (default stage '6').
-    if (result.current_stage) {
-      if (stageReached(result.current_stage, '3')) await sb.ensureStageFolder(roomId, '3');
-      if (stageReached(result.current_stage, '4')) await sb.ensureStageFolder(roomId, '4');
-    }
 
     // Load from Supabase granular tables
     let files, cws, tls, wfs, runs;
@@ -1528,7 +1518,7 @@ Be concise. Confirm actions after completing them.${knowledgeSection}`;
                 <FileEditor file={selectedFile} onUpdateContent={handleUpdateFileContent} />
               </div>
             ) : (
-              <FileExplorer fileTree={fileTree} selectedFileId={selectedFileId} onSelectFile={setSelectedFileId} onUpdateTree={handleUpdateTree} onSelectDepartment={setSelectedDeptId} showEducationalCues={showEducationalCues} />
+              <FileExplorer fileTree={fileTree} selectedFileId={selectedFileId} onSelectFile={setSelectedFileId} onUpdateTree={handleUpdateTree} onSelectDepartment={setSelectedDeptId} showEducationalCues={showEducationalCues} currentStage={currentStage} />
             )}
           </div>
         )}

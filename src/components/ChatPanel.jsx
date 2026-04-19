@@ -472,16 +472,15 @@ export default function ChatPanel({ messages, onSendMessage, onApprovalAction, o
   const [dmMessages, setDmMessages] = useState([]);
   const messagesRef = useRef(null);
 
-  // Derive which files are skills (under top-level "Instructions" folder) vs context.
+  // Derive which files are skills (anywhere inside a `skills` subfolder) vs context.
   const skillFileIds = useMemo(() => {
-    const instructions = (fileTree?.children || []).find(n => n.type === 'folder' && n.name === 'Instructions');
-    if (!instructions) return [];
     const ids = [];
-    const walk = (n) => {
-      if (n.type === 'file') ids.push(n.id);
-      (n.children || []).forEach(walk);
+    const walk = (n, inSkills) => {
+      const here = inSkills || (n.type === 'folder' && n.name === 'skills');
+      if (n.type === 'file' && here) ids.push(n.id);
+      (n.children || []).forEach(c => walk(c, here));
     };
-    walk(instructions);
+    (fileTree?.children || []).forEach(c => walk(c, false));
     return ids;
   }, [fileTree]);
   const greeting = useMemo(() => {

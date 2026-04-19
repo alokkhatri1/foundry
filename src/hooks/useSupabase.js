@@ -100,35 +100,6 @@ export default function useSupabase() {
     if (error) console.error('[sb] deprecateWorkshop:', error.message);
   }, []);
 
-  const ensureStageFolder = useCallback(async (roomId, stage) => {
-    if (!isSupabaseConfigured || !roomId) return null;
-    const folderMap = { '3': 'Knowledge', '4': 'Instructions' };
-    const folderName = folderMap[stage];
-    if (!folderName) return null;
-    const { data: existing } = await supabase.from('files')
-      .select('id')
-      .eq('room_id', roomId)
-      .eq('type', 'folder')
-      .eq('name', folderName)
-      .is('parent_id', null)
-      .maybeSingle();
-    if (existing) return existing.id;
-    const folderId = (typeof crypto !== 'undefined' && crypto.randomUUID)
-      ? crypto.randomUUID()
-      : ('folder-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8));
-    const { error } = await supabase.from('files').insert({
-      id: folderId,
-      room_id: roomId,
-      name: folderName,
-      type: 'folder',
-      parent_id: null,
-      sort_order: stage === '3' ? 0 : 1,
-      updated_at: new Date().toISOString(),
-    });
-    if (error) { console.error('[sb] ensureStageFolder:', error.message); return null; }
-    return folderId;
-  }, []);
-
   const revealStage = useCallback(async (roomId, toStage, fromStage, actorUserId) => {
     if (!isSupabaseConfigured) return;
     await supabase.from('stage_events').insert({
@@ -141,11 +112,11 @@ export default function useSupabase() {
       .update({ current_stage: toStage })
       .eq('id', roomId);
     if (error) console.error('[sb] revealStage:', error.message);
-    // Auto-create the folder that belongs to this stage (Stage 3 -> Knowledge, Stage 4 -> Instructions).
-    if (toStage === '3' || toStage === '4') {
-      await ensureStageFolder(roomId, toStage);
-    }
-  }, [ensureStageFolder]);
+    // Note: stage 3 and 4 no longer auto-create top-level Knowledge/Instructions
+    // folders. Knowledge + skills live as subfolders inside each user-created
+    // dept folder; the FileExplorer handles creation on new-folder click and
+    // stage-gates the `skills` subfolder's visibility until stage 4.
+  }, []);
 
   const loadWorkshopStats = useCallback(async (roomId) => {
     if (!isSupabaseConfigured) return null;
@@ -773,7 +744,7 @@ export default function useSupabase() {
     signOut, checkIsAdmin, onAuthStateChange,
     // Admin
     createWorkshop, loadAdminWorkshops, loadWorkshopParticipants,
-    deleteWorkshop, deprecateWorkshop, revealStage, ensureStageFolder, loadWorkshopStats, loadWorkshopContent, loadWorkshopActivity,
+    deleteWorkshop, deprecateWorkshop, revealStage, loadWorkshopStats, loadWorkshopContent, loadWorkshopActivity,
     seedWorkshopContent, subscribeToWorkshopPresence,
     // Room
     joinRoom, getRoomId,

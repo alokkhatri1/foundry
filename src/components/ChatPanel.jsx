@@ -769,6 +769,18 @@ export default function ChatPanel({ messages, onSendMessage, onApprovalAction, o
     if (messagesRef.current) messagesRef.current.scrollTop = messagesRef.current.scrollHeight;
   }, [messages.length, dmMessages.length]);
 
+  // When the review pane closes, the chat/DM scroller remounts fresh with
+  // scrollTop = 0. Snap it back to the bottom so the user returns to where
+  // the conversation was, not to the top of history.
+  useEffect(() => {
+    if (reviewPane !== null) return;
+    const el = messagesRef.current;
+    if (!el) return;
+    requestAnimationFrame(() => {
+      el.scrollTop = el.scrollHeight;
+    });
+  }, [reviewPane]);
+
   // When entering DM mode: clear AI-side selections so the UI stays simple.
   useEffect(() => {
     if (activeDm) {

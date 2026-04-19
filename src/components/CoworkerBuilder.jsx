@@ -369,6 +369,28 @@ function FilePicker({ fileTree, selectedIds, onChange, folderName }) {
   );
 }
 
+// ===== Coworker Row (list view) =====
+// Compact one-liner row — avatar + name + role + status + edit/delete. Used
+// when the coworker list gets long and scanning cards top-to-bottom becomes
+// painful. Click the row to chat, click Edit to open the editor.
+function CoworkerRow({ coworker, onStartChat, onEdit, onDelete }) {
+  const instrCount = coworker.instructionFileIds?.length || 0;
+  const isReady = instrCount > 0;
+  return (
+    <div className="cwb-row" onClick={() => onStartChat(coworker.id)} title="Click to chat">
+      <AvatarDisplay avatar={coworker.avatar} color={coworker.color} size={32} />
+      <div className="cwb-row-name">{coworker.name || 'Untitled'}</div>
+      <div className="cwb-row-role">{coworker.role ? (coworker.role.length > 80 ? coworker.role.slice(0, 80) + '\u2026' : coworker.role) : 'No role defined'}</div>
+      <span className={`cwb-card-status${isReady ? ' ready' : ''}`}>
+        <span className="cwb-card-dot" />
+        {isReady ? 'Ready' : 'Needs setup'}
+      </span>
+      <button className="cwb-row-edit" onClick={e => { e.stopPropagation(); onEdit(coworker.id); }} title="Edit">Edit</button>
+      <button className="cwb-row-delete" onClick={e => { e.stopPropagation(); onDelete(coworker.id); }} title="Delete">{'\u2715'}</button>
+    </div>
+  );
+}
+
 // ===== Coworker Card =====
 function CoworkerCard({ coworker, onStartChat, onEdit, onDelete }) {
   const instrCount = coworker.instructionFileIds?.length || 0;
@@ -555,7 +577,17 @@ export { AvatarDisplay, AvatarPicker, DescriptionSection, FilePicker, isImageAva
 
 export default function CoworkerBuilder({ coworkers, onUpdateCoworkers, fileTree, tools, userName, callClaudeAPI, showEducationalCues, currentStage, onStartChat, participants }) {
   const [selectedCwId, setSelectedCwId] = useState(null);
+  const [searchQ, setSearchQ] = useState('');
+  const [viewMode, setViewMode] = useState('grid'); // 'grid' | 'list'
   const selectedCw = selectedCwId ? coworkers.find(c => c.id === selectedCwId) : null;
+
+  const q = searchQ.trim().toLowerCase();
+  const visibleCoworkers = q
+    ? coworkers.filter(c =>
+        (c.name || '').toLowerCase().includes(q)
+        || (c.role || '').toLowerCase().includes(q)
+      )
+    : coworkers;
 
   function handleCreate() {
     const newCw = {
@@ -607,25 +639,69 @@ export default function CoworkerBuilder({ coworkers, onUpdateCoworkers, fileTree
           </div>
           <button className="cw-hire-btn" onClick={handleCreate}>+ New Coworker</button>
         </div>
-        <div className="cw-list-grid">
-          {coworkers.length === 0 && (
+
+        {coworkers.length > 0 && (
+          <div className="cwb-toolbar">
+            <input
+              type="text"
+              className="cwb-search"
+              placeholder="Search by name or role\u2026"
+              value={searchQ}
+              onChange={e => setSearchQ(e.target.value)}
+            />
+            <div className="cwb-view-toggle">
+              <button
+                className={`cwb-view-btn${viewMode === 'grid' ? ' active' : ''}`}
+                onClick={() => setViewMode('grid')}
+                title="Grid view"
+              >Grid</button>
+              <button
+                className={`cwb-view-btn${viewMode === 'list' ? ' active' : ''}`}
+                onClick={() => setViewMode('list')}
+                title="List view"
+              >List</button>
+            </div>
+          </div>
+        )}
+
+        {coworkers.length === 0 ? (
+          <div className="cw-list-grid">
             <div className="cw-list-empty">
               <p>No coworkers yet.</p>
               <button className="setup-btn-primary" onClick={handleCreate} style={{ marginTop: 16 }}>
                 + Create your first coworker<span className="btn-arrow">&#x2197;</span>
               </button>
             </div>
-          )}
-          {coworkers.map(cw => (
-            <CoworkerCard
-              key={cw.id}
-              coworker={cw}
-              onStartChat={handleStartChat}
-              onEdit={setSelectedCwId}
-              onDelete={handleDelete}
-            />
-          ))}
-        </div>
+          </div>
+        ) : visibleCoworkers.length === 0 ? (
+          <div className="cwb-empty-search">
+            No coworkers match &ldquo;{searchQ}&rdquo;.
+          </div>
+        ) : viewMode === 'grid' ? (
+          <div className="cw-list-grid">
+            {visibleCoworkers.map(cw => (
+              <CoworkerCard
+                key={cw.id}
+                coworker={cw}
+                onStartChat={handleStartChat}
+                onEdit={setSelectedCwId}
+                onDelete={handleDelete}
+              />
+            ))}
+          </div>
+        ) : (
+          <div className="cwb-list">
+            {visibleCoworkers.map(cw => (
+              <CoworkerRow
+                key={cw.id}
+                coworker={cw}
+                onStartChat={handleStartChat}
+                onEdit={setSelectedCwId}
+                onDelete={handleDelete}
+              />
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

@@ -250,9 +250,10 @@ function StepCard({ step, index, coworkers, tools, participants, onUpdate, onDel
           <span className="step-name">
             {step.type === 'agent'
               ? (assignedCw?.name?.trim() || 'New Coworker')
-              : step.name}
+              : step.type === 'approval'
+                ? (assignedPerson?.name || 'Review')
+                : step.name}
           </span>
-          {step.type !== 'agent' && assignee && <span className="step-assignee-name">{assignee.name}</span>}
           {statusBadge}
           <span className="step-actions">
             {!stepResult && step.type !== 'trigger' && (
@@ -280,12 +281,6 @@ function StepCard({ step, index, coworkers, tools, participants, onUpdate, onDel
         )}
         {expanded && !stepResult && (
           <div className="step-card-body">
-            {step.type === 'approval' && (
-              <div className="step-config-row">
-                <label>Step Name</label>
-                <input type="text" value={step.name} onChange={e => onUpdate({ ...step, name: e.target.value })} />
-              </div>
-            )}
 
             {step.type === 'trigger' && (
               <>
@@ -495,26 +490,33 @@ function WorkflowCanvas({ workflow, onUpdateWorkflow, fileTree, coworkers, tools
   const { derivedNodes, derivedEdges } = useMemo(() => {
     const positions = new Map((workflow.nodes || []).map(n => [n.id, n.position]));
     const steps = workflow.steps || [];
-    const nextNodes = steps.map((step, i) => ({
-      id: step.id,
-      type: step.type,
-      position: positions.get(step.id) || { x: 80, y: i * 240 },
-      data: {
-        stepCardProps: {
-          step, index: i, coworkers, tools, participants, fileTree,
-          onUpdate: (updated) => updateStep(i, updated),
-          onDelete: () => deleteStep(i),
-          expanded: expandedStep === i,
-          onToggleExpand: () => setExpandedStep(expandedStep === i ? null : i),
-          validationErrors: validationErrors[step.id],
-          allSteps: steps, currentStepId,
-          stepResult: activeRun?.stepResults?.[i],
-          showEducationalCues,
-          callClaudeAPI,
-          onSaveCoworkerToLibrary,
+    const nextNodes = steps.map((step, i) => {
+      const isExpanded = expandedStep === i;
+      return {
+        id: step.id,
+        type: step.type,
+        position: positions.get(step.id) || { x: 80, y: i * 240 },
+        // Lock dragging while the node is open for editing — prevents a click
+        // into an input field from being interpreted as a drag and shifting
+        // the node around the canvas. Collapsing re-enables drag.
+        draggable: !isExpanded,
+        data: {
+          stepCardProps: {
+            step, index: i, coworkers, tools, participants, fileTree,
+            onUpdate: (updated) => updateStep(i, updated),
+            onDelete: () => deleteStep(i),
+            expanded: isExpanded,
+            onToggleExpand: () => setExpandedStep(isExpanded ? null : i),
+            validationErrors: validationErrors[step.id],
+            allSteps: steps, currentStepId,
+            stepResult: activeRun?.stepResults?.[i],
+            showEducationalCues,
+            callClaudeAPI,
+            onSaveCoworkerToLibrary,
+          },
         },
-      },
-    }));
+      };
+    });
     const nextEdges = (workflow.edges || []).map(styleEdge);
     return { derivedNodes: nextNodes, derivedEdges: nextEdges };
   }, [workflow, fileTree, coworkers, tools, participants, activeRun, currentStepId, expandedStep, setExpandedStep, updateStep, deleteStep, validationErrors, showEducationalCues, callClaudeAPI, onSaveCoworkerToLibrary]);
@@ -596,6 +598,7 @@ function WorkflowCanvas({ workflow, onUpdateWorkflow, fileTree, coworkers, tools
         fitViewOptions={{ padding: 0.2, maxZoom: 1 }}
         proOptions={{ hideAttribution: true }}
         defaultEdgeOptions={{ type: 'default', animated: false, style: { stroke: '#c8956c', strokeWidth: 2 } }}
+        nodeDragThreshold={5}
       >
         <Background gap={20} size={1} color="#d4ccc2" />
         <Controls showInteractive={false} />

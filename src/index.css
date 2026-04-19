@@ -4056,6 +4056,92 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
 
 /* ========== COWORKER BUILDER (new) ========== */
 
+/* Toolbar — search + view toggle above the grid/list. Shown only when there
+   is at least one coworker; keeps the empty-state page clean. */
+.cwb-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.cwb-search {
+  flex: 1;
+  padding: 10px 14px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  font-size: 14px;
+  background: var(--bg-white);
+  outline: none;
+}
+.cwb-search:focus { border-color: var(--accent-gold); }
+.cwb-view-toggle { display: flex; gap: 4px; background: var(--bg-warm); padding: 3px; border-radius: var(--radius-sm); border: 1px solid var(--border-color); }
+.cwb-view-btn {
+  padding: 6px 12px;
+  border: none;
+  background: transparent;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+  border-radius: 4px;
+  cursor: pointer;
+}
+.cwb-view-btn.active { background: var(--bg-white); color: var(--text-dark); box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+.cwb-empty-search {
+  padding: 32px;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 14px;
+  background: var(--bg-white);
+  border: 1px dashed var(--border-color);
+  border-radius: var(--radius);
+}
+
+/* List view — dense rows. Scannable top-to-bottom; far more coworkers fit
+   on screen than the card grid. Same click semantics: click row to chat,
+   Edit to open the editor, X to delete. */
+.cwb-list {
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-white);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+.cwb-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border-color);
+  cursor: pointer;
+  transition: background 0.12s;
+}
+.cwb-row:last-child { border-bottom: none; }
+.cwb-row:hover { background: var(--bg-warm); }
+.cwb-row-name { font-size: 14px; font-weight: 700; color: var(--text-dark); flex-shrink: 0; min-width: 140px; }
+.cwb-row-role { font-size: 13px; color: var(--text-muted); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cwb-row-edit {
+  background: transparent;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-pill, 999px);
+  padding: 4px 12px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.cwb-row-edit:hover { border-color: var(--text-muted); color: var(--text-dark); }
+.cwb-row-delete {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  font-size: 14px;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 4px;
+}
+.cwb-row-delete:hover { background: #fcecec; color: #c45c5c; }
+
 /* Cards */
 .cwb-card {
   background: var(--bg-white); border: 1.5px solid var(--border-color);

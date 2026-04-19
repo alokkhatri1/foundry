@@ -1815,7 +1815,6 @@ Be concise. Confirm actions after completing them.${knowledgeSection}`;
           <div className="tab-pane tab-pane-activity">
             <ActivityDashboard
               workflowRuns={workflowRuns}
-              logs={logs}
               onApprovalAction={handleApprovalAction}
               onNudge={handleNudge}
               participants={participants}

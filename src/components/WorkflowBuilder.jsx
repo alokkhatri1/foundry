@@ -835,6 +835,13 @@ export default function WorkflowBuilder({ workflows, onUpdateWorkflows, fileTree
     onUpdateWorkflows([...workflows, copy]);
   }
 
+  function handleClearAll() {
+    if (workflows.length === 0) return;
+    if (!confirm(`Delete all ${workflows.length} orchestration${workflows.length === 1 ? '' : 's'} in this room? This affects every participant and cannot be undone.`)) return;
+    onUpdateWorkflows([]);
+    setSelectedWorkflowId(null);
+  }
+
   if (selectedWorkflow) {
     return (
       <div className="panel panel-center">
@@ -874,7 +881,14 @@ export default function WorkflowBuilder({ workflows, onUpdateWorkflows, fileTree
             <p className="wf-list-subtitle">Multi-step processes with AI coworkers, human approvals, and system actions.</p>
             <EducationalCue cueId="workflow-overview" show={showEducationalCues} />
           </div>
-          <button className="wf-create-btn" onClick={handleCreateWorkflow}>+ New Orchestration</button>
+          <div style={{ display: 'flex', gap: 8 }}>
+            {workflows.length > 0 && (
+              <button className="wf-clear-all-btn" onClick={handleClearAll} title="Delete every orchestration in this room">
+                Clear all
+              </button>
+            )}
+            <button className="wf-create-btn" onClick={handleCreateWorkflow}>+ New Orchestration</button>
+          </div>
         </div>
         <div className="wf-list-grid">
           {workflows.length === 0 && (

@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react';
-import ActivityLog from './ActivityLog';
 import EducationalCue from './EducationalCue';
 import { CoworkerGlyph } from './Icon';
 
@@ -225,8 +224,7 @@ function RunDetailView({ run, onBack, onApprovalAction, onNudge, showEducational
 }
 
 // ===== Main Dashboard =====
-export default function ActivityDashboard({ workflowRuns, logs, onApprovalAction, onNudge, participants, currentUserName, coworkers, workflows, showEducationalCues, approvalsByRun, onLoadApprovals }) {
-  const [view, setView] = useState('dashboard'); // 'dashboard' | 'log'
+export default function ActivityDashboard({ workflowRuns, onApprovalAction, onNudge, participants, currentUserName, coworkers, workflows, showEducationalCues, approvalsByRun, onLoadApprovals }) {
   const [selectedRunId, setSelectedRunId] = useState(null);
 
   const selectedRun = selectedRunId ? workflowRuns.find(r => r.id === selectedRunId) : null;
@@ -260,16 +258,8 @@ export default function ActivityDashboard({ workflowRuns, logs, onApprovalAction
 
   return (
     <div className="adash">
-      {/* View toggle */}
       <div className="adash-header">
-        <div className="adash-toggle">
-          <button className={`adash-toggle-btn${view === 'dashboard' ? ' active' : ''}`} onClick={() => setView('dashboard')}>
-            Dashboard
-          </button>
-          <button className={`adash-toggle-btn${view === 'log' ? ' active' : ''}`} onClick={() => setView('log')}>
-            Log View
-          </button>
-        </div>
+        <h2 className="adash-title">Observability</h2>
         <div className="adash-summary">
           <EducationalCue cueId="activity-dashboard" show={showEducationalCues} />
           {activeRuns.length > 0 && <span className="adash-stat running">{activeRuns.length} active</span>}
@@ -278,44 +268,40 @@ export default function ActivityDashboard({ workflowRuns, logs, onApprovalAction
         </div>
       </div>
 
-      {view === 'log' ? (
-        <ActivityLog logs={logs} showEducationalCues={showEducationalCues} />
-      ) : (
-        <div className="adash-body">
-          {workflowRuns.length === 0 && (
-            <div className="adash-empty">
-              <p className="adash-empty-title">No orchestration runs yet</p>
-              <p className="adash-empty-desc">Go to the Orchestration tab and click Run to start one. Active runs will appear here — everyone in the workshop can see them.</p>
-            </div>
-          )}
+      <div className="adash-body">
+        {workflowRuns.length === 0 && (
+          <div className="adash-empty">
+            <p className="adash-empty-title">No orchestration runs yet</p>
+            <p className="adash-empty-desc">Go to the Orchestration tab and click Run to start one. Active runs will appear here — everyone in the workshop can see them.</p>
+          </div>
+        )}
 
-          {activeRuns.length > 0 && (
-            <div className="adash-section">
-              <div className="adash-section-title adash-section-active">Active ({activeRuns.length})</div>
+        {activeRuns.length > 0 && (
+          <div className="adash-section">
+            <div className="adash-section-title adash-section-active">Active ({activeRuns.length})</div>
+            <div className="adash-grid">
+              {activeRuns.map(run => (
+                <RunCard key={run.id} run={run} onClick={setSelectedRunId} onNudge={onNudge} showEducationalCues={showEducationalCues} />
+              ))}
+            </div>
+          </div>
+        )}
+
+        {recentRuns.length > 0 && (
+          <div className="adash-section">
+            <div className="adash-section-title adash-section-completed" onClick={() => setShowRecent(!showRecent)} style={{ cursor: 'pointer' }}>
+              {showRecent ? '\u25BE' : '\u25B8'} Recent ({recentRuns.length})
+            </div>
+            {showRecent && (
               <div className="adash-grid">
-                {activeRuns.map(run => (
+                {recentRuns.map(run => (
                   <RunCard key={run.id} run={run} onClick={setSelectedRunId} onNudge={onNudge} showEducationalCues={showEducationalCues} />
                 ))}
               </div>
-            </div>
-          )}
-
-          {recentRuns.length > 0 && (
-            <div className="adash-section">
-              <div className="adash-section-title adash-section-completed" onClick={() => setShowRecent(!showRecent)} style={{ cursor: 'pointer' }}>
-                {showRecent ? '\u25BE' : '\u25B8'} Recent ({recentRuns.length})
-              </div>
-              {showRecent && (
-                <div className="adash-grid">
-                  {recentRuns.map(run => (
-                    <RunCard key={run.id} run={run} onClick={setSelectedRunId} onNudge={onNudge} showEducationalCues={showEducationalCues} />
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-      )}
+            )}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

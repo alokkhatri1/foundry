@@ -827,10 +827,29 @@ function App() {
             onMessage: addMessage,
             onCreateFile: (name, content) => {
               const newTree = JSON.parse(JSON.stringify(fileTree));
-              const root = newTree.children?.[0];
-              if (root?.children) {
-                const knowledge = root.children.find(c => c.name === 'knowledge');
-                if (knowledge) knowledge.children.push({ id: 'f-' + Date.now(), name, type: 'file', content });
+              newTree.children = newTree.children || [];
+              const newFile = {
+                id: 'f-' + Date.now() + '-' + Math.random().toString(36).slice(2, 7),
+                name,
+                type: 'file',
+                content,
+              };
+              // Preferred destination: inside the first user-created top-level
+              // folder's knowledge subfolder, so coworker output lands next to
+              // the other knowledge the user has been building. Fall back to
+              // the top level if no dept folder exists yet.
+              const firstDept = newTree.children.find(c => c.type === 'folder');
+              if (firstDept) {
+                firstDept.children = firstDept.children || [];
+                const knowledge = firstDept.children.find(c => c.type === 'folder' && c.name === 'knowledge');
+                if (knowledge) {
+                  knowledge.children = knowledge.children || [];
+                  knowledge.children.push(newFile);
+                } else {
+                  firstDept.children.push(newFile);
+                }
+              } else {
+                newTree.children.push(newFile);
               }
               handleUpdateTree(newTree);
             },

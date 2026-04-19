@@ -263,17 +263,18 @@ export function createStarterCoworkers() {
 
 export const BUILTIN_TOOLS = [
   {
-    id: 'builtin-research',
-    name: 'Research',
-    type: 'research',
-    description: 'Research a topic and return a concise brief. Uses the underlying AI\'s training knowledge — no live web lookup.',
-    icon: '\uD83D\uDD2C',
+    id: 'builtin-create-file',
+    name: 'Create File',
+    type: 'create',
+    description: 'Create a new file in the shared Files workspace. Use this when you want to produce an artifact — a summary, a report, a draft — that the user and everyone else in the workshop can see and open. Provide a clear title and the full markdown content.',
+    icon: '\uD83D\uDCDD',
     isBuiltin: true,
     createdBy: 'System',
     config: {
-      templateId: 'claude_research',
+      templateId: 'document_generator',
       parameters: [
-        { name: 'topic', label: 'Topic', type: 'string', required: true, description: 'The topic to research' },
+        { name: 'title', label: 'File Title', type: 'string', required: true, description: 'Short title for the file — also used to generate the filename' },
+        { name: 'content', label: 'Content', type: 'string', required: true, description: 'Full markdown content of the file' },
       ],
     },
   },
@@ -305,22 +306,6 @@ export const BUILTIN_TOOLS = [
       templateId: 'ask_human',
       parameters: [
         { name: 'question', label: 'Question', type: 'string', required: true, description: 'The specific question or item to check with the human. Be clear and self-contained — they will see this verbatim.' },
-      ],
-    },
-  },
-  {
-    id: 'builtin-process-doc',
-    name: 'Process Document',
-    type: 'process',
-    description: 'Take a document from the workspace plus an instruction (e.g., summarize, extract key points, translate) and return an AI-generated result.',
-    icon: '\uD83D\uDCC4',
-    isBuiltin: true,
-    createdBy: 'System',
-    config: {
-      templateId: 'claude_process_document',
-      parameters: [
-        { name: 'file_name', label: 'File Name', type: 'string', required: true, description: 'Name of the file in the workspace' },
-        { name: 'instruction', label: 'Instruction', type: 'string', required: true, description: 'What to do with the document (e.g., summarize, extract key points, translate)' },
       ],
     },
   },

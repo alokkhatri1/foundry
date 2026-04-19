@@ -133,23 +133,55 @@ export default function FileExplorer({ fileTree, selectedFileId, onSelectFile, o
   const rawItems = currentFolder.children || [];
   const skillsRevealed = stageReached(currentStage, '4');
 
-  // Backfill: once Stage 4 is reached, every top-level folder should have a
-  // `skills` subfolder beside `knowledge`. Folders created before Stage 4 only
-  // got `knowledge`, so add `skills` if it's missing. Idempotent — runs again
-  // on tree changes but does nothing when every top folder already has both.
+  // One-time migration: any top-level "Knowledge" / "Instructions" folder
+  // (capitalised — signature of the removed ensureStageFolder auto-creator)
+  // gets its children promoted to true top-level, then the legacy shell is
+  // dropped. Same pass also strips any stray empty top-level `knowledge` or
+  // `skills` folders that may have been backfilled into the legacy shells
+  // before we ripped that code out.
+  //
+  // Then the Stage-4 backfill: every remaining top-level folder should have a
+  // `skills` subfolder beside `knowledge`. Idempotent — runs on tree changes
+  // but does nothing when the tree is already clean.
   useEffect(() => {
-    if (!skillsRevealed || !fileTree?.children) return;
-    let dirty = false;
+    if (!fileTree?.children) return;
+    const legacyNames = new Set(['Knowledge', 'Instructions']);
+    const hasLegacy = fileTree.children.some(c => c.type === 'folder' && legacyNames.has(c.name));
     const updated = JSON.parse(JSON.stringify(fileTree));
-    for (const folder of (updated.children || [])) {
-      if (folder.type !== 'folder') continue;
-      const hasSkills = (folder.children || []).some(c => c.type === 'folder' && c.name === 'skills');
-      if (!hasSkills) {
-        folder.children = folder.children || [];
-        folder.children.push({ id: genId(), name: 'skills', type: 'folder', children: [] });
-        dirty = true;
+    let dirty = false;
+
+    if (hasLegacy) {
+      const survivors = [];
+      const promoted = [];
+      for (const child of updated.children) {
+        if (child.type === 'folder' && legacyNames.has(child.name)) {
+          (child.children || []).forEach(g => promoted.push(g));
+        } else {
+          survivors.push(child);
+        }
+      }
+      updated.children = [...survivors, ...promoted].filter(c => {
+        if (c.type === 'folder'
+            && (c.name === 'knowledge' || c.name === 'skills')
+            && (!c.children || c.children.length === 0)) return false;
+        return true;
+      });
+      dirty = true;
+    }
+
+    if (skillsRevealed) {
+      for (const folder of (updated.children || [])) {
+        if (folder.type !== 'folder') continue;
+        if (legacyNames.has(folder.name)) continue;
+        const hasSkills = (folder.children || []).some(c => c.type === 'folder' && c.name === 'skills');
+        if (!hasSkills) {
+          folder.children = folder.children || [];
+          folder.children.push({ id: genId(), name: 'skills', type: 'folder', children: [] });
+          dirty = true;
+        }
       }
     }
+
     if (dirty) onUpdateTree(updated);
   }, [skillsRevealed, fileTree, onUpdateTree]);
   const isRoot = currentFolder.id === fileTree.id;

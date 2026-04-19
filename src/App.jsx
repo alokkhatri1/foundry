@@ -556,11 +556,19 @@ function App() {
   }
 
   function handleUpdateTree(newTree) {
-    // Convert tree to flat files, update state, sync each file to Supabase
+    // Convert tree to flat files, update state, sync each file to Supabase.
+    // Also diff against the previous flat state to propagate removals: any id
+    // that existed before but is no longer in the new tree gets deleted from
+    // Supabase. This covers explicit deletes (the X button) and implicit ones
+    // (migrations that drop a folder shell), so orphaned rows don't reappear
+    // on the next page load.
     const newFlat = flattenTree(newTree, sb.getRoomId()).map(mapFileRow);
+    const prevIds = new Set((flatFiles || []).map(f => f.id));
+    const newIds = new Set(newFlat.map(f => f.id));
+    const removedIds = [...prevIds].filter(id => !newIds.has(id));
     setFlatFiles(newFlat);
-    // Batch save all files
     sb.saveFilesBatch(flattenTree(newTree, sb.getRoomId()));
+    for (const id of removedIds) sb.deleteFile(id);
     persistLocal({ fileTree: newTree });
   }
 

@@ -127,6 +127,7 @@ export function mapCoworkerRow(row) {
     instructionFileIds: row.instruction_file_ids || [],
     knowledgeFileIds: row.knowledge_file_ids || [],
     toolIds: row.tool_ids || [],
+    toolConfigs: row.tool_configs || {},
     createdBy: row.created_by,
     createdAt: row.created_at ? new Date(row.created_at).getTime() : Date.now(),
   };

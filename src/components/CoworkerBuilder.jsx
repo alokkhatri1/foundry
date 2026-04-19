@@ -177,6 +177,63 @@ Write in second person ("You are...", "You analyze...", "You produce..."). Be sp
   );
 }
 
+// ===== Create File tool config =====
+function CreateFileConfig({ fileTree, currentStage, config, onChange }) {
+  const topFolders = (fileTree?.children || []).filter(c => c.type === 'folder');
+  const folderId = config?.folderId || '';
+  const subfolder = config?.subfolder || 'knowledge';
+  const skillsAvailable = stageReached(currentStage, '4');
+
+  return (
+    <div className="cwb-tool-config">
+      <div className="cwb-tool-config-title">Where should new files go?</div>
+      <div className="cwb-tool-config-row">
+        <label className="cwb-tool-config-label">Folder</label>
+        <select
+          className="cwb-tool-config-select"
+          value={folderId}
+          onChange={e => onChange({ folderId: e.target.value, subfolder })}
+        >
+          <option value="">First available folder</option>
+          {topFolders.map(f => (
+            <option key={f.id} value={f.id}>{f.name}</option>
+          ))}
+        </select>
+      </div>
+      <div className="cwb-tool-config-row">
+        <label className="cwb-tool-config-label">Subfolder</label>
+        <div className="cwb-tool-config-radios">
+          <label className={`cwb-tool-config-radio${subfolder === 'knowledge' ? ' on' : ''}`}>
+            <input
+              type="radio"
+              name={`subfolder-${folderId || 'default'}`}
+              checked={subfolder === 'knowledge'}
+              onChange={() => onChange({ folderId, subfolder: 'knowledge' })}
+            />
+            knowledge
+          </label>
+          <label
+            className={`cwb-tool-config-radio${subfolder === 'skills' ? ' on' : ''}${skillsAvailable ? '' : ' disabled'}`}
+            title={skillsAvailable ? '' : 'Skills unlock at Stage 4'}
+          >
+            <input
+              type="radio"
+              name={`subfolder-${folderId || 'default'}`}
+              checked={subfolder === 'skills'}
+              disabled={!skillsAvailable}
+              onChange={() => onChange({ folderId, subfolder: 'skills' })}
+            />
+            skills
+          </label>
+        </div>
+      </div>
+      {topFolders.length === 0 && (
+        <div className="cwb-tool-config-hint">Create a folder in the Files tab first. Until then, files will land at the top level.</div>
+      )}
+    </div>
+  );
+}
+
 // ===== File Picker =====
 function FilePicker({ fileTree, selectedIds, onChange, folderName }) {
   const [open, setOpen] = useState(false);
@@ -373,23 +430,39 @@ function CoworkerEditor({ coworker, onUpdate, onBack, fileTree, callClaudeAPI, s
                   .map(tool => {
                   const checked = (coworker.toolIds || []).includes(tool.id);
                   return (
-                    <label key={tool.id} className={`cwb-tool-row${checked ? ' checked' : ''}`}>
-                      <input
-                        type="checkbox"
-                        checked={checked}
-                        onChange={e => {
-                          const ids = new Set(coworker.toolIds || []);
-                          if (e.target.checked) ids.add(tool.id);
-                          else ids.delete(tool.id);
-                          onUpdate({ ...coworker, toolIds: Array.from(ids) });
-                        }}
-                      />
-                      <span className="cwb-tool-icon">{tool.icon}</span>
-                      <div className="cwb-tool-info">
-                        <span className="cwb-tool-name">{tool.name}</span>
-                        <span className="cwb-tool-desc">{tool.description}</span>
-                      </div>
-                    </label>
+                    <div key={tool.id} className={`cwb-tool-wrap${checked ? ' checked' : ''}`}>
+                      <label className={`cwb-tool-row${checked ? ' checked' : ''}`}>
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={e => {
+                            const ids = new Set(coworker.toolIds || []);
+                            if (e.target.checked) ids.add(tool.id);
+                            else ids.delete(tool.id);
+                            onUpdate({ ...coworker, toolIds: Array.from(ids) });
+                          }}
+                        />
+                        <span className="cwb-tool-icon">{tool.icon}</span>
+                        <div className="cwb-tool-info">
+                          <span className="cwb-tool-name">{tool.name}</span>
+                          <span className="cwb-tool-desc">{tool.description}</span>
+                        </div>
+                      </label>
+                      {checked && tool.id === 'builtin-create-file' && (
+                        <CreateFileConfig
+                          fileTree={fileTree}
+                          currentStage={currentStage}
+                          config={coworker.toolConfigs?.['builtin-create-file']}
+                          onChange={next => onUpdate({
+                            ...coworker,
+                            toolConfigs: {
+                              ...(coworker.toolConfigs || {}),
+                              'builtin-create-file': next,
+                            },
+                          })}
+                        />
+                      )}
+                    </div>
                   );
                 })}
                 {(tools || []).filter(t => t.isBuiltin && stageReached(currentStage, TOOL_REVEAL_STAGE[t.id] || '5b')).length === 0 && (

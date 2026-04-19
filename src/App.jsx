@@ -834,19 +834,25 @@ function App() {
                 type: 'file',
                 content,
               };
-              // Preferred destination: inside the first user-created top-level
-              // folder's knowledge subfolder, so coworker output lands next to
-              // the other knowledge the user has been building. Fall back to
-              // the top level if no dept folder exists yet.
-              const firstDept = newTree.children.find(c => c.type === 'folder');
-              if (firstDept) {
-                firstDept.children = firstDept.children || [];
-                const knowledge = firstDept.children.find(c => c.type === 'folder' && c.name === 'knowledge');
-                if (knowledge) {
-                  knowledge.children = knowledge.children || [];
-                  knowledge.children.push(newFile);
+              // Destination precedence:
+              //   1. coworker.toolConfigs['builtin-create-file'].folderId + subfolder
+              //   2. first top-level folder's knowledge subfolder (fallback)
+              //   3. top level (no folders exist yet)
+              const cfg = coworker?.toolConfigs?.['builtin-create-file'];
+              const configuredFolder = cfg?.folderId
+                ? newTree.children.find(c => c.id === cfg.folderId && c.type === 'folder')
+                : null;
+              const targetFolder = configuredFolder
+                || newTree.children.find(c => c.type === 'folder');
+              const subName = cfg?.subfolder === 'skills' ? 'skills' : 'knowledge';
+              if (targetFolder) {
+                targetFolder.children = targetFolder.children || [];
+                const sub = targetFolder.children.find(c => c.type === 'folder' && c.name === subName);
+                if (sub) {
+                  sub.children = sub.children || [];
+                  sub.children.push(newFile);
                 } else {
-                  firstDept.children.push(newFile);
+                  targetFolder.children.push(newFile);
                 }
               } else {
                 newTree.children.push(newFile);

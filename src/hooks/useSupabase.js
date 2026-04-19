@@ -185,6 +185,7 @@ export default function useSupabase() {
         instruction_file_ids: cw.instructionFileIds || [],
         knowledge_file_ids: cw.knowledgeFileIds || [],
         tool_ids: cw.toolIds || [],
+        tool_configs: cw.toolConfigs || {},
         created_by: 'System',
       }, { onConflict: 'id' });
     }
@@ -531,6 +532,7 @@ export default function useSupabase() {
       instruction_file_ids: cw.instructionFileIds || [],
       knowledge_file_ids: cw.knowledgeFileIds || [],
       tool_ids: cw.toolIds || [],
+      tool_configs: cw.toolConfigs || {},
       created_by: cw.createdBy, updated_at: new Date().toISOString(),
     }, { onConflict: 'id' });
     if (error) { console.error('[sb] saveCoworker:', error.message); return; }

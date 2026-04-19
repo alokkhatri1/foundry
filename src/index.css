@@ -1982,12 +1982,20 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
 .wf-canvas-node .cwb-section + .cwb-section { margin-top: 10px; }
 .wf-canvas-node .cwb-section-title { font-size: 11px; margin-bottom: 0; }
 .wf-canvas-node .cwb-section-desc { font-size: 11px; margin: 2px 0 8px; line-height: 1.35; color: var(--text-muted); }
-.wf-canvas-node .cwb-section-identity { padding: 10px 12px; }
+.wf-canvas-node .cwb-section-identity { padding: 8px 12px; }
 .wf-canvas-node .cwb-identity { gap: 10px; }
-.wf-canvas-node .cwb-identity-avatar-btn { width: 38px; height: 38px; border-radius: 10px; }
-.wf-canvas-node .cwb-name-input { font-size: 15px; font-weight: 700; }
+.wf-canvas-node .cwb-identity-avatar-btn { width: 34px; height: 34px; border-radius: 8px; }
+.wf-canvas-node .cwb-name-input { font-size: 14px; font-weight: 700; }
 .wf-canvas-node .cwb-desc-gen { margin-top: 6px; display: flex; flex-direction: column; gap: 6px; }
-.wf-canvas-node .cwb-desc-input { min-height: 84px; padding: 10px 12px; font-size: 13px; line-height: 1.45; }
+/* Force textarea to a short initial height regardless of the rows attribute.
+   User can still resize down/up via the textarea's corner grip. */
+.wf-canvas-node .cwb-desc-input {
+  height: 72px;
+  min-height: 56px;
+  padding: 8px 10px;
+  font-size: 13px;
+  line-height: 1.45;
+}
 .wf-canvas-node .cwb-desc-gen-btn { padding: 6px 12px; font-size: 12px; align-self: flex-start; }
 .wf-canvas-node .ftp-selected { gap: 6px; }
 .validation-error { color: var(--accent-error); font-size: 12px; margin-top: 4px; padding: 4px 8px; background: #fdf0f0; border-radius: 4px; }

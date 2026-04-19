@@ -246,36 +246,6 @@ export function createStarterCoworkers() {
 
 export const BUILTIN_TOOLS = [
   {
-    id: 'builtin-search',
-    name: 'Knowledge Search',
-    type: 'lookup',
-    description: 'Searches knowledge files for relevant information by keyword. Use this when you need to find specific policies, rules, or reference material.',
-    icon: '\uD83D\uDD0D',
-    isBuiltin: true,
-    createdBy: 'System',
-    config: {
-      templateId: 'file_search',
-      parameters: [
-        { name: 'query', label: 'Search Query', type: 'string', required: true, description: 'Keywords to search for' },
-      ],
-    },
-  },
-  {
-    id: 'builtin-notify',
-    name: 'Chat Notification',
-    type: 'communicate',
-    description: 'Posts a notification message to the shared chat channel. Use this when you need to alert the team about something important.',
-    icon: '\uD83D\uDD14',
-    isBuiltin: true,
-    createdBy: 'System',
-    config: {
-      templateId: 'send_chat_message',
-      parameters: [
-        { name: 'message', label: 'Message', type: 'string', required: true, description: 'Message to post' },
-      ],
-    },
-  },
-  {
     id: 'builtin-research',
     name: 'Research',
     type: 'research',
@@ -310,15 +280,14 @@ export const BUILTIN_TOOLS = [
     id: 'builtin-ask-human',
     name: 'Ask Human',
     type: 'communicate',
-    description: 'Ask a specific human teammate a question and wait for their reply. Use when you need a human\'s judgment, confirmation, or missing information to finish the task. The reply is returned to you so you can continue with it in context.',
+    description: 'Ask a human teammate a question and wait for their reply. Use when you need a human\'s judgment, confirmation, or missing information to finish the task. The user will pick which human to ask — you only provide the question. The reply is returned to you so you can continue with it in context.',
     icon: '\uD83D\uDC4B',
     isBuiltin: true,
     createdBy: 'System',
     config: {
       templateId: 'ask_human',
       parameters: [
-        { name: 'recipient_name', label: 'Recipient', type: 'string', required: true, description: 'Full name of an online workshop participant' },
-        { name: 'question', label: 'Question', type: 'string', required: true, description: 'The specific question or item to check with them' },
+        { name: 'question', label: 'Question', type: 'string', required: true, description: 'The specific question or item to check with the human. Be clear and self-contained — they will see this verbatim.' },
       ],
     },
   },
@@ -384,8 +353,9 @@ export function createStarterTools() {
 export function ensurePrebuiltTools(existingTools) {
   if (!existingTools) return createStarterTools();
 
-  // Keep only connectors (type=connect) and built-in tools — drop all legacy prebuilt/user tools
-  let tools = existingTools.filter(t => t.isBuiltin || t.type === 'connect');
+  const currentBuiltinIds = new Set(BUILTIN_TOOLS.map(t => t.id));
+  // Keep only current builtins and connectors — drops legacy/retired builtins too
+  let tools = existingTools.filter(t => (t.isBuiltin && currentBuiltinIds.has(t.id)) || t.type === 'connect');
 
   const currentIds = new Set(tools.map(t => t.id));
 

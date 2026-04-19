@@ -45,7 +45,7 @@ function AssistantAvatar({ label, coworkerAvatar }) {
   return <div className="cl-avatar cl-avatar-ai">{letter}</div>;
 }
 
-function ChatMessage({ msg, onApprovalAction, onRetry, participants, showEducationalCues }) {
+function ChatMessage({ msg, onApprovalAction, onPickRecipient, onRetry, participants, currentUserName, showEducationalCues }) {
   const [comment, setComment] = useState('');
   const sender = msg.participantName ? participants?.find(p => p.name === msg.participantName) : null;
 
@@ -159,6 +159,45 @@ function ChatMessage({ msg, onApprovalAction, onRetry, participants, showEducati
 
   if (msg.type === 'tool_execution') {
     return <ToolExecutionCard msg={msg} />;
+  }
+
+  if (msg.type === 'recipient-picker') {
+    const isResolved = msg.status === 'resolved';
+    const onlineHumans = (participants || []).filter(p => p.online && (p.kind || 'human') === 'human' && p.name !== currentUserName);
+    return (
+      <div className="cl-row cl-row-ai">
+        <AssistantAvatar label={msg.coworkerName || 'AI'} coworkerAvatar={msg.coworkerAvatar} />
+        <div className="cl-bubble cl-bubble-approval">
+          <div className="cl-bubble-label approval">{msg.coworkerName || 'Coworker'} needs a human</div>
+          <div className="cl-bubble-content">{msg.question}</div>
+          {!isResolved && (
+            <>
+              <div className="cl-picker-prompt">Pick who to ask:</div>
+              {onlineHumans.length === 0 ? (
+                <div className="cl-picker-empty">No humans are currently online.</div>
+              ) : (
+                <div className="cl-picker-list">
+                  {onlineHumans.map(p => (
+                    <button
+                      key={p.id || p.name}
+                      className="cl-picker-chip"
+                      style={p.color ? { borderColor: p.color } : undefined}
+                      onClick={() => onPickRecipient && onPickRecipient(msg.id, p.name)}
+                    >
+                      <span className="cl-picker-dot" style={{ background: p.color || '#5a9e6f' }} />
+                      {p.name}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </>
+          )}
+          {isResolved && (
+            <div className="cl-approval-resolved">Asked {msg.resolvedRecipient}</div>
+          )}
+        </div>
+      </div>
+    );
   }
 
   if (msg.type === 'direct-response') {
@@ -423,7 +462,7 @@ function InlineEditor({ file, onUpdateContent, onClose }) {
 }
 
 // ===== Main ChatPanel =====
-export default function ChatPanel({ messages, onSendMessage, onApprovalAction, onRetry, isLoading, participants, currentUserName, fileTree, onUpdateFileContent, coworkers, showEducationalCues, conversations, activeConvoId, onNewChat, onSelectConvo, onDeleteConvo, onCoworkerChange, currentStage, activeDm, onOpenDm, onCloseDm, myParticipantId, sb, unreadDmCounts }) {
+export default function ChatPanel({ messages, onSendMessage, onApprovalAction, onPickRecipient, onRetry, isLoading, participants, currentUserName, fileTree, onUpdateFileContent, coworkers, showEducationalCues, conversations, activeConvoId, onNewChat, onSelectConvo, onDeleteConvo, onCoworkerChange, currentStage, activeDm, onOpenDm, onCloseDm, myParticipantId, sb, unreadDmCounts }) {
   const [input, setInput] = useState('');
   const [selectedFileIds, setSelectedFileIds] = useState([]);
   const [editingFileId, setEditingFileId] = useState(null);
@@ -756,7 +795,7 @@ export default function ChatPanel({ messages, onSendMessage, onApprovalAction, o
                   if ((m.type === 'approval' || m.type === 'workflow_start' || m.type === 'workflow_end') && !stageReached(currentStage, '7')) return false;
                   return true;
                 }).map((msg, i) => (
-                  <ChatMessage key={msg.id || i} msg={msg} onApprovalAction={onApprovalAction} onRetry={onRetry} participants={participants} showEducationalCues={showEducationalCues} />
+                  <ChatMessage key={msg.id || i} msg={msg} onApprovalAction={onApprovalAction} onPickRecipient={onPickRecipient} onRetry={onRetry} participants={participants} currentUserName={currentUserName} showEducationalCues={showEducationalCues} />
                 ))}
               </div>
             </div>

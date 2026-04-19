@@ -1,7 +1,14 @@
 import { useState, useRef } from 'react';
 import EducationalCue from './EducationalCue';
 import Icon, { COWORKER_ICONS, hasIcon } from './Icon';
-import RevealAt from './RevealAt';
+import RevealAt, { stageReached } from './RevealAt';
+
+const TOOL_REVEAL_STAGE = {
+  'builtin-research': '5b',
+  'builtin-process-doc': '5b',
+  'builtin-dm': '5c',
+  'builtin-ask-human': '5c',
+};
 
 let cwCounter = Date.now();
 function genCwId() { return 'cw-' + (cwCounter++); }
@@ -354,7 +361,10 @@ function CoworkerEditor({ coworker, onUpdate, onBack, fileTree, callClaudeAPI, s
               <h3 className="cwb-section-title">Tools</h3>
               <p className="cwb-section-desc">Capabilities this coworker can invoke during a conversation. Pick which tools they can use.</p>
               <div className="cwb-tools-list">
-                {(tools || []).filter(t => t.isBuiltin).map(tool => {
+                {(tools || [])
+                  .filter(t => t.isBuiltin)
+                  .filter(t => stageReached(currentStage, TOOL_REVEAL_STAGE[t.id] || '5b'))
+                  .map(tool => {
                   const checked = (coworker.toolIds || []).includes(tool.id);
                   return (
                     <label key={tool.id} className={`cwb-tool-row${checked ? ' checked' : ''}`}>
@@ -376,7 +386,7 @@ function CoworkerEditor({ coworker, onUpdate, onBack, fileTree, callClaudeAPI, s
                     </label>
                   );
                 })}
-                {(tools || []).filter(t => t.isBuiltin).length === 0 && (
+                {(tools || []).filter(t => t.isBuiltin && stageReached(currentStage, TOOL_REVEAL_STAGE[t.id] || '5b')).length === 0 && (
                   <p style={{ fontSize: 13, color: 'var(--text-muted, #888)', padding: 8 }}>No tools available yet.</p>
                 )}
               </div>

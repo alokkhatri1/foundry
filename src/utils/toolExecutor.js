@@ -138,12 +138,11 @@ const COMMUNICATE_TEMPLATES = {
   ask_human: {
     name: 'Ask Human',
     parameters: [
-      { name: 'recipient_name', label: 'Recipient', type: 'string', required: true, description: 'Full name of an online workshop participant' },
       { name: 'question', label: 'Question', type: 'string', required: true, description: 'The question or item to check with the human' },
     ],
     async execute(p, onMessage, onSendDm, onAskHuman) {
       if (!onAskHuman) return { success: false, output: 'Asking humans is not available in this context.' };
-      return await onAskHuman(p.recipient_name, p.question);
+      return await onAskHuman(p.question);
     },
   },
   notify_person: {

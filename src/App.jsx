@@ -248,6 +248,9 @@ function App() {
   // When a matching DM reply arrives, the resolver fires with the reply content
   // and is removed. First-reply-wins.
   const askHumanResolversRef = useRef(new Map());
+  // Pending recipient-picker resolvers, keyed by picker message id. When the
+  // user clicks a human in the picker, the resolver fires with that name.
+  const pickRecipientResolversRef = useRef(new Map());
   const activeTabRef = useRef(activeTab);
 
   useEffect(() => { activeTabRef.current = activeTab; }, [activeTab]);
@@ -838,7 +841,7 @@ function App() {
               if (sent?.data) return { success: true, output: `Message sent to ${recipientName}.` };
               return { success: false, output: `Failed to send message: ${sent?.error || 'unknown error'}` };
             },
-            onAskHuman: async (recipientName, question) => {
+            onAskHuman: async (question) => {
               if (!coworker?.id) {
                 return { success: false, output: 'Ask Human is only available when a specific AI coworker is running the tool.' };
               }
@@ -846,13 +849,25 @@ function App() {
               if (!coworkerParticipantId) {
                 return { success: false, output: 'AI coworker is not set up as a DM participant yet. Try again after saving the coworker.' };
               }
+              // Surface a picker in the chat — user chooses which online human to ask.
+              const pickId = 'pick-' + Date.now() + '-' + Math.random().toString(36).slice(2, 7);
+              addMessage({
+                id: pickId,
+                type: 'recipient-picker',
+                question,
+                coworkerName: coworker.name,
+                coworkerAvatar: coworker.avatar,
+                status: 'pending',
+              });
+              const recipientName = await new Promise((resolve) => {
+                pickRecipientResolversRef.current.set(pickId, resolve);
+              });
+              if (!recipientName) {
+                return { success: false, output: 'No recipient was picked.' };
+              }
               const humanId = await sb.findParticipantIdByName(recipientName);
               if (!humanId) {
-                return { success: false, output: `Could not find a workshop participant named "${recipientName}". Make sure the name matches exactly and they are in the workshop.` };
-              }
-              const online = participants.find(p => p.name === recipientName && p.online);
-              if (!online) {
-                return { success: false, output: `${recipientName} is not currently online. Ask someone who is live in the workshop right now.` };
+                return { success: false, output: `Could not find a workshop participant named "${recipientName}".` };
               }
               const sent = await sb.sendDm(coworkerParticipantId, humanId, question);
               if (!sent?.data) {
@@ -1092,6 +1107,16 @@ function App() {
     sb.logApproval({ runId, action, comment, resolvedBy: userName });
   }
 
+  function handlePickRecipient(pickId, recipientName) {
+    const resolver = pickRecipientResolversRef.current.get(pickId);
+    if (!resolver) return;
+    pickRecipientResolversRef.current.delete(pickId);
+    updateActiveMessages(prev => prev.map(m =>
+      m.id === pickId ? { ...m, status: 'resolved', resolvedRecipient: recipientName } : m
+    ));
+    resolver(recipientName);
+  }
+
   function handleNudge(runId) {
     const run = workflowRuns.find(r => r.id === runId);
     if (!run) return;
@@ -1126,11 +1151,7 @@ function App() {
       // ask_human to route correctly.
       let collabSection = '';
       if (stageReached(currentStage, '5c')) {
-        const liveHumans = (participants || []).filter(p => p.online && (p.kind || 'human') === 'human' && p.name !== targetCoworker.name);
-        const list = liveHumans.length > 0
-          ? liveHumans.map(p => `- ${p.name}`).join('\n')
-          : '- (nobody is online right now — the ask_human tool will fail until someone joins)';
-        collabSection = `\n\n## Live humans you can ask\n${list}\n\nWhen you genuinely need a human's judgment, confirmation, or a missing piece of information, call the Ask Human tool with their exact name and a clear question. Wait for the reply; incorporate it before concluding. Use this sparingly — only when the task actually needs a human.`;
+        collabSection = `\n\n## Reaching a human\n\nWhen you genuinely need a human's judgment, confirmation, or a missing piece of information, call the Ask Human tool with a clear, self-contained question. You do not pick who to ask — the user at the keyboard will pick a live human teammate for you. Wait for the reply; incorporate it before concluding. Use this sparingly — only when the task actually needs a human.`;
       }
       systemPrompt = [
         targetCoworker.role ? `## Role\n${targetCoworker.role}\n` : '',
@@ -1451,6 +1472,7 @@ Be concise. Confirm actions after completing them.${knowledgeSection}`;
               messages={messages}
               onSendMessage={handleSendMessage}
               onApprovalAction={handleApprovalAction}
+              onPickRecipient={handlePickRecipient}
               isLoading={isLoading}
               participants={participants}
               currentUserName={userName}

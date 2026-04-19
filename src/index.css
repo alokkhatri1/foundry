@@ -1626,6 +1626,49 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
   color: var(--text-muted);
 }
 
+/* Recipient picker (Ask Human) */
+.cl-picker-prompt {
+  margin-top: 12px;
+  margin-bottom: 8px;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+.cl-picker-empty {
+  margin-top: 10px;
+  font-size: 13px;
+  color: var(--text-muted);
+  font-style: italic;
+}
+.cl-picker-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.cl-picker-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 12px;
+  border-radius: 999px;
+  border: 1.5px solid var(--border-color);
+  background: var(--bg-white);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-dark);
+  cursor: pointer;
+  transition: transform 0.08s ease, box-shadow 0.08s ease;
+}
+.cl-picker-chip:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+}
+.cl-picker-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
 /* Loading animation */
 .cl-loading {
   display: flex;

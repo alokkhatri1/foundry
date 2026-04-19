@@ -147,12 +147,11 @@ function styleEdge(e) {
 }
 
 // ===== Step Card =====
-function StepCard({ step, index, coworkers, tools, participants, onUpdate, onDelete, expanded, onToggleExpand, validationErrors, allSteps, currentStepId, stepResult, isDragging, dragOverPos, onDragStart, onDragOver, onDragEnd, onDrop, showEducationalCues, onCanvas, fileTree, callClaudeAPI, onSaveCoworkerToLibrary }) {
+function StepCard({ step, index, coworkers, tools, participants, onUpdate, onDelete, expanded, onToggleExpand, validationErrors, allSteps, currentStepId, stepResult, isDragging, dragOverPos, onDragStart, onDragOver, onDragEnd, onDrop, showEducationalCues, onCanvas, fileTree, callClaudeAPI }) {
   const isRunning = currentStepId === step.id;
   const assignedCw = step.type === 'agent' ? resolveStepCoworker(step, coworkers) : null;
   const assignedPerson = step.assigneeId ? participants?.find(p => p.id === step.assigneeId) : null;
   const [showAvatarPicker, setShowAvatarPicker] = useState(false);
-  const [libraryState, setLibraryState] = useState('idle');
 
   // Ensure the agent step has an embedded coworker object before edits fire.
   // Old-style steps that only have coworkerId seed their embedded coworker
@@ -168,24 +167,6 @@ function StepCard({ step, index, coworkers, tools, participants, onUpdate, onDel
     // Drop the legacy coworkerId reference once we own a local copy.
     const { coworkerId: _drop, ...rest } = step;
     onUpdate({ ...rest, coworker: next });
-  }
-
-  function handleSaveToLibrary() {
-    if (!onSaveCoworkerToLibrary) return;
-    const snapshot = step.coworker || assignedCw;
-    if (!snapshot?.name?.trim()) return;
-    onSaveCoworkerToLibrary({
-      name: snapshot.name,
-      role: snapshot.role || '',
-      avatar: snapshot.avatar || 'icon:user',
-      color: snapshot.color || '#4a7fb5',
-      instructionFileIds: snapshot.instructionFileIds || [],
-      knowledgeFileIds: snapshot.knowledgeFileIds || [],
-      toolIds: snapshot.toolIds || [],
-      toolConfigs: snapshot.toolConfigs || {},
-    });
-    setLibraryState('saved');
-    setTimeout(() => setLibraryState('idle'), 2000);
   }
 
   // Live run state derived from the run's stepResults entry.
@@ -366,19 +347,6 @@ function StepCard({ step, index, coworkers, tools, participants, onUpdate, onDel
                   </div>
 
                   {validationErrors?.noAgent && <div className="validation-error">Name the coworker before running</div>}
-
-                  <div className="step-library-row">
-                    <button
-                      type="button"
-                      className="step-library-btn"
-                      onClick={handleSaveToLibrary}
-                      disabled={!cw.name?.trim() || libraryState === 'saved'}
-                      title={cw.name?.trim() ? 'Push a copy of this coworker to the Coworkers tab for future reuse' : 'Name the coworker first'}
-                    >
-                      {libraryState === 'saved' ? '\u2713 Saved to Coworkers tab' : 'Save to Coworkers tab'}
-                    </button>
-                    <span className="step-library-hint">Copies the current state to the Coworkers tab. The two are independent thereafter.</span>
-                  </div>
                 </>
               );
             })()}

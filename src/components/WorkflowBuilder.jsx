@@ -20,41 +20,6 @@ function getAllFolders(tree, path = []) {
   return folders;
 }
 
-// ===== Visual Flow Summary =====
-function FlowSummary({ steps, coworkers, participants }) {
-  if (steps.length === 0) return null;
-
-  return (
-    <div className="wf-flow">
-      {steps.map((step, i) => {
-        const cw = step.coworkerId ? coworkers?.find(c => c.id === step.coworkerId) : null;
-        const person = step.assigneeId ? participants?.find(p => p.id === step.assigneeId) : null;
-        const color = step.type === 'agent' ? (cw?.color || '#4a7fb5')
-          : step.type === 'approval' ? (person?.color || '#e8a87c')
-          : '#5a9e6f';
-        const label = step.type === 'agent' ? (cw?.name || step.name)
-          : step.type === 'approval' ? (person?.name || 'Reviewer')
-          : step.name;
-        const iconNode = step.type === 'agent'
-          ? <CoworkerGlyph avatar={cw?.avatar} size={14} color="#ffffff" />
-          : step.type === 'approval'
-            ? (person ? person.name.charAt(0).toUpperCase() : '\uD83D\uDC64')
-            : '\u2699\uFE0F';
-
-        return (
-          <div key={step.id} className="wf-flow-item">
-            {i > 0 && <span className="wf-flow-arrow">{'\u2192'}</span>}
-            <div className={`wf-flow-node ${step.type}`} style={{ borderColor: color }}>
-              <span className="wf-flow-icon" style={{ background: color }}>{iconNode}</span>
-              <span className="wf-flow-label">{label}</span>
-            </div>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
 // ===== Step Card =====
 function StepCard({ step, index, coworkers, tools, participants, onUpdate, onDelete, expanded, onToggleExpand, validationErrors, allSteps, currentStepId, isDragging, dragOverPos, onDragStart, onDragOver, onDragEnd, onDrop, showEducationalCues }) {
   const isRunning = currentStepId === step.id;
@@ -82,7 +47,7 @@ function StepCard({ step, index, coworkers, tools, participants, onUpdate, onDel
           <span className="step-drag-handle" title="Drag to reorder">{'\u2630'}</span>
           <span className={`step-number ${step.type}`}>{index + 1}</span>
           <span className={`step-type-label ${step.type}`}>
-            {step.type === 'agent' ? 'Agent' : step.type === 'approval' ? 'Human' : 'Tool'}
+            {step.type === 'agent' ? 'Coworker' : 'Review'}
           </span>
           {assignee && (
             <span className="step-assignee-badge" style={{ background: assignee.color || '#ccc' }}>
@@ -174,15 +139,6 @@ function StepCard({ step, index, coworkers, tools, participants, onUpdate, onDel
 }
 
 // ===== Workflow Editor =====
-const TRIGGER_TYPES = [
-  { value: 'manual', label: 'Manual Submit', icon: '\uD83D\uDCE5', desc: 'Someone uploads documents and submits a case' },
-  { value: 'folder', label: 'Folder Upload', icon: '\uD83D\uDCC1', desc: 'In production: files added to a shared drive trigger this workflow' },
-  { value: 'api', label: 'API / Webhook', icon: '\uD83D\uDD17', desc: 'In production: your CRM, ERP, or other system sends a request' },
-  { value: 'email', label: 'Email', icon: '\uD83D\uDCE7', desc: 'In production: an email to loans@your-bank.com triggers this' },
-  { value: 'schedule', label: 'Scheduled', icon: '\u23F0', desc: 'In production: runs automatically on a schedule (e.g., daily at 9 AM)' },
-  { value: 'form', label: 'Form Submission', icon: '\uD83D\uDCDD', desc: 'In production: a customer fills out an online form' },
-];
-
 function WorkflowEditor({ workflow, onUpdateWorkflow, fileTree, coworkers, tools, participants, onRun, isRunning, currentStepId, onBack, showEducationalCues }) {
   const [expandedStep, setExpandedStep] = useState(null);
   const [showAddMenu, setShowAddMenu] = useState(false);
@@ -271,36 +227,13 @@ function WorkflowEditor({ workflow, onUpdateWorkflow, fileTree, coworkers, tools
           placeholder="Orchestration name..."
         />
         <button className="run-btn" onClick={() => setShowSubmit(true)} disabled={isRunning || workflow.steps.length === 0}>
-          {isRunning ? 'Running...' : '\uD83D\uDCE5 Submit Case'}
+          {isRunning ? 'Running\u2026' : 'Run'}
         </button>
       </div>
 
-      {/* Trigger type config */}
-      <div className="wf-trigger-bar">
-        <span className="wf-trigger-label">Trigger:</span>
-        <div className="wf-trigger-pills">
-          {TRIGGER_TYPES.map(t => (
-            <button
-              key={t.value}
-              className={`wf-trigger-pill${(workflow.triggerType || 'manual') === t.value ? ' active' : ''}`}
-              onClick={() => onUpdateWorkflow({ ...workflow, triggerType: t.value })}
-              title={t.desc}
-            >
-              <span>{t.icon}</span> {t.label}
-            </button>
-          ))}
-        </div>
-      </div>
-      {(workflow.triggerType && workflow.triggerType !== 'manual') && (
-        <div className="wf-trigger-note">
-          <span className="wf-trigger-note-icon">{TRIGGER_TYPES.find(t => t.value === workflow.triggerType)?.icon}</span>
-          <span>{TRIGGER_TYPES.find(t => t.value === workflow.triggerType)?.desc}</span>
-          <span className="wf-trigger-note-sim">In Foundry, use "Submit Case" to simulate this trigger.</span>
-        </div>
-      )}
       {/* Destination for final output — set once per workflow, used to auto-save on completion */}
-      <div className="wf-trigger-bar">
-        <span className="wf-trigger-label">Saves to:</span>
+      <div className="wf-destination-bar">
+        <span className="wf-destination-label">Saves to</span>
         <select
           className="wf-destination-select"
           value={workflow.destination?.folderId || ''}
@@ -318,39 +251,28 @@ function WorkflowEditor({ workflow, onUpdateWorkflow, fileTree, coworkers, tools
           {['knowledge', 'skills'].map(sub => {
             const active = (workflow.destination?.subfolder || 'knowledge') === sub;
             return (
-              <label key={sub} className={`wf-trigger-pill${active ? ' active' : ''}`}>
-                <input
-                  type="radio"
-                  name="wf-destination-subfolder"
-                  checked={active}
-                  onChange={() => onUpdateWorkflow({
-                    ...workflow,
-                    destination: { ...(workflow.destination || {}), subfolder: sub },
-                  })}
-                  style={{ display: 'none' }}
-                />
+              <button
+                key={sub}
+                type="button"
+                className={`wf-destination-sub-pill${active ? ' active' : ''}`}
+                onClick={() => onUpdateWorkflow({
+                  ...workflow,
+                  destination: { ...(workflow.destination || {}), subfolder: sub },
+                })}
+              >
                 {sub}
-              </label>
+              </button>
             );
           })}
         </div>
-      </div>
-      <div style={{ padding: '0 24px' }}>
-        <EducationalCue cueId="workflow-triggers" show={showEducationalCues} />
-        {(workflow.triggerType || 'manual') === 'manual' && <EducationalCue cueId="trigger-manual" show={showEducationalCues} />}
-        {workflow.triggerType === 'folder' && <EducationalCue cueId="trigger-folder" show={showEducationalCues} />}
-        {workflow.triggerType === 'api' && <EducationalCue cueId="trigger-api" show={showEducationalCues} />}
-        {workflow.triggerType === 'email' && <EducationalCue cueId="trigger-email" show={showEducationalCues} />}
-        {workflow.triggerType === 'schedule' && <EducationalCue cueId="trigger-schedule" show={showEducationalCues} />}
-        {workflow.triggerType === 'form' && <EducationalCue cueId="trigger-form" show={showEducationalCues} />}
       </div>
 
       {/* Submit Case Modal */}
       {showSubmit && (
         <div className="modal-overlay" onClick={() => setShowSubmit(false)}>
           <div className="modal-box" style={{ maxWidth: 520 }} onClick={e => e.stopPropagation()}>
-            <h3>Submit Case</h3>
-            <p>Upload documents and describe the case. This will trigger the workflow.</p>
+            <h3>Run orchestration</h3>
+            <p>Describe the input for this run. Step 1 sees this; subsequent steps receive upstream outputs automatically.</p>
 
             <div className="submit-case-field">
               <label>Case Description (optional)</label>
@@ -419,16 +341,11 @@ function WorkflowEditor({ workflow, onUpdateWorkflow, fileTree, coworkers, tools
                   setSubmitFiles([]);
                 }}
               >
-                Submit & Run Orchestration
+                Run
               </button>
             </div>
           </div>
         </div>
-      )}
-
-      {/* Visual flow summary */}
-      {workflow.steps.length > 0 && (
-        <FlowSummary steps={workflow.steps} coworkers={coworkers} participants={participants} />
       )}
 
       <div className="workflow-steps">
@@ -441,7 +358,7 @@ function WorkflowEditor({ workflow, onUpdateWorkflow, fileTree, coworkers, tools
           <div className="no-steps-placeholder">
             <div>
               <p style={{ fontSize: 16, fontWeight: 600, marginBottom: 8 }}>Build your process</p>
-              <p>Add agent steps, human review gates, and system actions to create your workflow.</p>
+              <p>Chain coworker steps and human reviews. Click + Add Step below.</p>
             </div>
           </div>
         )}

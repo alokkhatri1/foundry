@@ -1415,10 +1415,28 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
   background: var(--bg-warm);
   border-radius: var(--radius-sm);
 }
+.wf-destination-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 24px;
+  border-bottom: 1px solid var(--border-color);
+  background: var(--bg-warm);
+  flex-wrap: wrap;
+}
+.wf-destination-label {
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+}
 .wf-destination-select {
-  padding: 6px 10px;
+  flex: 1;
+  max-width: 320px;
+  padding: 7px 12px;
   border: 1px solid var(--border-color);
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-pill, 999px);
   font-size: 13px;
   background: var(--bg-white);
   color: var(--text-dark);
@@ -1427,7 +1445,26 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
 .wf-destination-subfolder {
   display: inline-flex;
   gap: 4px;
-  margin-left: 4px;
+  padding: 3px;
+  background: var(--bg-white);
+  border-radius: var(--radius-pill, 999px);
+  border: 1px solid var(--border-color);
+}
+.wf-destination-sub-pill {
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-pill, 999px);
+  padding: 4px 14px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s;
+}
+.wf-destination-sub-pill:hover { color: var(--text-body); }
+.wf-destination-sub-pill.active {
+  background: var(--text-dark);
+  color: #fff;
 }
 .knowledge-checkboxes { display: flex; flex-direction: column; gap: 6px; margin-top: 4px; }
 .knowledge-checkboxes label { display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 400; color: var(--text-dark); cursor: pointer; }
@@ -2816,9 +2853,6 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
 .sl-channel-dot.on::after { transform: translateX(12px); background: white; }
 .sl-channel-dot:hover { background: rgba(255,255,255,0.2); }
 .sl-channel-dot.on:hover { background: #4db86a; }
-.sl-channel-dot.partial { background: rgba(90, 158, 111, 0.55); }
-.sl-channel-dot.partial::after { transform: translateX(6px); background: white; }
-.sl-channel-dot.partial:hover { background: rgba(90, 158, 111, 0.75); }
 
 /* People items */
 .sl-dm {

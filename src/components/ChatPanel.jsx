@@ -452,9 +452,7 @@ function ContextSidebar({ fileTree, selectedFileIds, onToggleFile, onToggleFolde
               {!isDeptCollapsed && dept.subfolders.map(subfolder => {
                 const isCollapsed = collapsedSections[subfolder.id];
                 const subfolderFileIds = subfolder.files.map(f => f.id);
-                const selectedInFolder = subfolderFileIds.filter(id => selectedFileIds.includes(id)).length;
-                const folderAllOn = subfolderFileIds.length > 0 && selectedInFolder === subfolderFileIds.length;
-                const folderPartial = selectedInFolder > 0 && !folderAllOn;
+                const folderAllOn = subfolderFileIds.length > 0 && subfolderFileIds.every(id => selectedFileIds.includes(id));
                 return (
                   <div key={subfolder.id} className="sl-channel-group">
                     <div className="sl-group-header" onClick={() => toggleSection(subfolder.id)}>
@@ -462,9 +460,9 @@ function ContextSidebar({ fileTree, selectedFileIds, onToggleFile, onToggleFolde
                       <span className="sl-group-name">{subfolder.name}</span>
                       {subfolderFileIds.length > 0 && (
                         <span
-                          className={`sl-channel-dot${folderAllOn ? ' on' : ''}${folderPartial ? ' partial' : ''}`}
+                          className={`sl-channel-dot${folderAllOn ? ' on' : ''}`}
                           onClick={e => { e.stopPropagation(); onToggleSubfolder(subfolderFileIds); }}
-                          title={folderAllOn ? 'Remove folder from context' : folderPartial ? `Add the remaining ${subfolderFileIds.length - selectedInFolder} file${subfolderFileIds.length - selectedInFolder === 1 ? '' : 's'}` : `Add all ${subfolderFileIds.length} file${subfolderFileIds.length === 1 ? '' : 's'} as context`}
+                          title={folderAllOn ? 'Remove folder from context' : `Add all ${subfolderFileIds.length} file${subfolderFileIds.length === 1 ? '' : 's'} as context`}
                         ></span>
                       )}
                     </div>

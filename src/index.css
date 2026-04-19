@@ -3453,6 +3453,39 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
   display: flex; align-items: center; gap: 10px; padding: 12px 16px;
   font-size: 13px; color: var(--text-muted); border-top: 1px solid var(--border-color);
 }
+/* Decision log — shown when a Review step is expanded in RunDetail. Each
+   entry is one decision (Approve/Reject) with who, when, and any comment
+   they left. Visible to everyone in the room via realtime sync. */
+.rdetail-step-decisionlog { padding: 12px 16px; border-top: 1px solid var(--border-color); background: var(--bg-white); }
+.rdetail-decisionlog-pending, .rdetail-decisionlog-empty {
+  font-size: 13px; color: var(--text-muted); font-style: italic;
+}
+.rdetail-decisionlog-title {
+  font-size: 11px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.5px; color: var(--text-muted); margin-bottom: 8px;
+}
+.rdetail-decisionlog-entry {
+  padding: 10px 12px; border-left: 3px solid var(--border-color);
+  background: var(--bg-warm); border-radius: 0 6px 6px 0; margin-bottom: 8px;
+}
+.rdetail-decisionlog-entry:last-child { margin-bottom: 0; }
+.rdetail-decisionlog-entry.approve { border-left-color: #5a9e6f; }
+.rdetail-decisionlog-entry.reject { border-left-color: #c45c5c; }
+.rdetail-decisionlog-head {
+  display: flex; align-items: center; gap: 10px; font-size: 12px;
+}
+.rdetail-decisionlog-action {
+  font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; font-size: 11px;
+  padding: 2px 8px; border-radius: var(--radius-pill);
+}
+.rdetail-decisionlog-action.approve { background: #e8f4ec; color: #5a9e6f; }
+.rdetail-decisionlog-action.reject { background: #fdf0f0; color: #c45c5c; }
+.rdetail-decisionlog-who { font-weight: 600; color: var(--text-dark); }
+.rdetail-decisionlog-when { margin-left: auto; color: var(--text-muted); font-size: 11px; }
+.rdetail-decisionlog-comment {
+  margin-top: 6px; font-size: 13px; color: var(--text-body); font-style: italic;
+  padding-left: 2px;
+}
 
 /* ========== ACTIVITY LOG (full tab) ========== */
 .activity-log {

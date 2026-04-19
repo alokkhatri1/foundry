@@ -201,6 +201,10 @@ function App() {
   const messages = activeConvo?.messages || [];
   const [logs, setLogs] = useState([]);
   const [workflowRuns, setWorkflowRuns] = useState(saved?.workflowRuns || []);
+  // Decision-log cache: { [runId]: [approvalRow, ...] }. Populated lazily
+  // when a participant expands a review step in the Observability view and
+  // kept fresh by the approvals realtime subscription.
+  const [approvalsByRun, setApprovalsByRun] = useState({});
   const [networkError, setNetworkError] = useState(false);
   const [activeTab, setActiveTab] = useState('chat');
   const [showExitConfirm, setShowExitConfirm] = useState(false);
@@ -282,8 +286,8 @@ function App() {
           setUserRoleLoaded(true);
         }
         // Load state from granular tables
-        const [files, cws, tls, wfs, dbParticipants] = await Promise.all([
-          sb.loadFiles(), sb.loadCoworkers(), sb.loadTools(), sb.loadWorkflows(), sb.loadParticipants(),
+        const [files, cws, tls, wfs, runs, dbParticipants] = await Promise.all([
+          sb.loadFiles(), sb.loadCoworkers(), sb.loadTools(), sb.loadWorkflows(), sb.loadWorkflowRuns(), sb.loadParticipants(),
         ]);
 
         if (files.length > 0) setFlatFiles(files);
@@ -295,6 +299,15 @@ function App() {
         }
         if (tls.length > 0) setTools(tls);
         if (wfs.length > 0) setWorkflows(wfs);
+        // Merge cross-user runs into local state so everyone sees everyone's.
+        // Local runs (started by this machine, not yet persisted) win by id.
+        if (runs.length > 0) {
+          setWorkflowRuns(prev => {
+            const byId = new Map((prev || []).map(r => [r.id, r]));
+            for (const r of runs) if (!byId.has(r.id)) byId.set(r.id, r);
+            return [...byId.values()].sort((a, b) => a.startedAt - b.startedAt);
+          });
+        }
         if (dbParticipants.length > 0) {
           setParticipants(prev => {
             const all = new Map();
@@ -396,6 +409,46 @@ function App() {
             return idx >= 0 ? list.map(w => w.id === mapped.id ? mapped : w) : [...list, mapped];
           });
         }
+      },
+      onWorkflowRunChange: (eventType, row, old) => {
+        if (eventType === 'DELETE') {
+          setWorkflowRuns(prev => (prev || []).filter(r => r.id !== old.id));
+        } else if (row) {
+          // Map DB row back to local shape and merge. Stage 7: a run started
+          // by another participant appears here via realtime — no reload needed.
+          const mapped = {
+            id: row.id, workflowId: row.workflow_id, workflowName: row.workflow_name,
+            status: row.status, currentStepIndex: row.current_step_index,
+            startedBy: row.started_by, caseInput: row.case_input,
+            stepResults: row.step_results || [],
+            startedAt: row.started_at ? new Date(row.started_at).getTime() : Date.now(),
+            completedAt: row.completed_at ? new Date(row.completed_at).getTime() : null,
+          };
+          setWorkflowRuns(prev => {
+            const list = prev || [];
+            const idx = list.findIndex(r => r.id === mapped.id);
+            if (idx < 0) return [...list, mapped];
+            // Don't clobber a locally-owned run with a stale DB echo: if the
+            // local copy has more-recent completedAt, keep it.
+            const local = list[idx];
+            if (local.completedAt && mapped.completedAt && local.completedAt > mapped.completedAt) return list;
+            return list.map(r => r.id === mapped.id ? mapped : r);
+          });
+        }
+      },
+      onApprovalChange: (row) => {
+        // Append to decision-log cache keyed by runId; ActivityDashboard
+        // reads from here without re-querying the DB on every expand.
+        setApprovalsByRun(prev => {
+          const next = { ...(prev || {}) };
+          const key = row.run_id;
+          const existing = next[key] || [];
+          if (existing.find(a => a.id === row.id)) return prev;
+          next[key] = [...existing, row].sort((a, b) =>
+            new Date(a.resolved_at).getTime() - new Date(b.resolved_at).getTime()
+          );
+          return next;
+        });
       },
       onRoomChange: (row) => {
         if (row?.deprecated_at) setWorkshopEnded(true);
@@ -1756,6 +1809,11 @@ Be concise. Confirm actions after completing them.${knowledgeSection}`;
               coworkers={coworkers}
               workflows={workflows}
               showEducationalCues={showEducationalCues}
+              approvalsByRun={approvalsByRun}
+              onLoadApprovals={async (runId) => {
+                const rows = await sb.loadApprovals(runId);
+                setApprovalsByRun(prev => ({ ...prev, [runId]: rows || [] }));
+              }}
             />
           </div>
         )}

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import ActivityLog from './ActivityLog';
 import EducationalCue from './EducationalCue';
 import { CoworkerGlyph } from './Icon';
@@ -79,10 +79,21 @@ function RunCard({ run, onClick, onNudge, showEducationalCues }) {
 }
 
 // ===== Run Detail View =====
-function RunDetailView({ run, onBack, onApprovalAction, onNudge, showEducationalCues }) {
+function RunDetailView({ run, onBack, onApprovalAction, onNudge, showEducationalCues, currentUserName, approvals, onLoadApprovals }) {
   const [expandedStep, setExpandedStep] = useState(null);
   const [comment, setComment] = useState('');
   const cfg = STATUS_CONFIG[run.status] || STATUS_CONFIG.running;
+  const isOwner = run.startedBy === currentUserName;
+
+  // Lazy-load the decision log the first time this RunDetailView mounts.
+  // Realtime subscription in App.jsx will keep it fresh thereafter.
+  useEffect(() => {
+    if (onLoadApprovals && !approvals) onLoadApprovals(run.id);
+  }, [run.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  function approvalsForStep(stepId) {
+    return (approvals || []).filter(a => a.step_id === stepId);
+  }
 
   return (
     <div className="rdetail">
@@ -130,12 +141,41 @@ function RunDetailView({ run, onBack, onApprovalAction, onNudge, showEducational
                 <span className="rdetail-step-status" style={{ color: stepCfg.color }}>{step.status}</span>
               </div>
 
-              {/* Expanded: show output or approval UI */}
-              {isExpanded && step.output && step.status === 'completed' && (
+              {/* Expanded body: depends on step type. Completed non-approval
+                  steps show their output. Approval steps always show the
+                  decision log (who decided, when, comment) when expanded,
+                  regardless of status. */}
+              {isExpanded && step.type !== 'approval' && step.output && step.status === 'completed' && (
                 <div className="rdetail-step-output">{step.output}</div>
               )}
 
-              {step.status === 'waiting' && (
+              {isExpanded && step.type === 'approval' && (
+                <div className="rdetail-step-decisionlog">
+                  {approvalsForStep(step.stepId).length === 0 ? (
+                    step.status === 'waiting' ? (
+                      <div className="rdetail-decisionlog-pending">Waiting on {step.assigneeName || 'a reviewer'}.</div>
+                    ) : (
+                      <div className="rdetail-decisionlog-empty">No decision log recorded.</div>
+                    )
+                  ) : (
+                    <div className="rdetail-decisionlog">
+                      <div className="rdetail-decisionlog-title">Decision log</div>
+                      {approvalsForStep(step.stepId).map(a => (
+                        <div key={a.id} className={`rdetail-decisionlog-entry ${a.action === 'Approve' ? 'approve' : 'reject'}`}>
+                          <div className="rdetail-decisionlog-head">
+                            <span className={`rdetail-decisionlog-action ${a.action === 'Approve' ? 'approve' : 'reject'}`}>{a.action}</span>
+                            <span className="rdetail-decisionlog-who">by {a.resolved_by || 'unknown'}</span>
+                            <span className="rdetail-decisionlog-when">{timeAgo(new Date(a.resolved_at).getTime())}</span>
+                          </div>
+                          {a.comment && <div className="rdetail-decisionlog-comment">&ldquo;{a.comment}&rdquo;</div>}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {step.status === 'waiting' && isOwner && (
                 <div className="rdetail-step-approval">
                   <div className="rdetail-step-approval-prompt">
                     Waiting for {step.assigneeName || 'reviewer'} to take action.
@@ -162,6 +202,13 @@ function RunDetailView({ run, onBack, onApprovalAction, onNudge, showEducational
                   </button>
                 </div>
               )}
+              {step.status === 'waiting' && !isOwner && (
+                <div className="rdetail-step-approval">
+                  <div className="rdetail-step-approval-prompt" style={{ color: 'var(--text-muted)' }}>
+                    Waiting on {step.assigneeName || 'a reviewer'}. Only {run.startedBy} (who started this run) can resolve it from this view.
+                  </div>
+                </div>
+              )}
 
               {step.status === 'running' && (
                 <div className="rdetail-step-running">
@@ -178,16 +225,23 @@ function RunDetailView({ run, onBack, onApprovalAction, onNudge, showEducational
 }
 
 // ===== Main Dashboard =====
-export default function ActivityDashboard({ workflowRuns, logs, onApprovalAction, onNudge, participants, currentUserName, coworkers, workflows, showEducationalCues }) {
+export default function ActivityDashboard({ workflowRuns, logs, onApprovalAction, onNudge, participants, currentUserName, coworkers, workflows, showEducationalCues, approvalsByRun, onLoadApprovals }) {
   const [view, setView] = useState('dashboard'); // 'dashboard' | 'log'
   const [selectedRunId, setSelectedRunId] = useState(null);
 
   const selectedRun = selectedRunId ? workflowRuns.find(r => r.id === selectedRunId) : null;
 
-  const pendingRuns = workflowRuns.filter(r => r.status === 'waiting_approval');
-  const activeRuns = workflowRuns.filter(r => r.status === 'running');
-  const completedRuns = workflowRuns.filter(r => r.status === 'completed' || r.status === 'rejected' || r.status === 'error');
-  const [showCompleted, setShowCompleted] = useState(true);
+  // Two buckets per the Stage 7 spec: Active (in-flight or waiting on a human)
+  // and Recent (finished, rejected, errored). Active sorts newest-first so a
+  // fresh run jumps to the top; Recent sorts by completion time.
+  const activeRuns = workflowRuns
+    .filter(r => r.status === 'running' || r.status === 'waiting_approval')
+    .sort((a, b) => (b.startedAt || 0) - (a.startedAt || 0));
+  const recentRuns = workflowRuns
+    .filter(r => r.status === 'completed' || r.status === 'rejected' || r.status === 'error')
+    .sort((a, b) => (b.completedAt || b.startedAt || 0) - (a.completedAt || a.startedAt || 0));
+  const pendingReviewCount = activeRuns.filter(r => r.status === 'waiting_approval').length;
+  const [showRecent, setShowRecent] = useState(true);
 
   if (selectedRun) {
     return (
@@ -197,6 +251,9 @@ export default function ActivityDashboard({ workflowRuns, logs, onApprovalAction
         onApprovalAction={onApprovalAction}
         onNudge={onNudge}
         showEducationalCues={showEducationalCues}
+        currentUserName={currentUserName}
+        approvals={approvalsByRun?.[selectedRun.id]}
+        onLoadApprovals={onLoadApprovals}
       />
     );
   }
@@ -215,9 +272,9 @@ export default function ActivityDashboard({ workflowRuns, logs, onApprovalAction
         </div>
         <div className="adash-summary">
           <EducationalCue cueId="activity-dashboard" show={showEducationalCues} />
-          {activeRuns.length > 0 && <span className="adash-stat running">{activeRuns.length} running</span>}
-          {pendingRuns.length > 0 && <span className="adash-stat waiting">{pendingRuns.length} pending</span>}
-          {completedRuns.length > 0 && <span className="adash-stat completed">{completedRuns.length} done</span>}
+          {activeRuns.length > 0 && <span className="adash-stat running">{activeRuns.length} active</span>}
+          {pendingReviewCount > 0 && <span className="adash-stat waiting">{pendingReviewCount} awaiting review</span>}
+          {recentRuns.length > 0 && <span className="adash-stat completed">{recentRuns.length} recent</span>}
         </div>
       </div>
 
@@ -228,24 +285,13 @@ export default function ActivityDashboard({ workflowRuns, logs, onApprovalAction
           {workflowRuns.length === 0 && (
             <div className="adash-empty">
               <p className="adash-empty-title">No orchestration runs yet</p>
-              <p className="adash-empty-desc">Go to the Orchestration tab and click Run to start one. Active runs will appear here.</p>
-            </div>
-          )}
-
-          {pendingRuns.length > 0 && (
-            <div className="adash-section">
-              <div className="adash-section-title adash-section-pending">Pending Reviews ({pendingRuns.length})</div>
-              <div className="adash-grid">
-                {pendingRuns.map(run => (
-                  <RunCard key={run.id} run={run} onClick={setSelectedRunId} onNudge={onNudge} showEducationalCues={showEducationalCues} />
-                ))}
-              </div>
+              <p className="adash-empty-desc">Go to the Orchestration tab and click Run to start one. Active runs will appear here — everyone in the workshop can see them.</p>
             </div>
           )}
 
           {activeRuns.length > 0 && (
             <div className="adash-section">
-              <div className="adash-section-title adash-section-active">Active Runs ({activeRuns.length})</div>
+              <div className="adash-section-title adash-section-active">Active ({activeRuns.length})</div>
               <div className="adash-grid">
                 {activeRuns.map(run => (
                   <RunCard key={run.id} run={run} onClick={setSelectedRunId} onNudge={onNudge} showEducationalCues={showEducationalCues} />
@@ -254,14 +300,14 @@ export default function ActivityDashboard({ workflowRuns, logs, onApprovalAction
             </div>
           )}
 
-          {completedRuns.length > 0 && (
+          {recentRuns.length > 0 && (
             <div className="adash-section">
-              <div className="adash-section-title adash-section-completed" onClick={() => setShowCompleted(!showCompleted)} style={{ cursor: 'pointer' }}>
-                {showCompleted ? '\u25BE' : '\u25B8'} Completed ({completedRuns.length})
+              <div className="adash-section-title adash-section-completed" onClick={() => setShowRecent(!showRecent)} style={{ cursor: 'pointer' }}>
+                {showRecent ? '\u25BE' : '\u25B8'} Recent ({recentRuns.length})
               </div>
-              {showCompleted && (
+              {showRecent && (
                 <div className="adash-grid">
-                  {completedRuns.map(run => (
+                  {recentRuns.map(run => (
                     <RunCard key={run.id} run={run} onClick={setSelectedRunId} onNudge={onNudge} showEducationalCues={showEducationalCues} />
                   ))}
                 </div>

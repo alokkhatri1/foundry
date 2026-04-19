@@ -605,6 +605,52 @@ export default function useSupabase() {
     }, { onConflict: 'id' });
   }, []);
 
+  // Reverse-map a workflow_runs row back to the shape the runtime expects.
+  function mapWorkflowRunRow(row) {
+    return {
+      id: row.id,
+      workflowId: row.workflow_id,
+      workflowName: row.workflow_name,
+      status: row.status,
+      currentStepIndex: row.current_step_index,
+      startedBy: row.started_by,
+      caseInput: row.case_input,
+      stepResults: row.step_results || [],
+      startedAt: row.started_at ? new Date(row.started_at).getTime() : Date.now(),
+      completedAt: row.completed_at ? new Date(row.completed_at).getTime() : null,
+    };
+  }
+
+  // Load every workflow run in the current room so all participants see
+  // everyone's runs (Stage 7 observability). Capped at 100 most-recent to
+  // keep the initial payload small; older runs can be fetched on demand.
+  const loadWorkflowRuns = useCallback(async () => {
+    if (!isSupabaseConfigured || !roomIdRef.current) return [];
+    const { data, error } = await supabase
+      .from('workflow_runs')
+      .select('*')
+      .eq('room_id', roomIdRef.current)
+      .order('started_at', { ascending: false })
+      .limit(100);
+    if (error) { console.error('[sb] loadWorkflowRuns:', error.message); return []; }
+    return (data || []).map(mapWorkflowRunRow);
+  }, []);
+
+  // Decision log for a specific run: every Approve/Reject with who, when,
+  // and what comment they left. Loaded on demand when the user expands
+  // a review step in the Observability RunDetail view.
+  const loadApprovals = useCallback(async (runId) => {
+    if (!isSupabaseConfigured || !roomIdRef.current) return [];
+    const { data, error } = await supabase
+      .from('approvals')
+      .select('*')
+      .eq('room_id', roomIdRef.current)
+      .eq('run_id', runId)
+      .order('resolved_at', { ascending: true });
+    if (error) { console.error('[sb] loadApprovals:', error.message); return []; }
+    return data || [];
+  }, []);
+
   const logToolCall = useCallback(async (data) => {
     if (!isSupabaseConfigured || !roomIdRef.current) return;
     await supabase.from('tool_calls').insert({
@@ -643,6 +689,12 @@ export default function useSupabase() {
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'workflows', filter: `room_id=eq.${roomIdRef.current}` }, (payload) => {
         if (handlers.onWorkflowChange) handlers.onWorkflowChange(payload.eventType, payload.new, payload.old);
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'workflow_runs', filter: `room_id=eq.${roomIdRef.current}` }, (payload) => {
+        if (handlers.onWorkflowRunChange) handlers.onWorkflowRunChange(payload.eventType, payload.new, payload.old);
+      })
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'approvals', filter: `room_id=eq.${roomIdRef.current}` }, (payload) => {
+        if (handlers.onApprovalChange) handlers.onApprovalChange(payload.new);
       })
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'rooms', filter: `id=eq.${roomIdRef.current}` }, (payload) => {
         if (handlers.onRoomChange) handlers.onRoomChange(payload.new, payload.old);
@@ -715,7 +767,7 @@ export default function useSupabase() {
     loadCoworkers, saveCoworker, deleteCoworker,
     loadTools, saveTool, deleteTool,
     loadWorkflows, saveWorkflow, deleteWorkflow,
-    saveMessage, saveWorkflowRun, logToolCall, logApproval,
+    saveMessage, saveWorkflowRun, loadWorkflowRuns, loadApprovals, logToolCall, logApproval,
     subscribeToRoom, trackPresence, leavePresence,
   };
 }

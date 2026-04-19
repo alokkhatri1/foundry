@@ -1466,6 +1466,107 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
   background: var(--text-dark);
   color: #fff;
 }
+
+/* ===== Live run state on step cards ===== */
+.workflow-step-card.waiting {
+  border-color: var(--accent-approval, #b88b3a);
+  box-shadow: 0 0 0 2px rgba(184, 139, 58, 0.15);
+}
+.workflow-step-card.completed {
+  border-color: var(--accent-system, #5a9e6f);
+  background: rgba(90, 158, 111, 0.04);
+}
+.workflow-step-card.rejected {
+  border-color: var(--accent-error, #c45c5c);
+  background: rgba(196, 92, 92, 0.05);
+}
+.step-number.done {
+  background: var(--accent-system, #5a9e6f);
+  color: #fff;
+}
+.step-status-badge {
+  margin-left: auto;
+  margin-right: 8px;
+  padding: 3px 10px;
+  border-radius: var(--radius-pill, 999px);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+.step-status-badge.running { background: rgba(200, 149, 108, 0.15); color: var(--accent-gold, #c8956c); }
+.step-status-badge.waiting { background: rgba(184, 139, 58, 0.14); color: var(--accent-approval, #b88b3a); }
+.step-status-badge.done    { background: rgba(90, 158, 111, 0.14); color: var(--accent-system, #5a9e6f); }
+.step-status-badge.rejected { background: rgba(196, 92, 92, 0.12); color: var(--accent-error, #c45c5c); }
+.step-status-spinner {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  animation: step-spin 0.8s linear infinite;
+  display: inline-block;
+}
+@keyframes step-spin { to { transform: rotate(360deg); } }
+.step-output-preview {
+  padding: 6px 16px 10px 44px;
+  font-size: 13px;
+  color: var(--text-muted);
+  font-style: italic;
+  cursor: pointer;
+  border-top: 1px dashed var(--border-color);
+}
+.step-output-preview.rejected { color: var(--accent-error, #c45c5c); font-style: normal; }
+.step-output-label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+  margin-bottom: 8px;
+}
+.step-output-body {
+  max-height: 360px;
+  overflow-y: auto;
+  padding-bottom: 8px;
+}
+.step-output-body > * { max-width: 100% !important; }
+.step-output-time {
+  margin-top: 8px;
+  font-size: 11px;
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+/* Run banner above steps while a run is active / complete / rejected */
+.wf-run-banner {
+  margin: 0 0 16px;
+  padding: 14px 16px;
+  border-radius: 10px;
+  border: 1px solid var(--border-color);
+  background: var(--bg-white);
+}
+.wf-run-banner.running { border-color: var(--accent-gold, #c8956c); background: rgba(200, 149, 108, 0.06); }
+.wf-run-banner.success { border-color: var(--accent-system, #5a9e6f); background: rgba(90, 158, 111, 0.06); }
+.wf-run-banner.rejected { border-color: var(--accent-error, #c45c5c); background: rgba(196, 92, 92, 0.06); }
+.wf-run-banner-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-dark);
+  margin-bottom: 4px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.wf-run-banner-body {
+  font-size: 12px;
+  color: var(--text-body);
+}
+
 .knowledge-checkboxes { display: flex; flex-direction: column; gap: 6px; margin-top: 4px; }
 .knowledge-checkboxes label { display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 400; color: var(--text-dark); cursor: pointer; }
 .workflow-actions-bar {

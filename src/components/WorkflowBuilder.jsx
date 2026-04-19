@@ -2,6 +2,7 @@ import { useState, useRef } from 'react';
 import { parseFile, getFileIcon, getFileCategory } from '../utils/fileParser';
 import EducationalCue from './EducationalCue';
 import { CoworkerGlyph } from './Icon';
+import RichText from './RichText';
 
 let stepCounter = Date.now();
 function genStepId() { return 'step-' + (stepCounter++); }
@@ -21,10 +22,21 @@ function getAllFolders(tree, path = []) {
 }
 
 // ===== Step Card =====
-function StepCard({ step, index, coworkers, tools, participants, onUpdate, onDelete, expanded, onToggleExpand, validationErrors, allSteps, currentStepId, isDragging, dragOverPos, onDragStart, onDragOver, onDragEnd, onDrop, showEducationalCues }) {
+function StepCard({ step, index, coworkers, tools, participants, onUpdate, onDelete, expanded, onToggleExpand, validationErrors, allSteps, currentStepId, stepResult, isDragging, dragOverPos, onDragStart, onDragOver, onDragEnd, onDrop, showEducationalCues }) {
   const isRunning = currentStepId === step.id;
   const assignedCw = step.coworkerId ? coworkers?.find(c => c.id === step.coworkerId) : null;
   const assignedPerson = step.assigneeId ? participants?.find(p => p.id === step.assigneeId) : null;
+
+  // Live run state derived from the run's stepResults entry.
+  const runStatus = stepResult?.status || 'pending';
+  const isWaiting = runStatus === 'waiting';
+  const isCompleted = runStatus === 'completed';
+  const isRejected = runStatus === 'rejected' || runStatus === 'error';
+  const cardStateClass = isWaiting ? ' waiting'
+    : isCompleted ? ' completed'
+    : isRejected ? ' rejected'
+    : isRunning ? ' running'
+    : '';
 
   // What to show on the collapsed card
   const assignee = step.type === 'agent' && assignedCw
@@ -33,19 +45,32 @@ function StepCard({ step, index, coworkers, tools, participants, onUpdate, onDel
       ? { icon: assignedPerson.name.charAt(0).toUpperCase(), name: assignedPerson.name, color: assignedPerson.color }
       : null;
 
+  // Condensed output summary shown under a completed step (collapsed view).
+  const outputPreview = stepResult?.output
+    ? String(stepResult.output).replace(/\s+/g, ' ').slice(0, 140) + (String(stepResult.output).length > 140 ? '\u2026' : '')
+    : null;
+
+  const statusBadge = isRunning || runStatus === 'running' ? <span className="step-status-badge running"><span className="step-status-spinner" /> Running</span>
+    : isWaiting ? <span className="step-status-badge waiting">Waiting on {assignedPerson?.name || 'a reviewer'}</span>
+    : isCompleted ? <span className="step-status-badge done">{'\u2713'} Done</span>
+    : isRejected ? <span className="step-status-badge rejected">Rejected</span>
+    : null;
+
   return (
     <div
       className={`step-drag-wrapper${isDragging ? ' dragging' : ''}${dragOverPos === 'above' ? ' drag-over-above' : ''}${dragOverPos === 'below' ? ' drag-over-below' : ''}`}
-      draggable
-      onDragStart={e => onDragStart(e, index)}
-      onDragOver={e => onDragOver(e, index)}
+      draggable={!stepResult}
+      onDragStart={e => !stepResult && onDragStart(e, index)}
+      onDragOver={e => !stepResult && onDragOver(e, index)}
       onDragEnd={onDragEnd}
-      onDrop={e => onDrop(e, index)}
+      onDrop={e => !stepResult && onDrop(e, index)}
     >
-      <div className={`workflow-step-card ${step.type}${isRunning ? ' running' : ''}${expanded ? ' expanded' : ''}`}>
+      <div className={`workflow-step-card ${step.type}${cardStateClass}${expanded ? ' expanded' : ''}`}>
         <div className="step-card-header" onClick={onToggleExpand}>
           <span className="step-drag-handle" title="Drag to reorder">{'\u2630'}</span>
-          <span className={`step-number ${step.type}`}>{index + 1}</span>
+          <span className={`step-number ${step.type}${isCompleted ? ' done' : ''}`}>
+            {isCompleted ? '\u2713' : index + 1}
+          </span>
           <span className={`step-type-label ${step.type}`}>
             {step.type === 'agent' ? 'Coworker' : 'Review'}
           </span>
@@ -56,12 +81,32 @@ function StepCard({ step, index, coworkers, tools, participants, onUpdate, onDel
           )}
           <span className="step-name">{step.name}</span>
           {assignee && <span className="step-assignee-name">{assignee.name}</span>}
+          {statusBadge}
           <span className="step-actions">
-            <button className="step-action-btn step-delete-btn" onClick={e => { e.stopPropagation(); onDelete(); }} title="Delete">{'\u2715'}</button>
+            {!stepResult && (
+              <button className="step-action-btn step-delete-btn" onClick={e => { e.stopPropagation(); onDelete(); }} title="Delete">{'\u2715'}</button>
+            )}
             <span className={`step-chevron${expanded ? ' open' : ''}`}>{'\u25BE'}</span>
           </span>
         </div>
-        {expanded && (
+        {!expanded && outputPreview && (
+          <div className="step-output-preview" onClick={onToggleExpand}>{outputPreview}</div>
+        )}
+        {!expanded && isRejected && stepResult?.output && (
+          <div className="step-output-preview rejected" onClick={onToggleExpand}>
+            Rejected: {String(stepResult.output).slice(0, 160)}
+          </div>
+        )}
+        {expanded && stepResult && stepResult.output && (
+          <div className="step-card-body">
+            <div className="step-output-label">Output</div>
+            <div className="step-output-body md-doc"><RichText content={String(stepResult.output)} /></div>
+            {stepResult.completedAt && (
+              <div className="step-output-time">{new Date(stepResult.completedAt).toLocaleTimeString()}</div>
+            )}
+          </div>
+        )}
+        {expanded && !stepResult && (
           <div className="step-card-body">
             <div className="step-config-row">
               <label>Step Name</label>
@@ -139,7 +184,7 @@ function StepCard({ step, index, coworkers, tools, participants, onUpdate, onDel
 }
 
 // ===== Workflow Editor =====
-function WorkflowEditor({ workflow, onUpdateWorkflow, fileTree, coworkers, tools, participants, onRun, isRunning, currentStepId, onBack, showEducationalCues }) {
+function WorkflowEditor({ workflow, onUpdateWorkflow, fileTree, coworkers, tools, participants, onRun, isRunning, currentStepId, activeRun, onBack, showEducationalCues }) {
   const [expandedStep, setExpandedStep] = useState(null);
   const [showAddMenu, setShowAddMenu] = useState(false);
   const [validationErrors, setValidationErrors] = useState({});
@@ -349,7 +394,32 @@ function WorkflowEditor({ workflow, onUpdateWorkflow, fileTree, coworkers, tools
       )}
 
       <div className="workflow-steps">
-        {workflow.steps.length > 1 && (
+        {activeRun && activeRun.status === 'completed' && (
+          <div className="wf-run-banner success">
+            <div className="wf-run-banner-title">{'\u2713'} Run complete</div>
+            <div className="wf-run-banner-body">
+              Started by {activeRun.startedBy} at {new Date(activeRun.startedAt).toLocaleTimeString()}.
+              Final output saved to the destination folder.
+            </div>
+          </div>
+        )}
+        {activeRun && activeRun.status === 'rejected' && (
+          <div className="wf-run-banner rejected">
+            <div className="wf-run-banner-title">Run rejected</div>
+            <div className="wf-run-banner-body">
+              A reviewer rejected and there was no previous review step to bounce back to. Revise the workflow or the input and run it again.
+            </div>
+          </div>
+        )}
+        {activeRun && (activeRun.status === 'running' || activeRun.status === 'waiting_approval') && (
+          <div className="wf-run-banner running">
+            <div className="wf-run-banner-title"><span className="step-status-spinner" /> Run in progress</div>
+            <div className="wf-run-banner-body">
+              Started by {activeRun.startedBy} at {new Date(activeRun.startedAt).toLocaleTimeString()}. Watch the steps below.
+            </div>
+          </div>
+        )}
+        {workflow.steps.length > 1 && !activeRun && (
           <div style={{ padding: '0 4px 8px' }}>
             <EducationalCue cueId="workflow-step-reorder" show={showEducationalCues} />
           </div>
@@ -373,6 +443,7 @@ function WorkflowEditor({ workflow, onUpdateWorkflow, fileTree, coworkers, tools
               onToggleExpand={() => setExpandedStep(expandedStep === index ? null : index)}
               validationErrors={validationErrors[step.id]}
               allSteps={workflow.steps} currentStepId={currentStepId}
+              stepResult={activeRun?.stepResults?.[index]}
               isDragging={dragIndex === index}
               dragOverPos={dragOverIndex === index && dragIndex !== index ? dragOverHalf : null}
               onDragStart={handleDragStart} onDragOver={handleDragOver}
@@ -481,6 +552,14 @@ export default function WorkflowBuilder({ workflows, onUpdateWorkflows, fileTree
           onRun={onRun}
           isRunning={workflowRuns.some(r => r.workflowId === selectedWorkflow.id && (r.status === 'running' || r.status === 'waiting_approval'))}
           currentStepId={(() => { const run = workflowRuns.find(r => r.workflowId === selectedWorkflow.id && r.status === 'running'); return run ? run.stepResults.find(s => s.status === 'running')?.stepId : null; })()}
+          activeRun={(() => {
+            // Most recent run for this workflow — shown live while running, and
+            // sticks around in "completed"/"rejected" state so the runner sees
+            // the final state without switching tabs.
+            const runs = (workflowRuns || []).filter(r => r.workflowId === selectedWorkflow.id);
+            if (runs.length === 0) return null;
+            return runs[runs.length - 1];
+          })()}
           onBack={() => setSelectedWorkflowId(null)}
           showEducationalCues={showEducationalCues}
         />

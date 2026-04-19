@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
-import ReactFlow, { Background, Controls, applyNodeChanges } from 'reactflow';
+import ReactFlow, { Background, Controls, Handle, Position, applyNodeChanges, applyEdgeChanges, addEdge } from 'reactflow';
 import 'reactflow/dist/style.css';
 import { parseFile, getFileIcon, getFileCategory } from '../utils/fileParser';
 import EducationalCue from './EducationalCue';
@@ -31,12 +31,36 @@ function getAllFolders(tree, path = []) {
 function StepNode({ data }) {
   return (
     <div className="wf-canvas-node" style={{ width: 420 }}>
+      <Handle type="target" position={Position.Top} id="in" className="wf-handle wf-handle-in" />
       <StepCard {...data.stepCardProps} onCanvas />
+      <Handle type="source" position={Position.Bottom} id="out" className="wf-handle wf-handle-out" />
     </div>
   );
 }
 
 const nodeTypes = { agent: StepNode, approval: StepNode };
+
+// Cycle prevention: before adding edge A→B, walk forward from B and if we can
+// reach A through existing edges, reject. Linear chains are always acyclic;
+// this only matters once users start wiring loop-back paths for revision.
+function wouldCreateCycle(edges, sourceId, targetId) {
+  if (sourceId === targetId) return true;
+  const adj = new Map();
+  for (const e of edges) {
+    if (!adj.has(e.source)) adj.set(e.source, []);
+    adj.get(e.source).push(e.target);
+  }
+  const seen = new Set();
+  const stack = [targetId];
+  while (stack.length) {
+    const node = stack.pop();
+    if (node === sourceId) return true;
+    if (seen.has(node)) continue;
+    seen.add(node);
+    for (const next of (adj.get(node) || [])) stack.push(next);
+  }
+  return false;
+}
 
 // ===== Step Card =====
 function StepCard({ step, index, coworkers, tools, participants, onUpdate, onDelete, expanded, onToggleExpand, validationErrors, allSteps, currentStepId, stepResult, isDragging, dragOverPos, onDragStart, onDragOver, onDragEnd, onDrop, showEducationalCues, onCanvas }) {
@@ -248,7 +272,6 @@ function WorkflowCanvas({ workflow, onUpdateWorkflow, coworkers, tools, particip
         const change = committed.find(c => c.id === n.id);
         return change ? { ...n, position: change.position } : n;
       });
-      // Include any nodes currently on the canvas that aren't in workflow.nodes yet
       const existingIds = new Set(updatedNodes.map(n => n.id));
       committed.forEach(c => {
         if (!existingIds.has(c.id)) {
@@ -260,6 +283,41 @@ function WorkflowCanvas({ workflow, onUpdateWorkflow, coworkers, tools, particip
     }
   }, [workflow, onUpdateWorkflow]);
 
+  const handleEdgesChange = useCallback((changes) => {
+    setEdges(es => applyEdgeChanges(changes, es));
+    const removed = changes.filter(c => c.type === 'remove');
+    if (removed.length > 0) {
+      const removeIds = new Set(removed.map(c => c.id));
+      const nextEdges = (workflow.edges || []).filter(e => !removeIds.has(e.id));
+      onUpdateWorkflow({ ...workflow, edges: nextEdges });
+    }
+  }, [workflow, onUpdateWorkflow]);
+
+  const handleConnect = useCallback((params) => {
+    const currentEdges = workflow.edges || [];
+    if (params.source === params.target) return;
+    // Skip duplicate edges (same source/target/handles).
+    const exists = currentEdges.some(e =>
+      e.source === params.source && e.target === params.target
+      && (e.sourceHandle || null) === (params.sourceHandle || null)
+      && (e.targetHandle || null) === (params.targetHandle || null)
+    );
+    if (exists) return;
+    if (wouldCreateCycle(currentEdges, params.source, params.target)) {
+      // Could surface a toast here; for now we just refuse the wire.
+      return;
+    }
+    const newEdge = {
+      id: `edge-${params.source}-${params.target}-${Date.now()}`,
+      source: params.source,
+      target: params.target,
+      sourceHandle: params.sourceHandle || 'out',
+      targetHandle: params.targetHandle || 'in',
+    };
+    setEdges(es => addEdge(newEdge, es));
+    onUpdateWorkflow({ ...workflow, edges: [...currentEdges, newEdge] });
+  }, [workflow, onUpdateWorkflow]);
+
   return (
     <div className="wf-canvas-wrap">
       <ReactFlow
@@ -267,10 +325,13 @@ function WorkflowCanvas({ workflow, onUpdateWorkflow, coworkers, tools, particip
         edges={edges}
         nodeTypes={nodeTypes}
         onNodesChange={handleNodesChange}
-        nodesConnectable={false}
+        onEdgesChange={handleEdgesChange}
+        onConnect={handleConnect}
+        nodesConnectable
         fitView
         fitViewOptions={{ padding: 0.2, maxZoom: 1 }}
         proOptions={{ hideAttribution: true }}
+        defaultEdgeOptions={{ type: 'default', animated: false, style: { stroke: '#c8956c', strokeWidth: 2 } }}
       >
         <Background gap={20} size={1} color="#d4ccc2" />
         <Controls showInteractive={false} />

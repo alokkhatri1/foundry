@@ -1384,6 +1384,20 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
 .wf-canvas-node { cursor: default; }
 .wf-canvas-node .step-drag-wrapper { width: 100%; }
 .wf-canvas-node .workflow-step-card.on-canvas { cursor: pointer; box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
+/* Connection handles on each node — small circle top/bottom, hover to enlarge */
+.wf-handle {
+  width: 12px !important;
+  height: 12px !important;
+  background: var(--bg-white) !important;
+  border: 2px solid var(--accent-gold, #c8956c) !important;
+  border-radius: 50% !important;
+  transition: transform 0.12s, background 0.12s;
+}
+.wf-handle:hover { transform: scale(1.3); background: var(--accent-gold, #c8956c) !important; }
+.wf-handle-in  { top: -6px !important; }
+.wf-handle-out { bottom: -6px !important; }
+.react-flow__edge-path { stroke: var(--accent-gold, #c8956c); stroke-width: 2; }
+.react-flow__edge.selected .react-flow__edge-path { stroke: var(--text-dark); stroke-width: 3; }
 .wf-canvas-empty {
   position: absolute;
   top: 50%;

@@ -5531,6 +5531,18 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
   padding: 48px 24px;
   overflow-y: auto;
 }
+/* Embedded variant — graduation rendered inside a tab pane (Stage 8 reveal
+   mode, workshop still alive). Drops the viewport-filling min-height and
+   sign-out footer since users can navigate back to other tabs. */
+.grad-page.embedded {
+  min-height: auto;
+  padding: 24px;
+  background: transparent;
+}
+.grad-page.embedded .grad-container {
+  max-width: 820px;
+  margin: 0 auto;
+}
 .grad-container {
   max-width: 820px;
   margin: 0 auto;

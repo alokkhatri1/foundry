@@ -248,6 +248,10 @@ function App() {
     previousStageRef.current = currentStage;
     if (prev !== null && prev !== currentStage && currentStage !== '1') {
       setJustRevealed(currentStage);
+      // Stage 8 (Graduation) — the whole-room moment. Snap every participant
+      // to the graduation tab so they see their scorecard together. Later
+      // navigation away is fine; this only fires on the transition.
+      if (currentStage === '8') setActiveTab('graduation');
     }
   }, [currentStage]);
 
@@ -1682,6 +1686,11 @@ Be concise. Confirm actions after completing them.${knowledgeSection}`;
               Observability{activeRuns.length > 0 && activeTab !== 'activity' && <span className="tab-count">{activeRuns.length}</span>}
             </button>
           </RevealAt>
+          <RevealAt stage="8" currentStage={currentStage}>
+            <button className={`tab-nav-item${activeTab === 'graduation' ? ' active' : ''}`} onClick={() => setActiveTab('graduation')}>
+              Graduation
+            </button>
+          </RevealAt>
         </nav>
         <div className="app-header-right">
           <span className="header-user-name">{userName}</span>
@@ -1803,6 +1812,21 @@ Be concise. Confirm actions after completing them.${knowledgeSection}`;
                 const rows = await sb.loadApprovals(runId);
                 setApprovalsByRun(prev => ({ ...prev, [runId]: rows || [] }));
               }}
+            />
+          </div>
+        )}
+        {activeTab === 'graduation' && (
+          <div className="tab-pane tab-pane-graduation">
+            <GraduationScreen
+              embedded
+              userName={userName}
+              conversations={conversations}
+              coworkers={coworkers}
+              workflows={workflows}
+              workflowRuns={workflowRuns}
+              flatFiles={flatFiles}
+              participants={participants}
+              loadAllRoomApprovals={sb.loadAllRoomApprovals}
             />
           </div>
         )}

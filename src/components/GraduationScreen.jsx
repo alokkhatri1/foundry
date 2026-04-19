@@ -16,6 +16,7 @@ export default function GraduationScreen({
   participants,
   loadAllRoomApprovals,
   onSignOut,
+  embedded = false,
 }) {
   const [approvals, setApprovals] = useState(null);
 
@@ -47,7 +48,7 @@ export default function GraduationScreen({
   const overallLabel = LEVELS[overall];
 
   return (
-    <div className="grad-page">
+    <div className={`grad-page${embedded ? ' embedded' : ''}`}>
       <div className="grad-container">
         <div className="grad-header">
           <div className="grad-eyebrow">Graduation</div>
@@ -123,11 +124,13 @@ export default function GraduationScreen({
           </>
         )}
 
-        <div className="grad-footer">
-          <button className="landing-join-btn grad-signout-btn" onClick={onSignOut}>
-            Sign out
-          </button>
-        </div>
+        {!embedded && (
+          <div className="grad-footer">
+            <button className="landing-join-btn grad-signout-btn" onClick={onSignOut}>
+              Sign out
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

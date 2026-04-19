@@ -170,7 +170,6 @@ export function mapWorkflowRow(row) {
     steps: row.steps || [],
     nodes: row.nodes || null,
     edges: row.edges || null,
-    destination: row.destination || null,
     createdBy: row.created_by,
     createdAt: row.created_at ? new Date(row.created_at).getTime() : Date.now(),
   });

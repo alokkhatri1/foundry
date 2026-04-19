@@ -1198,11 +1198,11 @@ function App() {
           approvalResolversRef.current.set(rId, resolve);
         });
       },
-      onSaveFinalOutput: ({ name, content, destination }) => {
-        // Save the workflow's final accumulated output to the workflow's
-        // configured destination folder (or first-available knowledge folder
-        // as fallback). Mirrors the Create File / Request Review file-writing
-        // logic — workflows are just longer-form artifact factories.
+      onSaveStepOutput: ({ name, content, destination }) => {
+        // Per-step save: fires whenever a step with step.save.enabled
+        // completes. Writes the content to the folder/subfolder chosen on
+        // that step. Falls back to the first top-level folder + 'knowledge'
+        // if nothing was explicitly picked.
         const newTree = JSON.parse(JSON.stringify(fileTree));
         newTree.children = newTree.children || [];
         const newFile = {

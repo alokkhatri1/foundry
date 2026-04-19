@@ -30,7 +30,7 @@ export async function executeWorkflowRun({
   removeLoadingMessages, // () => void
   onLog,                // (entry) => void
   getApprovalDecision,  // (runId, stepId, config) => Promise<{action, comment}>
-  onSaveFinalOutput,    // ({name, content, destination}) => void — auto-save the accumulated output on completion
+  onSaveStepOutput,     // ({stepName, content, name, destination}) => void — per-step save when step.save.enabled
 }) {
   const previousOutputs = [];
 
@@ -95,6 +95,18 @@ export async function executeWorkflowRun({
         previousOutputs.push(`### ${coworkerLabel}\n${result.content}`);
         const confMatch = result.content.match(/[Cc]onfidence\s*[Ss]core[:\s]*([01]?\.\d+|[01])/);
         onLog({ type: 'agent', message: `${coworkerLabel} | confidence: ${confMatch ? confMatch[1] : 'N/A'}` });
+        // Per-step save: if this coworker step is configured to save, write its
+        // output to the configured folder now.
+        if (step.save?.enabled && onSaveStepOutput) {
+          const fileName = (step.name || coworkerLabel || 'step').toLowerCase().replace(/[^a-z0-9]+/g, '-') + '-' + new Date().toISOString().slice(0, 10) + '.md';
+          onSaveStepOutput({
+            stepName: step.name || coworkerLabel,
+            content: `# ${step.name || coworkerLabel}\n\n${result.content}`,
+            name: fileName,
+            destination: { folderId: step.save.folderId, subfolder: step.save.subfolder },
+          });
+          onLog({ type: 'workflow', message: `saved step output: ${fileName}` });
+        }
       } else {
         onStepUpdate(runId, stepIndex, { status: 'error', output: result.error });
         onRunUpdate(runId, { status: 'error', completedAt: Date.now() });
@@ -129,6 +141,20 @@ export async function executeWorkflowRun({
       onMessage({ type: 'status', content: `${decision.action}${decision.comment ? ' — "' + decision.comment + '"' : ''}` });
       onLog({ type: 'approval', message: `${userName}: ${decision.action}${decision.comment ? ' | "' + decision.comment + '"' : ''}` });
 
+      // Per-step save on Approve: save the upstream output at the moment of
+      // approval (the version this reviewer signed off on).
+      if (decision.action === 'Approve' && step.save?.enabled && onSaveStepOutput) {
+        const approved = previousOutputs[previousOutputs.length - 1] || '';
+        const fileName = (step.name || 'approved').toLowerCase().replace(/[^a-z0-9]+/g, '-') + '-' + new Date().toISOString().slice(0, 10) + '.md';
+        onSaveStepOutput({
+          stepName: step.name,
+          content: `# ${step.name} — approved by ${decision.resolvedBy || userName}\n\n${approved}`,
+          name: fileName,
+          destination: { folderId: step.save.folderId, subfolder: step.save.subfolder },
+        });
+        onLog({ type: 'workflow', message: `saved approved output: ${fileName}` });
+      }
+
       if (decision.action === 'Reject') {
         // Bounce back to the previous human step for revision. Downstream
         // coworker steps between there and here will re-run with the
@@ -159,21 +185,6 @@ export async function executeWorkflowRun({
       // Unknown step type (legacy tool/system). Skip silently — leftovers
       // from a previous schema that shouldn't exist in new workflows.
       stepIndex++;
-    }
-  }
-
-  // Workflow completed — save the final accumulated output to the workflow's
-  // destination folder so the artifact is part of organizational knowledge.
-  if (onSaveFinalOutput && previousOutputs.length > 0) {
-    const finalOutput = previousOutputs.join('\n\n');
-    const fileName = (workflow.name || 'workflow-output').toLowerCase().replace(/[^a-z0-9]+/g, '-') + '-' + new Date().toISOString().slice(0, 10) + '.md';
-    const md = `# ${workflow.name}\n\n_Run completed ${new Date().toISOString()}_\n\n${finalOutput}`;
-    try {
-      onSaveFinalOutput({ name: fileName, content: md, destination: workflow.destination });
-      onMessage({ type: 'status', content: `Final output saved as ${fileName}` });
-      onLog({ type: 'workflow', message: `final output saved: ${fileName}` });
-    } catch (e) {
-      onLog({ type: 'error', message: `failed to save final output: ${e.message}` });
     }
   }
 

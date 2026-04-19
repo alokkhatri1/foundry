@@ -565,7 +565,6 @@ export default function useSupabase() {
       name: wf.name, steps: wf.steps || [],
       nodes: wf.nodes || null,
       edges: wf.edges || null,
-      destination: wf.destination || null,
       created_by: wf.createdBy, updated_at: new Date().toISOString(),
     }, { onConflict: 'id' });
     if (error) console.error('[sb] saveWorkflow:', error.message);

@@ -1469,6 +1469,30 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
   background: var(--bg-warm);
   border-radius: var(--radius-sm);
 }
+.step-save-block {
+  margin-top: 16px;
+  padding: 12px 14px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  background: var(--bg-warm);
+}
+.step-save-toggle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-body);
+  cursor: pointer;
+}
+.step-save-toggle input { accent-color: var(--accent-system, #5a9e6f); }
+.step-save-fields {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  margin-top: 10px;
+  flex-wrap: wrap;
+}
 .wf-destination-bar {
   display: flex;
   align-items: center;

@@ -63,7 +63,7 @@ function wouldCreateCycle(edges, sourceId, targetId) {
 }
 
 // ===== Step Card =====
-function StepCard({ step, index, coworkers, tools, participants, onUpdate, onDelete, expanded, onToggleExpand, validationErrors, allSteps, currentStepId, stepResult, isDragging, dragOverPos, onDragStart, onDragOver, onDragEnd, onDrop, showEducationalCues, onCanvas }) {
+function StepCard({ step, index, coworkers, tools, participants, onUpdate, onDelete, expanded, onToggleExpand, validationErrors, allSteps, currentStepId, stepResult, isDragging, dragOverPos, onDragStart, onDragOver, onDragEnd, onDrop, showEducationalCues, onCanvas, fileTree }) {
   const isRunning = currentStepId === step.id;
   const assignedCw = step.coworkerId ? coworkers?.find(c => c.id === step.coworkerId) : null;
   const assignedPerson = step.assigneeId ? participants?.find(p => p.id === step.assigneeId) : null;
@@ -217,6 +217,59 @@ function StepCard({ step, index, coworkers, tools, participants, onUpdate, onDel
               </>
             )}
 
+            {/* Save output toggle — off by default. When on, the step's output
+                (for coworker: what the coworker produced; for review: the
+                upstream draft at the moment of approval) is saved to the
+                configured folder on run completion. */}
+            <div className="step-save-block">
+              <label className="step-save-toggle">
+                <input
+                  type="checkbox"
+                  checked={!!step.save?.enabled}
+                  onChange={e => onUpdate({
+                    ...step,
+                    save: { ...(step.save || {}), enabled: e.target.checked },
+                  })}
+                />
+                <span>Save this step's output to the workspace</span>
+              </label>
+              {step.save?.enabled && (
+                <div className="step-save-fields">
+                  <select
+                    className="wf-destination-select"
+                    value={step.save?.folderId || ''}
+                    onChange={e => onUpdate({
+                      ...step,
+                      save: { ...(step.save || {}), folderId: e.target.value },
+                    })}
+                  >
+                    <option value="">First available folder</option>
+                    {(fileTree?.children || []).filter(c => c.type === 'folder').map(f => (
+                      <option key={f.id} value={f.id}>{f.name}</option>
+                    ))}
+                  </select>
+                  <div className="wf-destination-subfolder">
+                    {['knowledge', 'skills'].map(sub => {
+                      const active = (step.save?.subfolder || 'knowledge') === sub;
+                      return (
+                        <button
+                          key={sub}
+                          type="button"
+                          className={`wf-destination-sub-pill${active ? ' active' : ''}`}
+                          onClick={() => onUpdate({
+                            ...step,
+                            save: { ...(step.save || {}), subfolder: sub },
+                          })}
+                        >
+                          {sub}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+
           </div>
         )}
       </div>
@@ -229,7 +282,7 @@ function StepCard({ step, index, coworkers, tools, participants, onUpdate, onDel
 // visual — nodes are draggable and their positions persist, edges are
 // drawn read-only from the linear auto-migration. Wiring, typed handles,
 // and DAG runtime arrive in later phases.
-function WorkflowCanvas({ workflow, onUpdateWorkflow, coworkers, tools, participants, activeRun, currentStepId, expandedStep, setExpandedStep, updateStep, deleteStep, validationErrors, showEducationalCues }) {
+function WorkflowCanvas({ workflow, onUpdateWorkflow, fileTree, coworkers, tools, participants, activeRun, currentStepId, expandedStep, setExpandedStep, updateStep, deleteStep, validationErrors, showEducationalCues }) {
   const [nodes, setNodes] = useState([]);
   const [edges, setEdges] = useState([]);
 
@@ -243,7 +296,7 @@ function WorkflowCanvas({ workflow, onUpdateWorkflow, coworkers, tools, particip
       position: positions.get(step.id) || { x: 80, y: i * 240 },
       data: {
         stepCardProps: {
-          step, index: i, coworkers, tools, participants,
+          step, index: i, coworkers, tools, participants, fileTree,
           onUpdate: (updated) => updateStep(i, updated),
           onDelete: () => deleteStep(i),
           expanded: expandedStep === i,
@@ -257,7 +310,7 @@ function WorkflowCanvas({ workflow, onUpdateWorkflow, coworkers, tools, particip
     }));
     const nextEdges = (workflow.edges || []).map(e => ({ ...e, type: 'default' }));
     return { derivedNodes: nextNodes, derivedEdges: nextEdges };
-  }, [workflow, coworkers, tools, participants, activeRun, currentStepId, expandedStep, setExpandedStep, updateStep, deleteStep, validationErrors, showEducationalCues]);
+  }, [workflow, fileTree, coworkers, tools, participants, activeRun, currentStepId, expandedStep, setExpandedStep, updateStep, deleteStep, validationErrors, showEducationalCues]);
 
   useEffect(() => {
     setNodes(derivedNodes);
@@ -439,42 +492,6 @@ function WorkflowEditor({ workflow, onUpdateWorkflow, fileTree, coworkers, tools
         </button>
       </div>
 
-      {/* Destination for final output — set once per workflow, used to auto-save on completion */}
-      <div className="wf-destination-bar">
-        <span className="wf-destination-label">Saves to</span>
-        <select
-          className="wf-destination-select"
-          value={workflow.destination?.folderId || ''}
-          onChange={e => onUpdateWorkflow({
-            ...workflow,
-            destination: { ...(workflow.destination || {}), folderId: e.target.value },
-          })}
-        >
-          <option value="">First available folder</option>
-          {(fileTree?.children || []).filter(c => c.type === 'folder').map(f => (
-            <option key={f.id} value={f.id}>{f.name}</option>
-          ))}
-        </select>
-        <div className="wf-destination-subfolder">
-          {['knowledge', 'skills'].map(sub => {
-            const active = (workflow.destination?.subfolder || 'knowledge') === sub;
-            return (
-              <button
-                key={sub}
-                type="button"
-                className={`wf-destination-sub-pill${active ? ' active' : ''}`}
-                onClick={() => onUpdateWorkflow({
-                  ...workflow,
-                  destination: { ...(workflow.destination || {}), subfolder: sub },
-                })}
-              >
-                {sub}
-              </button>
-            );
-          })}
-        </div>
-      </div>
-
       {/* Submit Case Modal */}
       {showSubmit && (
         <div className="modal-overlay" onClick={() => setShowSubmit(false)}>
@@ -584,6 +601,7 @@ function WorkflowEditor({ workflow, onUpdateWorkflow, fileTree, coworkers, tools
       <WorkflowCanvas
         workflow={workflow}
         onUpdateWorkflow={onUpdateWorkflow}
+        fileTree={fileTree}
         coworkers={coworkers}
         tools={tools}
         participants={participants}

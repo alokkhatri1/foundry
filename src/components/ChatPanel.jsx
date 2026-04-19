@@ -1162,7 +1162,7 @@ export default function ChatPanel({ messages, onSendMessage, onApprovalAction, o
                   // Hide platform-tool executions before Stage 5a (tools aren't revealed yet).
                   if (m.type === 'tool_execution' && !stageReached(currentStage, '5a')) return false;
                   // Hide orchestration / approval messages before Stage 7 (Orchestration).
-                  if ((m.type === 'approval' || m.type === 'workflow_start' || m.type === 'workflow_end') && !stageReached(currentStage, '7')) return false;
+                  if ((m.type === 'approval' || m.type === 'workflow_start' || m.type === 'workflow_end') && !stageReached(currentStage, '6')) return false;
                   return true;
                 }).map((msg, i) => (
                   <ChatMessage key={msg.id || i} msg={msg} onApprovalAction={onApprovalAction} onPickRecipient={onPickRecipient} onNudgeRecipient={onNudgeRecipient} onSenderApproval={onSenderApproval} onOpenReviewPane={setReviewPane} onGoToFiles={onGoToFiles} onRetry={onRetry} participants={participants} currentUserName={currentUserName} showEducationalCues={showEducationalCues} />

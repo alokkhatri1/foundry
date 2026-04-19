@@ -357,53 +357,6 @@ export default function useSupabase() {
     if (error) console.error('[sb] saveUserRole:', error.message);
   }, []);
 
-  // ===== Participants with roles (for Stage 6 delegation decomposer) =====
-  const loadParticipantsWithRoles = useCallback(async () => {
-    if (!isSupabaseConfigured || !roomIdRef.current) return [];
-    const { data: parts } = await supabase.from('participants')
-      .select('id, name, color, auth_user_id')
-      .eq('room_id', roomIdRef.current);
-    if (!parts) return [];
-    const userIds = parts.map(p => p.auth_user_id).filter(Boolean);
-    if (userIds.length === 0) {
-      return parts.map(p => ({ id: p.id, name: p.name, color: p.color, role: null }));
-    }
-    const { data: prefs } = await supabase.from('user_preferences')
-      .select('auth_user_id, role')
-      .in('auth_user_id', userIds);
-    const roleMap = new Map((prefs || []).map(p => [p.auth_user_id, p.role]));
-    return parts.map(p => ({
-      id: p.id,
-      name: p.name,
-      color: p.color,
-      role: roleMap.get(p.auth_user_id) || null,
-    }));
-  }, []);
-
-  // ===== Delegation maps (Stage 6) =====
-  const saveDelegationMap = useCallback(async (authUserId, authorName, strategy, map) => {
-    if (!isSupabaseConfigured || !roomIdRef.current) return null;
-    const { data, error } = await supabase.from('delegation_maps').insert({
-      room_id: roomIdRef.current,
-      auth_user_id: authUserId || null,
-      author_name: authorName || null,
-      strategy,
-      map,
-    }).select('id').single();
-    if (error) { console.error('[sb] saveDelegationMap:', error.message); return null; }
-    return data?.id;
-  }, []);
-
-  const loadMyDelegationMaps = useCallback(async (authUserId) => {
-    if (!isSupabaseConfigured || !roomIdRef.current || !authUserId) return [];
-    const { data } = await supabase.from('delegation_maps')
-      .select('id, strategy, map, created_at')
-      .eq('room_id', roomIdRef.current)
-      .eq('auth_user_id', authUserId)
-      .order('created_at', { ascending: false });
-    return data || [];
-  }, []);
-
   // ===== Direct messages =====
   const sendDm = useCallback(async (fromParticipantId, toParticipantId, content, options = {}) => {
     if (!isSupabaseConfigured || !roomIdRef.current) {
@@ -755,7 +708,6 @@ export default function useSupabase() {
     joinRoom, getRoomId,
     upsertParticipant, loadParticipants, findParticipantIdByName, getParticipantById, getCoworkerParticipantId,
     loadUserPreferences, saveUserPreferences, loadUserRole, saveUserRole,
-    loadParticipantsWithRoles, saveDelegationMap, loadMyDelegationMaps,
     sendDm, fetchDmThread, subscribeToDms, subscribeToAllRoomDms,
     loadFiles, saveFile, deleteFile, saveFilesBatch,
     loadCoworkers, saveCoworker, deleteCoworker,

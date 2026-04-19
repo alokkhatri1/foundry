@@ -10,7 +10,6 @@ import ActivityDashboard from './components/ActivityDashboard';
 import RevealAt, { STAGE_META, stageReached } from './components/RevealAt';
 import { buildStageGuidance } from './data/stageGuidance';
 import PreferencesEditor from './components/PreferencesEditor';
-import DelegationPanel from './components/DelegationPanel';
 import {
   createStarterFolders,
   createStarterWorkflow,
@@ -1571,16 +1570,11 @@ Be concise. Confirm actions after completing them.${knowledgeSection}`;
             </button>
           </RevealAt>
           <RevealAt stage="6" currentStage={currentStage}>
-            <button className={`tab-nav-item${activeTab === 'delegation' ? ' active' : ''}`} onClick={() => setActiveTab('delegation')}>
-              Delegation
-            </button>
-          </RevealAt>
-          <RevealAt stage="7" currentStage={currentStage}>
             <button className={`tab-nav-item${activeTab === 'workflow' ? ' active' : ''}`} onClick={() => setActiveTab('workflow')}>
               Orchestration{hasActiveRuns && <span className="tab-running-dot" />}
             </button>
           </RevealAt>
-          <RevealAt stage="8" currentStage={currentStage}>
+          <RevealAt stage="7" currentStage={currentStage}>
             <button className={`tab-nav-item${activeTab === 'activity' ? ' active' : ''}`} onClick={() => setActiveTab('activity')}>
               Observability{activeRuns.length > 0 && activeTab !== 'activity' && <span className="tab-count">{activeRuns.length}</span>}
             </button>
@@ -1668,17 +1662,6 @@ Be concise. Confirm actions after completing them.${knowledgeSection}`;
 {activeTab === 'coworkers' && (
           <div className="tab-pane tab-pane-coworkers">
             <CoworkerBuilder coworkers={coworkers || []} onUpdateCoworkers={handleUpdateCoworkers} fileTree={fileTree} tools={tools || []} userName={userName} callClaudeAPI={callClaudeAPI} showEducationalCues={showEducationalCues} currentStage={currentStage} onStartChat={cwId => { handleCoworkerChange(cwId); setActiveTab('chat'); }} participants={participants} />
-          </div>
-        )}
-        {activeTab === 'delegation' && (
-          <div className="tab-pane tab-pane-delegation">
-            <DelegationPanel
-              sb={sb}
-              callClaudeAPI={callClaudeAPI}
-              userName={userName}
-              userRole={userRole}
-              coworkers={coworkers || []}
-            />
           </div>
         )}
         {activeTab === 'workflow' && (

@@ -35,22 +35,17 @@ const STAGE_GUIDES = {
     externalReference: 'The shift from "GPT" to "agent" — the AI gains hands. In Liberating Structures terms, the AI is now a peer doing work, not just reflecting.',
   },
   '5c': {
-    nowAvailable: 'Coworkers can now ask a human teammate for input mid-task. A new Ask Human tool is available to every coworker: the coworker pings a live participant, waits for the reply, and continues with the reply in its context.',
-    invitation: 'Invite them to give their coworker a task that genuinely needs a human\'s judgment, then watch the round-trip. The insight is felt when the human\'s words come back into the AI\'s work.',
-    externalReference: 'This is the foundational primitive of mixed-team work — what people call "human-in-the-loop" in agent systems. Before orchestration or delegation, AI and humans need a way to actually exchange work on one task.',
+    nowAvailable: 'Coworkers can now produce an artifact and send it to a human for approval. A new Request Review tool is available: the coworker drafts the full file, the user picks a reviewer, the reviewer sees draft + AI reasoning and approves or rejects, then the user gives final sign-off — the file is saved only when both gates say yes.',
+    invitation: 'Invite them to give their coworker a task that produces a concrete output, then watch the two-gate flow. The insight is felt when the draft is reviewed by a teammate and only lands in the workspace after both humans agree.',
+    externalReference: 'This is the foundational primitive of mixed-team work — human-in-the-loop review. Before orchestration chains it, AI and humans need a way to co-produce one artifact with real gates.',
   },
   '6': {
-    nowAvailable: 'Delegation — a new tab where they can describe a piece of work and see two panels side-by-side: how it looks staffed by humans only (roles + skills) vs. a mixed team of humans and AI coworkers.',
-    invitation: 'Invite them to open the Delegation tab and describe a real piece of work from their job. The two-panel view makes the routine-vs-creative split visible — what becomes AI, what stays human.',
-    externalReference: 'This is the Delegation Dilemma made visible — agentic AI adoption is organizational redesign, not a technical upgrade. The heuristic: work that can live in a document + knowledge base can be an AI coworker; work that requires dynamic, creative thinking stays human.',
-  },
-  '7': {
-    nowAvailable: 'Orchestration — the Orchestration tab (formerly Workflow) lets them chain AI coworkers, human approvals, and system actions into a multi-step process with human-in-loop checks.',
-    invitation: 'Invite them to take one slice of the Delegation map they just built and make it real — wire coworkers into a sequence, add an approval step where a human signs off.',
+    nowAvailable: 'Orchestration — chain AI coworkers and human approval steps into a multi-step workflow. Each coworker step processes upstream output with its knowledge + instructions; each human step reviews and either approves (flow continues) or rejects with feedback (flow halts and bounces back to the previous human step for revision).',
+    invitation: 'Invite them to chain the Stage 5c primitive they just felt — put a coworker, then a reviewer, then another coworker, then another reviewer. Run it. See a mixed team produce one outcome through several hands.',
     externalReference: 'Same primitive as Temporal, n8n, or Zapier — but with AI coworkers as first-class steps and humans pausing the flow for review.',
   },
-  '8': {
-    nowAvailable: 'Observability — the Observability tab (formerly Activity) shows every orchestration run, approval, and tool call on the record. The audit trail for a mixed team.',
+  '7': {
+    nowAvailable: 'Observability — every orchestration run, approval, and tool call on the record. The audit trail for a mixed team.',
     invitation: 'Invite them to look at what\'s already happened in the workshop — the runs, the approvals they gave, the tools that fired. This is how a mixed team stays accountable.',
     externalReference: 'Same role as Datadog, OpenTelemetry, or Grafana in a software system — but for a team of humans and agents working together.',
   },

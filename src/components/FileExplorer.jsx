@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { KNOWLEDGE_TEMPLATE, INSTRUCTION_TEMPLATE } from '../data/starterContent';
 import { parseFile, getFileIcon, getFileCategory } from '../utils/fileParser';
 import EducationalCue from './EducationalCue';
@@ -132,6 +132,26 @@ export default function FileExplorer({ fileTree, selectedFileId, onSelectFile, o
   const breadcrumb = buildPath(fileTree, currentFolderId);
   const rawItems = currentFolder.children || [];
   const skillsRevealed = stageReached(currentStage, '4');
+
+  // Backfill: once Stage 4 is reached, every top-level folder should have a
+  // `skills` subfolder beside `knowledge`. Folders created before Stage 4 only
+  // got `knowledge`, so add `skills` if it's missing. Idempotent — runs again
+  // on tree changes but does nothing when every top folder already has both.
+  useEffect(() => {
+    if (!skillsRevealed || !fileTree?.children) return;
+    let dirty = false;
+    const updated = JSON.parse(JSON.stringify(fileTree));
+    for (const folder of (updated.children || [])) {
+      if (folder.type !== 'folder') continue;
+      const hasSkills = (folder.children || []).some(c => c.type === 'folder' && c.name === 'skills');
+      if (!hasSkills) {
+        folder.children = folder.children || [];
+        folder.children.push({ id: genId(), name: 'skills', type: 'folder', children: [] });
+        dirty = true;
+      }
+    }
+    if (dirty) onUpdateTree(updated);
+  }, [skillsRevealed, fileTree, onUpdateTree]);
   // Stage 4 reveals the skills subfolder. Before that, hide it even if present
   // in the data — the reveal is additive: at stage 3 each dept shows only its
   // knowledge folder; at stage 4 skills joins it as a sibling.
@@ -181,10 +201,11 @@ export default function FileExplorer({ fileTree, selectedFileId, onSelectFile, o
       const isTopLevelCreate = parent.id === fileTree.id;
       const children = [];
       if (isTopLevelCreate) {
+        // Always write both subfolders. Skills is hidden by the stage-4 UI
+        // filter until the reveal, so the data is consistent no matter when
+        // the folder was created.
         children.push({ id: genId(), name: 'knowledge', type: 'folder', children: [] });
-        if (skillsRevealed) {
-          children.push({ id: genId(), name: 'skills', type: 'folder', children: [] });
-        }
+        children.push({ id: genId(), name: 'skills', type: 'folder', children: [] });
       }
       parent.children.push({
         id: genId(),

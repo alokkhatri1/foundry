@@ -52,7 +52,6 @@ export async function executeWorkflowRun({
   onLog,                // (entry) => void
   getApprovalDecision,  // (runId, stepId, config) => Promise<{action, comment}>
 }) {
-  const correctionCounts = {};
   const previousOutputs = [];
 
   onMessage({ type: 'user', content: caseInput });
@@ -126,31 +125,22 @@ export async function executeWorkflowRun({
       stepIndex++;
 
     } else if (step.type === 'approval') {
-      const correctionKey = step.id;
-      if (!correctionCounts[correctionKey]) correctionCounts[correctionKey] = 0;
-      const correctionsUsed = correctionCounts[correctionKey];
-      const maxCorrections = step.maxCorrections || 3;
-
       onStepUpdate(runId, stepIndex, { status: 'waiting' });
       onRunUpdate(runId, { status: 'waiting_approval' });
 
       onMessage({
         type: 'approval',
         runId,
-        prompt: step.prompt || 'Review and approve or reject',
-        actions: step.actions || ['Approve', 'Reject', 'Request Correction', 'Escalate'],
+        prompt: step.prompt || 'Review the upstream output and approve or reject with feedback',
+        actions: ['Approve', 'Reject'],
         previousOutput: previousOutputs[previousOutputs.length - 1] || '',
-        maxCorrections,
-        correctionsRemaining: maxCorrections - correctionsUsed,
         resolved: false,
       });
 
       // Wait for human decision
       const decision = await getApprovalDecision(runId, step.id, {
         prompt: step.prompt,
-        actions: step.actions || ['Approve', 'Reject', 'Request Correction', 'Escalate'],
-        maxCorrections,
-        correctionsUsed,
+        actions: ['Approve', 'Reject'],
         assigneeId: step.assigneeId,
         assigneeName: step.assigneeName,
       });
@@ -160,20 +150,27 @@ export async function executeWorkflowRun({
       onLog({ type: 'approval', message: `${userName}: ${decision.action}${decision.comment ? ' | "' + decision.comment + '"' : ''}` });
 
       if (decision.action === 'Reject') {
-        onRunUpdate(runId, { status: 'rejected', completedAt: Date.now() });
-        onMessage({ type: 'status', content: 'Workflow rejected' });
-        onLog({ type: 'workflow', message: 'status: REJECTED' });
-        return;
-      } else if (decision.action === 'Request Correction') {
-        correctionCounts[correctionKey]++;
-        const targetIndex = workflow.steps.findIndex(s => s.id === step.correctionTarget);
-        if (targetIndex >= 0) {
-          onMessage({ type: 'status', content: `Correction requested — returning to Step ${targetIndex + 1}` });
-          stepIndex = targetIndex;
-          previousOutputs.length = 0;
-        } else {
-          stepIndex++;
+        // Bounce back to the previous human step for revision. Downstream
+        // coworker steps between there and here will re-run with the
+        // reviewer's feedback woven into context. If there was no previous
+        // human step, this is a final reject — nothing upstream to bounce
+        // to.
+        let prevHumanIdx = -1;
+        for (let i = stepIndex - 1; i >= 0; i--) {
+          if (workflow.steps[i].type === 'approval') { prevHumanIdx = i; break; }
         }
+        if (prevHumanIdx < 0) {
+          onRunUpdate(runId, { status: 'rejected', completedAt: Date.now() });
+          onMessage({ type: 'status', content: `Workflow finally rejected (no previous human to revise with)` });
+          onLog({ type: 'workflow', message: 'status: FINAL_REJECTED' });
+          return;
+        }
+        // Append the rejection feedback so re-running coworker steps see it.
+        const feedbackNote = `### ${step.name} — rejected by ${decision.resolvedBy || 'reviewer'}\n${decision.comment || '(no feedback given)'}`;
+        previousOutputs.push(feedbackNote);
+        onMessage({ type: 'status', content: `Rejected — bouncing back to Step ${prevHumanIdx + 1} (${workflow.steps[prevHumanIdx].name}) for revision` });
+        onLog({ type: 'workflow', message: `bounce to step ${prevHumanIdx + 1}` });
+        stepIndex = prevHumanIdx;
       } else {
         stepIndex++;
       }

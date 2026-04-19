@@ -166,21 +166,11 @@ function StepCard({ step, index, coworkers, tools, participants, onUpdate, onDel
                   </div>
                 )}
                 <div className="step-config-row">
-                  <label>Approval Prompt</label>
-                  <textarea value={step.prompt || ''} onChange={e => onUpdate({ ...step, prompt: e.target.value })} placeholder="Instructions for the reviewer..." />
+                  <label>Review prompt</label>
+                  <textarea value={step.prompt || ''} onChange={e => onUpdate({ ...step, prompt: e.target.value })} placeholder="What should the reviewer check?" />
                 </div>
-                <div className="step-config-row">
-                  <label>Max Correction Loops</label>
-                  <input type="number" min="1" max="10" value={step.maxCorrections || 3} onChange={e => onUpdate({ ...step, maxCorrections: parseInt(e.target.value) || 3 })} />
-                </div>
-                <EducationalCue cueId="workflow-correction-loop" show={showEducationalCues} />
-                <div className="step-config-row">
-                  <label>Correction Target (jump back to step)</label>
-                  <select value={step.correctionTarget || ''} onChange={e => onUpdate({ ...step, correctionTarget: e.target.value })}>
-                    <option value="">Select step...</option>
-                    {allSteps.filter((s, i) => i < index).map((s, i) => <option key={s.id} value={s.id}>Step {i + 1}: {s.name}</option>)}
-                  </select>
-                  {validationErrors?.noCorrectionTarget && <div className="validation-error">Correction target required</div>}
+                <div className="step-config-hint">
+                  On reject the run bounces back to the previous review step for revision (or final-rejects if there's no prior human review).
                 </div>
               </>
             )}
@@ -276,7 +266,7 @@ function WorkflowEditor({ workflow, onUpdateWorkflow, fileTree, coworkers, tools
       id: genStepId(), type,
       name: type === 'agent' ? 'New Agent Step' : type === 'approval' ? 'Human Review' : 'System Action',
       ...(type === 'agent' && { coworkerId: '', inputDescription: '' }),
-      ...(type === 'approval' && { assigneeId: '', prompt: '', actions: ['Approve', 'Reject', 'Request Correction', 'Escalate'], maxCorrections: 3, correctionTarget: '' }),
+      ...(type === 'approval' && { assigneeId: '', prompt: '', actions: ['Approve', 'Reject'] }),
       ...(type === 'system' && { toolId: '', description: '' }),
       ...(type === 'tool' && { toolId: '', description: '' }),
     };
@@ -291,10 +281,6 @@ function WorkflowEditor({ workflow, onUpdateWorkflow, fileTree, coworkers, tools
     workflow.steps.forEach((step) => {
       errors[step.id] = {};
       if (step.type === 'agent' && !step.coworkerId) { errors[step.id].noAgent = true; valid = false; }
-      if (step.type === 'approval') {
-        const hasCorrectionAction = (step.actions || []).includes('Request Correction');
-        if (hasCorrectionAction && !step.correctionTarget) { errors[step.id].noCorrectionTarget = true; valid = false; }
-      }
     });
     setValidationErrors(errors);
     return { valid, errors };

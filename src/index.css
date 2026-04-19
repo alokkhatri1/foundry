@@ -1405,6 +1405,16 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
 .step-config-row input:focus,
 .step-config-row textarea:focus { border-color: var(--accent-gold); background: var(--bg-white); }
 .step-config-row textarea { resize: vertical; min-height: 60px; font-family: inherit; }
+.step-config-hint {
+  margin-top: 10px;
+  padding: 8px 12px;
+  font-size: 12px;
+  color: var(--text-muted);
+  font-style: italic;
+  line-height: 1.5;
+  background: var(--bg-warm);
+  border-radius: var(--radius-sm);
+}
 .knowledge-checkboxes { display: flex; flex-direction: column; gap: 6px; margin-top: 4px; }
 .knowledge-checkboxes label { display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 400; color: var(--text-dark); cursor: pointer; }
 .workflow-actions-bar {

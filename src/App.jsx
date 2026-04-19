@@ -1201,7 +1201,7 @@ function App() {
     // Try run-specific resolver first
     const resolver = approvalResolversRef.current.get(runId);
     if (resolver) {
-      resolver({ action, comment });
+      resolver({ action, comment, resolvedBy: userName });
       approvalResolversRef.current.delete(runId);
     }
     // Log to Supabase

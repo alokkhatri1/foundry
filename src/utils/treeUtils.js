@@ -180,12 +180,74 @@ export function mapWorkflowRow(row) {
 // sequential edges wired from one step's 'out' handle to the next step's
 // 'in' handle. The runtime still reads steps[] for now; nodes/edges ride
 // alongside until the DAG runtime replaces the sequential loop in phase 5.
+//
+// Also ensures every workflow has a Trigger step at index 0. The trigger is
+// the canonical entry point — it holds the case input text so the header Run
+// button can just fire instead of popping a modal. Old workflows that
+// predate the trigger get one transparently prepended on load.
 export function ensureDagShape(workflow) {
   if (!workflow) return workflow;
-  const steps = workflow.steps || [];
+  let steps = workflow.steps || [];
+
+  const hasTrigger = steps.length > 0 && steps[0].type === 'trigger';
+  if (!hasTrigger) {
+    const triggerStep = {
+      id: 'trigger-' + (workflow.id || Date.now()),
+      type: 'trigger',
+      name: 'Trigger',
+      caseInput: '',
+    };
+    steps = [triggerStep, ...steps];
+  }
+
+  // Phase 4 handle migration: review steps used to have a single 'out' handle;
+  // they now have two — 'approved' (default forward) and 'rejected'. Any
+  // existing edge from a review source with sourceHandle='out' gets rewritten
+  // to 'approved' so it connects to the new handle on reload.
+  const isApprovalId = new Set(steps.filter(s => s.type === 'approval').map(s => s.id));
+  function migrateEdgeHandle(e) {
+    if (isApprovalId.has(e.source) && (!e.sourceHandle || e.sourceHandle === 'out')) {
+      return { ...e, sourceHandle: 'approved' };
+    }
+    return e;
+  }
+
+  // Auto-wire helper: the default outgoing handle depends on source type.
+  // Review nodes emit on 'approved' by default (rejected is explicit).
+  function autoWireEdge(sourceStep, targetStep) {
+    const sourceHandle = sourceStep.type === 'approval' ? 'approved' : 'out';
+    return {
+      id: `edge-${sourceStep.id}-${targetStep.id}`,
+      source: sourceStep.id,
+      target: targetStep.id,
+      sourceHandle,
+      targetHandle: 'in',
+    };
+  }
+
   const hasDag = Array.isArray(workflow.nodes) && workflow.nodes.length > 0;
   if (hasDag) {
-    return { ...workflow, edges: Array.isArray(workflow.edges) ? workflow.edges : [] };
+    let nodes = workflow.nodes;
+    let edges = (Array.isArray(workflow.edges) ? workflow.edges : []).map(migrateEdgeHandle);
+    if (!hasTrigger) {
+      // Just prepended a trigger — give it a node at the top and auto-wire
+      // to whatever was step[0] before (now steps[1]).
+      const triggerStep = steps[0];
+      const topY = Math.min(...nodes.map(n => n.position?.y ?? 0), 0);
+      nodes = [
+        {
+          id: triggerStep.id,
+          type: 'trigger',
+          position: { x: 240, y: topY - 220 },
+          data: { ...triggerStep },
+        },
+        ...nodes,
+      ];
+      if (steps.length > 1) {
+        edges = [autoWireEdge(triggerStep, steps[1]), ...edges];
+      }
+    }
+    return { ...workflow, steps, nodes, edges };
   }
   const nodes = steps.map((step, i) => ({
     id: step.id,
@@ -195,13 +257,7 @@ export function ensureDagShape(workflow) {
   }));
   const edges = [];
   for (let i = 0; i < steps.length - 1; i++) {
-    edges.push({
-      id: `edge-${steps[i].id}-${steps[i + 1].id}`,
-      source: steps[i].id,
-      target: steps[i + 1].id,
-      sourceHandle: 'out',
-      targetHandle: 'in',
-    });
+    edges.push(autoWireEdge(steps[i], steps[i + 1]));
   }
-  return { ...workflow, nodes, edges };
+  return { ...workflow, steps, nodes, edges };
 }

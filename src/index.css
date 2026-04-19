@@ -1384,6 +1384,14 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
 .wf-canvas-node { cursor: default; }
 .wf-canvas-node .step-drag-wrapper { width: 100%; }
 .wf-canvas-node .workflow-step-card.on-canvas { cursor: pointer; box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
+/* Trigger node — the canonical entry point. Greener accent, soft-tinted bg
+   so it reads as "start here" at a glance in the canvas. */
+.wf-trigger-node .workflow-step-card {
+  background: #f0f6f1;
+  border-left-color: var(--accent-system, #5a8f6b);
+}
+.wf-trigger-node .step-number.trigger { background: var(--accent-system, #5a8f6b); }
+.wf-trigger-node .step-type-label.trigger { background: #e1efe4; color: var(--accent-system, #5a8f6b); }
 /* Connection handles on each node — small circle top/bottom, hover to enlarge */
 .wf-handle {
   width: 12px !important;
@@ -1396,6 +1404,26 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
 .wf-handle:hover { transform: scale(1.3); background: var(--accent-gold, #c8956c) !important; }
 .wf-handle-in  { top: -6px !important; }
 .wf-handle-out { bottom: -6px !important; }
+/* Typed handles on Review — approved (green) forward path, rejected (red)
+   revision path. Colors echo the edge stroke so a rejection path is
+   visually traceable from handle through wire to its target. */
+.wf-handle-approved { border-color: #5a9e6f !important; }
+.wf-handle-approved:hover { background: #5a9e6f !important; }
+.wf-handle-rejected { border-color: #c45c5c !important; }
+.wf-handle-rejected:hover { background: #c45c5c !important; }
+.wf-review-outputs {
+  display: flex;
+  justify-content: space-between;
+  padding: 4px 22px 8px;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  border-top: 1px solid var(--border-color);
+  background: #fafaf8;
+}
+.wf-review-output-label.approved { color: #5a9e6f; }
+.wf-review-output-label.rejected { color: #c45c5c; }
 .react-flow__edge-path { stroke: var(--accent-gold, #c8956c); stroke-width: 2; }
 .react-flow__edge.selected .react-flow__edge-path { stroke: var(--text-dark); stroke-width: 3; }
 .wf-canvas-empty {
@@ -1422,6 +1450,7 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
 .workflow-step-card.agent { border-left-color: var(--accent-agent); }
 .workflow-step-card.approval { border-left-color: var(--accent-approval); }
 .workflow-step-card.system { border-left-color: var(--accent-system); }
+.workflow-step-card.trigger { border-left-color: var(--accent-system, #5a8f6b); }
 .workflow-step-card.running { border-color: var(--accent-agent); }
 .step-card-header { display: flex; align-items: center; padding: 12px 16px; gap: 10px; cursor: pointer; }
 .step-number {
@@ -1432,6 +1461,7 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
 .step-number.agent { background: var(--accent-agent); }
 .step-number.approval { background: var(--accent-approval); }
 .step-number.system { background: var(--accent-system); }
+.step-number.trigger { background: var(--accent-system, #5a8f6b); }
 .step-type-label {
   font-size: 10px; font-weight: 600; text-transform: uppercase;
   letter-spacing: 0.5px; padding: 2px 8px; border-radius: var(--radius-pill);
@@ -1439,6 +1469,7 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
 .step-type-label.agent { background: #e8f0f8; color: var(--accent-agent); }
 .step-type-label.approval { background: #fdf0e6; color: #b8784e; }
 .step-type-label.system { background: #e8f4ec; color: var(--accent-system); }
+.step-type-label.trigger { background: #e1efe4; color: var(--accent-system, #5a8f6b); }
 .step-name { flex: 1; font-weight: 600; font-size: 14px; color: var(--text-dark); }
 .step-name-input { flex: 1; font-weight: 600; font-size: 14px; border: none; outline: none; background: transparent; padding: 0; }
 .step-actions { display: flex; gap: 4px; }
@@ -1873,6 +1904,65 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
 .wf-card-flow-dot.agent { border-color: var(--accent-agent); }
 .wf-card-flow-dot.approval { border-color: var(--accent-approval); }
 .wf-card-flow-dot.system { border-color: var(--accent-system); }
+.wf-card-flow-dot.trigger { border-color: var(--accent-system, #5a8f6b); }
+/* Coworker node "Save to Coworkers tab" row — sits below the inline editor.
+   Pushes a decoupled snapshot to the shared coworker pool. */
+.step-library-row {
+  margin-top: 16px;
+  padding: 12px;
+  background: var(--bg-warm);
+  border: 1px dashed var(--border-color);
+  border-radius: var(--radius-sm);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.step-library-btn {
+  align-self: flex-start;
+  padding: 8px 14px;
+  background: var(--text-dark, #2c2c2c);
+  color: #fff;
+  border: none;
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.step-library-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.step-library-btn:hover:not(:disabled) { background: #000; }
+.step-library-hint { font-size: 11px; color: var(--text-muted); line-height: 1.4; }
+/* Skipped node — unreachable from the Trigger via wired edges. Dim the card
+   and tag it so the user notices the stray node after a run. */
+.workflow-step-card.skipped { opacity: 0.55; }
+.workflow-step-card.skipped.on-canvas { box-shadow: none; }
+.step-status-badge.skipped { background: #e0ded8; color: var(--text-muted); }
+/* Phase 7: run-state overlays on canvas nodes. Pulses while running/waiting
+   so the current step is unmistakable even at a zoomed-out glance; solid
+   tinted glow for completed/rejected so state is readable after the run. */
+@keyframes wf-pulse-running {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(74, 127, 181, 0.45); }
+  50% { box-shadow: 0 0 0 10px rgba(74, 127, 181, 0); }
+}
+@keyframes wf-pulse-waiting {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(200, 149, 108, 0.55); }
+  50% { box-shadow: 0 0 0 10px rgba(200, 149, 108, 0); }
+}
+.wf-canvas-node .workflow-step-card.running {
+  animation: wf-pulse-running 1.6s ease-in-out infinite;
+  border-color: var(--accent-agent, #4a7fb5);
+}
+.wf-canvas-node .workflow-step-card.waiting {
+  animation: wf-pulse-waiting 1.6s ease-in-out infinite;
+  border-color: #c8956c;
+}
+.wf-canvas-node .workflow-step-card.completed {
+  box-shadow: 0 0 0 2px rgba(90, 158, 111, 0.35);
+  border-color: #5a9e6f;
+}
+.wf-canvas-node .workflow-step-card.rejected {
+  box-shadow: 0 0 0 2px rgba(196, 92, 92, 0.35);
+  border-color: #c45c5c;
+}
 .validation-error { color: var(--accent-error); font-size: 12px; margin-top: 4px; padding: 4px 8px; background: #fdf0f0; border-radius: 4px; }
 
 /* Drag handle & chevron */

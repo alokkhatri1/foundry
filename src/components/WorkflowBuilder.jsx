@@ -1,10 +1,34 @@
-import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
-import ReactFlow, { Background, Controls, Handle, Position, applyNodeChanges, applyEdgeChanges, addEdge } from 'reactflow';
+import { useState, useEffect, useCallback, useMemo } from 'react';
+import ReactFlow, { Background, Controls, MiniMap, Handle, Position, applyNodeChanges, applyEdgeChanges, addEdge } from 'reactflow';
 import 'reactflow/dist/style.css';
-import { parseFile, getFileIcon, getFileCategory } from '../utils/fileParser';
 import EducationalCue from './EducationalCue';
 import { CoworkerGlyph } from './Icon';
 import RichText from './RichText';
+import { AvatarDisplay, AvatarPicker, DescriptionSection, FilePicker } from './CoworkerBuilder';
+
+// Resolve a step's coworker data. New-style steps embed the full coworker
+// config at step.coworker (self-contained, decoupled from the shared pool).
+// Old-style steps stored only step.coworkerId pointing at the shared pool —
+// fall back to looking it up until the user edits the step, at which point
+// the editor writes step.coworker and this branch stops mattering.
+function resolveStepCoworker(step, coworkers) {
+  if (step?.coworker) return step.coworker;
+  if (step?.coworkerId) return (coworkers || []).find(c => c.id === step.coworkerId) || null;
+  return null;
+}
+
+function emptyCoworker() {
+  return {
+    name: '',
+    role: '',
+    avatar: 'icon:user',
+    color: '#4a7fb5',
+    instructionFileIds: [],
+    knowledgeFileIds: [],
+    toolIds: [],
+    toolConfigs: {},
+  };
+}
 
 let stepCounter = Date.now();
 function genStepId() { return 'step-' + (stepCounter++); }
@@ -23,12 +47,12 @@ function getAllFolders(tree, path = []) {
   return folders;
 }
 
-// ===== React Flow node wrapper =====
+// ===== React Flow node wrappers =====
 // Each step renders inside a React Flow node as a StepCard. The node's
 // position comes from workflow.nodes[i].position; the step's config lives in
 // data.stepCardProps. The drag-handle and drop-zone behavior inside StepCard
 // is suppressed when onCanvas is true — position drag happens via React Flow.
-function StepNode({ data }) {
+function CoworkerStepNode({ data }) {
   return (
     <div className="wf-canvas-node" style={{ width: 420 }}>
       <Handle type="target" position={Position.Top} id="in" className="wf-handle wf-handle-in" />
@@ -38,15 +62,60 @@ function StepNode({ data }) {
   );
 }
 
-const nodeTypes = { agent: StepNode, approval: StepNode };
+// Review node — two typed outputs: approved (green) and rejected (red).
+// Phase 6 wires the rejected path through the runtime; for now this node
+// just exposes the handles so the user can draw both paths on the canvas.
+function ReviewStepNode({ data }) {
+  return (
+    <div className="wf-canvas-node wf-review-node" style={{ width: 420 }}>
+      <Handle type="target" position={Position.Top} id="in" className="wf-handle wf-handle-in" />
+      <StepCard {...data.stepCardProps} onCanvas />
+      <div className="wf-review-outputs">
+        <span className="wf-review-output-label approved">Approved</span>
+        <span className="wf-review-output-label rejected">Rejected</span>
+      </div>
+      <Handle
+        type="source"
+        position={Position.Bottom}
+        id="approved"
+        className="wf-handle wf-handle-out wf-handle-approved"
+        style={{ left: '30%' }}
+      />
+      <Handle
+        type="source"
+        position={Position.Bottom}
+        id="rejected"
+        className="wf-handle wf-handle-out wf-handle-rejected"
+        style={{ left: '70%' }}
+      />
+    </div>
+  );
+}
 
-// Cycle prevention: before adding edge A→B, walk forward from B and if we can
-// reach A through existing edges, reject. Linear chains are always acyclic;
-// this only matters once users start wiring loop-back paths for revision.
-function wouldCreateCycle(edges, sourceId, targetId) {
+// Trigger node — the canonical entry point. No input handle (nothing upstream),
+// one output wire carrying the case input into the first real step.
+function TriggerNode({ data }) {
+  return (
+    <div className="wf-canvas-node wf-trigger-node" style={{ width: 420 }}>
+      <StepCard {...data.stepCardProps} onCanvas />
+      <Handle type="source" position={Position.Bottom} id="out" className="wf-handle wf-handle-out" />
+    </div>
+  );
+}
+
+const nodeTypes = { agent: CoworkerStepNode, approval: ReviewStepNode, trigger: TriggerNode };
+
+// Cycle prevention: before adding a new edge A→B, walk forward from B via
+// the existing edges and reject if we can reach A. Rejected-path edges are
+// allowed to close cycles — that's how revision loops get expressed (Phase 6:
+// "reject bounces back to this coworker"). So the forward walk only follows
+// approved/default edges when looking for a cycle closure.
+function wouldCreateCycle(edges, sourceId, targetId, sourceHandle) {
   if (sourceId === targetId) return true;
+  if (sourceHandle === 'rejected') return false;
   const adj = new Map();
   for (const e of edges) {
+    if ((e.sourceHandle || '') === 'rejected') continue;
     if (!adj.has(e.source)) adj.set(e.source, []);
     adj.get(e.source).push(e.target);
   }
@@ -62,20 +131,73 @@ function wouldCreateCycle(edges, sourceId, targetId) {
   return false;
 }
 
+// Edge styling hook — approved/default edges stay gold, rejected edges are
+// red. Keeps the visual language consistent with the handle colors so users
+// can trace a rejection path at a glance.
+function styleEdge(e) {
+  const isRejected = (e.sourceHandle || '') === 'rejected';
+  return {
+    ...e,
+    type: 'default',
+    style: {
+      stroke: isRejected ? '#c45c5c' : '#c8956c',
+      strokeWidth: 2,
+    },
+  };
+}
+
 // ===== Step Card =====
-function StepCard({ step, index, coworkers, tools, participants, onUpdate, onDelete, expanded, onToggleExpand, validationErrors, allSteps, currentStepId, stepResult, isDragging, dragOverPos, onDragStart, onDragOver, onDragEnd, onDrop, showEducationalCues, onCanvas, fileTree }) {
+function StepCard({ step, index, coworkers, tools, participants, onUpdate, onDelete, expanded, onToggleExpand, validationErrors, allSteps, currentStepId, stepResult, isDragging, dragOverPos, onDragStart, onDragOver, onDragEnd, onDrop, showEducationalCues, onCanvas, fileTree, callClaudeAPI, onSaveCoworkerToLibrary }) {
   const isRunning = currentStepId === step.id;
-  const assignedCw = step.coworkerId ? coworkers?.find(c => c.id === step.coworkerId) : null;
+  const assignedCw = step.type === 'agent' ? resolveStepCoworker(step, coworkers) : null;
   const assignedPerson = step.assigneeId ? participants?.find(p => p.id === step.assigneeId) : null;
+  const [showAvatarPicker, setShowAvatarPicker] = useState(false);
+  const [libraryState, setLibraryState] = useState('idle');
+
+  // Ensure the agent step has an embedded coworker object before edits fire.
+  // Old-style steps that only have coworkerId seed their embedded coworker
+  // from the shared pool on first interaction, so later edits stay local
+  // (the "decoupled after touch" contract).
+  function updateCoworker(updater) {
+    const current = step.coworker || (assignedCw
+      ? { name: assignedCw.name, role: assignedCw.role, avatar: assignedCw.avatar, color: assignedCw.color,
+          instructionFileIds: assignedCw.instructionFileIds || [], knowledgeFileIds: assignedCw.knowledgeFileIds || [],
+          toolIds: assignedCw.toolIds || [], toolConfigs: assignedCw.toolConfigs || {} }
+      : emptyCoworker());
+    const next = typeof updater === 'function' ? updater(current) : { ...current, ...updater };
+    // Drop the legacy coworkerId reference once we own a local copy.
+    const { coworkerId: _drop, ...rest } = step;
+    onUpdate({ ...rest, coworker: next });
+  }
+
+  function handleSaveToLibrary() {
+    if (!onSaveCoworkerToLibrary) return;
+    const snapshot = step.coworker || assignedCw;
+    if (!snapshot?.name?.trim()) return;
+    onSaveCoworkerToLibrary({
+      name: snapshot.name,
+      role: snapshot.role || '',
+      avatar: snapshot.avatar || 'icon:user',
+      color: snapshot.color || '#4a7fb5',
+      instructionFileIds: snapshot.instructionFileIds || [],
+      knowledgeFileIds: snapshot.knowledgeFileIds || [],
+      toolIds: snapshot.toolIds || [],
+      toolConfigs: snapshot.toolConfigs || {},
+    });
+    setLibraryState('saved');
+    setTimeout(() => setLibraryState('idle'), 2000);
+  }
 
   // Live run state derived from the run's stepResults entry.
   const runStatus = stepResult?.status || 'pending';
   const isWaiting = runStatus === 'waiting';
   const isCompleted = runStatus === 'completed';
   const isRejected = runStatus === 'rejected' || runStatus === 'error';
+  const isSkipped = runStatus === 'skipped';
   const cardStateClass = isWaiting ? ' waiting'
     : isCompleted ? ' completed'
     : isRejected ? ' rejected'
+    : isSkipped ? ' skipped'
     : isRunning ? ' running'
     : '';
 
@@ -95,6 +217,7 @@ function StepCard({ step, index, coworkers, tools, participants, onUpdate, onDel
     : isWaiting ? <span className="step-status-badge waiting">Waiting on {assignedPerson?.name || 'a reviewer'}</span>
     : isCompleted ? <span className="step-status-badge done">{'\u2713'} Done</span>
     : isRejected ? <span className="step-status-badge rejected">Rejected</span>
+    : isSkipped ? <span className="step-status-badge skipped">Skipped</span>
     : null;
 
   return (
@@ -108,23 +231,31 @@ function StepCard({ step, index, coworkers, tools, participants, onUpdate, onDel
     >
       <div className={`workflow-step-card ${step.type}${cardStateClass}${expanded ? ' expanded' : ''}${onCanvas ? ' on-canvas' : ''}`}>
         <div className="step-card-header" onClick={onToggleExpand}>
-          {!onCanvas && <span className="step-drag-handle" title="Drag to reorder">{'\u2630'}</span>}
+          {!onCanvas && step.type !== 'trigger' && <span className="step-drag-handle" title="Drag to reorder">{'\u2630'}</span>}
           <span className={`step-number ${step.type}${isCompleted ? ' done' : ''}`}>
-            {isCompleted ? '\u2713' : index + 1}
+            {isCompleted
+              ? '\u2713'
+              : step.type === 'trigger'
+                ? '\u25B6'
+                : ((allSteps || []).filter(s => s.type !== 'trigger').findIndex(s => s.id === step.id) + 1)}
           </span>
           <span className={`step-type-label ${step.type}`}>
-            {step.type === 'agent' ? 'Coworker' : 'Review'}
+            {step.type === 'agent' ? 'Coworker' : step.type === 'approval' ? 'Review' : 'Trigger'}
           </span>
           {assignee && (
             <span className="step-assignee-badge" style={{ background: assignee.color || '#ccc' }}>
               {assignee.icon}
             </span>
           )}
-          <span className="step-name">{step.name}</span>
-          {assignee && <span className="step-assignee-name">{assignee.name}</span>}
+          <span className="step-name">
+            {step.type === 'agent'
+              ? (assignedCw?.name?.trim() || 'New Coworker')
+              : step.name}
+          </span>
+          {step.type !== 'agent' && assignee && <span className="step-assignee-name">{assignee.name}</span>}
           {statusBadge}
           <span className="step-actions">
-            {!stepResult && (
+            {!stepResult && step.type !== 'trigger' && (
               <button className="step-action-btn step-delete-btn" onClick={e => { e.stopPropagation(); onDelete(); }} title="Delete">{'\u2715'}</button>
             )}
             <span className={`step-chevron${expanded ? ' open' : ''}`}>{'\u25BE'}</span>
@@ -149,42 +280,113 @@ function StepCard({ step, index, coworkers, tools, participants, onUpdate, onDel
         )}
         {expanded && !stepResult && (
           <div className="step-card-body">
-            <div className="step-config-row">
-              <label>Step Name</label>
-              <input type="text" value={step.name} onChange={e => onUpdate({ ...step, name: e.target.value })} />
-            </div>
+            {step.type === 'approval' && (
+              <div className="step-config-row">
+                <label>Step Name</label>
+                <input type="text" value={step.name} onChange={e => onUpdate({ ...step, name: e.target.value })} />
+              </div>
+            )}
 
-            {step.type === 'agent' && (
+            {step.type === 'trigger' && (
               <>
-                <EducationalCue cueId="step-type-agent" show={showEducationalCues} />
                 <div className="step-config-row">
-                  <label>Assign Coworker</label>
-                  <select value={step.coworkerId || ''} onChange={e => onUpdate({ ...step, coworkerId: e.target.value })}>
-                    <option value="">Select a coworker...</option>
-                    {(coworkers || []).map(c => (
-                      <option key={c.id} value={c.id}>{c.name} — {c.role}</option>
-                    ))}
-                  </select>
-                  {(coworkers || []).length === 0 && <div className="validation-error" style={{ background: '#f5f0e8', color: 'var(--text-body)' }}>No coworkers yet. Go to the Coworkers tab to add one.</div>}
-                  {validationErrors?.noAgent && <div className="validation-error">Coworker is required</div>}
+                  <label>Case Input</label>
+                  <textarea
+                    value={step.caseInput || ''}
+                    onChange={e => onUpdate({ ...step, caseInput: e.target.value })}
+                    placeholder="Describe the case this workflow should process. The first coworker step sees this directly; downstream steps also receive upstream outputs."
+                    rows={5}
+                  />
                 </div>
-                {assignedCw && (
-                  <div className="step-agent-info">
-                    <span className="step-agent-info-avatar" style={{ background: assignedCw.color }}>
-                      <CoworkerGlyph avatar={assignedCw.avatar} size={16} color="#ffffff" />
-                    </span>
-                    <div>
-                      <div className="step-agent-info-name">{assignedCw.name}</div>
-                      <div className="step-agent-info-role">{assignedCw.role}</div>
-                    </div>
-                  </div>
-                )}
-                <div className="step-config-row">
-                  <label>Input Description</label>
-                  <textarea value={step.inputDescription || ''} onChange={e => onUpdate({ ...step, inputDescription: e.target.value })} placeholder="What does this step process?" />
+                <div className="step-config-hint">
+                  The header Run button fires with whatever is in this field. Fill it in, press Run, watch the token walk down the chain.
                 </div>
               </>
             )}
+
+            {step.type === 'agent' && (() => {
+              // Inline coworker editor — same pattern as the Coworkers tab.
+              // Embedded on the step so the node is self-contained; saving
+              // to the library (button below) pushes a decoupled copy to
+              // the shared pool.
+              const cw = step.coworker || assignedCw || emptyCoworker();
+              return (
+                <>
+                  <EducationalCue cueId="step-type-agent" show={showEducationalCues} />
+                  <div className="cwb-section cwb-section-identity">
+                    <div className="cwb-identity">
+                      <div
+                        className="cwb-identity-avatar-btn"
+                        style={{ background: cw.color || '#4a7fb5' }}
+                        onClick={() => setShowAvatarPicker(!showAvatarPicker)}
+                      >
+                        <AvatarDisplay avatar={cw.avatar} color={cw.color} size={44} />
+                      </div>
+                      <div className="cwb-identity-fields">
+                        <input
+                          className="cwb-name-input"
+                          type="text"
+                          value={cw.name || ''}
+                          onChange={e => updateCoworker({ name: e.target.value })}
+                          placeholder="Coworker name"
+                        />
+                      </div>
+                    </div>
+                    {showAvatarPicker && (
+                      <AvatarPicker
+                        avatar={cw.avatar}
+                        color={cw.color}
+                        onChangeAvatar={avatar => updateCoworker({ avatar })}
+                        onChangeColor={color => updateCoworker({ color })}
+                      />
+                    )}
+                  </div>
+
+                  <DescriptionSection
+                    role={cw.role || ''}
+                    onChangeRole={role => updateCoworker({ role })}
+                    callClaudeAPI={callClaudeAPI}
+                  />
+
+                  <div className="cwb-section">
+                    <h3 className="cwb-section-title">Skills</h3>
+                    <p className="cwb-section-desc">How this coworker behaves — its process and output format.</p>
+                    <FilePicker
+                      fileTree={fileTree}
+                      selectedIds={cw.instructionFileIds || []}
+                      onChange={ids => updateCoworker({ instructionFileIds: ids })}
+                      folderName="skills"
+                    />
+                  </div>
+
+                  <div className="cwb-section">
+                    <h3 className="cwb-section-title">Knowledge</h3>
+                    <p className="cwb-section-desc">Reference material — policies, rules, criteria.</p>
+                    <FilePicker
+                      fileTree={fileTree}
+                      selectedIds={cw.knowledgeFileIds || []}
+                      onChange={ids => updateCoworker({ knowledgeFileIds: ids })}
+                      folderName="knowledge"
+                    />
+                  </div>
+
+                  {validationErrors?.noAgent && <div className="validation-error">Name the coworker before running</div>}
+
+                  <div className="step-library-row">
+                    <button
+                      type="button"
+                      className="step-library-btn"
+                      onClick={handleSaveToLibrary}
+                      disabled={!cw.name?.trim() || libraryState === 'saved'}
+                      title={cw.name?.trim() ? 'Push a copy of this coworker to the Coworkers tab for future reuse' : 'Name the coworker first'}
+                    >
+                      {libraryState === 'saved' ? '\u2713 Saved to Coworkers tab' : 'Save to Coworkers tab'}
+                    </button>
+                    <span className="step-library-hint">Copies the current state to the Coworkers tab. The two are independent thereafter.</span>
+                  </div>
+                </>
+              );
+            })()}
 
             {step.type === 'approval' && (
               <>
@@ -220,7 +422,9 @@ function StepCard({ step, index, coworkers, tools, participants, onUpdate, onDel
             {/* Save output toggle — off by default. When on, the step's output
                 (for coworker: what the coworker produced; for review: the
                 upstream draft at the moment of approval) is saved to the
-                configured folder on run completion. */}
+                configured folder on run completion. Not applicable to the
+                trigger (it has no output of its own). */}
+            {step.type !== 'trigger' && (
             <div className="step-save-block">
               <label className="step-save-toggle">
                 <input
@@ -269,6 +473,7 @@ function StepCard({ step, index, coworkers, tools, participants, onUpdate, onDel
                 </div>
               )}
             </div>
+            )}
 
           </div>
         )}
@@ -282,7 +487,7 @@ function StepCard({ step, index, coworkers, tools, participants, onUpdate, onDel
 // visual — nodes are draggable and their positions persist, edges are
 // drawn read-only from the linear auto-migration. Wiring, typed handles,
 // and DAG runtime arrive in later phases.
-function WorkflowCanvas({ workflow, onUpdateWorkflow, fileTree, coworkers, tools, participants, activeRun, currentStepId, expandedStep, setExpandedStep, updateStep, deleteStep, validationErrors, showEducationalCues }) {
+function WorkflowCanvas({ workflow, onUpdateWorkflow, fileTree, coworkers, tools, participants, activeRun, currentStepId, expandedStep, setExpandedStep, updateStep, deleteStep, validationErrors, showEducationalCues, callClaudeAPI, onSaveCoworkerToLibrary }) {
   const [nodes, setNodes] = useState([]);
   const [edges, setEdges] = useState([]);
 
@@ -305,12 +510,14 @@ function WorkflowCanvas({ workflow, onUpdateWorkflow, fileTree, coworkers, tools
           allSteps: steps, currentStepId,
           stepResult: activeRun?.stepResults?.[i],
           showEducationalCues,
+          callClaudeAPI,
+          onSaveCoworkerToLibrary,
         },
       },
     }));
-    const nextEdges = (workflow.edges || []).map(e => ({ ...e, type: 'default' }));
+    const nextEdges = (workflow.edges || []).map(styleEdge);
     return { derivedNodes: nextNodes, derivedEdges: nextEdges };
-  }, [workflow, fileTree, coworkers, tools, participants, activeRun, currentStepId, expandedStep, setExpandedStep, updateStep, deleteStep, validationErrors, showEducationalCues]);
+  }, [workflow, fileTree, coworkers, tools, participants, activeRun, currentStepId, expandedStep, setExpandedStep, updateStep, deleteStep, validationErrors, showEducationalCues, callClaudeAPI, onSaveCoworkerToLibrary]);
 
   useEffect(() => {
     setNodes(derivedNodes);
@@ -356,18 +563,22 @@ function WorkflowCanvas({ workflow, onUpdateWorkflow, fileTree, coworkers, tools
       && (e.targetHandle || null) === (params.targetHandle || null)
     );
     if (exists) return;
-    if (wouldCreateCycle(currentEdges, params.source, params.target)) {
+    if (wouldCreateCycle(currentEdges, params.source, params.target, params.sourceHandle)) {
       // Could surface a toast here; for now we just refuse the wire.
       return;
     }
+    const sourceStep = (workflow.steps || []).find(s => s.id === params.source);
+    // Default sourceHandle depends on node type: Review's default is
+    // 'approved' (Phase 4 split), everything else stays 'out'.
+    const defaultHandle = sourceStep?.type === 'approval' ? 'approved' : 'out';
     const newEdge = {
       id: `edge-${params.source}-${params.target}-${Date.now()}`,
       source: params.source,
       target: params.target,
-      sourceHandle: params.sourceHandle || 'out',
+      sourceHandle: params.sourceHandle || defaultHandle,
       targetHandle: params.targetHandle || 'in',
     };
-    setEdges(es => addEdge(newEdge, es));
+    setEdges(es => addEdge(styleEdge(newEdge), es));
     onUpdateWorkflow({ ...workflow, edges: [...currentEdges, newEdge] });
   }, [workflow, onUpdateWorkflow]);
 
@@ -388,11 +599,24 @@ function WorkflowCanvas({ workflow, onUpdateWorkflow, fileTree, coworkers, tools
       >
         <Background gap={20} size={1} color="#d4ccc2" />
         <Controls showInteractive={false} />
+        <MiniMap
+          nodeColor={(n) => {
+            // Tint minimap tiles by node type so the overall shape reads at a glance.
+            if (n.type === 'trigger') return '#5a8f6b';
+            if (n.type === 'approval') return '#c8956c';
+            return '#4a7fb5';
+          }}
+          nodeStrokeWidth={2}
+          maskColor="rgba(250, 247, 242, 0.6)"
+          pannable
+          zoomable
+          style={{ background: 'var(--bg-white)', border: '1px solid var(--border-color)', borderRadius: 6 }}
+        />
       </ReactFlow>
-      {workflow.steps.length === 0 && (
+      {(workflow.steps || []).filter(s => s.type !== 'trigger').length === 0 && (
         <div className="wf-canvas-empty">
           <p style={{ fontSize: 16, fontWeight: 600, marginBottom: 8 }}>Build your process</p>
-          <p>Click + Add Step below to chain coworker steps and human reviews.</p>
+          <p>The Trigger holds the case input. Click + Add Step to chain coworker steps and human reviews after it.</p>
         </div>
       )}
     </div>
@@ -400,18 +624,17 @@ function WorkflowCanvas({ workflow, onUpdateWorkflow, fileTree, coworkers, tools
 }
 
 // ===== Workflow Editor =====
-function WorkflowEditor({ workflow, onUpdateWorkflow, fileTree, coworkers, tools, participants, onRun, isRunning, currentStepId, activeRun, onBack, showEducationalCues }) {
+function WorkflowEditor({ workflow, onUpdateWorkflow, fileTree, coworkers, tools, participants, onRun, isRunning, currentStepId, activeRun, onBack, showEducationalCues, callClaudeAPI, onSaveCoworkerToLibrary }) {
   const [expandedStep, setExpandedStep] = useState(null);
   const [showAddMenu, setShowAddMenu] = useState(false);
   const [validationErrors, setValidationErrors] = useState({});
   const [dragIndex, setDragIndex] = useState(null);
   const [dragOverIndex, setDragOverIndex] = useState(null);
   const [dragOverHalf, setDragOverHalf] = useState(null);
-  const [showSubmit, setShowSubmit] = useState(false);
-  const [submitText, setSubmitText] = useState('');
-  const [submitFiles, setSubmitFiles] = useState([]);
-  const [parsingFiles, setParsingFiles] = useState(false);
-  const submitFileRef = useRef(null);
+
+  const triggerStep = (workflow.steps || []).find(s => s.type === 'trigger');
+  const hasCaseInput = !!triggerStep?.caseInput?.trim();
+  const realStepCount = (workflow.steps || []).filter(s => s.type !== 'trigger').length;
 
   function updateStep(index, updatedStep) {
     const steps = [...workflow.steps];
@@ -420,6 +643,7 @@ function WorkflowEditor({ workflow, onUpdateWorkflow, fileTree, coworkers, tools
   }
 
   function deleteStep(index) {
+    if (workflow.steps[index]?.type === 'trigger') return;
     if (!confirm('Delete this step?')) return;
     onUpdateWorkflow({ ...workflow, steps: workflow.steps.filter((_, i) => i !== index) });
     setExpandedStep(null);
@@ -451,8 +675,8 @@ function WorkflowEditor({ workflow, onUpdateWorkflow, fileTree, coworkers, tools
   function addStep(type) {
     const newStep = {
       id: genStepId(), type,
-      name: type === 'agent' ? 'New Coworker Step' : 'Human Review',
-      ...(type === 'agent' && { coworkerId: '', inputDescription: '' }),
+      name: type === 'agent' ? 'New Coworker' : 'Human Review',
+      ...(type === 'agent' && { coworker: emptyCoworker() }),
       ...(type === 'approval' && { assigneeId: '', prompt: '', actions: ['Approve', 'Reject'] }),
     };
     onUpdateWorkflow({ ...workflow, steps: [...workflow.steps, newStep] });
@@ -462,10 +686,14 @@ function WorkflowEditor({ workflow, onUpdateWorkflow, fileTree, coworkers, tools
 
   function validate() {
     const errors = {}; let valid = true;
-    if (workflow.steps.length === 0) return { valid: false, errors };
+    if (realStepCount === 0) return { valid: false, errors };
     workflow.steps.forEach((step) => {
       errors[step.id] = {};
-      if (step.type === 'agent' && !step.coworkerId) { errors[step.id].noAgent = true; valid = false; }
+      if (step.type === 'agent') {
+        const cw = step.coworker || (step.coworkerId ? (coworkers || []).find(c => c.id === step.coworkerId) : null);
+        if (!cw?.name?.trim()) { errors[step.id].noAgent = true; valid = false; }
+      }
+      if (step.type === 'trigger' && !step.caseInput?.trim()) { errors[step.id].noCaseInput = true; valid = false; }
     });
     setValidationErrors(errors);
     return { valid, errors };
@@ -473,7 +701,14 @@ function WorkflowEditor({ workflow, onUpdateWorkflow, fileTree, coworkers, tools
 
   function handleRun() {
     const { valid } = validate();
-    if (!valid) return;
+    if (!valid) {
+      // If trigger is missing case input, expand it so the user sees where to type.
+      if (triggerStep && !hasCaseInput) {
+        const triggerIdx = workflow.steps.findIndex(s => s.id === triggerStep.id);
+        if (triggerIdx >= 0) setExpandedStep(triggerIdx);
+      }
+      return;
+    }
     onRun(workflow.id);
   }
 
@@ -487,98 +722,26 @@ function WorkflowEditor({ workflow, onUpdateWorkflow, fileTree, coworkers, tools
           onChange={e => onUpdateWorkflow({ ...workflow, name: e.target.value })}
           placeholder="Orchestration name..."
         />
-        <button className="run-btn" onClick={() => setShowSubmit(true)} disabled={isRunning || workflow.steps.length === 0}>
+        <button
+          className="run-btn"
+          onClick={handleRun}
+          disabled={isRunning || realStepCount === 0 || !hasCaseInput}
+          title={
+            realStepCount === 0 ? 'Add at least one step before running'
+            : !hasCaseInput ? 'Fill in the Trigger case input before running'
+            : ''
+          }
+        >
           {isRunning ? 'Running\u2026' : 'Run'}
         </button>
       </div>
-
-      {/* Submit Case Modal */}
-      {showSubmit && (
-        <div className="modal-overlay" onClick={() => setShowSubmit(false)}>
-          <div className="modal-box" style={{ maxWidth: 520 }} onClick={e => e.stopPropagation()}>
-            <h3>Run orchestration</h3>
-            <p>Describe the input for this run. Step 1 sees this; subsequent steps receive upstream outputs automatically.</p>
-
-            <div className="submit-case-field">
-              <label>Case Description (optional)</label>
-              <textarea
-                value={submitText}
-                onChange={e => setSubmitText(e.target.value)}
-                placeholder="Describe the case, or leave blank and upload documents..."
-                rows={3}
-                style={{ width: '100%', padding: '10px 12px', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-sm)', fontSize: 14, outline: 'none', resize: 'vertical', fontFamily: 'inherit' }}
-              />
-            </div>
-
-            <div className="submit-case-field">
-              <label>Documents</label>
-              <input type="file" ref={submitFileRef} style={{ display: 'none' }} multiple
-                accept=".pdf,.doc,.docx,.xls,.xlsx,.csv,.txt,.md,.json,.png,.jpg,.jpeg,.gif,.webp"
-                onChange={async (e) => {
-                  const files = Array.from(e.target.files);
-                  if (files.length === 0) return;
-                  setParsingFiles(true);
-                  const parsed = [];
-                  for (const file of files) {
-                    const result = await parseFile(file);
-                    parsed.push({ ...result, category: getFileCategory(file) });
-                  }
-                  setSubmitFiles(prev => [...prev, ...parsed]);
-                  setParsingFiles(false);
-                  if (submitFileRef.current) submitFileRef.current.value = '';
-                }}
-              />
-              <button className="submit-case-upload" onClick={() => submitFileRef.current?.click()} disabled={parsingFiles}>
-                {parsingFiles ? 'Reading files...' : '+ Upload Documents'}
-              </button>
-              {submitFiles.length > 0 && (
-                <div className="submit-case-files">
-                  {submitFiles.map((f, i) => (
-                    <span key={i} className="cl-attached-chip">
-                      <span className="cl-attached-chip-icon">{getFileIcon(f.category)}</span>
-                      <span className="cl-attached-chip-name">{f.fileName}</span>
-                      <button className="cl-attached-chip-remove" onClick={() => setSubmitFiles(prev => prev.filter((_, j) => j !== i))}>{'\u2715'}</button>
-                    </span>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            <div className="modal-actions" style={{ marginTop: 16 }}>
-              <button className="modal-btn cancel" onClick={() => { setShowSubmit(false); setSubmitText(''); setSubmitFiles([]); }}>Cancel</button>
-              <button
-                className="modal-btn primary"
-                disabled={!submitText.trim() && submitFiles.length === 0}
-                onClick={() => {
-                  // Build case input from text + documents
-                  const parts = [];
-                  if (submitText.trim()) parts.push(submitText.trim());
-                  if (submitFiles.length > 0) {
-                    parts.push('\n## Submitted Documents\n');
-                    submitFiles.forEach(f => {
-                      if (f.type === 'text') parts.push(f.content);
-                    });
-                  }
-                  const caseInput = parts.join('\n\n');
-                  onRun(workflow.id, caseInput);
-                  setShowSubmit(false);
-                  setSubmitText('');
-                  setSubmitFiles([]);
-                }}
-              >
-                Run
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {(activeRun && activeRun.status === 'completed') && (
         <div className="wf-run-banner success wf-run-banner-canvas">
           <div className="wf-run-banner-title">{'\u2713'} Run complete</div>
           <div className="wf-run-banner-body">
             Started by {activeRun.startedBy} at {new Date(activeRun.startedAt).toLocaleTimeString()}.
-            Final output saved to the destination folder.
+            Any step with save enabled wrote its output to its chosen folder.
           </div>
         </div>
       )}
@@ -613,6 +776,8 @@ function WorkflowEditor({ workflow, onUpdateWorkflow, fileTree, coworkers, tools
         deleteStep={deleteStep}
         validationErrors={validationErrors}
         showEducationalCues={showEducationalCues}
+        callClaudeAPI={callClaudeAPI}
+        onSaveCoworkerToLibrary={onSaveCoworkerToLibrary}
       />
 
       <div className="workflow-actions-bar">
@@ -641,22 +806,23 @@ function WorkflowCard({ workflow, coworkers, participants, onSelect, onDelete, o
       {/* Mini flow preview */}
       <div className="wf-card-flow">
         {(workflow.steps || []).map((step, i) => {
-          const cw = step.coworkerId ? coworkers?.find(c => c.id === step.coworkerId) : null;
+          const cw = resolveStepCoworker(step, coworkers);
           const icon = step.type === 'agent'
             ? <CoworkerGlyph avatar={cw?.avatar} size={12} color="#ffffff" />
             : step.type === 'approval' ? '\uD83D\uDC64'
+            : step.type === 'trigger' ? '\u25B6'
             : '\u2699\uFE0F';
           return (
             <span key={step.id} className="wf-card-flow-item">
               {i > 0 && <span className="wf-card-flow-arrow">{'\u2192'}</span>}
-              <span className={`wf-card-flow-dot ${step.type}`} title={step.name}>{icon}</span>
+              <span className={`wf-card-flow-dot ${step.type}`} title={cw?.name || step.name}>{icon}</span>
             </span>
           );
         })}
-        {(!workflow.steps || workflow.steps.length === 0) && <span className="wf-card-empty">No steps yet</span>}
+        {(workflow.steps || []).filter(s => s.type !== 'trigger').length === 0 && <span className="wf-card-empty">No steps yet</span>}
       </div>
       <div className="wf-card-meta">
-        <span>{workflow.steps?.length || 0} steps</span>
+        <span>{(workflow.steps || []).filter(s => s.type !== 'trigger').length} steps</span>
       </div>
       <div className="wf-card-actions">
         <button className="wf-card-action" onClick={e => { e.stopPropagation(); onDuplicate(workflow.id); }} title="Duplicate">Copy</button>
@@ -667,7 +833,7 @@ function WorkflowCard({ workflow, coworkers, participants, onSelect, onDelete, o
 }
 
 // ===== Main Export =====
-export default function WorkflowBuilder({ workflows, onUpdateWorkflows, fileTree, coworkers, tools, onRun, workflowRuns = [], participants, currentUserName, showEducationalCues }) {
+export default function WorkflowBuilder({ workflows, onUpdateWorkflows, fileTree, coworkers, tools, onRun, workflowRuns = [], participants, currentUserName, showEducationalCues, callClaudeAPI, onSaveCoworkerToLibrary }) {
   const [selectedWorkflowId, setSelectedWorkflowId] = useState(null);
 
   const selectedWorkflow = selectedWorkflowId ? workflows.find(w => w.id === selectedWorkflowId) : null;
@@ -723,6 +889,8 @@ export default function WorkflowBuilder({ workflows, onUpdateWorkflows, fileTree
           })()}
           onBack={() => setSelectedWorkflowId(null)}
           showEducationalCues={showEducationalCues}
+          callClaudeAPI={callClaudeAPI}
+          onSaveCoworkerToLibrary={onSaveCoworkerToLibrary}
         />
       </div>
     );

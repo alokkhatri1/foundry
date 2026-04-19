@@ -289,6 +289,7 @@ function RequestReviewConfig({ participants, config, onChange }) {
 }
 
 // ===== File Picker =====
+// Exported below for reuse from WorkflowBuilder's inline Coworker node.
 function FilePicker({ fileTree, selectedIds, onChange, folderName }) {
   const [open, setOpen] = useState(false);
   const [previewId, setPreviewId] = useState(null);
@@ -548,6 +549,10 @@ function CoworkerEditor({ coworker, onUpdate, onBack, fileTree, callClaudeAPI, s
 }
 
 // ===== Main Export =====
+// Re-export shared editor pieces so the Coworker node in WorkflowBuilder can
+// render the same About / Skills / Knowledge UI inline on the canvas.
+export { AvatarDisplay, AvatarPicker, DescriptionSection, FilePicker, isImageAvatar, isIconAvatar, iconName, DEFAULT_ICON };
+
 export default function CoworkerBuilder({ coworkers, onUpdateCoworkers, fileTree, tools, userName, callClaudeAPI, showEducationalCues, currentStage, onStartChat, participants }) {
   const [selectedCwId, setSelectedCwId] = useState(null);
   const selectedCw = selectedCwId ? coworkers.find(c => c.id === selectedCwId) : null;

@@ -620,6 +620,20 @@ function App() {
     persistLocal({ coworkers: newCoworkers });
   }
 
+  // "Save to Coworkers tab" — pushes a fresh snapshot of a canvas-built
+  // coworker to the shared pool. The snapshot and the canvas step are fully
+  // decoupled after this: editing either one never touches the other.
+  function handleSaveCoworkerToLibrary(snapshot) {
+    const newCoworker = {
+      id: 'cw-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6),
+      createdAt: Date.now(),
+      createdBy: userName,
+      ...snapshot,
+    };
+    handleUpdateCoworkers([...(coworkers || []), newCoworker]);
+    addMessage({ type: 'status', content: `Saved "${newCoworker.name}" to Coworkers tab` });
+  }
+
   function addMessage(msg) {
     const newMsg = { id: genMsgId(), timestamp: Date.now(), ...msg };
     setConversations(prev => {
@@ -1137,10 +1151,17 @@ function App() {
     const workflow = workflows.find(w => w.id === workflowId);
     if (!workflow) return;
 
+    // Case input now lives on the Trigger step. autoInput is kept as a
+    // backdoor for programmatic callers (tests, replays) — otherwise the
+    // header Run button fires with whatever the user typed into the Trigger.
     let caseInput = autoInput || null;
     if (!caseInput) {
-      caseInput = prompt('Enter case input for the workflow:', DEFAULT_TEST_CASE);
-      if (!caseInput) return;
+      const triggerStep = (workflow.steps || []).find(s => s.type === 'trigger');
+      caseInput = triggerStep?.caseInput?.trim() || null;
+    }
+    if (!caseInput) {
+      addMessage({ type: 'error', content: 'Fill in the Trigger case input before running.' });
+      return;
     }
 
     const runId = 'run-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6);
@@ -1157,11 +1178,11 @@ function App() {
       completedAt: null,
       caseInput,
       stepResults: workflow.steps.map(step => {
-        const cw = step.coworkerId ? coworkers?.find(c => c.id === step.coworkerId) : null;
+        const cw = step.coworker || (step.coworkerId ? coworkers?.find(c => c.id === step.coworkerId) : null);
         const person = step.assigneeId ? participants?.find(p => p.id === step.assigneeId) : null;
         return {
           stepId: step.id,
-          stepName: step.name,
+          stepName: step.type === 'agent' ? (cw?.name || step.name) : step.name,
           type: step.type,
           coworkerName: cw?.name || null,
           coworkerAvatar: cw?.avatar || null,
@@ -1705,7 +1726,7 @@ Be concise. Confirm actions after completing them.${knowledgeSection}`;
         )}
         {activeTab === 'workflow' && (
           <div className="tab-pane tab-pane-workflow">
-            <WorkflowBuilder workflows={workflows} onUpdateWorkflows={handleUpdateWorkflows} fileTree={fileTree} onRun={runWorkflow} workflowRuns={workflowRuns} participants={participants} currentUserName={userName} coworkers={coworkers || []} tools={tools || []} showEducationalCues={showEducationalCues} />
+            <WorkflowBuilder workflows={workflows} onUpdateWorkflows={handleUpdateWorkflows} fileTree={fileTree} onRun={runWorkflow} workflowRuns={workflowRuns} participants={participants} currentUserName={userName} coworkers={coworkers || []} tools={tools || []} showEducationalCues={showEducationalCues} callClaudeAPI={callClaudeAPI} onSaveCoworkerToLibrary={handleSaveCoworkerToLibrary} />
           </div>
         )}
         {activeTab === 'files' && (

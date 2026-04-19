@@ -1967,6 +1967,25 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
   box-shadow: 0 0 0 2px rgba(196, 92, 92, 0.35);
   border-color: #c45c5c;
 }
+
+/* Compact layout for the inline Coworker editor on canvas. The same
+   editor pieces (About, Skills, Knowledge) also render in the full-size
+   Coworkers tab — we only shrink them here, not globally. */
+.wf-canvas-node .cwb-section {
+  padding: 12px 14px;
+  border-radius: 8px;
+  background: var(--bg-warm);
+  border: none;
+}
+.wf-canvas-node .cwb-section + .cwb-section { margin-top: 8px; }
+.wf-canvas-node .cwb-section-title { font-size: 11px; margin-bottom: 2px; }
+.wf-canvas-node .cwb-section-desc { font-size: 11px; margin-bottom: 8px; margin-top: 2px; line-height: 1.35; }
+.wf-canvas-node .cwb-section-identity { padding: 10px 12px; }
+.wf-canvas-node .cwb-desc-input { min-height: 84px; padding: 10px 12px; font-size: 13px; line-height: 1.45; }
+.wf-canvas-node .cwb-desc-gen-btn { padding: 6px 12px; font-size: 12px; }
+.wf-canvas-node .step-library-row { margin-top: 10px; padding: 8px 10px; }
+.wf-canvas-node .step-library-btn { padding: 6px 12px; font-size: 12px; }
+.wf-canvas-node .step-library-hint { font-size: 10px; }
 .validation-error { color: var(--accent-error); font-size: 12px; margin-top: 4px; padding: 4px 8px; background: #fdf0f0; border-radius: 4px; }
 
 /* Drag handle & chevron */

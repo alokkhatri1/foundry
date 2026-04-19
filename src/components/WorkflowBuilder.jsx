@@ -1,4 +1,6 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
+import ReactFlow, { Background, Controls, applyNodeChanges } from 'reactflow';
+import 'reactflow/dist/style.css';
 import { parseFile, getFileIcon, getFileCategory } from '../utils/fileParser';
 import EducationalCue from './EducationalCue';
 import { CoworkerGlyph } from './Icon';
@@ -21,8 +23,23 @@ function getAllFolders(tree, path = []) {
   return folders;
 }
 
+// ===== React Flow node wrapper =====
+// Each step renders inside a React Flow node as a StepCard. The node's
+// position comes from workflow.nodes[i].position; the step's config lives in
+// data.stepCardProps. The drag-handle and drop-zone behavior inside StepCard
+// is suppressed when onCanvas is true — position drag happens via React Flow.
+function StepNode({ data }) {
+  return (
+    <div className="wf-canvas-node" style={{ width: 420 }}>
+      <StepCard {...data.stepCardProps} onCanvas />
+    </div>
+  );
+}
+
+const nodeTypes = { agent: StepNode, approval: StepNode };
+
 // ===== Step Card =====
-function StepCard({ step, index, coworkers, tools, participants, onUpdate, onDelete, expanded, onToggleExpand, validationErrors, allSteps, currentStepId, stepResult, isDragging, dragOverPos, onDragStart, onDragOver, onDragEnd, onDrop, showEducationalCues }) {
+function StepCard({ step, index, coworkers, tools, participants, onUpdate, onDelete, expanded, onToggleExpand, validationErrors, allSteps, currentStepId, stepResult, isDragging, dragOverPos, onDragStart, onDragOver, onDragEnd, onDrop, showEducationalCues, onCanvas }) {
   const isRunning = currentStepId === step.id;
   const assignedCw = step.coworkerId ? coworkers?.find(c => c.id === step.coworkerId) : null;
   const assignedPerson = step.assigneeId ? participants?.find(p => p.id === step.assigneeId) : null;
@@ -59,15 +76,15 @@ function StepCard({ step, index, coworkers, tools, participants, onUpdate, onDel
   return (
     <div
       className={`step-drag-wrapper${isDragging ? ' dragging' : ''}${dragOverPos === 'above' ? ' drag-over-above' : ''}${dragOverPos === 'below' ? ' drag-over-below' : ''}`}
-      draggable={!stepResult}
-      onDragStart={e => !stepResult && onDragStart(e, index)}
-      onDragOver={e => !stepResult && onDragOver(e, index)}
+      draggable={!stepResult && !onCanvas}
+      onDragStart={e => !stepResult && !onCanvas && onDragStart(e, index)}
+      onDragOver={e => !stepResult && !onCanvas && onDragOver(e, index)}
       onDragEnd={onDragEnd}
-      onDrop={e => !stepResult && onDrop(e, index)}
+      onDrop={e => !stepResult && !onCanvas && onDrop(e, index)}
     >
-      <div className={`workflow-step-card ${step.type}${cardStateClass}${expanded ? ' expanded' : ''}`}>
+      <div className={`workflow-step-card ${step.type}${cardStateClass}${expanded ? ' expanded' : ''}${onCanvas ? ' on-canvas' : ''}`}>
         <div className="step-card-header" onClick={onToggleExpand}>
-          <span className="step-drag-handle" title="Drag to reorder">{'\u2630'}</span>
+          {!onCanvas && <span className="step-drag-handle" title="Drag to reorder">{'\u2630'}</span>}
           <span className={`step-number ${step.type}${isCompleted ? ' done' : ''}`}>
             {isCompleted ? '\u2713' : index + 1}
           </span>
@@ -179,6 +196,91 @@ function StepCard({ step, index, coworkers, tools, participants, onUpdate, onDel
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+// ===== Workflow Canvas =====
+// Renders the workflow as a React Flow graph. In phase 2 this is just
+// visual — nodes are draggable and their positions persist, edges are
+// drawn read-only from the linear auto-migration. Wiring, typed handles,
+// and DAG runtime arrive in later phases.
+function WorkflowCanvas({ workflow, onUpdateWorkflow, coworkers, tools, participants, activeRun, currentStepId, expandedStep, setExpandedStep, updateStep, deleteStep, validationErrors, showEducationalCues }) {
+  const [nodes, setNodes] = useState([]);
+  const [edges, setEdges] = useState([]);
+
+  // Derive canvas nodes from workflow.steps preserving any stored positions.
+  const { derivedNodes, derivedEdges } = useMemo(() => {
+    const positions = new Map((workflow.nodes || []).map(n => [n.id, n.position]));
+    const steps = workflow.steps || [];
+    const nextNodes = steps.map((step, i) => ({
+      id: step.id,
+      type: step.type,
+      position: positions.get(step.id) || { x: 80, y: i * 240 },
+      data: {
+        stepCardProps: {
+          step, index: i, coworkers, tools, participants,
+          onUpdate: (updated) => updateStep(i, updated),
+          onDelete: () => deleteStep(i),
+          expanded: expandedStep === i,
+          onToggleExpand: () => setExpandedStep(expandedStep === i ? null : i),
+          validationErrors: validationErrors[step.id],
+          allSteps: steps, currentStepId,
+          stepResult: activeRun?.stepResults?.[i],
+          showEducationalCues,
+        },
+      },
+    }));
+    const nextEdges = (workflow.edges || []).map(e => ({ ...e, type: 'default' }));
+    return { derivedNodes: nextNodes, derivedEdges: nextEdges };
+  }, [workflow, coworkers, tools, participants, activeRun, currentStepId, expandedStep, setExpandedStep, updateStep, deleteStep, validationErrors, showEducationalCues]);
+
+  useEffect(() => {
+    setNodes(derivedNodes);
+    setEdges(derivedEdges);
+  }, [derivedNodes, derivedEdges]);
+
+  const handleNodesChange = useCallback((changes) => {
+    setNodes(ns => applyNodeChanges(changes, ns));
+    const committed = changes.filter(c => c.type === 'position' && c.dragging === false && c.position);
+    if (committed.length > 0) {
+      const updatedNodes = (workflow.nodes || []).map(n => {
+        const change = committed.find(c => c.id === n.id);
+        return change ? { ...n, position: change.position } : n;
+      });
+      // Include any nodes currently on the canvas that aren't in workflow.nodes yet
+      const existingIds = new Set(updatedNodes.map(n => n.id));
+      committed.forEach(c => {
+        if (!existingIds.has(c.id)) {
+          const step = (workflow.steps || []).find(s => s.id === c.id);
+          if (step) updatedNodes.push({ id: step.id, type: step.type, position: c.position, data: { ...step } });
+        }
+      });
+      onUpdateWorkflow({ ...workflow, nodes: updatedNodes });
+    }
+  }, [workflow, onUpdateWorkflow]);
+
+  return (
+    <div className="wf-canvas-wrap">
+      <ReactFlow
+        nodes={nodes}
+        edges={edges}
+        nodeTypes={nodeTypes}
+        onNodesChange={handleNodesChange}
+        nodesConnectable={false}
+        fitView
+        fitViewOptions={{ padding: 0.2, maxZoom: 1 }}
+        proOptions={{ hideAttribution: true }}
+      >
+        <Background gap={20} size={1} color="#d4ccc2" />
+        <Controls showInteractive={false} />
+      </ReactFlow>
+      {workflow.steps.length === 0 && (
+        <div className="wf-canvas-empty">
+          <p style={{ fontSize: 16, fontWeight: 600, marginBottom: 8 }}>Build your process</p>
+          <p>Click + Add Step below to chain coworker steps and human reviews.</p>
+        </div>
+      )}
     </div>
   );
 }
@@ -393,66 +495,46 @@ function WorkflowEditor({ workflow, onUpdateWorkflow, fileTree, coworkers, tools
         </div>
       )}
 
-      <div className="workflow-steps">
-        {activeRun && activeRun.status === 'completed' && (
-          <div className="wf-run-banner success">
-            <div className="wf-run-banner-title">{'\u2713'} Run complete</div>
-            <div className="wf-run-banner-body">
-              Started by {activeRun.startedBy} at {new Date(activeRun.startedAt).toLocaleTimeString()}.
-              Final output saved to the destination folder.
-            </div>
+      {(activeRun && activeRun.status === 'completed') && (
+        <div className="wf-run-banner success wf-run-banner-canvas">
+          <div className="wf-run-banner-title">{'\u2713'} Run complete</div>
+          <div className="wf-run-banner-body">
+            Started by {activeRun.startedBy} at {new Date(activeRun.startedAt).toLocaleTimeString()}.
+            Final output saved to the destination folder.
           </div>
-        )}
-        {activeRun && activeRun.status === 'rejected' && (
-          <div className="wf-run-banner rejected">
-            <div className="wf-run-banner-title">Run rejected</div>
-            <div className="wf-run-banner-body">
-              A reviewer rejected and there was no previous review step to bounce back to. Revise the workflow or the input and run it again.
-            </div>
+        </div>
+      )}
+      {(activeRun && activeRun.status === 'rejected') && (
+        <div className="wf-run-banner rejected wf-run-banner-canvas">
+          <div className="wf-run-banner-title">Run rejected</div>
+          <div className="wf-run-banner-body">
+            A reviewer rejected and there was no previous review step to bounce back to. Revise the workflow or the input and run it again.
           </div>
-        )}
-        {activeRun && (activeRun.status === 'running' || activeRun.status === 'waiting_approval') && (
-          <div className="wf-run-banner running">
-            <div className="wf-run-banner-title"><span className="step-status-spinner" /> Run in progress</div>
-            <div className="wf-run-banner-body">
-              Started by {activeRun.startedBy} at {new Date(activeRun.startedAt).toLocaleTimeString()}. Watch the steps below.
-            </div>
+        </div>
+      )}
+      {(activeRun && (activeRun.status === 'running' || activeRun.status === 'waiting_approval')) && (
+        <div className="wf-run-banner running wf-run-banner-canvas">
+          <div className="wf-run-banner-title"><span className="step-status-spinner" /> Run in progress</div>
+          <div className="wf-run-banner-body">
+            Started by {activeRun.startedBy} at {new Date(activeRun.startedAt).toLocaleTimeString()}. Watch the steps below.
           </div>
-        )}
-        {workflow.steps.length > 1 && !activeRun && (
-          <div style={{ padding: '0 4px 8px' }}>
-            <EducationalCue cueId="workflow-step-reorder" show={showEducationalCues} />
-          </div>
-        )}
-        {workflow.steps.length === 0 && (
-          <div className="no-steps-placeholder">
-            <div>
-              <p style={{ fontSize: 16, fontWeight: 600, marginBottom: 8 }}>Build your process</p>
-              <p>Chain coworker steps and human reviews. Click + Add Step below.</p>
-            </div>
-          </div>
-        )}
-        {workflow.steps.map((step, index) => (
-          <div key={step.id}>
-            {index > 0 && <div className="step-connector">{'\u2193'}</div>}
-            <StepCard
-              step={step} index={index} coworkers={coworkers} tools={tools} participants={participants}
-              onUpdate={updated => updateStep(index, updated)}
-              onDelete={() => deleteStep(index)}
-              expanded={expandedStep === index}
-              onToggleExpand={() => setExpandedStep(expandedStep === index ? null : index)}
-              validationErrors={validationErrors[step.id]}
-              allSteps={workflow.steps} currentStepId={currentStepId}
-              stepResult={activeRun?.stepResults?.[index]}
-              isDragging={dragIndex === index}
-              dragOverPos={dragOverIndex === index && dragIndex !== index ? dragOverHalf : null}
-              onDragStart={handleDragStart} onDragOver={handleDragOver}
-              onDragEnd={handleDragEnd} onDrop={handleDrop}
-              showEducationalCues={showEducationalCues}
-            />
-          </div>
-        ))}
-      </div>
+        </div>
+      )}
+      <WorkflowCanvas
+        workflow={workflow}
+        onUpdateWorkflow={onUpdateWorkflow}
+        coworkers={coworkers}
+        tools={tools}
+        participants={participants}
+        activeRun={activeRun}
+        currentStepId={currentStepId}
+        expandedStep={expandedStep}
+        setExpandedStep={setExpandedStep}
+        updateStep={updateStep}
+        deleteStep={deleteStep}
+        validationErrors={validationErrors}
+        showEducationalCues={showEducationalCues}
+      />
 
       <div className="workflow-actions-bar">
         <div className="add-step-dropdown">

@@ -631,9 +631,27 @@ function ReviewPane({ pane, onBack, onGoToFiles }) {
       <div className="cl-review-pane-header">
         <button className="cl-review-pane-back" onClick={onBack}>{'\u2190'} Back to chat</button>
         <div className="cl-review-pane-title">{title || 'Draft'}</div>
-        {status === 'done' && savedFileName && onGoToFiles && (
-          <button className="cl-send-btn-cancel" onClick={onGoToFiles}>Open in Files tab</button>
-        )}
+        <div className="cl-review-pane-header-actions">
+          {canAct && !rejecting && (
+            <>
+              <button
+                className="cl-send-btn-approve"
+                onClick={async () => { await onApprove?.(); }}
+              >
+                Approve
+              </button>
+              <button
+                className="cl-send-btn-cancel"
+                onClick={() => { setRejecting(true); setFeedback(''); }}
+              >
+                Reject
+              </button>
+            </>
+          )}
+          {status === 'done' && savedFileName && onGoToFiles && (
+            <button className="cl-send-btn-cancel" onClick={onGoToFiles}>Open in Files tab</button>
+          )}
+        </div>
       </div>
       <div className="cl-review-pane-tabs">
         <button
@@ -652,50 +670,33 @@ function ReviewPane({ pane, onBack, onGoToFiles }) {
       <div className="cl-review-pane-body md-doc">
         <RichText content={body} />
       </div>
-      {canAct && (
+      {canAct && rejecting && (
         <div className="cl-review-pane-footer">
-          {!rejecting ? (
-            <>
+          <div className="cl-review-pane-reject">
+            <textarea
+              className="cwb-tool-config-textarea"
+              value={feedback}
+              onChange={e => setFeedback(e.target.value)}
+              placeholder="What's not right? Feedback goes back to the coworker for revision."
+              rows={3}
+              autoFocus
+            />
+            <div className="cl-review-pane-reject-actions">
               <button
                 className="cl-send-btn-approve"
-                onClick={async () => { if (await onApprove?.()) { /* pane closes from caller */ } }}
+                disabled={!feedback.trim()}
+                onClick={async () => { if (await onReject?.(feedback.trim())) { setRejecting(false); setFeedback(''); } }}
               >
-                Approve
+                Send rejection
               </button>
               <button
                 className="cl-send-btn-cancel"
-                onClick={() => { setRejecting(true); setFeedback(''); }}
+                onClick={() => { setRejecting(false); setFeedback(''); }}
               >
-                Reject with feedback
+                Cancel
               </button>
-            </>
-          ) : (
-            <div className="cl-review-pane-reject">
-              <textarea
-                className="cwb-tool-config-textarea"
-                value={feedback}
-                onChange={e => setFeedback(e.target.value)}
-                placeholder="What's not right? Feedback goes back to the coworker for revision."
-                rows={3}
-                autoFocus
-              />
-              <div className="cl-review-pane-reject-actions">
-                <button
-                  className="cl-send-btn-approve"
-                  disabled={!feedback.trim()}
-                  onClick={async () => { if (await onReject?.(feedback.trim())) { setRejecting(false); setFeedback(''); } }}
-                >
-                  Send rejection
-                </button>
-                <button
-                  className="cl-send-btn-cancel"
-                  onClick={() => { setRejecting(false); setFeedback(''); }}
-                >
-                  Cancel
-                </button>
-              </div>
             </div>
-          )}
+          </div>
         </div>
       )}
     </div>

@@ -2179,6 +2179,11 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
   overflow: hidden;
   text-overflow: ellipsis;
 }
+.cl-review-pane-header-actions {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
 .cl-review-pane-tabs {
   display: flex;
   gap: 0;

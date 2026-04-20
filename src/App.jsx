@@ -1643,7 +1643,7 @@ Be concise. Confirm actions after completing them.${knowledgeSection}`;
       {justRevealed && (
         <div className="modal-overlay reveal-modal-overlay" onClick={() => setJustRevealed(null)}>
           <div className="reveal-modal" role="status" onClick={e => e.stopPropagation()}>
-            <div className="reveal-modal-eyebrow">Stage {justRevealed} · New Stage Unlocked</div>
+            <div className="reveal-modal-eyebrow">New Stage Unlocked</div>
             <div className="reveal-modal-title">{STAGE_META[justRevealed]?.label || justRevealed}</div>
             {STAGE_META[justRevealed]?.description && (
               <p className="reveal-modal-desc">
@@ -1693,9 +1693,10 @@ Be concise. Confirm actions after completing them.${knowledgeSection}`;
           </RevealAt>
         </nav>
         <div className="app-header-right">
-          {currentStage && (
-            <span className="header-stage-chip" title={STAGE_META[currentStage]?.label || ''}>
-              Stage {currentStage}
+          {currentStage && STAGE_META[currentStage]?.label && (
+            <span className="header-stage-chip">
+              <span className="header-stage-chip-eyebrow">Current Level</span>
+              <span className="header-stage-chip-label">{STAGE_META[currentStage].label}</span>
             </span>
           )}
           <span className="header-user-name">{userName}</span>

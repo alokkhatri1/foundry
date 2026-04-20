@@ -456,7 +456,11 @@ function StepCard({ step, index, coworkers, tools, participants, onUpdate, onDel
 function WorkflowCanvas({ workflow, onUpdateWorkflow, fileTree, coworkers, tools, participants, activeRun, currentStepId, expandedStep, setExpandedStep, updateStep, deleteStep, validationErrors, showEducationalCues, callClaudeAPI, onSaveCoworkerToLibrary, onUpdateFileContent, apiKey }) {
   const [nodes, setNodes] = useState([]);
   const [edges, setEdges] = useState([]);
-  const [copilotOpen, setCopilotOpen] = useState(false);
+  // Auto-open the copilot when this workflow has no real steps yet — the
+  // panel IS the empty state. User can still collapse it via the toggle.
+  const [copilotOpen, setCopilotOpen] = useState(
+    () => (workflow?.steps || []).filter(s => s.type !== 'trigger').length === 0
+  );
   const [copilotMessages, setCopilotMessages] = useState([]);
   const [copilotInput, setCopilotInput] = useState('');
   const [copilotBusy, setCopilotBusy] = useState(false);
@@ -638,12 +642,6 @@ function WorkflowCanvas({ workflow, onUpdateWorkflow, fileTree, coworkers, tools
           style={{ background: 'var(--bg-white)', border: '1px solid var(--border-color)', borderRadius: 6 }}
         />
       </ReactFlow>
-      {(workflow.steps || []).filter(s => s.type !== 'trigger').length === 0 && (
-        <div className="wf-canvas-empty">
-          <p style={{ fontSize: 16, fontWeight: 600, marginBottom: 8 }}>Build your process</p>
-          <p>Describe what you want in the Copilot panel, or click + Add Step to build it by hand.</p>
-        </div>
-      )}
       <button
         className={`wf-copilot-toggle${copilotOpen ? ' open' : ''}`}
         onClick={() => setCopilotOpen(o => !o)}

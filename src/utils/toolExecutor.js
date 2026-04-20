@@ -124,17 +124,6 @@ const COMMUNICATE_TEMPLATES = {
       return { success: true, output: `Message sent: "${p.message}"` };
     },
   },
-  request_review: {
-    name: 'Request Review',
-    parameters: [
-      { name: 'title', label: 'File Title', type: 'string', required: true, description: 'Short title for the draft file' },
-      { name: 'content', label: 'Content', type: 'string', required: true, description: 'Full markdown content of the draft' },
-    ],
-    async execute(p, { onRequestReview }) {
-      if (!onRequestReview) return { success: false, output: 'Review-gated drafts are not available in this context.' };
-      return await onRequestReview({ title: p.title, content: p.content });
-    },
-  },
   notify_person: {
     name: 'Notify Person',
     parameters: [

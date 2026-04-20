@@ -6,7 +6,6 @@ import RichText from './RichText';
 
 const TOOL_REVEAL_STAGE = {
   'builtin-create-file': '5b',
-  'builtin-request-review': '5c',
 };
 
 let cwCounter = Date.now();
@@ -230,60 +229,6 @@ function CreateFileConfig({ fileTree, currentStage, config, onChange }) {
       {topFolders.length === 0 && (
         <div className="cwb-tool-config-hint">Create a folder in the Files tab first. Until then, files will land at the top level.</div>
       )}
-    </div>
-  );
-}
-
-// ===== Request Review tool config =====
-function RequestReviewConfig({ participants, config, onChange }) {
-  const instructions = config?.instructions || '';
-  const allowed = config?.allowedParticipantIds || [];
-  const humans = (participants || []).filter(p => (p.kind || 'human') === 'human');
-
-  function toggleParticipant(pid) {
-    const next = allowed.includes(pid)
-      ? allowed.filter(id => id !== pid)
-      : [...allowed, pid];
-    onChange({ instructions, allowedParticipantIds: next });
-  }
-
-  return (
-    <div className="cwb-tool-config">
-      <div className="cwb-tool-config-title">Who signs off on this coworker's work?</div>
-      <textarea
-        className="cwb-tool-config-textarea"
-        value={instructions}
-        onChange={e => onChange({ instructions: e.target.value, allowedParticipantIds: allowed })}
-        placeholder="e.g., Priya approves credit risk memos. The team lead approves anything flagging the 2024 exception."
-        rows={3}
-      />
-      <div className="cwb-tool-config-row cwb-tool-config-col">
-        <label className="cwb-tool-config-label">Who can be asked</label>
-        {humans.length === 0 ? (
-          <div className="cwb-tool-config-hint">No workshop participants yet — the picker will have nothing to show at runtime.</div>
-        ) : (
-          <div className="cwb-tool-config-checklist">
-            {humans.map(p => (
-              <label key={p.id} className={`cwb-tool-config-checkitem${allowed.includes(p.id) ? ' on' : ''}`}>
-                <input
-                  type="checkbox"
-                  checked={allowed.includes(p.id)}
-                  onChange={() => toggleParticipant(p.id)}
-                />
-                <span
-                  className="cwb-tool-config-dot"
-                  style={{ background: p.color || '#888', opacity: p.online ? 1 : 0.35 }}
-                  title={p.online ? 'Online' : 'Offline'}
-                />
-                <span className="cwb-tool-config-checkname">{p.name}</span>
-              </label>
-            ))}
-          </div>
-        )}
-        {humans.length > 0 && allowed.length === 0 && (
-          <div className="cwb-tool-config-warning">Pick at least one — the tool won't fire with an empty whitelist.</div>
-        )}
-      </div>
     </div>
   );
 }
@@ -560,19 +505,6 @@ function CoworkerEditor({ coworker, onUpdate, onBack, fileTree, callClaudeAPI, s
                             toolConfigs: {
                               ...(coworker.toolConfigs || {}),
                               'builtin-create-file': next,
-                            },
-                          })}
-                        />
-                      )}
-                      {checked && tool.id === 'builtin-request-review' && (
-                        <RequestReviewConfig
-                          participants={participants}
-                          config={coworker.toolConfigs?.['builtin-request-review']}
-                          onChange={next => onUpdate({
-                            ...coworker,
-                            toolConfigs: {
-                              ...(coworker.toolConfigs || {}),
-                              'builtin-request-review': next,
                             },
                           })}
                         />

@@ -34,11 +34,6 @@ const STAGE_GUIDES = {
     invitation: 'Invite them to add a tool to a coworker. This is the jump from assistant to agent.',
     externalReference: 'The shift from "GPT" to "agent" — the AI gains hands. In Liberating Structures terms, the AI is now a peer doing work, not just reflecting.',
   },
-  '5c': {
-    nowAvailable: 'Coworkers can now produce an artifact and send it to a human for approval. A new Request Review tool is available: the coworker drafts the full file, the user picks a reviewer, the reviewer sees draft + AI reasoning and approves or rejects, then the user gives final sign-off — the file is saved only when both gates say yes.',
-    invitation: 'Invite them to give their coworker a task that produces a concrete output, then watch the two-gate flow. The insight is felt when the draft is reviewed by a teammate and only lands in the workspace after both humans agree.',
-    externalReference: 'This is the foundational primitive of mixed-team work — human-in-the-loop review. Before orchestration chains it, AI and humans need a way to co-produce one artifact with real gates.',
-  },
   '6': {
     nowAvailable: 'Orchestration — chain AI coworkers and human approval steps into a multi-step workflow. Each coworker step processes upstream output with its knowledge + instructions; each human step reviews and either approves (flow continues) or rejects with feedback (flow halts and bounces back to the previous human step for revision).',
     invitation: 'Invite them to chain the Stage 5c primitive they just felt — put a coworker, then a reviewer, then another coworker, then another reviewer. Run it. See a mixed team produce one outcome through several hands.',

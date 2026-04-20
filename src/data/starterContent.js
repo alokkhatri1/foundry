@@ -278,22 +278,6 @@ export const BUILTIN_TOOLS = [
       ],
     },
   },
-  {
-    id: 'builtin-request-review',
-    name: 'Request Review',
-    type: 'communicate',
-    description: 'Finish your work by drafting the full file, then sending it to a human teammate for approval. On approve, the file is saved to the workspace automatically. On reject, the reviewer\'s feedback comes back so you can revise and try again. Use this when your task has a concrete output (a document, a summary, a plan) and a human should sign off before it goes on the record.',
-    icon: '\u2714\uFE0F',
-    isBuiltin: true,
-    createdBy: 'System',
-    config: {
-      templateId: 'request_review',
-      parameters: [
-        { name: 'title', label: 'File Title', type: 'string', required: true, description: 'Short title for the file — also used to generate the filename' },
-        { name: 'content', label: 'Content', type: 'string', required: true, description: 'Full markdown content of the draft — this is what the reviewer sees, and what gets saved on approval' },
-      ],
-    },
-  },
 ];
 
 // Starter external connectors — real, free, no-auth APIs for workshop demos

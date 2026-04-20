@@ -114,8 +114,8 @@ export function flattenTree(tree, roomId) {
 // Preserve a local coworker's toolConfigs when the DB-sourced version comes
 // back empty. Covers three sync paths — realtime echo, initial room load,
 // and handleJoin — where migration 013 not being applied would otherwise
-// strip the user's Create File destination / Request Review whitelist on
-// every sync. If the incoming has any configs, it wins (normal case).
+// strip the user's Create File destination on every sync. If the incoming
+// has any configs, it wins (normal case).
 export function preserveToolConfigs(incoming, previous) {
   if (!incoming) return incoming;
   const hasIncoming = incoming.toolConfigs && Object.keys(incoming.toolConfigs).length > 0;

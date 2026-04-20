@@ -256,13 +256,6 @@ function App() {
   }, [currentStage]);
 
   const approvalResolversRef = useRef(new Map());
-  // Pending request_review resolvers, keyed by `${coworkerParticipantId}:${humanParticipantId}`.
-  // When a matching review_response DM lands, the resolver fires with the
-  // metadata ({ action, feedback }) and is removed. First-reply-wins.
-  const reviewResolversRef = useRef(new Map());
-  // Stage-5c second gate: after the reviewer approves, the sender still has
-  // to sign off in their own chat. Keyed by the picker message id.
-  const senderApprovalResolversRef = useRef(new Map());
   // Pending recipient-picker resolvers, keyed by picker message id. When the
   // user clicks a human in the picker, the resolver fires with that name.
   const pickRecipientResolversRef = useRef(new Map());
@@ -500,25 +493,6 @@ function App() {
     });
     return unsub;
   }, [myParticipantId, sb]);
-
-  // Route ask_human replies back to their waiting AI turn. We listen to every
-  // DM in the room because the reply comes FROM a human TO the AI coworker's
-  // mirror — neither side is the current participant, so the regular DM
-  // subscription filtered by myParticipantId would miss it. The resolver map
-  // is held on this client (the one that initiated the AI chat).
-  useEffect(() => {
-    if (!isJoined) return;
-    const unsub = sb.subscribeToAllRoomDms((dm) => {
-      if (dm.kind !== 'review_response') return;
-      const key = `${dm.to_participant_id}:${dm.from_participant_id}`;
-      const resolver = reviewResolversRef.current.get(key);
-      if (resolver) {
-        reviewResolversRef.current.delete(key);
-        resolver(dm.metadata || { action: 'approved' });
-      }
-    });
-    return unsub;
-  }, [isJoined, sb]);
 
   // Reflect unread count in browser tab title.
   useEffect(() => {
@@ -972,107 +946,6 @@ function App() {
           const result = await executeTool(tool, toolUse.input, fileTree, callClaudeAPI, {
             onMessage: addMessage,
             onCreateFile: writeCoworkerFile,
-            // Stage 5c — the draft-and-review primitive. Coworker drafts the
-            // full file, picks a reviewer, sends the draft as a review_request
-            // DM carrying title/content/reasoning as metadata. On approve, the
-            // file is written to the coworker's configured destination and
-            // success flows back to Claude. On reject, the feedback flows back
-            // so the coworker can revise and try again.
-            onRequestReview: async ({ title, content }) => {
-              if (!coworker?.id) return { success: false, output: 'Request Review is only available when a specific AI coworker is running the tool.' };
-              const coworkerParticipantId = await sb.getCoworkerParticipantId(coworker.id);
-              if (!coworkerParticipantId) return { success: false, output: 'AI coworker is not set up as a DM participant yet. Try again after saving the coworker.' };
-              const cfg = coworker.toolConfigs?.['builtin-request-review'];
-              const allowedIds = cfg?.allowedParticipantIds || [];
-              if (allowedIds.length === 0) {
-                return { success: false, output: 'This coworker has no reviewers configured. Open the editor and pick at least one reviewer.' };
-              }
-              // Reasoning = the narration text this coworker has emitted in
-              // the current turn so far. Reviewer can open it in a viewer.
-              const reasoning = allContent.filter(c => c.type === 'text').map(c => c.text).join('\n\n');
-
-              const pickId = 'review-' + Date.now() + '-' + Math.random().toString(36).slice(2, 7);
-              addMessage({
-                id: pickId,
-                type: 'recipient-picker',
-                kind: 'review',
-                question: title,
-                draftTitle: title,
-                draftContent: content,
-                reasoning,
-                coworkerName: coworker.name,
-                coworkerAvatar: coworker.avatar,
-                allowedParticipantIds: allowedIds,
-                status: 'pending',
-              });
-              const recipientName = await new Promise((resolve) => {
-                pickRecipientResolversRef.current.set(pickId, resolve);
-              });
-              if (!recipientName) return { success: false, output: 'No reviewer was picked.' };
-
-              const humanId = await sb.findParticipantIdByName(recipientName);
-              if (!humanId) return { success: false, output: `Could not find a reviewer named "${recipientName}".` };
-
-              // Register the review response resolver BEFORE sending — same
-              // race as Ask Human if the reviewer clicks Approve instantly.
-              const key = `${coworkerParticipantId}:${humanId}`;
-              const responsePromise = new Promise((resolve) => {
-                reviewResolversRef.current.set(key, resolve);
-              });
-              const sent = await sb.sendDm(coworkerParticipantId, humanId, `Review request: ${title}`, {
-                kind: 'review_request',
-                metadata: {
-                  title,
-                  content,
-                  reasoning,
-                  coworkerName: coworker.name,
-                  coworkerId: coworker.id,
-                },
-              });
-              if (!sent?.data) {
-                reviewResolversRef.current.delete(key);
-                updateActiveMessages(prev => prev.map(m => m.id === pickId ? { ...m, status: 'error', errorOutput: sent?.error || 'unknown error' } : m));
-                return { success: false, output: `Failed to send the review: ${sent?.error || 'unknown error'}.` };
-              }
-              updateActiveMessages(prev => prev.map(m =>
-                m.id === pickId ? { ...m, status: 'waiting_reviewer', fromParticipantId: coworkerParticipantId, toParticipantId: humanId } : m
-              ));
-              const response = await responsePromise;
-              const reviewerAction = response?.action || 'approved';
-              const reviewerFeedback = response?.feedback || '';
-
-              if (reviewerAction !== 'approved') {
-                updateActiveMessages(prev => prev.map(m =>
-                  m.id === pickId ? { ...m, status: 'reviewer_rejected', reviewerAction, reviewerFeedback } : m
-                ));
-                return { success: false, output: `${recipientName} rejected the draft.${reviewerFeedback ? ' Feedback: ' + reviewerFeedback : ''} Revise the draft and call Request Review again.` };
-              }
-
-              // Reviewer approved — hand off to the sender for final sign-off.
-              updateActiveMessages(prev => prev.map(m =>
-                m.id === pickId ? { ...m, status: 'sender_gate', reviewerAction, reviewerFeedback } : m
-              ));
-              const senderDecision = await new Promise((resolve) => {
-                senderApprovalResolversRef.current.set(pickId, resolve);
-              });
-              const senderAction = senderDecision?.action || 'approved';
-              const senderFeedback = senderDecision?.feedback || '';
-
-              if (senderAction !== 'approved') {
-                updateActiveMessages(prev => prev.map(m =>
-                  m.id === pickId ? { ...m, status: 'sender_rejected', senderAction, senderFeedback } : m
-                ));
-                return { success: false, output: `The user (the original sender) rejected the draft after ${recipientName} approved it.${senderFeedback ? ' Feedback: ' + senderFeedback : ''} Revise and call Request Review again — the reviewer will see it fresh.` };
-              }
-
-              const fileName = (title || 'draft').toLowerCase().replace(/[^a-z0-9]+/g, '-') + '.md';
-              const md = `# ${title}\n\n${content}`;
-              const written = writeCoworkerFile(fileName, md);
-              updateActiveMessages(prev => prev.map(m =>
-                m.id === pickId ? { ...m, status: 'done', senderAction, savedFileName: written?.name || fileName } : m
-              ));
-              return { success: true, output: `${recipientName} approved and the user confirmed. File saved as ${written?.name || fileName}.` };
-            },
           });
 
           if (onToolExecution) {
@@ -1353,30 +1226,6 @@ function App() {
     resolver(recipientName);
   }
 
-  function handleSenderApproval(pickId, action, feedback) {
-    const resolver = senderApprovalResolversRef.current.get(pickId);
-    if (!resolver) return;
-    senderApprovalResolversRef.current.delete(pickId);
-    resolver({ action, feedback: feedback || '' });
-  }
-
-  async function handleReviewRespond(reviewDm, action, feedback) {
-    if (!myParticipantId || !reviewDm?.from_participant_id) return false;
-    const humanReplySummary = action === 'approved'
-      ? 'Approved'
-      : `Rejected${feedback ? `: ${feedback}` : ''}`;
-    const sent = await sb.sendDm(
-      myParticipantId,
-      reviewDm.from_participant_id,
-      humanReplySummary,
-      {
-        kind: 'review_response',
-        metadata: { action, feedback: feedback || '', reviewRequestDmId: reviewDm.id },
-      }
-    );
-    return !!sent?.data;
-  }
-
   async function handleNudgeRecipient(pickId) {
     // Re-send the same question from the same sender to the same recipient
     // with a "just checking in" prefix. Increments nudgeCount on the message
@@ -1423,20 +1272,6 @@ function App() {
       // Build system prompt from role description + instruction files + knowledge files
       const instructions = (targetCoworker.instructionFileIds || []).map(id => findNode(fileTree, id)).filter(Boolean);
       const knowledge = (targetCoworker.knowledgeFileIds || []).map(id => findNode(fileTree, id)).filter(Boolean);
-      // Stage 5c — give the coworker a list of who is currently live and a
-      // hint about when to reach out. The names must match exactly for
-      // ask_human to route correctly.
-      let collabSection = '';
-      const hasRequestReview = (targetCoworker.toolIds || []).includes('builtin-request-review');
-      if (stageReached(currentStage, '5c') && hasRequestReview) {
-        const reviewCfg = targetCoworker.toolConfigs?.['builtin-request-review'];
-        const customGuidance = reviewCfg?.instructions?.trim();
-        const whoSignsOffLine = customGuidance
-          ? `\n\n### Who signs off (set by the user)\n${customGuidance}`
-          : '';
-        collabSection = `\n\n## Finishing your work — review is mandatory\n\nYou DO NOT have access to Create File directly. Every artifact you produce must go through two gates: the reviewer AND the original sender.\n\nWorkflow:\n1. Process the task — read your knowledge, think it through, narrate your steps in short lines.\n2. Draft the full file in your head — title + full markdown content.\n3. Call Request Review with that title and content. The sender picks a reviewer for you.\n4. The reviewer sees your draft and your reasoning, then approves or rejects.\n   - On reviewer reject: the tool returns their feedback. Revise and call Request Review again.\n5. If the reviewer approves, the sender gets a final sign-off gate in their own chat.\n   - On sender approve: the file is saved to the workspace. The tool returns success — you're done, don't call anything else.\n   - On sender reject: the tool returns their feedback. Revise and call Request Review again — the reviewer will see it fresh on the next round.\n\nRepeat until both the reviewer and the sender have approved the same draft. Never finalise without both gates saying yes. Never substitute a chat summary for a reviewed file.${whoSignsOffLine}`;
-      }
-
       // Narration habit: short "what I'm doing now" lines between tool calls.
       // The UI streams these to the chat the moment they arrive, so the user
       // sees the coworker's state transitions instead of silence.
@@ -1447,7 +1282,6 @@ function App() {
         ...instructions.map(f => f.content),
         knowledge.length > 0 ? '\n\n## Knowledge Documents\n' : '',
         ...knowledge.map(k => `### ${k.name}\n${k.content}\n`),
-        collabSection,
         narrationHint,
       ].filter(Boolean).join('\n');
     } else if (contextFileIds && contextFileIds.length > 0) {
@@ -1502,15 +1336,6 @@ function App() {
     let coworkerTools = targetCoworker
       ? (targetCoworker.toolIds || []).map(tid => tools?.find(t => t.id === tid)).filter(Boolean)
       : [];
-
-    // When Request Review is ticked, it takes precedence over direct Create
-    // File — the coworker must go through human approval to produce any
-    // artifact. Strip Create File from the exposed toolset so Claude can't
-    // short-circuit the review gate. The underlying writeCoworkerFile helper
-    // stays in scope so Request Review can still write the file on approval.
-    if (coworkerTools.some(t => t.id === 'builtin-request-review')) {
-      coworkerTools = coworkerTools.filter(t => t.id !== 'builtin-create-file');
-    }
 
     if (coworkerTools.length > 0) {
       const result = await callClaudeWithTools({
@@ -1751,8 +1576,6 @@ Be concise. Confirm actions after completing them.${knowledgeSection}`;
               onApprovalAction={handleApprovalAction}
               onPickRecipient={handlePickRecipient}
               onNudgeRecipient={handleNudgeRecipient}
-              onReviewRespond={handleReviewRespond}
-              onSenderApproval={handleSenderApproval}
               onGoToFiles={() => setActiveTab('files')}
               isLoading={isLoading}
               participants={participants}

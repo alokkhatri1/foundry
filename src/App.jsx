@@ -680,23 +680,28 @@ function App() {
     addMessage({ type: 'status', content: `Saved "${newCoworker.name}" to Coworkers tab` });
   }
 
-  function addMessage(msg) {
+  function addMessage(msg, targetConvoId = null) {
     const newMsg = { id: genMsgId(), timestamp: Date.now(), ...msg };
     setConversations(prev => {
       let convos = [...prev];
-      let convoId = activeConvoId;
+      // If caller pinned a convo (e.g., a workflow run that pre-created its
+      // own dedicated "Run: X" chat), route there; otherwise fall back to the
+      // currently open chat or create a new one as a last resort.
+      let convoId = targetConvoId || activeConvoId;
 
-      // Create a new conversation if none exists
       if (!convoId || !convos.find(c => c.id === convoId)) {
         const newConvo = {
-          id: 'convo-' + Date.now(),
+          id: targetConvoId || ('convo-' + Date.now()),
           title: 'New Chat',
           createdAt: Date.now(),
           messages: [],
         };
         convos = [...convos, newConvo];
         convoId = newConvo.id;
-        setActiveConvoId(convoId);
+        // Only promote the new convo to active when the caller wasn't already
+        // routing somewhere specific. A workflow run pre-creates its own chat
+        // and should not hijack the user's current chat view.
+        if (!targetConvoId) setActiveConvoId(convoId);
       }
 
       convos = convos.map(c => {
@@ -713,7 +718,7 @@ function App() {
       return convos;
     });
     // Also persist to Supabase
-    sb.saveMessage(newMsg, activeConvoId);
+    sb.saveMessage(newMsg, targetConvoId || activeConvoId);
     if (activeTabRef.current !== 'chat') {
       setChatBadge(true);
     }
@@ -1187,6 +1192,18 @@ function App() {
     setWorkflowRuns(prev => [...prev, newRun]);
     sb.saveWorkflowRun(newRun);
 
+    // Pre-create one dedicated chat per run so every status line / agent
+    // reply / approval note lands in a single conversation rather than
+    // spawning a new "New Chat" for each message (which it used to, because
+    // addMessage falls back to creating a convo when activeConvoId is stale).
+    const runConvoId = 'convo-run-' + runId;
+    setConversations(prev => [...prev, {
+      id: runConvoId,
+      title: `Run: ${workflow.name}`,
+      createdAt: Date.now(),
+      messages: [],
+    }]);
+
     // Fire and forget — runs concurrently
     executeWorkflowRun({
       runId,
@@ -1200,7 +1217,7 @@ function App() {
       executeToolFn: executeTool,
       onStepUpdate: updateRunStep,
       onRunUpdate: updateRun,
-      onMessage: addMessage,
+      onMessage: (msg) => addMessage(msg, runConvoId),
       removeLoadingMessages: () => updateActiveMessages(prev => prev.filter(m => m.type !== 'loading')),
       onLog: addLog,
       getApprovalDecision: (rId, stepId, config) => {

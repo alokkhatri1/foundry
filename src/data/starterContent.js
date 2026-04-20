@@ -278,6 +278,21 @@ export const BUILTIN_TOOLS = [
       ],
     },
   },
+  {
+    id: 'builtin-send-message',
+    name: 'Send Message',
+    type: 'communicate',
+    description: 'Post a short message into the shared conversation. Use this to announce progress, flag a decision point, or surface something the team should know in the moment. The message appears as a system note in the chat — everyone in the workshop can see it.',
+    icon: '\uD83D\uDCAC',
+    isBuiltin: true,
+    createdBy: 'System',
+    config: {
+      templateId: 'send_chat_message',
+      parameters: [
+        { name: 'message', label: 'Message', type: 'string', required: true, description: 'The message to post to the shared chat' },
+      ],
+    },
+  },
 ];
 
 // Starter external connectors — real, free, no-auth APIs for workshop demos

@@ -6,6 +6,7 @@ import RichText from './RichText';
 
 const TOOL_REVEAL_STAGE = {
   'builtin-create-file': '5b',
+  'builtin-send-message': '5b',
 };
 
 let cwCounter = Date.now();

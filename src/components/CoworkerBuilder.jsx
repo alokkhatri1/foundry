@@ -359,18 +359,13 @@ function FilePicker({ fileTree, selectedIds, onChange, folderName, onUpdateConte
             <div className="ftp-preview">
               <div className="ftp-preview-header">
                 <span className="ftp-preview-name">{previewFile.name.replace(/\.md$/, '')}</span>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                   {onUpdateContent && (
-                    <div className="file-editor-modes">
-                      <button
-                        className={`file-editor-mode${previewMode === 'view' ? ' active' : ''}`}
-                        onClick={() => setPreviewMode('view')}
-                      >View</button>
-                      <button
-                        className={`file-editor-mode${previewMode === 'edit' ? ' active' : ''}`}
-                        onClick={() => setPreviewMode('edit')}
-                      >Edit</button>
-                    </div>
+                    <button
+                      className="ftp-preview-edit"
+                      onClick={() => setPreviewMode(previewMode === 'edit' ? 'view' : 'edit')}
+                      title={previewMode === 'edit' ? 'Done editing' : 'Edit file'}
+                    >{previewMode === 'edit' ? '\u2713' : '\u270E'}</button>
                   )}
                   <button className="ftp-preview-close" onClick={() => setPreviewId(null)}>{'\u2715'}</button>
                 </div>

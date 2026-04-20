@@ -124,6 +124,16 @@ const COMMUNICATE_TEMPLATES = {
       return { success: true, output: `Message sent: "${p.message}"` };
     },
   },
+  dm_human: {
+    name: 'DM a Human',
+    parameters: [
+      { name: 'message', label: 'Message', type: 'string', required: true, description: 'The message to send — the user will pick who it goes to' },
+    ],
+    async execute(p, { onSendDm }) {
+      if (!onSendDm) return { success: false, output: 'DM is not available in this context.' };
+      return await onSendDm({ message: p.message });
+    },
+  },
   notify_person: {
     name: 'Notify Person',
     parameters: [

@@ -946,6 +946,45 @@ function App() {
           const result = await executeTool(tool, toolUse.input, fileTree, callClaudeAPI, {
             onMessage: addMessage,
             onCreateFile: writeCoworkerFile,
+            // Send Message tool — coworker drafts a message, the user picks
+            // which online human it goes to, and we DM them from the coworker's
+            // mirror participant. Fire-and-forget: no reply is awaited.
+            onSendDm: async ({ message }) => {
+              if (!coworker?.id) return { success: false, output: 'Send Message is only available when a specific AI coworker is running the tool.' };
+              const coworkerParticipantId = await sb.getCoworkerParticipantId(coworker.id);
+              if (!coworkerParticipantId) return { success: false, output: 'AI coworker is not set up as a DM participant yet. Try again after saving the coworker.' };
+
+              const pickId = 'dm-' + Date.now() + '-' + Math.random().toString(36).slice(2, 7);
+              addMessage({
+                id: pickId,
+                type: 'recipient-picker',
+                kind: 'dm',
+                question: message,
+                coworkerName: coworker.name,
+                coworkerAvatar: coworker.avatar,
+                status: 'pending',
+              });
+              const recipientName = await new Promise((resolve) => {
+                pickRecipientResolversRef.current.set(pickId, resolve);
+              });
+              if (!recipientName) return { success: false, output: 'No recipient was picked.' };
+
+              const humanId = await sb.findParticipantIdByName(recipientName);
+              if (!humanId) {
+                updateActiveMessages(prev => prev.map(m => m.id === pickId ? { ...m, status: 'error', errorOutput: `Could not find "${recipientName}".` } : m));
+                return { success: false, output: `Could not find a participant named "${recipientName}".` };
+              }
+
+              const sent = await sb.sendDm(coworkerParticipantId, humanId, message);
+              if (!sent?.data) {
+                updateActiveMessages(prev => prev.map(m => m.id === pickId ? { ...m, status: 'error', errorOutput: sent?.error || 'unknown error' } : m));
+                return { success: false, output: `Failed to send the DM: ${sent?.error || 'unknown error'}.` };
+              }
+              updateActiveMessages(prev => prev.map(m =>
+                m.id === pickId ? { ...m, status: 'sent' } : m
+              ));
+              return { success: true, output: `Message delivered to ${recipientName}.` };
+            },
           });
 
           if (onToolExecution) {

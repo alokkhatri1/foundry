@@ -167,6 +167,7 @@ function ChatMessage({ msg, onApprovalAction, onPickRecipient, onNudgeRecipient,
 
   if (msg.type === 'recipient-picker') {
     const status = msg.status || 'pending';
+    const isDm = msg.kind === 'dm';
     const allowedSet = msg.allowedParticipantIds && msg.allowedParticipantIds.length > 0
       ? new Set(msg.allowedParticipantIds)
       : null;
@@ -179,8 +180,11 @@ function ChatMessage({ msg, onApprovalAction, onPickRecipient, onNudgeRecipient,
     const coworkerLabel = msg.coworkerName || 'Coworker';
 
     const label =
-      status === 'pending' ? `${coworkerLabel} needs a human`
+      status === 'pending' && isDm ? `${coworkerLabel} wants to send a message`
+      : status === 'pending' ? `${coworkerLabel} needs a human`
+      : status === 'waiting' && isDm ? `Sending to ${msg.resolvedRecipient}\u2026`
       : status === 'waiting' ? `${coworkerLabel} is waiting on ${msg.resolvedRecipient}`
+      : status === 'sent' ? `Message delivered to ${msg.resolvedRecipient}`
       : status === 'resolved' ? `${msg.resolvedRecipient} replied to ${coworkerLabel}`
       : status === 'error' ? `Couldn't reach ${msg.resolvedRecipient || 'recipient'}`
       : '';
@@ -194,9 +198,9 @@ function ChatMessage({ msg, onApprovalAction, onPickRecipient, onNudgeRecipient,
 
           {status === 'pending' && (
             <>
-              <div className="cl-picker-prompt">Pick who to ask:</div>
+              <div className="cl-picker-prompt">{isDm ? 'Pick who to send to:' : 'Pick who to ask:'}</div>
               {onlineHumans.length === 0 ? (
-                <div className="cl-picker-empty">No allowed humans are currently online.</div>
+                <div className="cl-picker-empty">No humans are currently online.</div>
               ) : (
                 <div className="cl-picker-list">
                   {onlineHumans.map(p => (
@@ -215,7 +219,7 @@ function ChatMessage({ msg, onApprovalAction, onPickRecipient, onNudgeRecipient,
             </>
           )}
 
-          {status === 'waiting' && (
+          {status === 'waiting' && !isDm && (
             <>
               <div className="cl-picker-prompt">
                 DM sent to <strong>{msg.resolvedRecipient}</strong>. Waiting for their decision
@@ -241,7 +245,7 @@ function ChatMessage({ msg, onApprovalAction, onPickRecipient, onNudgeRecipient,
           )}
 
           {status === 'error' && (
-            <div className="cl-approval-resolved">{msg.errorOutput || 'Could not send the question.'}</div>
+            <div className="cl-approval-resolved">{msg.errorOutput || 'Could not send the message.'}</div>
           )}
         </div>
       </div>

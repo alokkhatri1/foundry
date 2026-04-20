@@ -1311,6 +1311,23 @@ function App() {
       // Build system prompt from role description + instruction files + knowledge files
       const instructions = (targetCoworker.instructionFileIds || []).map(id => findNode(fileTree, id)).filter(Boolean);
       const knowledge = (targetCoworker.knowledgeFileIds || []).map(id => findNode(fileTree, id)).filter(Boolean);
+
+      // Tool guidance — Claude gets the schemas automatically, but without
+      // a directive it often drafts artifacts or messages in chat instead
+      // of invoking the tool. Tell it when each builtin is the right move,
+      // and only list the ones this coworker actually has.
+      const toolIds = new Set(targetCoworker.toolIds || []);
+      const toolLines = [];
+      if (toolIds.has('builtin-create-file')) {
+        toolLines.push(`- **Create File** — when the task produces a concrete artifact (memo, summary, report, plan), call Create File with a title and the full markdown content. Do not paste the finished document into chat; put it in a file so the whole room can open it.`);
+      }
+      if (toolIds.has('builtin-send-message')) {
+        toolLines.push(`- **Send Message** — when the task calls for notifying a specific person in the workshop (a heads-up, a hand-off, a request), call Send Message with the drafted text. The user will pick which teammate it goes to. Don't just say "I'll let Priya know" in chat — actually call the tool.`);
+      }
+      const toolSection = toolLines.length > 0
+        ? `\n\n## Tools — use them when the work calls for them\n\nAlways read your Knowledge documents and follow your Instructions first, then decide which tool fits.\n\n${toolLines.join('\n')}`
+        : '';
+
       // Narration habit: short "what I'm doing now" lines between tool calls.
       // The UI streams these to the chat the moment they arrive, so the user
       // sees the coworker's state transitions instead of silence.
@@ -1321,6 +1338,7 @@ function App() {
         ...instructions.map(f => f.content),
         knowledge.length > 0 ? '\n\n## Knowledge Documents\n' : '',
         ...knowledge.map(k => `### ${k.name}\n${k.content}\n`),
+        toolSection,
         narrationHint,
       ].filter(Boolean).join('\n');
     } else if (contextFileIds && contextFileIds.length > 0) {

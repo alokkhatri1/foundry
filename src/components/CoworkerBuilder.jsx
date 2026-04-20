@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import EducationalCue from './EducationalCue';
 import Icon, { COWORKER_ICONS, hasIcon } from './Icon';
 import RevealAt, { stageReached } from './RevealAt';
@@ -290,13 +290,16 @@ function RequestReviewConfig({ participants, config, onChange }) {
 
 // ===== File Picker =====
 // Exported below for reuse from WorkflowBuilder's inline Coworker node.
-function FilePicker({ fileTree, selectedIds, onChange, folderName }) {
+function FilePicker({ fileTree, selectedIds, onChange, folderName, onUpdateContent }) {
   const [open, setOpen] = useState(false);
   const [previewId, setPreviewId] = useState(null);
+  const [previewMode, setPreviewMode] = useState('view');
   const [collapsedDepts, setCollapsedDepts] = useState({});
   const groups = getFilesByDept(fileTree, folderName);
   const selected = selectedIds.map(id => findNode(fileTree, id)).filter(Boolean);
   const previewFile = previewId ? findNode(fileTree, previewId) : null;
+
+  useEffect(() => { setPreviewMode('view'); }, [previewId]);
 
   function toggleFile(fileId) {
     if (selectedIds.includes(fileId)) onChange(selectedIds.filter(id => id !== fileId));
@@ -356,11 +359,35 @@ function FilePicker({ fileTree, selectedIds, onChange, folderName }) {
             <div className="ftp-preview">
               <div className="ftp-preview-header">
                 <span className="ftp-preview-name">{previewFile.name.replace(/\.md$/, '')}</span>
-                <button className="ftp-preview-close" onClick={() => setPreviewId(null)}>{'\u2715'}</button>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  {onUpdateContent && (
+                    <div className="file-editor-modes">
+                      <button
+                        className={`file-editor-mode${previewMode === 'view' ? ' active' : ''}`}
+                        onClick={() => setPreviewMode('view')}
+                      >View</button>
+                      <button
+                        className={`file-editor-mode${previewMode === 'edit' ? ' active' : ''}`}
+                        onClick={() => setPreviewMode('edit')}
+                      >Edit</button>
+                    </div>
+                  )}
+                  <button className="ftp-preview-close" onClick={() => setPreviewId(null)}>{'\u2715'}</button>
+                </div>
               </div>
-              <div className="ftp-preview-content">
-                {previewFile.content ? <RichText content={previewFile.content} /> : <em style={{ color: 'var(--text-muted)' }}>Empty file</em>}
-              </div>
+              {previewMode === 'edit' && onUpdateContent ? (
+                <textarea
+                  className="ftp-preview-textarea"
+                  value={previewFile.content || ''}
+                  onChange={e => onUpdateContent(previewFile.id, e.target.value)}
+                  placeholder="Start writing..."
+                  spellCheck={false}
+                />
+              ) : (
+                <div className="ftp-preview-content">
+                  {previewFile.content ? <RichText content={previewFile.content} /> : <em style={{ color: 'var(--text-muted)' }}>Empty file</em>}
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -424,7 +451,7 @@ function CoworkerCard({ coworker, onStartChat, onEdit, onDelete }) {
 }
 
 // ===== Coworker Editor =====
-function CoworkerEditor({ coworker, onUpdate, onBack, fileTree, callClaudeAPI, showEducationalCues, tools, currentStage, participants }) {
+function CoworkerEditor({ coworker, onUpdate, onBack, fileTree, callClaudeAPI, showEducationalCues, tools, currentStage, participants, onUpdateFileContent }) {
   const [showAvatarPicker, setShowAvatarPicker] = useState(false);
 
   return (
@@ -482,6 +509,7 @@ function CoworkerEditor({ coworker, onUpdate, onBack, fileTree, callClaudeAPI, s
               selectedIds={coworker.instructionFileIds || []}
               onChange={ids => onUpdate({ ...coworker, instructionFileIds: ids })}
               folderName="skills"
+              onUpdateContent={onUpdateFileContent}
             />
           </div>
 
@@ -494,6 +522,7 @@ function CoworkerEditor({ coworker, onUpdate, onBack, fileTree, callClaudeAPI, s
               selectedIds={coworker.knowledgeFileIds || []}
               onChange={ids => onUpdate({ ...coworker, knowledgeFileIds: ids })}
               folderName="knowledge"
+              onUpdateContent={onUpdateFileContent}
             />
           </div>
 
@@ -575,7 +604,7 @@ function CoworkerEditor({ coworker, onUpdate, onBack, fileTree, callClaudeAPI, s
 // render the same About / Skills / Knowledge UI inline on the canvas.
 export { AvatarDisplay, AvatarPicker, DescriptionSection, FilePicker, isImageAvatar, isIconAvatar, iconName, DEFAULT_ICON };
 
-export default function CoworkerBuilder({ coworkers, onUpdateCoworkers, fileTree, tools, userName, callClaudeAPI, showEducationalCues, currentStage, onStartChat, participants }) {
+export default function CoworkerBuilder({ coworkers, onUpdateCoworkers, fileTree, tools, userName, callClaudeAPI, showEducationalCues, currentStage, onStartChat, participants, onUpdateFileContent }) {
   const [selectedCwId, setSelectedCwId] = useState(null);
   const [searchQ, setSearchQ] = useState('');
   const [viewMode, setViewMode] = useState('grid'); // 'grid' | 'list'
@@ -623,7 +652,7 @@ export default function CoworkerBuilder({ coworkers, onUpdateCoworkers, fileTree
   if (selectedCw) {
     return (
       <div className="panel panel-center">
-        <CoworkerEditor coworker={selectedCw} onUpdate={handleUpdate} onBack={() => setSelectedCwId(null)} fileTree={fileTree} callClaudeAPI={callClaudeAPI} showEducationalCues={showEducationalCues} tools={tools} currentStage={currentStage} participants={participants} />
+        <CoworkerEditor coworker={selectedCw} onUpdate={handleUpdate} onBack={() => setSelectedCwId(null)} fileTree={fileTree} callClaudeAPI={callClaudeAPI} showEducationalCues={showEducationalCues} tools={tools} currentStage={currentStage} participants={participants} onUpdateFileContent={onUpdateFileContent} />
       </div>
     );
   }

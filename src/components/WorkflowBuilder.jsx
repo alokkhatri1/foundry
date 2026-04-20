@@ -147,7 +147,7 @@ function styleEdge(e) {
 }
 
 // ===== Step Card =====
-function StepCard({ step, index, coworkers, tools, participants, onUpdate, onDelete, expanded, onToggleExpand, validationErrors, allSteps, currentStepId, stepResult, isDragging, dragOverPos, onDragStart, onDragOver, onDragEnd, onDrop, showEducationalCues, onCanvas, fileTree, callClaudeAPI }) {
+function StepCard({ step, index, coworkers, tools, participants, onUpdate, onDelete, expanded, onToggleExpand, validationErrors, allSteps, currentStepId, stepResult, isDragging, dragOverPos, onDragStart, onDragOver, onDragEnd, onDrop, showEducationalCues, onCanvas, fileTree, callClaudeAPI, onUpdateFileContent }) {
   const isRunning = currentStepId === step.id;
   const assignedCw = step.type === 'agent' ? resolveStepCoworker(step, coworkers) : null;
   const assignedPerson = step.assigneeId ? participants?.find(p => p.id === step.assigneeId) : null;
@@ -332,6 +332,7 @@ function StepCard({ step, index, coworkers, tools, participants, onUpdate, onDel
                       selectedIds={cw.instructionFileIds || []}
                       onChange={ids => updateCoworker({ instructionFileIds: ids })}
                       folderName="skills"
+                      onUpdateContent={onUpdateFileContent}
                     />
                   </div>
 
@@ -343,6 +344,7 @@ function StepCard({ step, index, coworkers, tools, participants, onUpdate, onDel
                       selectedIds={cw.knowledgeFileIds || []}
                       onChange={ids => updateCoworker({ knowledgeFileIds: ids })}
                       folderName="knowledge"
+                      onUpdateContent={onUpdateFileContent}
                     />
                   </div>
 
@@ -450,7 +452,7 @@ function StepCard({ step, index, coworkers, tools, participants, onUpdate, onDel
 // visual — nodes are draggable and their positions persist, edges are
 // drawn read-only from the linear auto-migration. Wiring, typed handles,
 // and DAG runtime arrive in later phases.
-function WorkflowCanvas({ workflow, onUpdateWorkflow, fileTree, coworkers, tools, participants, activeRun, currentStepId, expandedStep, setExpandedStep, updateStep, deleteStep, validationErrors, showEducationalCues, callClaudeAPI, onSaveCoworkerToLibrary }) {
+function WorkflowCanvas({ workflow, onUpdateWorkflow, fileTree, coworkers, tools, participants, activeRun, currentStepId, expandedStep, setExpandedStep, updateStep, deleteStep, validationErrors, showEducationalCues, callClaudeAPI, onSaveCoworkerToLibrary, onUpdateFileContent }) {
   const [nodes, setNodes] = useState([]);
   const [edges, setEdges] = useState([]);
 
@@ -481,13 +483,14 @@ function WorkflowCanvas({ workflow, onUpdateWorkflow, fileTree, coworkers, tools
             showEducationalCues,
             callClaudeAPI,
             onSaveCoworkerToLibrary,
+            onUpdateFileContent,
           },
         },
       };
     });
     const nextEdges = (workflow.edges || []).map(styleEdge);
     return { derivedNodes: nextNodes, derivedEdges: nextEdges };
-  }, [workflow, fileTree, coworkers, tools, participants, activeRun, currentStepId, expandedStep, setExpandedStep, updateStep, deleteStep, validationErrors, showEducationalCues, callClaudeAPI, onSaveCoworkerToLibrary]);
+  }, [workflow, fileTree, coworkers, tools, participants, activeRun, currentStepId, expandedStep, setExpandedStep, updateStep, deleteStep, validationErrors, showEducationalCues, callClaudeAPI, onSaveCoworkerToLibrary, onUpdateFileContent]);
 
   useEffect(() => {
     setNodes(derivedNodes);
@@ -595,7 +598,7 @@ function WorkflowCanvas({ workflow, onUpdateWorkflow, fileTree, coworkers, tools
 }
 
 // ===== Workflow Editor =====
-function WorkflowEditor({ workflow, onUpdateWorkflow, fileTree, coworkers, tools, participants, onRun, isRunning, currentStepId, activeRun, onBack, showEducationalCues, callClaudeAPI, onSaveCoworkerToLibrary }) {
+function WorkflowEditor({ workflow, onUpdateWorkflow, fileTree, coworkers, tools, participants, onRun, isRunning, currentStepId, activeRun, onBack, showEducationalCues, callClaudeAPI, onSaveCoworkerToLibrary, onUpdateFileContent }) {
   const [expandedStep, setExpandedStep] = useState(null);
   const [showAddMenu, setShowAddMenu] = useState(false);
   const [validationErrors, setValidationErrors] = useState({});
@@ -758,6 +761,7 @@ function WorkflowEditor({ workflow, onUpdateWorkflow, fileTree, coworkers, tools
         showEducationalCues={showEducationalCues}
         callClaudeAPI={callClaudeAPI}
         onSaveCoworkerToLibrary={onSaveCoworkerToLibrary}
+        onUpdateFileContent={onUpdateFileContent}
       />
 
     </div>
@@ -802,7 +806,7 @@ function WorkflowCard({ workflow, coworkers, participants, onSelect, onDelete, o
 }
 
 // ===== Main Export =====
-export default function WorkflowBuilder({ workflows, onUpdateWorkflows, fileTree, coworkers, tools, onRun, workflowRuns = [], participants, currentUserName, showEducationalCues, callClaudeAPI, onSaveCoworkerToLibrary }) {
+export default function WorkflowBuilder({ workflows, onUpdateWorkflows, fileTree, coworkers, tools, onRun, workflowRuns = [], participants, currentUserName, showEducationalCues, callClaudeAPI, onSaveCoworkerToLibrary, onUpdateFileContent }) {
   const [selectedWorkflowId, setSelectedWorkflowId] = useState(null);
 
   const selectedWorkflow = selectedWorkflowId ? workflows.find(w => w.id === selectedWorkflowId) : null;
@@ -867,6 +871,7 @@ export default function WorkflowBuilder({ workflows, onUpdateWorkflows, fileTree
           showEducationalCues={showEducationalCues}
           callClaudeAPI={callClaudeAPI}
           onSaveCoworkerToLibrary={onSaveCoworkerToLibrary}
+          onUpdateFileContent={onUpdateFileContent}
         />
       </div>
     );

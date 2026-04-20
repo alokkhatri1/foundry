@@ -1643,7 +1643,7 @@ Be concise. Confirm actions after completing them.${knowledgeSection}`;
       {justRevealed && (
         <div className="modal-overlay reveal-modal-overlay" onClick={() => setJustRevealed(null)}>
           <div className="reveal-modal" role="status" onClick={e => e.stopPropagation()}>
-            <div className="reveal-modal-eyebrow">New Stage Unlocked</div>
+            <div className="reveal-modal-eyebrow">Stage {justRevealed} · New Stage Unlocked</div>
             <div className="reveal-modal-title">{STAGE_META[justRevealed]?.label || justRevealed}</div>
             {STAGE_META[justRevealed]?.description && (
               <p className="reveal-modal-desc">
@@ -1693,6 +1693,11 @@ Be concise. Confirm actions after completing them.${knowledgeSection}`;
           </RevealAt>
         </nav>
         <div className="app-header-right">
+          {currentStage && (
+            <span className="header-stage-chip" title={STAGE_META[currentStage]?.label || ''}>
+              Stage {currentStage}
+            </span>
+          )}
           <span className="header-user-name">{userName}</span>
           <RevealAt stage="2" currentStage={currentStage}>
             <button className="header-btn" onClick={() => setShowPreferences(true)}>Preferences</button>

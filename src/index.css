@@ -883,6 +883,16 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
   border-radius: var(--radius-pill);
   padding: 3px;
 }
+.header-stage-chip {
+  padding: 6px 12px;
+  border-radius: var(--radius-pill);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--accent-gold);
+  background: white;
+  margin-right: 4px;
+  letter-spacing: 0.02em;
+}
 .header-btn {
   padding: 6px 16px;
   border-radius: var(--radius-pill);

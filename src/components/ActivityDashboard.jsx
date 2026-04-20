@@ -1,6 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import EducationalCue from './EducationalCue';
 import { CoworkerGlyph } from './Icon';
+import RunDagView from './RunDagView';
 
 function isIconOrImage(avatar) {
   return typeof avatar === 'string' && (avatar.startsWith('icon:') || avatar.startsWith('data:'));
@@ -78,14 +79,56 @@ function RunCard({ run, onClick, onNudge, showEducationalCues }) {
 }
 
 // ===== Run Detail View =====
-function RunDetailView({ run, onBack, onApprovalAction, onNudge, showEducationalCues, currentUserName, approvals, onLoadApprovals }) {
-  const [expandedStep, setExpandedStep] = useState(null);
-  const [comment, setComment] = useState('');
+// DAG mirror on the left, decision-first sidebar on the right. Clicking a
+// node selects it on both sides; the sidebar row expands inline with the
+// step's output, decision log, or (if it's the run owner's turn) the
+// approval form.
+function RunDetailView({ run, onBack, onApprovalAction, onNudge, showEducationalCues, currentUserName, approvals, onLoadApprovals, workflows }) {
   const cfg = STATUS_CONFIG[run.status] || STATUS_CONFIG.running;
   const isOwner = run.startedBy === currentUserName;
 
-  // Lazy-load the decision log the first time this RunDetailView mounts.
-  // Realtime subscription in App.jsx will keep it fresh thereafter.
+  // The workflow the run was derived from. Needed for the DAG shape
+  // (nodes/edges) and node positions. If the workflow has been deleted
+  // since the run started, fall back to a synthetic straight-line shape
+  // built from stepResults alone — ugly but never blank.
+  const workflow = useMemo(() => {
+    const found = (workflows || []).find(w => w.id === run.workflowId);
+    if (found) return found;
+    const steps = (run.stepResults || []).map((sr, i) => ({
+      id: sr.stepId,
+      type: sr.type,
+      name: sr.stepName,
+    }));
+    const nodes = steps.map((s, i) => ({ id: s.id, type: s.type, position: { x: 80, y: i * 180 } }));
+    const edges = [];
+    for (let i = 0; i < steps.length - 1; i++) {
+      edges.push({
+        id: `edge-${steps[i].id}-${steps[i + 1].id}`,
+        source: steps[i].id,
+        target: steps[i + 1].id,
+        sourceHandle: steps[i].type === 'approval' ? 'approved' : 'out',
+        targetHandle: 'in',
+      });
+    }
+    return { steps, nodes, edges };
+  }, [workflows, run]);
+
+  // Thread approvals into the run object for RunDagView's traversal logic.
+  const runWithApprovals = useMemo(
+    () => ({ ...run, approvals: approvals || [] }),
+    [run, approvals]
+  );
+
+  const [selectedStepId, setSelectedStepId] = useState(() => {
+    // Default selection: the current action — running, waiting, or the
+    // most recently completed step. Empty if nothing has moved yet.
+    const sr = run.stepResults || [];
+    const active = sr.find(s => s.status === 'running' || s.status === 'waiting');
+    if (active) return active.stepId;
+    const completed = [...sr].reverse().find(s => s.status === 'completed');
+    return completed?.stepId || null;
+  });
+
   useEffect(() => {
     if (onLoadApprovals && !approvals) onLoadApprovals(run.id);
   }, [run.id]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -95,7 +138,7 @@ function RunDetailView({ run, onBack, onApprovalAction, onNudge, showEducational
   }
 
   return (
-    <div className="rdetail">
+    <div className="rdetail-v2">
       <div className="rdetail-header">
         <button className="files-back-btn" onClick={onBack}>{'\u2190'} Dashboard</button>
         <div className="rdetail-title">
@@ -109,116 +152,234 @@ function RunDetailView({ run, onBack, onApprovalAction, onNudge, showEducational
         <EducationalCue cueId="activity-run-status" show={showEducationalCues} />
       </div>
 
-      {/* Case input */}
-      <div className="rdetail-case">
-        <div className="rdetail-case-label">Case Input</div>
-        <div className="rdetail-case-text">{run.caseInput}</div>
+      <div className="rdetail-v2-case">
+        <span className="rdetail-case-label">Case Input</span>
+        <span className="rdetail-case-text">{run.caseInput}</span>
       </div>
 
-      {/* Steps */}
-      <div className="rdetail-steps">
-        {run.stepResults.map((step, i) => {
-          const isExpanded = expandedStep === i;
-          const stepCfg = step.status === 'completed' ? { color: '#5a9e6f', icon: '\u2713' }
-            : step.status === 'running' ? { color: '#4a7fb5', icon: '\u25CF' }
-            : step.status === 'waiting' ? { color: '#c8956c', icon: '\u25CB' }
-            : step.status === 'error' ? { color: '#c45c5c', icon: '\u2715' }
-            : { color: 'var(--text-muted)', icon: '\u25CB' };
+      <div className="rdetail-v2-body">
+        <div className="rdetail-v2-dag">
+          <RunDagView
+            workflow={workflow}
+            run={runWithApprovals}
+            selectedStepId={selectedStepId}
+            onSelectStep={setSelectedStepId}
+          />
+        </div>
 
-          return (
-            <div key={i} className={`rdetail-step ${step.status}`}>
-              <div className="rdetail-step-header" onClick={() => setExpandedStep(isExpanded ? null : i)}>
-                <span className="rdetail-step-icon" style={{ background: stepCfg.color }}>
-                  {isIconOrImage(step.coworkerAvatar)
-                    ? <CoworkerGlyph avatar={step.coworkerAvatar} size={12} color="#ffffff" />
-                    : (step.coworkerAvatar || stepCfg.icon)}
-                </span>
-                <span className="rdetail-step-number">Step {i + 1}</span>
-                <span className="rdetail-step-name">{step.stepName}</span>
-                {step.coworkerName && <span className="rdetail-step-agent">{step.coworkerName}</span>}
-                {step.assigneeName && <span className="rdetail-step-agent">{step.assigneeName}</span>}
-                <span className="rdetail-step-status" style={{ color: stepCfg.color }}>{step.status}</span>
-              </div>
+        <aside className="rdetail-v2-sidebar">
+          <div className="rdetail-v2-sidebar-title">Decisions</div>
+          <DecisionList
+            run={run}
+            selectedStepId={selectedStepId}
+            onSelectStep={setSelectedStepId}
+            approvalsForStep={approvalsForStep}
+            isOwner={isOwner}
+            onApprovalAction={onApprovalAction}
+            onNudge={onNudge}
+          />
+        </aside>
+      </div>
+    </div>
+  );
+}
 
-              {/* Expanded body: depends on step type. Completed non-approval
-                  steps show their output. Approval steps always show the
-                  decision log (who decided, when, comment) when expanded,
-                  regardless of status. */}
-              {isExpanded && step.type !== 'approval' && step.output && step.status === 'completed' && (
-                <div className="rdetail-step-output">{step.output}</div>
-              )}
+// ===== Decision-first sidebar =====
+// Rows phrased around who did what, not "Step N <type> <status>". Ordering:
+// completed steps by completion time, then whatever's in progress, then
+// still-pending (dim). The selected row expands inline with output /
+// decision log / approval form.
+function DecisionList({ run, selectedStepId, onSelectStep, approvalsForStep, isOwner, onApprovalAction, onNudge }) {
+  const [comment, setComment] = useState('');
 
-              {isExpanded && step.type === 'approval' && (
-                <div className="rdetail-step-decisionlog">
-                  {approvalsForStep(step.stepId).length === 0 ? (
-                    step.status === 'waiting' ? (
-                      <div className="rdetail-decisionlog-pending">Waiting on {step.assigneeName || 'a reviewer'}.</div>
-                    ) : (
-                      <div className="rdetail-decisionlog-empty">No decision log recorded.</div>
-                    )
-                  ) : (
-                    <div className="rdetail-decisionlog">
-                      <div className="rdetail-decisionlog-title">Decision log</div>
-                      {approvalsForStep(step.stepId).map(a => (
-                        <div key={a.id} className={`rdetail-decisionlog-entry ${a.action === 'Approve' ? 'approve' : 'reject'}`}>
-                          <div className="rdetail-decisionlog-head">
-                            <span className={`rdetail-decisionlog-action ${a.action === 'Approve' ? 'approve' : 'reject'}`}>{a.action}</span>
-                            <span className="rdetail-decisionlog-who">by {a.resolved_by || 'unknown'}</span>
-                            <span className="rdetail-decisionlog-when">{timeAgo(new Date(a.resolved_at).getTime())}</span>
-                          </div>
-                          {a.comment && <div className="rdetail-decisionlog-comment">&ldquo;{a.comment}&rdquo;</div>}
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
+  // Bucket + order the steps so the list reads as a timeline of decisions
+  // rather than the arbitrary authoring order. Completed first (in time
+  // order), then active (running/waiting), then not-yet-reached (pending).
+  const ordered = useMemo(() => {
+    const sr = run.stepResults || [];
+    const done = sr
+      .filter(s => s.status === 'completed' || s.status === 'skipped' || s.status === 'error')
+      .sort((a, b) => (a.completedAt || 0) - (b.completedAt || 0));
+    const active = sr.filter(s => s.status === 'running' || s.status === 'waiting');
+    const pending = sr.filter(s => s.status === 'pending');
+    return [...done, ...active, ...pending];
+  }, [run.stepResults]);
 
-              {step.status === 'waiting' && isOwner && (
-                <div className="rdetail-step-approval">
-                  <div className="rdetail-step-approval-prompt">
-                    Waiting for {step.assigneeName || 'reviewer'} to take action.
-                  </div>
-                  <textarea
-                    className="cl-approval-comment"
-                    placeholder="Add a comment (optional)..."
-                    value={comment}
-                    onChange={e => setComment(e.target.value)}
-                    rows={2}
-                  />
-                  <div className="cl-approval-actions">
-                    {['Approve', 'Reject', 'Request Correction', 'Escalate'].map(action => {
-                      const cls = action === 'Approve' ? 'approve' : action === 'Reject' ? 'reject' : action === 'Request Correction' ? 'correction' : 'escalate';
-                      return (
-                        <button key={action} className={`cl-approval-btn ${cls}`} onClick={() => onApprovalAction(run.id, null, action, comment)}>
-                          {action}
-                        </button>
-                      );
-                    })}
-                  </div>
-                  <button className="rcard-nudge" style={{ marginTop: 8 }} onClick={() => onNudge(run.id)}>
-                    Nudge {step.assigneeName || 'reviewer'}
-                  </button>
-                </div>
-              )}
-              {step.status === 'waiting' && !isOwner && (
-                <div className="rdetail-step-approval">
-                  <div className="rdetail-step-approval-prompt" style={{ color: 'var(--text-muted)' }}>
-                    Waiting on {step.assigneeName || 'a reviewer'}. Only {run.startedBy} (who started this run) can resolve it from this view.
-                  </div>
-                </div>
-              )}
+  return (
+    <div className="rdetail-v2-decisions">
+      {ordered.map(step => (
+        <DecisionRow
+          key={step.stepId}
+          step={step}
+          run={run}
+          isSelected={step.stepId === selectedStepId}
+          onSelect={() => onSelectStep(step.stepId)}
+          approvalsForStep={approvalsForStep}
+          isOwner={isOwner}
+          comment={comment}
+          setComment={setComment}
+          onApprovalAction={onApprovalAction}
+          onNudge={onNudge}
+        />
+      ))}
+    </div>
+  );
+}
 
-              {step.status === 'running' && (
-                <div className="rdetail-step-running">
-                  <div className="cl-loading"><span></span><span></span><span></span></div>
-                  <span>Processing...</span>
-                </div>
-              )}
+// ===== Decision row =====
+// Each row reads like a headline: actor + verb + object, with a small meta
+// line below (when, how long, comment). Expanded rows show the full output
+// / decision log / approval controls depending on step state.
+function DecisionRow({ step, run, isSelected, onSelect, approvalsForStep, isOwner, comment, setComment, onApprovalAction, onNudge }) {
+  const state = step.status;
+  const isReview = step.type === 'approval';
+  const isTrigger = step.type === 'trigger';
+  const stepApprovals = isReview ? approvalsForStep(step.stepId) : [];
+  const latestApproval = stepApprovals[stepApprovals.length - 1];
+
+  // Headline phrased around the decision, not the step index.
+  let headline;
+  let subject;
+  if (isTrigger) {
+    headline = 'Case started';
+    subject = run.startedBy || 'someone';
+  } else if (isReview) {
+    if (state === 'completed' && latestApproval) {
+      const verb = latestApproval.action === 'Approve'
+        ? 'approved'
+        : latestApproval.action === 'Reject'
+          ? 'rejected'
+          : latestApproval.action.toLowerCase();
+      headline = `${verb}`;
+      subject = latestApproval.resolved_by || step.assigneeName || 'reviewer';
+    } else if (state === 'waiting') {
+      headline = 'is reviewing';
+      subject = step.assigneeName || 'reviewer';
+    } else if (state === 'skipped') {
+      headline = 'was skipped';
+      subject = step.assigneeName || 'reviewer';
+    } else {
+      headline = 'up next';
+      subject = step.assigneeName || 'reviewer';
+    }
+  } else {
+    // Coworker step
+    if (state === 'completed') {
+      headline = 'finished';
+      subject = step.coworkerName || step.stepName || 'coworker';
+    } else if (state === 'running') {
+      headline = 'is working';
+      subject = step.coworkerName || step.stepName || 'coworker';
+    } else if (state === 'error') {
+      headline = 'hit an error';
+      subject = step.coworkerName || step.stepName || 'coworker';
+    } else if (state === 'skipped') {
+      headline = 'was skipped';
+      subject = step.coworkerName || step.stepName || 'coworker';
+    } else {
+      headline = 'up next';
+      subject = step.coworkerName || step.stepName || 'coworker';
+    }
+  }
+
+  // Meta line: timing + decision comment if any.
+  const metaBits = [];
+  if (step.completedAt) metaBits.push(timeAgo(step.completedAt));
+  else if (step.startedAt && state === 'running') metaBits.push(`started ${timeAgo(step.startedAt)}`);
+  if (step.completedAt && step.startedAt) {
+    const dur = step.completedAt - step.startedAt;
+    metaBits.push(dur < 1000 ? `${dur}ms` : dur < 60000 ? `${(dur / 1000).toFixed(1)}s` : `${Math.floor(dur / 60000)}m`);
+  }
+
+  return (
+    <div className={`rdetail-v2-row status-${state}${isSelected ? ' selected' : ''}`} onClick={onSelect}>
+      <div className="rdetail-v2-row-main">
+        <span className={`rdetail-v2-row-dot status-${state}`} />
+        <div className="rdetail-v2-row-text">
+          <div className="rdetail-v2-row-headline">
+            <span className="rdetail-v2-row-subject">{subject}</span>
+            <span className="rdetail-v2-row-verb"> {headline}</span>
+          </div>
+          {(metaBits.length > 0 || latestApproval?.comment) && (
+            <div className="rdetail-v2-row-meta">
+              {metaBits.join(' \u00B7 ')}
+              {latestApproval?.comment && <> {metaBits.length > 0 && '\u00B7'} &ldquo;{latestApproval.comment}&rdquo;</>}
             </div>
-          );
-        })}
+          )}
+        </div>
       </div>
+
+      {isSelected && (
+        <div className="rdetail-v2-row-expand" onClick={e => e.stopPropagation()}>
+          {/* Coworker output */}
+          {!isReview && step.status === 'completed' && step.output && (
+            <div className="rdetail-step-output">{step.output}</div>
+          )}
+
+          {/* Decision log for review steps */}
+          {isReview && stepApprovals.length > 0 && (
+            <div className="rdetail-decisionlog">
+              <div className="rdetail-decisionlog-title">Decision log</div>
+              {stepApprovals.map(a => (
+                <div key={a.id} className={`rdetail-decisionlog-entry ${a.action === 'Approve' ? 'approve' : 'reject'}`}>
+                  <div className="rdetail-decisionlog-head">
+                    <span className={`rdetail-decisionlog-action ${a.action === 'Approve' ? 'approve' : 'reject'}`}>{a.action}</span>
+                    <span className="rdetail-decisionlog-who">by {a.resolved_by || 'unknown'}</span>
+                    <span className="rdetail-decisionlog-when">{timeAgo(new Date(a.resolved_at).getTime())}</span>
+                  </div>
+                  {a.comment && <div className="rdetail-decisionlog-comment">&ldquo;{a.comment}&rdquo;</div>}
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Approval form for the run owner when this review is waiting */}
+          {isReview && state === 'waiting' && isOwner && (
+            <div className="rdetail-step-approval">
+              <div className="rdetail-step-approval-prompt">
+                Waiting for {step.assigneeName || 'reviewer'} to take action.
+              </div>
+              <textarea
+                className="cl-approval-comment"
+                placeholder="Add a comment (optional)..."
+                value={comment}
+                onChange={e => setComment(e.target.value)}
+                rows={2}
+              />
+              <div className="cl-approval-actions">
+                {['Approve', 'Reject', 'Request Correction', 'Escalate'].map(action => {
+                  const cls = action === 'Approve' ? 'approve' : action === 'Reject' ? 'reject' : action === 'Request Correction' ? 'correction' : 'escalate';
+                  return (
+                    <button key={action} className={`cl-approval-btn ${cls}`} onClick={() => onApprovalAction(run.id, null, action, comment)}>
+                      {action}
+                    </button>
+                  );
+                })}
+              </div>
+              <button className="rcard-nudge" style={{ marginTop: 8 }} onClick={() => onNudge(run.id)}>
+                Nudge {step.assigneeName || 'reviewer'}
+              </button>
+            </div>
+          )}
+
+          {/* Waiting on someone else */}
+          {isReview && state === 'waiting' && !isOwner && (
+            <div className="rdetail-step-approval">
+              <div className="rdetail-step-approval-prompt" style={{ color: 'var(--text-muted)' }}>
+                Waiting on {step.assigneeName || 'a reviewer'}. Only {run.startedBy} (who started this run) can resolve it from this view.
+              </div>
+            </div>
+          )}
+
+          {/* Coworker in flight */}
+          {!isReview && state === 'running' && (
+            <div className="rdetail-step-running">
+              <div className="cl-loading"><span></span><span></span><span></span></div>
+              <span>Processing...</span>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -252,6 +413,7 @@ export default function ActivityDashboard({ workflowRuns, onApprovalAction, onNu
         currentUserName={currentUserName}
         approvals={approvalsByRun?.[selectedRun.id]}
         onLoadApprovals={onLoadApprovals}
+        workflows={workflows}
       />
     );
   }

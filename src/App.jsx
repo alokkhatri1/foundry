@@ -263,6 +263,27 @@ function App() {
 
   useEffect(() => { activeTabRef.current = activeTab; }, [activeTab]);
 
+  // One-time cleanup of stale "New Chat" conversations left behind by the
+  // old workflow-run → addMessage bug (which spawned a fresh chat per
+  // message). Signals something is garbage: title is still the default
+  // "New Chat" (a real user message would have auto-retitled it), and the
+  // chat was created more than a minute ago (so a freshly-opened empty
+  // chat on this mount won't get swept). Runs once on mount.
+  useEffect(() => {
+    const cutoff = Date.now() - 60 * 1000;
+    setConversations(prev => {
+      const kept = prev.filter(c => !(c.title === 'New Chat' && (c.createdAt || 0) < cutoff));
+      if (kept.length === prev.length) return prev;
+      persistConversations(kept);
+      if (activeConvoId && !kept.find(c => c.id === activeConvoId)) {
+        setActiveConvoId(kept.length > 0 ? kept[kept.length - 1].id : null);
+      }
+      return kept;
+    });
+    // Intentionally empty deps — this is a one-shot sweep on mount.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // On load: reconnect to Supabase, load state from granular tables, start presence + realtime
   useEffect(() => {
     if (isJoined && workshopCode) {

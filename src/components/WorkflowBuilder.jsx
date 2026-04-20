@@ -1,10 +1,11 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import ReactFlow, { Background, Controls, MiniMap, Handle, Position, applyNodeChanges, applyEdgeChanges, addEdge } from 'reactflow';
 import 'reactflow/dist/style.css';
 import EducationalCue from './EducationalCue';
 import { CoworkerGlyph } from './Icon';
 import RichText from './RichText';
 import { AvatarDisplay, AvatarPicker, DescriptionSection, FilePicker } from './CoworkerBuilder';
+import { runCopilotTurn } from '../utils/workflowCopilot';
 
 // Resolve a step's coworker data. New-style steps embed the full coworker
 // config at step.coworker (self-contained, decoupled from the shared pool).
@@ -452,9 +453,15 @@ function StepCard({ step, index, coworkers, tools, participants, onUpdate, onDel
 // visual — nodes are draggable and their positions persist, edges are
 // drawn read-only from the linear auto-migration. Wiring, typed handles,
 // and DAG runtime arrive in later phases.
-function WorkflowCanvas({ workflow, onUpdateWorkflow, fileTree, coworkers, tools, participants, activeRun, currentStepId, expandedStep, setExpandedStep, updateStep, deleteStep, validationErrors, showEducationalCues, callClaudeAPI, onSaveCoworkerToLibrary, onUpdateFileContent }) {
+function WorkflowCanvas({ workflow, onUpdateWorkflow, fileTree, coworkers, tools, participants, activeRun, currentStepId, expandedStep, setExpandedStep, updateStep, deleteStep, validationErrors, showEducationalCues, callClaudeAPI, onSaveCoworkerToLibrary, onUpdateFileContent, apiKey }) {
   const [nodes, setNodes] = useState([]);
   const [edges, setEdges] = useState([]);
+  const [copilotOpen, setCopilotOpen] = useState(false);
+  const [copilotMessages, setCopilotMessages] = useState([]);
+  const [copilotInput, setCopilotInput] = useState('');
+  const [copilotBusy, setCopilotBusy] = useState(false);
+  const copilotHistoryRef = useRef([]);
+  const copilotScrollRef = useRef(null);
 
   // Derive canvas nodes from workflow.steps preserving any stored positions.
   const { derivedNodes, derivedEdges } = useMemo(() => {
@@ -555,7 +562,51 @@ function WorkflowCanvas({ workflow, onUpdateWorkflow, fileTree, coworkers, tools
     onUpdateWorkflow({ ...workflow, edges: [...currentEdges, newEdge] });
   }, [workflow, onUpdateWorkflow]);
 
+  // Auto-scroll the copilot transcript to the bottom whenever it grows.
+  useEffect(() => {
+    const el = copilotScrollRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [copilotMessages]);
+
+  const handleCopilotSend = useCallback(async () => {
+    const text = copilotInput.trim();
+    if (!text || copilotBusy) return;
+    setCopilotInput('');
+    setCopilotMessages(prev => [...prev, { kind: 'user', text }]);
+    setCopilotBusy(true);
+
+    const workflowRef = { current: workflow };
+    try {
+      const { updatedHistory, updatedWorkflow } = await runCopilotTurn({
+        apiKey,
+        userMessage: text,
+        conversationHistory: copilotHistoryRef.current,
+        workflow,
+        coworkers,
+        participants,
+        onWorkflowUpdate: (next) => {
+          workflowRef.current = next;
+          onUpdateWorkflow(next);
+        },
+        onNarration: (narration) => {
+          setCopilotMessages(prev => [...prev, { kind: 'assistant', text: narration }]);
+        },
+        onError: (errMsg) => {
+          setCopilotMessages(prev => [...prev, { kind: 'error', text: errMsg }]);
+        },
+      });
+      copilotHistoryRef.current = updatedHistory;
+      // updatedWorkflow is already committed via onWorkflowUpdate — nothing else to do here.
+      void updatedWorkflow;
+    } catch (err) {
+      setCopilotMessages(prev => [...prev, { kind: 'error', text: `Copilot crashed: ${err.message}` }]);
+    } finally {
+      setCopilotBusy(false);
+    }
+  }, [copilotInput, copilotBusy, apiKey, workflow, coworkers, participants, onUpdateWorkflow]);
+
   return (
+    <div className={`wf-canvas-layout${copilotOpen ? ' copilot-open' : ''}`}>
     <div className="wf-canvas-wrap">
       <ReactFlow
         nodes={nodes}
@@ -590,15 +641,67 @@ function WorkflowCanvas({ workflow, onUpdateWorkflow, fileTree, coworkers, tools
       {(workflow.steps || []).filter(s => s.type !== 'trigger').length === 0 && (
         <div className="wf-canvas-empty">
           <p style={{ fontSize: 16, fontWeight: 600, marginBottom: 8 }}>Build your process</p>
-          <p>The Trigger holds the case input. Click + Add Step to chain coworker steps and human reviews after it.</p>
+          <p>Describe what you want in the Copilot panel, or click + Add Step to build it by hand.</p>
         </div>
       )}
+      <button
+        className={`wf-copilot-toggle${copilotOpen ? ' open' : ''}`}
+        onClick={() => setCopilotOpen(o => !o)}
+        title={copilotOpen ? 'Hide copilot' : 'Open copilot'}
+      >
+        {copilotOpen ? '\u2192' : '\u2190'} Copilot
+      </button>
+    </div>
+    {copilotOpen && (
+      <aside className="wf-copilot-panel">
+        <div className="wf-copilot-header">
+          <span className="wf-copilot-title">Workflow Copilot</span>
+          <button className="wf-copilot-close" onClick={() => setCopilotOpen(false)}>{'\u2715'}</button>
+        </div>
+        <div className="wf-copilot-messages" ref={copilotScrollRef}>
+          {copilotMessages.length === 0 && !copilotBusy && (
+            <div className="wf-copilot-empty">
+              Describe the workflow you want. I'll stitch the DAG — add coworker steps, wire reviews, connect the edges.
+              <br /><br />
+              Try: <em>"Ravi drafts a risk memo, Priya reviews, then Legal AI checks exceptions, then I sign off."</em>
+            </div>
+          )}
+          {copilotMessages.map((m, i) => (
+            <div key={i} className={`wf-copilot-msg wf-copilot-msg-${m.kind}`}>
+              <RichText content={m.text} />
+            </div>
+          ))}
+          {copilotBusy && <div className="wf-copilot-msg wf-copilot-msg-thinking">Thinking\u2026</div>}
+        </div>
+        <div className="wf-copilot-input-row">
+          <textarea
+            className="wf-copilot-input"
+            value={copilotInput}
+            onChange={e => setCopilotInput(e.target.value)}
+            onKeyDown={e => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                handleCopilotSend();
+              }
+            }}
+            placeholder={copilotBusy ? 'Copilot is working\u2026' : 'Describe the workflow or a change\u2026'}
+            rows={2}
+            disabled={copilotBusy}
+          />
+          <button
+            className="wf-copilot-send"
+            onClick={handleCopilotSend}
+            disabled={copilotBusy || !copilotInput.trim()}
+          >Send</button>
+        </div>
+      </aside>
+    )}
     </div>
   );
 }
 
 // ===== Workflow Editor =====
-function WorkflowEditor({ workflow, onUpdateWorkflow, fileTree, coworkers, tools, participants, onRun, isRunning, currentStepId, activeRun, onBack, showEducationalCues, callClaudeAPI, onSaveCoworkerToLibrary, onUpdateFileContent }) {
+function WorkflowEditor({ workflow, onUpdateWorkflow, fileTree, coworkers, tools, participants, onRun, isRunning, currentStepId, activeRun, onBack, showEducationalCues, callClaudeAPI, onSaveCoworkerToLibrary, onUpdateFileContent, apiKey }) {
   const [expandedStep, setExpandedStep] = useState(null);
   const [showAddMenu, setShowAddMenu] = useState(false);
   const [validationErrors, setValidationErrors] = useState({});
@@ -762,6 +865,7 @@ function WorkflowEditor({ workflow, onUpdateWorkflow, fileTree, coworkers, tools
         callClaudeAPI={callClaudeAPI}
         onSaveCoworkerToLibrary={onSaveCoworkerToLibrary}
         onUpdateFileContent={onUpdateFileContent}
+        apiKey={apiKey}
       />
 
     </div>
@@ -806,7 +910,7 @@ function WorkflowCard({ workflow, coworkers, participants, onSelect, onDelete, o
 }
 
 // ===== Main Export =====
-export default function WorkflowBuilder({ workflows, onUpdateWorkflows, fileTree, coworkers, tools, onRun, workflowRuns = [], participants, currentUserName, showEducationalCues, callClaudeAPI, onSaveCoworkerToLibrary, onUpdateFileContent }) {
+export default function WorkflowBuilder({ workflows, onUpdateWorkflows, fileTree, coworkers, tools, onRun, workflowRuns = [], participants, currentUserName, showEducationalCues, callClaudeAPI, onSaveCoworkerToLibrary, onUpdateFileContent, apiKey }) {
   const [selectedWorkflowId, setSelectedWorkflowId] = useState(null);
 
   const selectedWorkflow = selectedWorkflowId ? workflows.find(w => w.id === selectedWorkflowId) : null;
@@ -872,6 +976,7 @@ export default function WorkflowBuilder({ workflows, onUpdateWorkflows, fileTree
           callClaudeAPI={callClaudeAPI}
           onSaveCoworkerToLibrary={onSaveCoworkerToLibrary}
           onUpdateFileContent={onUpdateFileContent}
+          apiKey={apiKey}
         />
       </div>
     );

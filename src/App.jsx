@@ -8,7 +8,7 @@ import WorkflowBuilder from './components/WorkflowBuilder';
 import CoworkerBuilder from './components/CoworkerBuilder';
 import ChatPanel from './components/ChatPanel';
 import ActivityDashboard from './components/ActivityDashboard';
-import RevealAt, { STAGE_META, stageReached } from './components/RevealAt';
+import RevealAt, { STAGE_META, stageReached, normalizeStage } from './components/RevealAt';
 import { buildStageGuidance } from './data/stageGuidance';
 import PreferencesEditor from './components/PreferencesEditor';
 import {
@@ -270,7 +270,7 @@ function App() {
         if (result?.error === 'deprecated') { setWorkshopEnded(true); return; }
         if (result?.error || !result?.id || !userName) return;
         const roomId = result.id;
-        if (result.current_stage) setCurrentStage(result.current_stage);
+        if (result.current_stage) setCurrentStage(normalizeStage(result.current_stage));
 
         const myColor = participants.find(p => p.name === userName)?.color || COLORS[0];
         const authUser = await sb.getUser();
@@ -450,7 +450,7 @@ function App() {
       },
       onRoomChange: (row) => {
         if (row?.deprecated_at) setWorkshopEnded(true);
-        if (row?.current_stage) setCurrentStage(row.current_stage);
+        if (row?.current_stage) setCurrentStage(normalizeStage(row.current_stage));
       },
     });
   }
@@ -504,7 +504,7 @@ function App() {
     const result = await sb.joinRoom(code);
     if (result?.error) return result;
     const roomId = result.id;
-    if (result.current_stage) setCurrentStage(result.current_stage);
+    if (result.current_stage) setCurrentStage(normalizeStage(result.current_stage));
 
     // Load from Supabase granular tables
     let files, cws, tls, wfs, runs;

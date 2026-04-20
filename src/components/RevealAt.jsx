@@ -1,15 +1,24 @@
 const STAGE_ORDER = ['1', '2', '3', '4', '5a', '5b', '6', '7', '8'];
 
+// Rooms deprecated before the arc change can carry stage IDs that no longer
+// exist in STAGE_ORDER. Without normalization, indexOf returns -1 and every
+// stageReached() check fails, hiding all gated UI (including the Tools list
+// on coworkers). Map retired IDs to their nearest still-valid predecessor.
+const STAGE_ALIASES = { '5c': '5b' };
+function normalizeStage(s) {
+  return STAGE_ALIASES[s] || s;
+}
+
 export function stageReached(currentStage, targetStage) {
   if (!currentStage) return false;
-  const cur = STAGE_ORDER.indexOf(currentStage);
-  const tgt = STAGE_ORDER.indexOf(targetStage);
+  const cur = STAGE_ORDER.indexOf(normalizeStage(currentStage));
+  const tgt = STAGE_ORDER.indexOf(normalizeStage(targetStage));
   if (cur === -1 || tgt === -1) return false;
   return cur >= tgt;
 }
 
 export function nextStage(currentStage) {
-  const idx = STAGE_ORDER.indexOf(currentStage);
+  const idx = STAGE_ORDER.indexOf(normalizeStage(currentStage));
   if (idx === -1 || idx >= STAGE_ORDER.length - 1) return null;
   return STAGE_ORDER[idx + 1];
 }
@@ -26,7 +35,7 @@ export const STAGE_META = {
   '8':  { label: 'Graduation',           description: 'Here\u2019s a read of what you built, {name} \u2014 your competency scorecard across everything we just did together.' },
 };
 
-export { STAGE_ORDER };
+export { STAGE_ORDER, normalizeStage };
 
 export default function RevealAt({ stage, currentStage, children, fallback = null }) {
   return stageReached(currentStage, stage) ? children : fallback;

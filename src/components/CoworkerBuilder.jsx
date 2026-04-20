@@ -234,6 +234,64 @@ function CreateFileConfig({ fileTree, currentStage, config, onChange }) {
   );
 }
 
+// ===== Send Message tool config =====
+// Instructions for WHEN to DM someone + a whitelist of humans this coworker
+// is allowed to message. The whitelist is enforced on the runtime picker,
+// and the instructions get folded into the coworker's system prompt so it
+// knows when to reach for the tool.
+function SendMessageConfig({ participants, config, onChange }) {
+  const instructions = config?.instructions || '';
+  const allowed = config?.allowedParticipantIds || [];
+  const humans = (participants || []).filter(p => (p.kind || 'human') === 'human');
+
+  function toggleParticipant(pid) {
+    const next = allowed.includes(pid)
+      ? allowed.filter(id => id !== pid)
+      : [...allowed, pid];
+    onChange({ instructions, allowedParticipantIds: next });
+  }
+
+  return (
+    <div className="cwb-tool-config">
+      <div className="cwb-tool-config-title">When should this coworker send a message?</div>
+      <textarea
+        className="cwb-tool-config-textarea"
+        value={instructions}
+        onChange={e => onChange({ instructions: e.target.value, allowedParticipantIds: allowed })}
+        placeholder="e.g., DM the team lead when a loan flags the 2024 exception. DM ops if the case takes longer than expected."
+        rows={3}
+      />
+      <div className="cwb-tool-config-row cwb-tool-config-col">
+        <label className="cwb-tool-config-label">Who this coworker can message</label>
+        {humans.length === 0 ? (
+          <div className="cwb-tool-config-hint">No workshop participants yet — the picker will have nothing to show at runtime.</div>
+        ) : (
+          <div className="cwb-tool-config-checklist">
+            {humans.map(p => (
+              <label key={p.id} className={`cwb-tool-config-checkitem${allowed.includes(p.id) ? ' on' : ''}`}>
+                <input
+                  type="checkbox"
+                  checked={allowed.includes(p.id)}
+                  onChange={() => toggleParticipant(p.id)}
+                />
+                <span
+                  className="cwb-tool-config-dot"
+                  style={{ background: p.color || '#888', opacity: p.online ? 1 : 0.35 }}
+                  title={p.online ? 'Online' : 'Offline'}
+                />
+                <span className="cwb-tool-config-checkname">{p.name}</span>
+              </label>
+            ))}
+          </div>
+        )}
+        {humans.length > 0 && allowed.length === 0 && (
+          <div className="cwb-tool-config-warning">Pick at least one — the tool won't fire with an empty whitelist.</div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ===== File Picker =====
 // Exported below for reuse from WorkflowBuilder's inline Coworker node.
 function FilePicker({ fileTree, selectedIds, onChange, folderName, onUpdateContent }) {
@@ -506,6 +564,19 @@ function CoworkerEditor({ coworker, onUpdate, onBack, fileTree, callClaudeAPI, s
                             toolConfigs: {
                               ...(coworker.toolConfigs || {}),
                               'builtin-create-file': next,
+                            },
+                          })}
+                        />
+                      )}
+                      {checked && tool.id === 'builtin-send-message' && (
+                        <SendMessageConfig
+                          participants={participants}
+                          config={coworker.toolConfigs?.['builtin-send-message']}
+                          onChange={next => onUpdate({
+                            ...coworker,
+                            toolConfigs: {
+                              ...(coworker.toolConfigs || {}),
+                              'builtin-send-message': next,
                             },
                           })}
                         />

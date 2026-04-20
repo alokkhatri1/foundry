@@ -953,6 +953,11 @@ function App() {
               if (!coworker?.id) return { success: false, output: 'Send Message is only available when a specific AI coworker is running the tool.' };
               const coworkerParticipantId = await sb.getCoworkerParticipantId(coworker.id);
               if (!coworkerParticipantId) return { success: false, output: 'AI coworker is not set up as a DM participant yet. Try again after saving the coworker.' };
+              const dmCfg = coworker.toolConfigs?.['builtin-send-message'];
+              const allowedIds = dmCfg?.allowedParticipantIds || [];
+              if (allowedIds.length === 0) {
+                return { success: false, output: 'This coworker has no recipients configured. Open the editor and pick at least one person it can message.' };
+              }
 
               const pickId = 'dm-' + Date.now() + '-' + Math.random().toString(36).slice(2, 7);
               addMessage({
@@ -962,6 +967,7 @@ function App() {
                 question: message,
                 coworkerName: coworker.name,
                 coworkerAvatar: coworker.avatar,
+                allowedParticipantIds: allowedIds,
                 status: 'pending',
               });
               const recipientName = await new Promise((resolve) => {
@@ -1322,7 +1328,12 @@ function App() {
         toolLines.push(`- **Create File** — when the task produces a concrete artifact (memo, summary, report, plan), call Create File with a title and the full markdown content. Do not paste the finished document into chat; put it in a file so the whole room can open it.`);
       }
       if (toolIds.has('builtin-send-message')) {
-        toolLines.push(`- **Send Message** — when the task calls for notifying a specific person in the workshop (a heads-up, a hand-off, a request), call Send Message with the drafted text. The user will pick which teammate it goes to. Don't just say "I'll let Priya know" in chat — actually call the tool.`);
+        const dmCfg = targetCoworker.toolConfigs?.['builtin-send-message'];
+        const dmGuidance = dmCfg?.instructions?.trim();
+        const dmWhenLine = dmGuidance
+          ? `\n  - *When the user has set*: ${dmGuidance}`
+          : '';
+        toolLines.push(`- **Send Message** — when the task calls for notifying a specific person in the workshop (a heads-up, a hand-off, a request), call Send Message with the drafted text. The user will pick which teammate it goes to. Don't just say "I'll let Priya know" in chat — actually call the tool.${dmWhenLine}`);
       }
       const toolSection = toolLines.length > 0
         ? `\n\n## Tools — use them when the work calls for them\n\nAlways read your Knowledge documents and follow your Instructions first, then decide which tool fits.\n\n${toolLines.join('\n')}`

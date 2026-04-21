@@ -734,8 +734,13 @@ export default function useSupabase() {
 
   const subscribeToWorkshopUsage = useCallback((onInsert) => {
     if (!isSupabaseConfigured || !roomIdRef.current) return () => {};
+    // Unique channel name per subscription — two components (the Usage
+    // tab and the header settings menu) subscribe to the same filter, and
+    // Supabase's realtime client throws if two subscriptions share a
+    // channel name once the first one is already subscribed.
+    const chan = `llm-usage-workshop:${roomIdRef.current}:${Math.random().toString(36).slice(2, 8)}`;
     const channel = supabase
-      .channel(`llm-usage-workshop:${roomIdRef.current}`)
+      .channel(chan)
       .on('postgres_changes', {
         event: 'INSERT', schema: 'public', table: 'llm_usage',
         filter: `workshop_id=eq.${roomIdRef.current}`,
@@ -778,8 +783,9 @@ export default function useSupabase() {
 
   const subscribeToMyUsage = useCallback((participantId, onInsert) => {
     if (!isSupabaseConfigured || !roomIdRef.current || !participantId) return () => {};
+    const chan = `llm-usage:${roomIdRef.current}:${participantId}:${Math.random().toString(36).slice(2, 8)}`;
     const channel = supabase
-      .channel(`llm-usage:${roomIdRef.current}:${participantId}`)
+      .channel(chan)
       .on(
         'postgres_changes',
         {

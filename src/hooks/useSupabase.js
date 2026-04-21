@@ -72,7 +72,7 @@ export default function useSupabase() {
   const loadAdminWorkshops = useCallback(async (adminId) => {
     if (!isSupabaseConfigured) return [];
     const { data, error } = await supabase.from('rooms')
-      .select('id, code, org_name, created_at, deprecated_at, current_stage')
+      .select('id, code, org_name, created_at, deprecated_at, current_stage, credit_allocation')
       .eq('admin_id', adminId)
       .order('created_at', { ascending: false });
     if (error) { console.error('[sb] loadAdminWorkshops:', error.message); return []; }
@@ -225,7 +225,7 @@ export default function useSupabase() {
     if (!isSupabaseConfigured) return { error: 'not_configured' };
     const { data: room, error } = await supabase
       .from('rooms')
-      .select('id, deprecated_at, current_stage')
+      .select('id, deprecated_at, current_stage, credit_allocation')
       .eq('code', code)
       .maybeSingle();
     if (error) { console.error('[sb] joinRoom:', error.message); return { error: 'db_error' }; }
@@ -233,7 +233,32 @@ export default function useSupabase() {
     if (room.deprecated_at) return { error: 'deprecated' };
     roomIdRef.current = room.id;
     console.log('[sb] joined room:', room.id);
-    return { id: room.id, current_stage: room.current_stage };
+    return {
+      id: room.id,
+      current_stage: room.current_stage,
+      credit_allocation: room.credit_allocation ?? 100,
+    };
+  }, []);
+
+  // Credit allocation setter — used by the admin dashboard. Per-room, affects
+  // every participant going forward. Existing participants don't lose credits
+  // already spent; their budget just jumps to match the new allocation.
+  const setCreditAllocation = useCallback(async (roomId, allocation) => {
+    if (!isSupabaseConfigured || !roomId) return false;
+    const { error } = await supabase.from('rooms')
+      .update({ credit_allocation: allocation })
+      .eq('id', roomId);
+    if (error) { console.error('[sb] setCreditAllocation:', error.message); return false; }
+    return true;
+  }, []);
+
+  const setParticipantCreditBonus = useCallback(async (participantId, bonus) => {
+    if (!isSupabaseConfigured || !participantId) return false;
+    const { error } = await supabase.from('participants')
+      .update({ credit_bonus: bonus })
+      .eq('id', participantId);
+    if (error) { console.error('[sb] setParticipantCreditBonus:', error.message); return false; }
+    return true;
   }, []);
 
   const getRoomId = useCallback(() => roomIdRef.current, []);
@@ -312,7 +337,7 @@ export default function useSupabase() {
   const getParticipantById = useCallback(async (id) => {
     if (!isSupabaseConfigured || !id) return null;
     const { data } = await supabase.from('participants')
-      .select('id, name, color')
+      .select('id, name, color, credit_bonus')
       .eq('id', id)
       .maybeSingle();
     return data;
@@ -890,7 +915,7 @@ export default function useSupabase() {
     deleteWorkshop, deprecateWorkshop, revealStage, loadWorkshopStats, loadWorkshopContent, loadWorkshopActivity,
     seedWorkshopContent, subscribeToWorkshopPresence,
     // Room
-    joinRoom, getRoomId,
+    joinRoom, getRoomId, setCreditAllocation, setParticipantCreditBonus,
     upsertParticipant, loadParticipants, findParticipantIdByName, getParticipantById, getCoworkerParticipantId,
     loadUserPreferences, saveUserPreferences, loadUserRole, saveUserRole,
     sendDm, fetchDmThread, subscribeToDms, subscribeToAllRoomDms,

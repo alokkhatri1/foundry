@@ -11,7 +11,7 @@ import ActivityDashboard from './components/ActivityDashboard';
 import UsageView, { useMyUsageTotal, useWorkshopUsageTotal } from './components/UsageView';
 import { formatUsd, formatTokens } from './utils/llmCost';
 import RevealAt, { STAGE_META, stageReached, normalizeStage } from './components/RevealAt';
-import { computeCost } from './utils/llmCost';
+import { computeCost, costToCredits, DEFAULT_CREDIT_ALLOCATION, CREDITS_WARN_THRESHOLD } from './utils/llmCost';
 import { buildStageGuidance } from './data/stageGuidance';
 import PreferencesEditor from './components/PreferencesEditor';
 import {
@@ -186,7 +186,7 @@ function SpendChip({ sb, myParticipantId, onClick }) {
 // Current Level, live spend total (when Stage 7b is revealed),
 // Preferences (Stage 2+), and Exit Workshop. Frees the header to show
 // every stage tab without wrapping.
-function SettingsMenu({ userName, currentStage, sb, myParticipantId, onOpenUsage, onOpenPreferences, onExit }) {
+function SettingsMenu({ userName, currentStage, sb, myParticipantId, creditsLeft, creditsTotal, onOpenUsage, onOpenPreferences, onExit }) {
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
   const showSpend = stageReached(currentStage, '7b');
@@ -197,6 +197,7 @@ function SettingsMenu({ userName, currentStage, sb, myParticipantId, onOpenUsage
   const showPreferences = stageReached(currentStage, '2');
   const initial = (userName || '?').trim().charAt(0).toUpperCase();
   const stageLabel = currentStage ? STAGE_META[currentStage]?.label : null;
+  const creditsLow = creditsLeft != null && creditsLeft <= CREDITS_WARN_THRESHOLD;
 
   useEffect(() => {
     if (!open) return;
@@ -227,6 +228,19 @@ function SettingsMenu({ userName, currentStage, sb, myParticipantId, onOpenUsage
                 <span className="header-settings-meta-value">{stageLabel}</span>
               </div>
             )}
+            {creditsLeft != null && (
+              <div
+                className="header-settings-meta"
+                title="~1 credit = a typical chat. ~5 credits = a workflow run."
+              >
+                <span className="header-settings-meta-label">Credits</span>
+                <span
+                  className={`header-settings-meta-value${creditsLow ? ' header-settings-meta-low' : ''}`}
+                >
+                  {Math.max(0, creditsLeft)} / {creditsTotal}
+                </span>
+              </div>
+            )}
             {showSpend && (
               <div
                 className="header-settings-meta header-settings-meta-clickable"
@@ -253,6 +267,25 @@ function SettingsMenu({ userName, currentStage, sb, myParticipantId, onOpenUsage
         </div>
       )}
     </div>
+  );
+}
+
+// Compact credits pill — mounted in the header post-7b. Before that, the
+// credits live only in the settings menu. The pill clicks through to the
+// Economics tab so participants can see where the balance went.
+function CreditsChip({ creditsLeft, creditsTotal, onClick }) {
+  if (creditsLeft == null) return null;
+  const low = creditsLeft <= CREDITS_WARN_THRESHOLD;
+  return (
+    <span
+      className={`header-credits-chip${low ? ' low' : ''}`}
+      onClick={onClick}
+      title="Credits left. ~1 credit = a typical chat. ~5 credits = a workflow run."
+    >
+      <span className="header-credits-chip-value">{Math.max(0, creditsLeft)}</span>
+      <span className="header-credits-chip-of">/ {creditsTotal}</span>
+      <span className="header-credits-chip-label">credits</span>
+    </span>
   );
 }
 
@@ -303,6 +336,14 @@ function App() {
   const [approvalsByRun, setApprovalsByRun] = useState({});
   const [networkError, setNetworkError] = useState(false);
   const [activeTab, setActiveTab] = useState('chat');
+  // Personal spend drives credits used. Subscribes to llm_usage inserts so
+  // the balance ticks down in realtime. Exposed as myUsdSpend so the
+  // credit calc below is derivative.
+  const { total: myUsdSpend } = useMyUsageTotal(sb, myParticipantId);
+  const creditsTotal = creditAllocation + myCreditBonus;
+  const creditsUsed = costToCredits(myUsdSpend);
+  const creditsLeft = creditsTotal - creditsUsed;
+  const creditsExhausted = creditsLeft <= 0;
   const [showExitConfirm, setShowExitConfirm] = useState(false);
   const [showEducationalCues, setShowEducationalCues] = useState(() => {
     try { const v = localStorage.getItem('sandbox:show-edu-cues'); return v === null ? true : v === 'true'; } catch { return true; }
@@ -324,6 +365,11 @@ function App() {
   const [isJoined, setIsJoined] = useState(!!(saved?.userName && saved?.workshopCode && (saved?.fileTree || saved?.workflows)));
   const [workshopEnded, setWorkshopEnded] = useState(false);
   const [currentStage, setCurrentStage] = useState('6');
+  // Credit budget: allocation is per-room (admin-configurable), bonus is
+  // per-participant (admin-grantable). Used-credits is derived live from
+  // the workshop's llm_usage rows in the settings menu's credits hook.
+  const [creditAllocation, setCreditAllocation] = useState(DEFAULT_CREDIT_ALLOCATION);
+  const [myCreditBonus, setMyCreditBonus] = useState(0);
   const [userPreferences, setUserPreferences] = useState('');
   const [showPreferences, setShowPreferences] = useState(false);
   const [userRole, setUserRole] = useState('');
@@ -383,6 +429,7 @@ function App() {
   useEffect(() => {
     if (isJoined && workshopCode) {
       sb.joinRoom(workshopCode).then(async (result) => {
+        if (result?.credit_allocation != null) setCreditAllocation(result.credit_allocation);
         if (result?.error === 'deprecated') { setWorkshopEnded(true); return; }
         if (result?.error || !result?.id || !userName) return;
         const roomId = result.id;
@@ -391,7 +438,11 @@ function App() {
         const myColor = participants.find(p => p.name === userName)?.color || COLORS[0];
         const authUser = await sb.getUser();
         const me = await sb.upsertParticipant(userName, myColor, authUser?.id, authUser?.email);
-        if (me?.id) setMyParticipantId(me.id);
+        if (me?.id) {
+          setMyParticipantId(me.id);
+          // Fetch participant's credit bonus — admin may have granted extra.
+          sb.getParticipantById(me.id).then(p => setMyCreditBonus(p?.credit_bonus || 0));
+        }
         if (authUser?.id) {
           const prefs = await sb.loadUserPreferences(authUser.id);
           setUserPreferences(prefs);
@@ -567,6 +618,7 @@ function App() {
       onRoomChange: (row) => {
         if (row?.deprecated_at) setWorkshopEnded(true);
         if (row?.current_stage) setCurrentStage(normalizeStage(row.current_stage));
+        if (row?.credit_allocation != null) setCreditAllocation(row.credit_allocation);
       },
     });
   }
@@ -621,6 +673,7 @@ function App() {
     if (result?.error) return result;
     const roomId = result.id;
     if (result.current_stage) setCurrentStage(normalizeStage(result.current_stage));
+    if (result.credit_allocation != null) setCreditAllocation(result.credit_allocation);
 
     // Load from Supabase granular tables
     let files, cws, tls, wfs, runs;
@@ -1400,6 +1453,17 @@ Examples:
     const workflow = workflows.find(w => w.id === workflowId);
     if (!workflow) return;
 
+    // Credit budget enforcement — workflow runs are the priciest calls on
+    // the platform (multi-step Sonnet coworkers). Block if the starter is
+    // already out of credits.
+    if (creditsExhausted) {
+      addMessage({
+        type: 'error',
+        content: `You're out of credits (${creditsTotal} allocated). Ask the facilitator to grant more before running a workflow.`,
+      });
+      return;
+    }
+
     // Case input now lives on the Trigger step. autoInput is kept as a
     // backdoor for programmatic callers (tests, replays) — otherwise the
     // header Run button fires with whatever the user typed into the Trigger.
@@ -1570,6 +1634,18 @@ Examples:
 
   // ===== Direct Chat =====
   async function handleSendMessage(text, contextFileIds, coworkerId, attachments, skillFileIds = []) {
+    // Credit budget enforcement — hard block at 0 so a runaway participant
+    // can't blow past the facilitator's per-person allocation. The user
+    // sees the message in chat; the facilitator can top them up from
+    // the admin dashboard and they can retry.
+    if (creditsExhausted) {
+      addMessage({ type: 'user', content: text, participantName: userName });
+      addMessage({
+        type: 'error',
+        content: `You're out of credits (${creditsTotal} allocated). Ask the facilitator to grant more and try again.`,
+      });
+      return;
+    }
     // Build attachment info for message display
     const attachmentMeta = attachments?.map(a => ({ fileName: a.fileName || a.originalName, category: a.category })) || [];
     addMessage({ type: 'user', content: text, participantName: userName, attachments: attachmentMeta });
@@ -1908,11 +1984,20 @@ Answer in ONE sentence. If the user asks "how", a second sentence is allowed —
           </RevealAt>
         </nav>
         <div className="app-header-right">
+          <RevealAt stage="7b" currentStage={currentStage}>
+            <CreditsChip
+              creditsLeft={creditsLeft}
+              creditsTotal={creditsTotal}
+              onClick={() => setActiveTab('usage')}
+            />
+          </RevealAt>
           <SettingsMenu
             userName={userName}
             currentStage={currentStage}
             sb={sb}
             myParticipantId={myParticipantId}
+            creditsLeft={creditsLeft}
+            creditsTotal={creditsTotal}
             onOpenUsage={() => setActiveTab('usage')}
             onOpenPreferences={() => setShowPreferences(true)}
             onExit={() => setShowExitConfirm(true)}
@@ -2041,6 +2126,8 @@ Answer in ONE sentence. If the user asks "how", a second sentence is allowed —
               participants={participants}
               myParticipantId={myParticipantId}
               showEducationalCues={showEducationalCues}
+              creditAllocation={creditAllocation}
+              myCreditBonus={myCreditBonus}
             />
           </div>
         )}

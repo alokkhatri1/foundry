@@ -8,7 +8,7 @@
 // accountability.
 
 import { useEffect, useMemo, useState } from 'react';
-import { computeCost, formatUsd, formatTokens, labelForSegment } from '../utils/llmCost';
+import { computeCost, formatUsd, formatTokens, labelForSegment, costToCredits } from '../utils/llmCost';
 import EducationalCue from './EducationalCue';
 
 function timeAgo(ts) {
@@ -28,7 +28,7 @@ const SEGMENT_COLORS = {
   scorecard: '#9b9b9b',
 };
 
-export default function UsageView({ sb, participants, myParticipantId, showEducationalCues }) {
+export default function UsageView({ sb, participants, myParticipantId, showEducationalCues, creditAllocation, myCreditBonus }) {
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -163,6 +163,27 @@ export default function UsageView({ sb, participants, myParticipantId, showEduca
               {participantsInOrder.length} participant{participantsInOrder.length === 1 ? '' : 's'} contributing
             </div>
           </div>
+
+          {myParticipantId && creditAllocation != null && (() => {
+            const myRow = participantsInOrder.find(p => p.pid === myParticipantId);
+            const myCost = myRow?.cost || 0;
+            const myCreditsUsed = costToCredits(myCost);
+            const myCreditsTotal = creditAllocation + (myCreditBonus || 0);
+            const myCreditsLeft = Math.max(0, myCreditsTotal - myCreditsUsed);
+            return (
+              <div className="usage-credits-banner">
+                <div className="usage-credits-banner-left">
+                  <div className="usage-credits-banner-label">Your credits</div>
+                  <div className="usage-credits-banner-value">
+                    {myCreditsLeft} <span className="usage-credits-banner-of">of {myCreditsTotal} left</span>
+                  </div>
+                </div>
+                <div className="usage-credits-banner-right">
+                  You started with {myCreditsTotal} credits ({formatUsd(myCreditsTotal * 0.005)}). You've used {myCreditsUsed} of them — here's exactly where they went.
+                </div>
+              </div>
+            );
+          })()}
 
           <div className="usage-bar-section">
             <div className="usage-bar-label">By type of work</div>

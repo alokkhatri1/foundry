@@ -1,6 +1,38 @@
 import { useState, useEffect, useCallback } from 'react';
 import { STAGE_ORDER, STAGE_META, stageReached, nextStage } from './RevealAt';
 
+// Per-participant credit allocation editor. Small inline row above the
+// stage list — big enough to notice, small enough not to steal focus from
+// the reveal flow. 100 credits = $0.50 at current rates; facilitators
+// running dry-runs often want to bump this to 500+ so no one hits the cap.
+function AdminCreditAllocation({ value, onSave, deprecated }) {
+  const [draft, setDraft] = useState(String(value));
+  useEffect(() => { setDraft(String(value)); }, [value]);
+  const dirty = String(value) !== draft.trim();
+  return (
+    <div className="admin-credit-row">
+      <div className="admin-credit-label">
+        <span className="admin-credit-label-title">Credits per participant</span>
+        <span className="admin-credit-label-hint">100 credits ≈ $0.50. Apply to this workshop only.</span>
+      </div>
+      <input
+        type="number"
+        min="0"
+        step="10"
+        className="admin-credit-input"
+        value={draft}
+        onChange={e => setDraft(e.target.value)}
+        disabled={deprecated}
+      />
+      <button
+        className="admin-credit-save"
+        onClick={() => onSave(draft)}
+        disabled={!dirty || deprecated}
+      >Save</button>
+    </div>
+  );
+}
+
 function WorkshopRow({ w, selected, onSelect, copied, onCopy, stats, dim }) {
   const stageLabel = w.deprecated_at
     ? 'Delivered'
@@ -122,6 +154,19 @@ export default function AdminDashboard({ sb, user, onBack }) {
       cursor = s;
     }
     setSelected(prev => prev ? { ...prev, current_stage: lastStage } : prev);
+    await loadWorkshops();
+  }
+
+  // Admin can grow the per-participant credit allocation on the fly — useful
+  // when the cohort is deeper into the workshop than the initial budget
+  // supported, or for dry-runs that need unlimited exploration. The update
+  // broadcasts to every participant client via the rooms realtime sub.
+  async function handleUpdateCreditAllocation(newAllocation) {
+    if (!selected) return;
+    const clamped = Math.max(0, Math.floor(Number(newAllocation) || 0));
+    const ok = await sb.setCreditAllocation(selected.id, clamped);
+    if (!ok) return;
+    setSelected(prev => prev ? { ...prev, credit_allocation: clamped } : prev);
     await loadWorkshops();
   }
 
@@ -324,6 +369,11 @@ export default function AdminDashboard({ sb, user, onBack }) {
               {/* Tab content */}
               {detailTab === 'stages' && (
                 <div className="admin-tab-content">
+                  <AdminCreditAllocation
+                    value={selected.credit_allocation ?? 100}
+                    onSave={handleUpdateCreditAllocation}
+                    deprecated={!!selected.deprecated_at}
+                  />
                   <div className="admin-stage-header">
                     <p className="admin-tab-intro" style={{ margin: 0 }}>
                       Reveal is monotonic — once a stage is revealed, it stays revealed. Sub-stages reveal in order. Current stage:{' '}

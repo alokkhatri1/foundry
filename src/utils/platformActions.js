@@ -110,130 +110,128 @@ export const TOOL_ICONS = {
 };
 
 // ===== Tool Schemas (Claude API format) =====
+// Tool descriptions are intentionally terse — these schemas are re-sent
+// on every chat turn, so every word costs tokens. The concise form still
+// gives the model enough to route correctly; longer explanations belong
+// in the system prompt (which is cached once per session).
 export const PLATFORM_TOOL_SCHEMAS = [
   {
     name: 'list_files',
-    description: 'List all files in the platform organized by department and folder type (knowledge/skills). Use this to see what exists before creating or referencing files.',
+    description: 'List all files.',
     input_schema: {
       type: 'object',
       properties: {
-        folder_type: {
-          type: 'string',
-          description: 'Optional filter: "knowledge" or "skills". Omit to list all files.',
-        },
+        folder_type: { type: 'string', description: 'Optional: "knowledge" or "skills".' },
       },
       required: [],
     },
   },
   {
     name: 'read_file',
-    description: 'Read the full content of a file by name. Use to check contents before updating or to answer questions about a file.',
+    description: 'Read a file by name (partial match works).',
     input_schema: {
       type: 'object',
       properties: {
-        file_name: {
-          type: 'string',
-          description: 'File name (e.g., "review-criteria.md"). Partial name matching works.',
-        },
+        file_name: { type: 'string' },
       },
       required: ['file_name'],
     },
   },
   {
     name: 'create_file',
-    description: 'Create a new file. Knowledge files contain policies, rules, and reference material. Skill files define how an AI coworker should behave.',
+    description: 'Create a knowledge or skill file.',
     input_schema: {
       type: 'object',
       properties: {
-        name: { type: 'string', description: 'File name ending in .md (e.g., "lending-policy.md")' },
-        content: { type: 'string', description: 'Full file content in markdown format' },
-        folder_type: { type: 'string', description: '"knowledge" or "skills"', enum: ['knowledge', 'skills'] },
-        department: { type: 'string', description: 'Department name. If omitted, uses the first department.' },
+        name: { type: 'string', description: 'Must end in .md' },
+        content: { type: 'string' },
+        folder_type: { type: 'string', enum: ['knowledge', 'skills'] },
+        department: { type: 'string', description: 'Defaults to first department.' },
       },
       required: ['name', 'content', 'folder_type'],
     },
   },
   {
     name: 'update_file',
-    description: 'Replace the content of an existing file with new content.',
+    description: 'Replace a file\'s content.',
     input_schema: {
       type: 'object',
       properties: {
-        file_name: { type: 'string', description: 'Name of the file to update' },
-        content: { type: 'string', description: 'New full content for the file' },
+        file_name: { type: 'string' },
+        content: { type: 'string' },
       },
       required: ['file_name', 'content'],
     },
   },
   {
     name: 'list_tools',
-    description: 'List all tools on the platform with type, description, and template.',
+    description: 'List all tools.',
     input_schema: { type: 'object', properties: {}, required: [] },
   },
   {
     name: 'add_connector',
-    description: `Add an external connector. For platform providers (${CONNECTOR_PROVIDERS.map(p => p.name).join(', ')}), pass provider ID and token. For custom APIs, pass name and url.`,
+    description: `Add a connector. Providers: ${CONNECTOR_PROVIDERS.map(p => p.id).join(', ')}. Or custom HTTP API.`,
     input_schema: {
       type: 'object',
       properties: {
-        provider: { type: 'string', description: `Provider ID for pre-configured connectors: ${CONNECTOR_PROVIDERS.map(p => `"${p.id}" (${p.name})`).join(', ')}. Omit for custom API.` },
-        token: { type: 'string', description: 'API token for the provider (required when provider is set)' },
-        name: { type: 'string', description: 'Connector name (required for custom API, optional override for providers)' },
-        description: { type: 'string', description: 'What this connector does' },
-        url: { type: 'string', description: 'API endpoint URL (required for custom API, ignored for providers)' },
-        method: { type: 'string', description: 'HTTP method (for custom API)', enum: ['GET', 'POST'] },
+        provider: { type: 'string', description: `One of: ${CONNECTOR_PROVIDERS.map(p => p.id).join(', ')}. Omit for custom API.` },
+        token: { type: 'string', description: 'Required for provider.' },
+        name: { type: 'string' },
+        description: { type: 'string' },
+        url: { type: 'string', description: 'Required for custom API.' },
+        method: { type: 'string', enum: ['GET', 'POST'] },
       },
       required: [],
     },
   },
   {
     name: 'configure_tool',
-    description: 'Update settings on an existing tool. For checklist tools: change the required items list. For API tools: change URL or method. For custom tools: also change name or description.',
+    description: 'Update tool settings.',
     input_schema: {
       type: 'object',
       properties: {
-        tool_name: { type: 'string', description: 'Name of the tool to configure' },
-        settings: { type: 'string', description: 'JSON object of settings. Keys: "requiredItems" (array of strings), "url" (string), "method" (string), "name" (string), "description" (string)' },
+        tool_name: { type: 'string' },
+        settings: { type: 'string', description: 'JSON with: requiredItems, url, method, name, description' },
       },
       required: ['tool_name', 'settings'],
     },
   },
   {
     name: 'list_coworkers',
-    description: 'List all AI coworkers with their roles, instruction files, knowledge files, and tools.',
+    description: 'List all AI coworkers.',
     input_schema: { type: 'object', properties: {}, required: [] },
   },
   {
     name: 'create_coworker',
-    description: 'Create a new AI coworker with a role, instruction files (behavior), knowledge files (context), and tools (capabilities). Files and tools must already exist.',
+    description: 'Create an AI coworker. Files and tools must already exist.',
     input_schema: {
       type: 'object',
       properties: {
-        name: { type: 'string', description: 'Coworker name' },
-        role: { type: 'string', description: 'Short role description' },
-        avatar: { type: 'string', description: 'Icon id (one of: user, users, search, chart, document, shield, code, scales, target, bulb, package, globe, alert, gavel, wallet, checklist). Pass bare id or prefixed with "icon:".' },
-        instruction_files: { type: 'string', description: 'Comma-separated instruction file names (must exist)' },
-        knowledge_files: { type: 'string', description: 'Comma-separated knowledge file names (must exist)' },
-        tool_names: { type: 'string', description: 'Comma-separated tool names (must exist)' },
+        name: { type: 'string' },
+        role: { type: 'string' },
+        avatar: { type: 'string', description: 'One of: user, users, search, chart, document, shield, code, scales, target, bulb, package, globe, alert, gavel, wallet, checklist.' },
+        instruction_files: { type: 'string', description: 'Comma-separated names.' },
+        knowledge_files: { type: 'string', description: 'Comma-separated names.' },
+        tool_names: { type: 'string', description: 'Comma-separated names.' },
       },
       required: ['name', 'role'],
     },
   },
   {
     name: 'list_workflows',
-    description: 'List all workflows with their step sequences.',
+    description: 'List all workflows.',
     input_schema: { type: 'object', properties: {}, required: [] },
   },
   {
     name: 'create_workflow',
-    description: 'Create a workflow — a sequence of steps. Agent steps (AI coworker tasks), approval steps (human review gates), and system steps (automated actions). Coworkers referenced in agent steps must already exist.',
+    description: 'Create a workflow. Coworkers referenced in agent steps must exist.',
     input_schema: {
       type: 'object',
       properties: {
-        name: { type: 'string', description: 'Workflow name' },
+        name: { type: 'string' },
         steps: {
           type: 'string',
-          description: 'JSON array of steps. Agent: {"type":"agent","name":"Step Name","coworker_name":"..."}. Approval: {"type":"approval","name":"Step Name","prompt":"Review instructions"}. System: {"type":"system","name":"Step Name","action":"update_status","description":"..."}.',
+          description: 'JSON array. Agent: {"type":"agent","name":"...","coworker_name":"..."}. Approval: {"type":"approval","name":"...","prompt":"..."}. System: {"type":"system","name":"...","action":"update_status","description":"..."}.',
         },
       },
       required: ['name', 'steps'],
@@ -241,12 +239,12 @@ export const PLATFORM_TOOL_SCHEMAS = [
   },
   {
     name: 'run_workflow',
-    description: 'Start executing a workflow with case input text.',
+    description: 'Run a workflow with case input.',
     input_schema: {
       type: 'object',
       properties: {
-        workflow_name: { type: 'string', description: 'Name of the workflow to run' },
-        case_input: { type: 'string', description: 'Input text for the workflow to process' },
+        workflow_name: { type: 'string' },
+        case_input: { type: 'string' },
       },
       required: ['workflow_name', 'case_input'],
     },

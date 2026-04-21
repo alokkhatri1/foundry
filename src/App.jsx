@@ -943,6 +943,9 @@ function App() {
         },
         body: JSON.stringify({
           model,
+          // Workflow-run coworker steps do need more runway than chat turns
+          // (they produce structured assessments), so keep 1000 — still below
+          // the earlier 2000-4096 ceilings and caps the outlier cost per call.
           max_tokens: 1000,
           // Cache the system prompt so repeated turns with the same coworker /
           // skills / knowledge hit the 10x-cheaper cache_read rate. Claude
@@ -1209,7 +1212,10 @@ function App() {
           },
           body: JSON.stringify({
             model: 'claude-haiku-4-5-20251001',
-            max_tokens: 4096,
+            // Platform-chat replies are routing + short confirmations — a
+            // tight cap prevents Haiku from verbosity blowing the bill on
+            // an outlier turn. Typical reply is ~300 tokens.
+            max_tokens: 512,
             // System prompt + platform tools array are stable across the
             // agentic loop's turns; cache both for 10x-cheaper reads.
             ...(systemPrompt ? { system: [{ type: 'text', text: systemPrompt, cache_control: { type: 'ephemeral' } }] } : {}),
@@ -1664,7 +1670,9 @@ The platform has these elements:
 
 When building something, create dependencies first: files before coworkers that need them, coworkers before workflows that reference them. Use assign_tool to wire tools to coworkers.
 When answering questions, check current state with list/read tools if needed.
-Be concise. Confirm actions after completing them.${knowledgeSection}`;
+
+## Reply style — strict
+Answer in ≤2 short sentences unless the user explicitly asks for detail. After an action, a single-line confirmation is enough ("Created Ravi." / "Listed 3 coworkers."). No restating the user's request, no bullet-list recap, no closing pleasantries.${knowledgeSection}`;
 
         const result = await callClaudeWithPlatformActions({
           systemPrompt: platformSystemPrompt,

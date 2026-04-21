@@ -236,7 +236,7 @@ export default function useSupabase() {
     return {
       id: room.id,
       current_stage: room.current_stage,
-      credit_allocation: room.credit_allocation ?? 100,
+      credit_allocation: room.credit_allocation ?? 1000,
     };
   }, []);
 

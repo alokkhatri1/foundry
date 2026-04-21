@@ -231,14 +231,14 @@ function SettingsMenu({ userName, currentStage, sb, myParticipantId, creditsLeft
             {creditsLeft != null && (
               <div
                 className="header-settings-meta"
-                title={`${Math.max(0, creditsLeft)} of ${creditsTotal} credits left. ~1 credit = a typical chat. ~5 credits = a workflow run.`}
+                title={`${Math.max(0, creditsLeft).toLocaleString()} of ${creditsTotal.toLocaleString()} credits left. ~10 credits = a typical chat. ~50 credits = a workflow run.`}
               >
                 <span className="header-settings-meta-label">Credits</span>
                 <span
                   className={`header-settings-meta-value header-settings-credits${creditsLow ? ' header-settings-meta-low' : ''}`}
                 >
                   <span className="header-settings-credits-star" aria-hidden>✦</span>
-                  {Math.max(0, creditsLeft)}
+                  {Math.max(0, creditsLeft).toLocaleString()}
                 </span>
               </div>
             )}
@@ -282,7 +282,7 @@ function CreditsChip({ creditsLeft, creditsTotal, onClick }) {
     <span
       className={`header-credits-chip${low ? ' low' : ''}`}
       onClick={onClick}
-      title={`${value} of ${creditsTotal} credits left. ~1 credit = a typical chat. ~5 credits = a workflow run.`}
+      title={`${value.toLocaleString()} of ${creditsTotal.toLocaleString()} credits left. ~10 credits = a typical chat. ~50 credits = a workflow run.`}
     >
       <span className="header-credits-chip-star" aria-hidden>✦</span>
       <span className="header-credits-chip-value">{value.toLocaleString()}</span>
@@ -1989,24 +1989,26 @@ Answer in ONE sentence. If the user asks "how", a second sentence is allowed —
           </RevealAt>
         </nav>
         <div className="app-header-right">
-          <RevealAt stage="7b" currentStage={currentStage}>
-            <CreditsChip
+          <div className="header-account-pill">
+            <RevealAt stage="7b" currentStage={currentStage}>
+              <CreditsChip
+                creditsLeft={creditsLeft}
+                creditsTotal={creditsTotal}
+                onClick={() => setActiveTab('usage')}
+              />
+            </RevealAt>
+            <SettingsMenu
+              userName={userName}
+              currentStage={currentStage}
+              sb={sb}
+              myParticipantId={myParticipantId}
               creditsLeft={creditsLeft}
               creditsTotal={creditsTotal}
-              onClick={() => setActiveTab('usage')}
+              onOpenUsage={() => setActiveTab('usage')}
+              onOpenPreferences={() => setShowPreferences(true)}
+              onExit={() => setShowExitConfirm(true)}
             />
-          </RevealAt>
-          <SettingsMenu
-            userName={userName}
-            currentStage={currentStage}
-            sb={sb}
-            myParticipantId={myParticipantId}
-            creditsLeft={creditsLeft}
-            creditsTotal={creditsTotal}
-            onOpenUsage={() => setActiveTab('usage')}
-            onOpenPreferences={() => setShowPreferences(true)}
-            onExit={() => setShowExitConfirm(true)}
-          />
+          </div>
         </div>
       </header>
 

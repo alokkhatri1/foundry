@@ -1060,6 +1060,43 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
   border-color: var(--accent-error);
   background: #fdf0f0;
 }
+
+/* When credits and settings sit side-by-side, merge them into a single
+   pill so they read as one account-meta control. The wrapper owns the
+   border + radius; inner buttons strip theirs and a 1px divider sits
+   between them. */
+.header-account-pill {
+  display: inline-flex;
+  align-items: stretch;
+  background: white;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-pill);
+  transition: border-color 0.15s;
+}
+.header-account-pill:hover { border-color: var(--accent-gold); }
+.header-account-pill:has(.header-credits-chip.low) {
+  border-color: var(--accent-error);
+  background: #fdf0f0;
+}
+.header-account-pill .header-credits-chip,
+.header-account-pill .header-settings-btn {
+  border: 1px solid transparent;
+  background: transparent;
+  margin: 0;
+  border-radius: var(--radius-pill);
+}
+.header-account-pill .header-credits-chip:hover,
+.header-account-pill .header-settings-btn:hover {
+  background: var(--bg-warm);
+  border-color: transparent;
+}
+.header-account-pill .header-credits-chip.low { background: transparent; }
+.header-account-pill .header-credits-chip + .header-settings {
+  border-left: 1px solid var(--border-color);
+}
+.header-account-pill:has(.header-credits-chip.low) .header-credits-chip + .header-settings {
+  border-left-color: rgba(197, 48, 48, 0.25);
+}
 .header-credits-chip-star {
   font-size: 13px;
   color: var(--accent-gold);

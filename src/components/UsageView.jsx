@@ -8,7 +8,7 @@
 // accountability.
 
 import { useEffect, useMemo, useState } from 'react';
-import { computeCost, formatUsd, formatTokens, labelForSegment, costToCredits } from '../utils/llmCost';
+import { computeCost, formatUsd, formatTokens, labelForSegment, costToCredits, creditsToUsd } from '../utils/llmCost';
 import EducationalCue from './EducationalCue';
 
 function timeAgo(ts) {
@@ -180,7 +180,7 @@ export default function UsageView({ sb, participants, myParticipantId, showEduca
                   </div>
                 </div>
                 <div className="usage-credits-banner-right">
-                  You started with {myCreditsTotal} credits ({formatUsd(myCreditsTotal * 0.005)}). You've used {myCreditsUsed} of them — here's exactly where they went.
+                  You started with {myCreditsTotal.toLocaleString()} credits ({formatUsd(creditsToUsd(myCreditsTotal))}). You've used {myCreditsUsed.toLocaleString()} of them — here's exactly where they went.
                 </div>
               </div>
             );

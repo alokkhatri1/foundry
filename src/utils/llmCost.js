@@ -81,13 +81,13 @@ export function labelForSegment(s) {
 }
 
 // ===== Credits system =====
-// 100 credits = $0.50, so one credit = half a cent. Conversion is intentional:
-// credits keep the number in a "budget-ish" range people can reason about
-// without thinking in micro-dollars. Round UP when converting spend to
-// credits so fractional spend never gets under-counted against the budget.
-export const CREDIT_USD_VALUE = 0.005;
-export const DEFAULT_CREDIT_ALLOCATION = 100;
-export const CREDITS_WARN_THRESHOLD = 10;
+// 1000 credits = $0.50, so one credit = $0.0005 (one-twentieth of a cent).
+// The bigger number is deliberate: a 4-digit balance that counts down feels
+// generous and gives finer-grained resolution per chat/run. Round UP when
+// converting spend to credits so fractional spend never under-counts.
+export const CREDIT_USD_VALUE = 0.0005;
+export const DEFAULT_CREDIT_ALLOCATION = 1000;
+export const CREDITS_WARN_THRESHOLD = 100;
 
 export function costToCredits(usd) {
   if (!usd || usd <= 0) return 0;

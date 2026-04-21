@@ -3,8 +3,8 @@ import { STAGE_ORDER, STAGE_META, stageReached, nextStage } from './RevealAt';
 
 // Per-participant credit allocation editor. Small inline row above the
 // stage list — big enough to notice, small enough not to steal focus from
-// the reveal flow. 100 credits = $0.50 at current rates; facilitators
-// running dry-runs often want to bump this to 500+ so no one hits the cap.
+// the reveal flow. 1000 credits = $0.50 at current rates; facilitators
+// running dry-runs often want to bump this so no one hits the cap.
 function AdminCreditAllocation({ value, onSave, deprecated }) {
   const [draft, setDraft] = useState(String(value));
   useEffect(() => { setDraft(String(value)); }, [value]);
@@ -13,12 +13,12 @@ function AdminCreditAllocation({ value, onSave, deprecated }) {
     <div className="admin-credit-row">
       <div className="admin-credit-label">
         <span className="admin-credit-label-title">Credits per participant</span>
-        <span className="admin-credit-label-hint">100 credits ≈ $0.50. Apply to this workshop only.</span>
+        <span className="admin-credit-label-hint">1000 credits ≈ $0.50. Apply to this workshop only.</span>
       </div>
       <input
         type="number"
         min="0"
-        step="10"
+        step="100"
         className="admin-credit-input"
         value={draft}
         onChange={e => setDraft(e.target.value)}
@@ -370,7 +370,7 @@ export default function AdminDashboard({ sb, user, onBack }) {
               {detailTab === 'stages' && (
                 <div className="admin-tab-content">
                   <AdminCreditAllocation
-                    value={selected.credit_allocation ?? 100}
+                    value={selected.credit_allocation ?? 1000}
                     onSave={handleUpdateCreditAllocation}
                     deprecated={!!selected.deprecated_at}
                   />

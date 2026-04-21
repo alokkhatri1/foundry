@@ -336,14 +336,6 @@ function App() {
   const [approvalsByRun, setApprovalsByRun] = useState({});
   const [networkError, setNetworkError] = useState(false);
   const [activeTab, setActiveTab] = useState('chat');
-  // Personal spend drives credits used. Subscribes to llm_usage inserts so
-  // the balance ticks down in realtime. Exposed as myUsdSpend so the
-  // credit calc below is derivative.
-  const { total: myUsdSpend } = useMyUsageTotal(sb, myParticipantId);
-  const creditsTotal = creditAllocation + myCreditBonus;
-  const creditsUsed = costToCredits(myUsdSpend);
-  const creditsLeft = creditsTotal - creditsUsed;
-  const creditsExhausted = creditsLeft <= 0;
   const [showExitConfirm, setShowExitConfirm] = useState(false);
   const [showEducationalCues, setShowEducationalCues] = useState(() => {
     try { const v = localStorage.getItem('sandbox:show-edu-cues'); return v === null ? true : v === 'true'; } catch { return true; }
@@ -381,6 +373,17 @@ function App() {
   const [unreadDmCounts, setUnreadDmCounts] = useState({});
   const activeDmRef = useRef(activeDm);
   useEffect(() => { activeDmRef.current = activeDm; }, [activeDm]);
+
+  // Credit budget computation — lives here, after every state dependency
+  // (myParticipantId, creditAllocation, myCreditBonus) is declared. Earlier
+  // placement triggered a Temporal Dead Zone crash in production builds
+  // because the minifier couldn't hoist the hook call above the useState
+  // declarations it referenced.
+  const { total: myUsdSpend } = useMyUsageTotal(sb, myParticipantId);
+  const creditsTotal = creditAllocation + myCreditBonus;
+  const creditsUsed = costToCredits(myUsdSpend);
+  const creditsLeft = creditsTotal - creditsUsed;
+  const creditsExhausted = creditsLeft <= 0;
 
   // Show a celebratory modal when the admin unlocks a new stage. Skip Stage 1
   // (workshop start is not an "unlock") and skip the initial mount.

@@ -232,7 +232,6 @@ function SettingsMenu({ userName, currentStage, sb, myParticipantId, onOpenUsage
                 <span className="header-settings-meta-label">Spend</span>
                 <span className="header-settings-meta-value header-settings-meta-cost">
                   {formatUsd(spend.total)}
-                  <span className="header-settings-meta-tokens"> · {formatTokens(spend.tokenTotal)} tok</span>
                 </span>
               </div>
             )}

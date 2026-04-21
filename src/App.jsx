@@ -1178,7 +1178,7 @@ function App() {
   }
 
   // ===== Claude with Platform Actions (agentic loop for platform management) =====
-  async function callClaudeWithPlatformActions({ systemPrompt, userMessage, onToolExecution }) {
+  async function callClaudeWithPlatformActions({ systemPrompt, systemBlocks, userMessage, onToolExecution }) {
     if (!apiKey) return { success: false, content: [{ type: 'text', text: 'No API key configured.' }] };
 
     // Mutable context so consecutive tool calls in one turn see each other's changes
@@ -1216,9 +1216,15 @@ function App() {
             // Output is the dominant remaining cost once caching kicks in;
             // capping tight pushes Haiku toward ~100-token replies.
             max_tokens: 256,
-            // System prompt + platform tools array are stable across the
-            // agentic loop's turns; cache both for 10x-cheaper reads.
-            ...(systemPrompt ? { system: [{ type: 'text', text: systemPrompt, cache_control: { type: 'ephemeral' } }] } : {}),
+            // System prompt: prefer the multi-block array from callers that
+            // want stable-vs-variable caching (the platform-chat path); fall
+            // back to wrapping a plain string in a single cached block for
+            // legacy callers.
+            ...(systemBlocks
+              ? { system: systemBlocks }
+              : systemPrompt
+                ? { system: [{ type: 'text', text: systemPrompt, cache_control: { type: 'ephemeral' } }] }
+                : {}),
             messages: msgs,
             tools: PLATFORM_TOOL_SCHEMAS.length > 0
               ? PLATFORM_TOOL_SCHEMAS.map((t, i) => i === PLATFORM_TOOL_SCHEMAS.length - 1 ? { ...t, cache_control: { type: 'ephemeral' } } : t)
@@ -1659,8 +1665,15 @@ function App() {
           addMessage({ type: 'error', content: result.error });
         }
       } else {
-        // Stage 5a+: platform assistant with full tool access
-        const platformSystemPrompt = `${userPrefsForPlatform}${stageGuidanceSection}You are the Foundry platform assistant for ${orgName}. You help users build and manage their AI coworker platform through natural language.
+        // Stage 5a+: platform assistant with full tool access.
+        //
+        // Split the system prompt into a STABLE block (cached) and a VARIABLE
+        // block (not cached). Previously the stage guidance (fires only on
+        // first exchange) and knowledge section (varies per message) were
+        // folded into one big system string — the prefix changed across
+        // turns, so cache_control never hit. Now the stable platform
+        // description + user prefs cache once and stay hot.
+        const platformStableBlock = `${userPrefsForPlatform}You are the Foundry platform assistant for ${orgName}. You help users build and manage their AI coworker platform through natural language.
 
 The platform has these elements:
 - **Files**: Knowledge documents (policies, rules, reference) and instruction files (AI coworker behavior). Organized in department folders.
@@ -1672,10 +1685,23 @@ When building something, create dependencies first: files before coworkers that 
 When answering questions, check current state with list/read tools if needed.
 
 ## Reply style — strict
-Answer in ONE sentence. If the user asks "how", a second sentence is allowed — never more. After an action, reply with a bare confirmation and nothing else ("Created Ravi." / "Listed 3 coworkers."). Never restate the user's request. Never bullet-list a recap. Never say "Let me know if…" or "Feel free to…". If you can't fit the answer in two sentences, ask the user what specifically they want to know.${knowledgeSection}`;
+Answer in ONE sentence. If the user asks "how", a second sentence is allowed — never more. After an action, reply with a bare confirmation and nothing else ("Created Ravi." / "Listed 3 coworkers."). Never restate the user's request. Never bullet-list a recap. Never say "Let me know if…" or "Feel free to…". If you can't fit the answer in two sentences, ask the user what specifically they want to know.`;
+
+        // Everything below varies per turn — stage guidance fires only on
+        // the first exchange and knowledge section changes with attached
+        // files. Keep it uncached so the stable prefix above still hits
+        // the cache on turn 2+.
+        const platformVariableTail = `${stageGuidanceSection}${knowledgeSection}`;
 
         const result = await callClaudeWithPlatformActions({
-          systemPrompt: platformSystemPrompt,
+          systemBlocks: platformVariableTail.trim()
+            ? [
+                { type: 'text', text: platformStableBlock, cache_control: { type: 'ephemeral' } },
+                { type: 'text', text: platformVariableTail },
+              ]
+            : [
+                { type: 'text', text: platformStableBlock, cache_control: { type: 'ephemeral' } },
+              ],
           userMessage,
           onToolExecution: (execData) => addMessage({ type: 'tool_execution', ...execData }),
         });

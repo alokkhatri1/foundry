@@ -944,7 +944,10 @@ function App() {
         body: JSON.stringify({
           model,
           max_tokens: 1000,
-          ...(systemPrompt ? { system: systemPrompt } : {}),
+          // Cache the system prompt so repeated turns with the same coworker /
+          // skills / knowledge hit the 10x-cheaper cache_read rate. Claude
+          // ignores cache_control below its 1024-token minimum gracefully.
+          ...(systemPrompt ? { system: [{ type: 'text', text: systemPrompt, cache_control: { type: 'ephemeral' } }] } : {}),
           messages: [{ role: 'user', content: userMessage }],
         }),
       });
@@ -978,6 +981,12 @@ function App() {
     if (!apiKey) return { success: false, content: [{ type: 'text', text: 'No API key configured.' }] };
 
     const claudeTools = agentTools.map(t => toolToClaudeSchema(t));
+    // Mark the last tool with cache_control so the entire tools array is
+    // cached — identical per coworker across turns. Saves re-sending the
+    // schemas on every tool-loop iteration.
+    const claudeToolsCached = claudeTools.length > 0
+      ? claudeTools.map((t, i) => i === claudeTools.length - 1 ? { ...t, cache_control: { type: 'ephemeral' } } : t)
+      : claudeTools;
     let messages = [{ role: 'user', content: typeof userMessage === 'string' ? userMessage : userMessage }];
     const allContent = [];
     let turns = 0;
@@ -1001,9 +1010,12 @@ function App() {
           body: JSON.stringify({
             model,
             max_tokens: 2000,
-            ...(systemPrompt ? { system: systemPrompt } : {}),
+            // System prompt (role + skills + knowledge + tool guidance) is
+            // identical across turns of a coworker chat — cache it. Tools
+            // are also marked cacheable via the last-tool trick above.
+            ...(systemPrompt ? { system: [{ type: 'text', text: systemPrompt, cache_control: { type: 'ephemeral' } }] } : {}),
             messages,
-            tools: claudeTools,
+            tools: claudeToolsCached,
           }),
         });
 
@@ -1198,9 +1210,13 @@ function App() {
           body: JSON.stringify({
             model: 'claude-sonnet-4-20250514',
             max_tokens: 4096,
-            ...(systemPrompt ? { system: systemPrompt } : {}),
+            // System prompt + platform tools array are stable across the
+            // agentic loop's turns; cache both for 10x-cheaper reads.
+            ...(systemPrompt ? { system: [{ type: 'text', text: systemPrompt, cache_control: { type: 'ephemeral' } }] } : {}),
             messages: msgs,
-            tools: PLATFORM_TOOL_SCHEMAS,
+            tools: PLATFORM_TOOL_SCHEMAS.length > 0
+              ? PLATFORM_TOOL_SCHEMAS.map((t, i) => i === PLATFORM_TOOL_SCHEMAS.length - 1 ? { ...t, cache_control: { type: 'ephemeral' } } : t)
+              : PLATFORM_TOOL_SCHEMAS,
           }),
         });
 

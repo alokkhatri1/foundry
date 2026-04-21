@@ -331,9 +331,15 @@ export async function runCopilotTurn({
         body: JSON.stringify({
           model: 'claude-sonnet-4-20250514',
           max_tokens: 2000,
-          system: systemPrompt,
+          // The copilot system prompt changes only when the workflow state,
+          // coworker list, or participant list changes. Within a back-to-back
+          // conversation it's usually stable for 2–5 turns — cache it. Tools
+          // are invariant across calls.
+          system: [{ type: 'text', text: systemPrompt, cache_control: { type: 'ephemeral' } }],
           messages,
-          tools: COPILOT_TOOL_SCHEMAS,
+          tools: COPILOT_TOOL_SCHEMAS.length > 0
+            ? COPILOT_TOOL_SCHEMAS.map((t, i) => i === COPILOT_TOOL_SCHEMAS.length - 1 ? { ...t, cache_control: { type: 'ephemeral' } } : t)
+            : COPILOT_TOOL_SCHEMAS,
         }),
       });
       if (!response.ok) {

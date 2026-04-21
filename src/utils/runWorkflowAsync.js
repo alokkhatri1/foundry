@@ -182,7 +182,10 @@ export async function executeWorkflowRun({
       ].join('\n');
 
       onMessage({ type: 'loading', label: coworkerLabel });
-      const result = await callClaudeAPI(systemPrompt, userMessage);
+      const result = await callClaudeAPI(systemPrompt, userMessage, {
+        segment: 'workflow_run',
+        segmentRefId: `${runId}:${step.id}`,
+      });
       removeLoadingMessages();
 
       if (!result.success) {

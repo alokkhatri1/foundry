@@ -453,7 +453,7 @@ function StepCard({ step, index, coworkers, tools, participants, onUpdate, onDel
 // visual — nodes are draggable and their positions persist, edges are
 // drawn read-only from the linear auto-migration. Wiring, typed handles,
 // and DAG runtime arrive in later phases.
-function WorkflowCanvas({ workflow, onUpdateWorkflow, fileTree, coworkers, tools, participants, activeRun, currentStepId, expandedStep, setExpandedStep, updateStep, deleteStep, validationErrors, showEducationalCues, callClaudeAPI, onSaveCoworkerToLibrary, onUpdateFileContent, apiKey }) {
+function WorkflowCanvas({ workflow, onUpdateWorkflow, fileTree, coworkers, tools, participants, activeRun, currentStepId, expandedStep, setExpandedStep, updateStep, deleteStep, validationErrors, showEducationalCues, callClaudeAPI, onSaveCoworkerToLibrary, onUpdateFileContent, apiKey, onCopilotUsage }) {
   const [nodes, setNodes] = useState([]);
   const [edges, setEdges] = useState([]);
   // Auto-open the copilot when this workflow has no real steps yet — the
@@ -598,6 +598,7 @@ function WorkflowCanvas({ workflow, onUpdateWorkflow, fileTree, coworkers, tools
         onError: (errMsg) => {
           setCopilotMessages(prev => [...prev, { kind: 'error', text: errMsg }]);
         },
+        onUsage: onCopilotUsage,
       });
       copilotHistoryRef.current = updatedHistory;
       // updatedWorkflow is already committed via onWorkflowUpdate — nothing else to do here.
@@ -699,7 +700,7 @@ function WorkflowCanvas({ workflow, onUpdateWorkflow, fileTree, coworkers, tools
 }
 
 // ===== Workflow Editor =====
-function WorkflowEditor({ workflow, onUpdateWorkflow, fileTree, coworkers, tools, participants, onRun, isRunning, currentStepId, activeRun, onBack, showEducationalCues, callClaudeAPI, onSaveCoworkerToLibrary, onUpdateFileContent, apiKey }) {
+function WorkflowEditor({ workflow, onUpdateWorkflow, fileTree, coworkers, tools, participants, onRun, isRunning, currentStepId, activeRun, onBack, showEducationalCues, callClaudeAPI, onSaveCoworkerToLibrary, onUpdateFileContent, apiKey, onCopilotUsage }) {
   const [expandedStep, setExpandedStep] = useState(null);
   const [showAddMenu, setShowAddMenu] = useState(false);
   const [validationErrors, setValidationErrors] = useState({});
@@ -864,6 +865,7 @@ function WorkflowEditor({ workflow, onUpdateWorkflow, fileTree, coworkers, tools
         onSaveCoworkerToLibrary={onSaveCoworkerToLibrary}
         onUpdateFileContent={onUpdateFileContent}
         apiKey={apiKey}
+        onCopilotUsage={onCopilotUsage}
       />
 
     </div>
@@ -908,7 +910,7 @@ function WorkflowCard({ workflow, coworkers, participants, onSelect, onDelete, o
 }
 
 // ===== Main Export =====
-export default function WorkflowBuilder({ workflows, onUpdateWorkflows, fileTree, coworkers, tools, onRun, workflowRuns = [], participants, currentUserName, showEducationalCues, callClaudeAPI, onSaveCoworkerToLibrary, onUpdateFileContent, apiKey }) {
+export default function WorkflowBuilder({ workflows, onUpdateWorkflows, fileTree, coworkers, tools, onRun, workflowRuns = [], participants, currentUserName, showEducationalCues, callClaudeAPI, onSaveCoworkerToLibrary, onUpdateFileContent, apiKey, onCopilotUsage }) {
   const [selectedWorkflowId, setSelectedWorkflowId] = useState(null);
 
   const selectedWorkflow = selectedWorkflowId ? workflows.find(w => w.id === selectedWorkflowId) : null;
@@ -975,6 +977,7 @@ export default function WorkflowBuilder({ workflows, onUpdateWorkflows, fileTree
           onSaveCoworkerToLibrary={onSaveCoworkerToLibrary}
           onUpdateFileContent={onUpdateFileContent}
           apiKey={apiKey}
+          onCopilotUsage={onCopilotUsage}
         />
       </div>
     );

@@ -1,4 +1,4 @@
-const STAGE_ORDER = ['1', '2', '3', '4', '5a', '5b', '6', '7', '8'];
+const STAGE_ORDER = ['1', '2', '3', '4', '5a', '5b', '6', '7', '7b', '8'];
 
 // Rooms deprecated before the arc change can carry stage IDs that no longer
 // exist in STAGE_ORDER. Without normalization, indexOf returns -1 and every
@@ -32,6 +32,7 @@ export const STAGE_META = {
   '5b': { label: 'Coworker Tools',       description: 'Now hand your coworkers real tools, {name} \u2014 research, messaging, action.' },
   '6':  { label: 'Orchestration',        description: 'Now choreograph it, {name} \u2014 chain coworkers and humans into a workflow with human-in-loop checks.' },
   '7':  { label: 'Observability',        description: 'Last one, {name} \u2014 every run, approval, and tool call on the record. See what your team actually did.' },
+  '7b': { label: 'Economics',            description: 'Time to see the bill, {name} \u2014 every token your team spent is on the record now.' },
   '8':  { label: 'Graduation',           description: 'Here\u2019s a read of what you built, {name} \u2014 your competency scorecard across everything we just did together.' },
 };
 

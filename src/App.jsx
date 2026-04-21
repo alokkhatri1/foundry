@@ -8,7 +8,10 @@ import WorkflowBuilder from './components/WorkflowBuilder';
 import CoworkerBuilder from './components/CoworkerBuilder';
 import ChatPanel from './components/ChatPanel';
 import ActivityDashboard from './components/ActivityDashboard';
+import UsageView, { useMyUsageTotal } from './components/UsageView';
+import { formatUsd, formatTokens } from './utils/llmCost';
 import RevealAt, { STAGE_META, stageReached, normalizeStage } from './components/RevealAt';
+import { computeCost } from './utils/llmCost';
 import { buildStageGuidance } from './data/stageGuidance';
 import PreferencesEditor from './components/PreferencesEditor';
 import {
@@ -160,6 +163,23 @@ function getKnowledgeForDepartment(tree, deptId) {
 
 let msgId = Date.now();
 function genMsgId() { return 'm-' + (msgId++); }
+
+// Header chip showing live running spend. Subscribes to llm_usage inserts
+// for this participant and re-renders the dollar total. Mounted only
+// post-7b so we don't pay for a realtime channel before the reveal.
+function SpendChip({ sb, myParticipantId, onClick }) {
+  const { total, tokenTotal } = useMyUsageTotal(sb, myParticipantId);
+  return (
+    <span
+      className="header-spend-chip"
+      onClick={onClick}
+      title="Your LLM spend so far. Click to see the breakdown."
+    >
+      <span className="header-spend-chip-amount">{formatUsd(total)}</span>
+      <span className="header-spend-chip-tokens">{formatTokens(tokenTotal)} tok</span>
+    </span>
+  );
+}
 
 function App() {
   const saved = loadState();
@@ -829,10 +849,14 @@ function App() {
   }
 
   // ===== Claude API =====
-  async function callClaudeAPI(systemPrompt, userMessage) {
+  // Default segment 'chat' is correct for the free-text chat surface; callers
+  // with a different context (refine_description, scorecard, etc.) should
+  // pass options.segment explicitly.
+  async function callClaudeAPI(systemPrompt, userMessage, options = {}) {
     if (!apiKey) {
       return { success: false, error: 'No API key configured. Add your Anthropic API key in .env file.' };
     }
+    const model = 'claude-sonnet-4-20250514';
     try {
       const response = await fetch('https://api.anthropic.com/v1/messages', {
         method: 'POST',
@@ -843,7 +867,7 @@ function App() {
           'anthropic-dangerous-direct-browser-access': 'true',
         },
         body: JSON.stringify({
-          model: 'claude-sonnet-4-20250514',
+          model,
           max_tokens: 1000,
           ...(systemPrompt ? { system: systemPrompt } : {}),
           messages: [{ role: 'user', content: userMessage }],
@@ -855,6 +879,16 @@ function App() {
         return { success: false, error: `API returned ${response.status}. ${errorText}` };
       }
       const data = await response.json();
+      if (data.usage) {
+        sb.logLlmUsage({
+          participantId: myParticipantId,
+          segment: options.segment || 'chat',
+          segmentRefId: options.segmentRefId,
+          model,
+          usage: data.usage,
+          costUsd: computeCost(data.usage, model),
+        });
+      }
       const content = data.content.filter(item => item.type === 'text').map(item => item.text).join('\n');
       setNetworkError(false);
       return { success: true, content };
@@ -865,13 +899,18 @@ function App() {
   }
 
   // ===== Claude with Tools (agentic loop) =====
-  async function callClaudeWithTools({ systemPrompt, userMessage, agentTools, onToolExecution, onProgressText, coworker }) {
+  async function callClaudeWithTools({ systemPrompt, userMessage, agentTools, onToolExecution, onProgressText, coworker, usageSegment, usageRefId }) {
     if (!apiKey) return { success: false, content: [{ type: 'text', text: 'No API key configured.' }] };
 
     const claudeTools = agentTools.map(t => toolToClaudeSchema(t));
     let messages = [{ role: 'user', content: typeof userMessage === 'string' ? userMessage : userMessage }];
     const allContent = [];
     let turns = 0;
+    const model = 'claude-sonnet-4-20250514';
+    // 'coworker_chat' for any coworker-backed turn; 'workflow_run' when the
+    // workflow runner invokes this function via its own wrapper (sets
+    // usageSegment explicitly). Falls back to chat for safety.
+    const segment = usageSegment || (coworker ? 'coworker_chat' : 'chat');
 
     while (turns < 10) {
       turns++;
@@ -885,7 +924,7 @@ function App() {
             'anthropic-dangerous-direct-browser-access': 'true',
           },
           body: JSON.stringify({
-            model: 'claude-sonnet-4-20250514',
+            model,
             max_tokens: 2000,
             ...(systemPrompt ? { system: systemPrompt } : {}),
             messages,
@@ -899,6 +938,16 @@ function App() {
         }
 
         const data = await response.json();
+        if (data.usage) {
+          sb.logLlmUsage({
+            participantId: myParticipantId,
+            segment,
+            segmentRefId: usageRefId,
+            model,
+            usage: data.usage,
+            costUsd: computeCost(data.usage, model),
+          });
+        }
         const textBlocks = [];
         const toolUseBlocks = [];
 
@@ -1086,6 +1135,15 @@ function App() {
         }
 
         const data = await response.json();
+        if (data.usage) {
+          sb.logLlmUsage({
+            participantId: myParticipantId,
+            segment: 'chat',
+            model: 'claude-sonnet-4-20250514',
+            usage: data.usage,
+            costUsd: computeCost(data.usage, 'claude-sonnet-4-20250514'),
+          });
+        }
         const toolUseBlocks = [];
 
         for (const block of data.content) {
@@ -1617,6 +1675,11 @@ Be concise. Confirm actions after completing them.${knowledgeSection}`;
               Observability{activeRuns.length > 0 && activeTab !== 'activity' && <span className="tab-count">{activeRuns.length}</span>}
             </button>
           </RevealAt>
+          <RevealAt stage="7b" currentStage={currentStage}>
+            <button className={`tab-nav-item${activeTab === 'usage' ? ' active' : ''}`} onClick={() => setActiveTab('usage')}>
+              Usage
+            </button>
+          </RevealAt>
           <RevealAt stage="8" currentStage={currentStage}>
             <button className={`tab-nav-item${activeTab === 'graduation' ? ' active' : ''}`} onClick={() => setActiveTab('graduation')}>
               Graduation
@@ -1630,6 +1693,9 @@ Be concise. Confirm actions after completing them.${knowledgeSection}`;
               <span className="header-stage-chip-label">{STAGE_META[currentStage].label}</span>
             </span>
           )}
+          <RevealAt stage="7b" currentStage={currentStage}>
+            <SpendChip sb={sb} myParticipantId={myParticipantId} onClick={() => setActiveTab('usage')} />
+          </RevealAt>
           <span className="header-user-name">{userName}</span>
           <RevealAt stage="2" currentStage={currentStage}>
             <button className="header-btn" onClick={() => setShowPreferences(true)}>Preferences</button>
@@ -1713,7 +1779,7 @@ Be concise. Confirm actions after completing them.${knowledgeSection}`;
         )}
         {activeTab === 'workflow' && (
           <div className="tab-pane tab-pane-workflow">
-            <WorkflowBuilder workflows={workflows} onUpdateWorkflows={handleUpdateWorkflows} fileTree={fileTree} onRun={runWorkflow} workflowRuns={workflowRuns} participants={participants} currentUserName={userName} coworkers={coworkers || []} tools={tools || []} showEducationalCues={showEducationalCues} callClaudeAPI={callClaudeAPI} onSaveCoworkerToLibrary={handleSaveCoworkerToLibrary} onUpdateFileContent={handleUpdateFileContent} apiKey={apiKey} />
+            <WorkflowBuilder workflows={workflows} onUpdateWorkflows={handleUpdateWorkflows} fileTree={fileTree} onRun={runWorkflow} workflowRuns={workflowRuns} participants={participants} currentUserName={userName} coworkers={coworkers || []} tools={tools || []} showEducationalCues={showEducationalCues} callClaudeAPI={callClaudeAPI} onSaveCoworkerToLibrary={handleSaveCoworkerToLibrary} onUpdateFileContent={handleUpdateFileContent} apiKey={apiKey} onCopilotUsage={({ usage, model }) => sb.logLlmUsage({ participantId: myParticipantId, segment: 'workflow_copilot', model, usage, costUsd: computeCost(usage, model) })} />
           </div>
         )}
         {activeTab === 'files' && (
@@ -1747,6 +1813,17 @@ Be concise. Confirm actions after completing them.${knowledgeSection}`;
                 const rows = await sb.loadApprovals(runId);
                 setApprovalsByRun(prev => ({ ...prev, [runId]: rows || [] }));
               }}
+              currentStage={currentStage}
+              sb={sb}
+            />
+          </div>
+        )}
+        {activeTab === 'usage' && stageReached(currentStage, '7b') && (
+          <div className="tab-pane tab-pane-usage">
+            <UsageView
+              sb={sb}
+              myParticipantId={myParticipantId}
+              showEducationalCues={showEducationalCues}
             />
           </div>
         )}

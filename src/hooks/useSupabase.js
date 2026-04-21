@@ -687,6 +687,87 @@ export default function useSupabase() {
     });
   }, []);
 
+  // LLM usage — one row per Claude API response, precomputed cost. Non-blocking
+  // fire-and-forget: the caller shouldn't wait on this, and a silent failure
+  // here must never interrupt the user-facing chat/run loop.
+  const logLlmUsage = useCallback(async ({
+    participantId, segment, segmentRefId,
+    model, usage, costUsd,
+  }) => {
+    if (!isSupabaseConfigured || !roomIdRef.current) return;
+    if (!usage) return;
+    try {
+      await supabase.from('llm_usage').insert({
+        workshop_id: roomIdRef.current,
+        participant_id: participantId || null,
+        segment,
+        segment_ref_id: segmentRefId || null,
+        model,
+        input_tokens: usage.input_tokens || 0,
+        output_tokens: usage.output_tokens || 0,
+        cache_creation_input_tokens: usage.cache_creation_input_tokens || 0,
+        cache_read_input_tokens: usage.cache_read_input_tokens || 0,
+        cost_usd: costUsd,
+      });
+    } catch (err) {
+      console.warn('logLlmUsage failed:', err?.message || err);
+    }
+  }, []);
+
+  // Load all workflow_run usage rows tagged with a given runId. Used by
+  // the Observability run detail view to annotate each step with its cost.
+  const loadRunUsage = useCallback(async (runId) => {
+    if (!isSupabaseConfigured || !roomIdRef.current || !runId) return [];
+    const { data, error } = await supabase
+      .from('llm_usage')
+      .select('*')
+      .eq('workshop_id', roomIdRef.current)
+      .eq('segment', 'workflow_run')
+      .like('segment_ref_id', `${runId}:%`);
+    if (error) {
+      console.warn('loadRunUsage:', error.message);
+      return [];
+    }
+    return data || [];
+  }, []);
+
+  const loadMyUsage = useCallback(async (participantId) => {
+    if (!isSupabaseConfigured || !roomIdRef.current || !participantId) return [];
+    const { data, error } = await supabase
+      .from('llm_usage')
+      .select('*')
+      .eq('workshop_id', roomIdRef.current)
+      .eq('participant_id', participantId)
+      .order('created_at', { ascending: true });
+    if (error) {
+      console.warn('loadMyUsage:', error.message);
+      return [];
+    }
+    return data || [];
+  }, []);
+
+  const subscribeToMyUsage = useCallback((participantId, onInsert) => {
+    if (!isSupabaseConfigured || !roomIdRef.current || !participantId) return () => {};
+    const channel = supabase
+      .channel(`llm-usage:${roomIdRef.current}:${participantId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'llm_usage',
+          filter: `workshop_id=eq.${roomIdRef.current}`,
+        },
+        (payload) => {
+          const row = payload.new;
+          if (row?.participant_id !== participantId) return;
+          onInsert(row);
+        }
+      )
+      .subscribe();
+    return () => supabase.removeChannel(channel);
+  }, []);
+
   // ===== Realtime: subscribe to all entity tables =====
   const subscribeToRoom = useCallback((handlers) => {
     if (!isSupabaseConfigured || !roomIdRef.current) return () => {};
@@ -782,6 +863,7 @@ export default function useSupabase() {
     loadTools, saveTool, deleteTool,
     loadWorkflows, saveWorkflow, deleteWorkflow,
     saveMessage, saveWorkflowRun, loadWorkflowRuns, loadApprovals, loadAllRoomApprovals, logToolCall, logApproval,
+    logLlmUsage, loadMyUsage, subscribeToMyUsage, loadRunUsage,
     subscribeToRoom, trackPresence, leavePresence,
   };
 }

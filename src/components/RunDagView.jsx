@@ -8,6 +8,7 @@
 import { useMemo, useCallback } from 'react';
 import ReactFlow, { Background, Controls, MiniMap, Handle, Position } from 'reactflow';
 import 'reactflow/dist/style.css';
+import { formatUsd } from '../utils/llmCost';
 
 const NODE_STATE_COLOR = {
   completed: { bg: '#e8f4ec', border: '#5a9e6f', text: '#2f5f3e' },
@@ -33,7 +34,7 @@ const STATUS_GLYPH = {
 // than the Orchestration canvas nodes — no inline editor, no drag handle.
 
 function RunNode({ data }) {
-  const { step, label, role, selected } = data;
+  const { step, label, role, selected, cost } = data;
   const state = step?.status || 'pending';
   const cfg = NODE_STATE_COLOR[state] || NODE_STATE_COLOR.pending;
   const isTrigger = step?.type === 'trigger';
@@ -56,9 +57,14 @@ function RunNode({ data }) {
         <span className="run-node-role">{role}</span>
       </div>
       <div className="run-node-label">{label}</div>
-      {step?.durationMs != null && step.status === 'completed' && (
-        <div className="run-node-duration">{formatDuration(step.durationMs)}</div>
-      )}
+      <div className="run-node-meta">
+        {step?.durationMs != null && step.status === 'completed' && (
+          <span className="run-node-duration">{formatDuration(step.durationMs)}</span>
+        )}
+        {cost != null && cost > 0 && (
+          <span className="run-node-cost">{formatUsd(cost)}</span>
+        )}
+      </div>
       {isReview ? (
         <>
           <Handle type="source" position={Position.Bottom} id="approved" style={{ left: '30%' }} />
@@ -113,7 +119,7 @@ function computeTraversedEdges(workflow, run) {
 
 // ===== Main component =====
 
-export default function RunDagView({ workflow, run, selectedStepId, onSelectStep }) {
+export default function RunDagView({ workflow, run, selectedStepId, onSelectStep, costByStepId }) {
   const { nodes, edges } = useMemo(() => {
     if (!workflow || !run) return { nodes: [], edges: [] };
     const steps = workflow.steps || [];
@@ -148,6 +154,7 @@ export default function RunDagView({ workflow, run, selectedStepId, onSelectStep
           label,
           role,
           selected: step.id === selectedStepId,
+          cost: costByStepId ? (costByStepId[step.id] || 0) : null,
         },
       };
     });
@@ -169,7 +176,7 @@ export default function RunDagView({ workflow, run, selectedStepId, onSelectStep
     });
 
     return { nodes: nextNodes, edges: nextEdges };
-  }, [workflow, run, selectedStepId]);
+  }, [workflow, run, selectedStepId, costByStepId]);
 
   const handleNodeClick = useCallback((_evt, node) => {
     onSelectStep?.(node.id);

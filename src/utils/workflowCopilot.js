@@ -297,6 +297,7 @@ export async function runCopilotTurn({
   onWorkflowUpdate,
   onNarration,
   onError,
+  onUsage,
 }) {
   if (!apiKey) {
     onError?.('No API key configured. Add VITE_ANTHROPIC_API_KEY to .env.');
@@ -341,6 +342,9 @@ export async function runCopilotTurn({
         return { updatedHistory: messages, updatedWorkflow: currentWorkflow };
       }
       data = await response.json();
+      if (data.usage && onUsage) {
+        onUsage({ usage: data.usage, model: 'claude-sonnet-4-20250514' });
+      }
     } catch (err) {
       onError?.(`Network error: ${err.message}`);
       return { updatedHistory: messages, updatedWorkflow: currentWorkflow };

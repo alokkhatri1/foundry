@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import EducationalCue from './EducationalCue';
 import { CoworkerGlyph } from './Icon';
 import RunDagView from './RunDagView';
+import { stageReached } from './RevealAt';
 
 function isIconOrImage(avatar) {
   return typeof avatar === 'string' && (avatar.startsWith('icon:') || avatar.startsWith('data:'));
@@ -83,7 +84,22 @@ function RunCard({ run, onClick, onNudge, showEducationalCues }) {
 // node selects it on both sides; the sidebar row expands inline with the
 // step's output, decision log, or (if it's the run owner's turn) the
 // approval form.
-function RunDetailView({ run, onBack, onApprovalAction, onNudge, showEducationalCues, currentUserName, approvals, onLoadApprovals, workflows }) {
+function RunDetailView({ run, onBack, onApprovalAction, onNudge, showEducationalCues, currentUserName, approvals, onLoadApprovals, workflows, currentStage, sb }) {
+  const showCost = stageReached(currentStage, '7b');
+  const [costByStepId, setCostByStepId] = useState({});
+
+  useEffect(() => {
+    if (!showCost || !sb?.loadRunUsage) return;
+    sb.loadRunUsage(run.id).then((rows) => {
+      const map = {};
+      for (const r of rows) {
+        const stepId = r.segment_ref_id?.split(':')[1];
+        if (!stepId) continue;
+        map[stepId] = (map[stepId] || 0) + Number(r.cost_usd || 0);
+      }
+      setCostByStepId(map);
+    });
+  }, [run.id, showCost, sb]);
   const cfg = STATUS_CONFIG[run.status] || STATUS_CONFIG.running;
   const isOwner = run.startedBy === currentUserName;
 
@@ -164,6 +180,7 @@ function RunDetailView({ run, onBack, onApprovalAction, onNudge, showEducational
             run={runWithApprovals}
             selectedStepId={selectedStepId}
             onSelectStep={setSelectedStepId}
+            costByStepId={showCost ? costByStepId : null}
           />
         </div>
 
@@ -385,7 +402,7 @@ function DecisionRow({ step, run, isSelected, onSelect, approvalsForStep, isOwne
 }
 
 // ===== Main Dashboard =====
-export default function ActivityDashboard({ workflowRuns, onApprovalAction, onNudge, participants, currentUserName, coworkers, workflows, showEducationalCues, approvalsByRun, onLoadApprovals }) {
+export default function ActivityDashboard({ workflowRuns, onApprovalAction, onNudge, participants, currentUserName, coworkers, workflows, showEducationalCues, approvalsByRun, onLoadApprovals, currentStage, sb }) {
   const [selectedRunId, setSelectedRunId] = useState(null);
 
   const selectedRun = selectedRunId ? workflowRuns.find(r => r.id === selectedRunId) : null;
@@ -414,6 +431,8 @@ export default function ActivityDashboard({ workflowRuns, onApprovalAction, onNu
         approvals={approvalsByRun?.[selectedRun.id]}
         onLoadApprovals={onLoadApprovals}
         workflows={workflows}
+        currentStage={currentStage}
+        sb={sb}
       />
     );
   }

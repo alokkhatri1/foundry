@@ -181,6 +181,79 @@ function SpendChip({ sb, myParticipantId, onClick }) {
   );
 }
 
+// Single settings button on the far-right of the header. Opens a dropdown
+// that carries everything that used to crowd the header: user name,
+// Current Level, live spend total (when Stage 7b is revealed),
+// Preferences (Stage 2+), and Exit Workshop. Frees the header to show
+// every stage tab without wrapping.
+function SettingsMenu({ userName, currentStage, sb, myParticipantId, onOpenUsage, onOpenPreferences, onExit }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+  const showSpend = stageReached(currentStage, '7b');
+  const spend = useMyUsageTotal(sb, showSpend ? myParticipantId : null);
+  const showPreferences = stageReached(currentStage, '2');
+  const initial = (userName || '?').trim().charAt(0).toUpperCase();
+  const stageLabel = currentStage ? STAGE_META[currentStage]?.label : null;
+
+  useEffect(() => {
+    if (!open) return;
+    function onDocClick(e) {
+      if (ref.current && !ref.current.contains(e.target)) setOpen(false);
+    }
+    document.addEventListener('mousedown', onDocClick);
+    return () => document.removeEventListener('mousedown', onDocClick);
+  }, [open]);
+
+  return (
+    <div className="header-settings" ref={ref}>
+      <button
+        className={`header-settings-btn${open ? ' open' : ''}`}
+        onClick={() => setOpen(o => !o)}
+        title="Settings"
+      >
+        <span className="header-settings-avatar">{initial}</span>
+        <span className="header-settings-caret">{open ? '\u25B4' : '\u25BE'}</span>
+      </button>
+      {open && (
+        <div className="header-settings-menu" role="menu">
+          <div className="header-settings-identity">
+            <div className="header-settings-name">{userName || 'You'}</div>
+            {stageLabel && (
+              <div className="header-settings-meta">
+                <span className="header-settings-meta-label">Current Level</span>
+                <span className="header-settings-meta-value">{stageLabel}</span>
+              </div>
+            )}
+            {showSpend && (
+              <div
+                className="header-settings-meta header-settings-meta-clickable"
+                onClick={() => { onOpenUsage?.(); setOpen(false); }}
+              >
+                <span className="header-settings-meta-label">Spend</span>
+                <span className="header-settings-meta-value header-settings-meta-cost">
+                  {formatUsd(spend.total)}
+                  <span className="header-settings-meta-tokens"> · {formatTokens(spend.tokenTotal)} tok</span>
+                </span>
+              </div>
+            )}
+          </div>
+          <div className="header-settings-divider" />
+          {showPreferences && (
+            <button
+              className="header-settings-item"
+              onClick={() => { onOpenPreferences?.(); setOpen(false); }}
+            >Preferences</button>
+          )}
+          <button
+            className="header-settings-item danger"
+            onClick={() => { onExit?.(); setOpen(false); }}
+          >Exit Workshop</button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function App() {
   const saved = loadState();
   const sb = useSupabase();
@@ -1687,20 +1760,15 @@ Be concise. Confirm actions after completing them.${knowledgeSection}`;
           </RevealAt>
         </nav>
         <div className="app-header-right">
-          {currentStage && STAGE_META[currentStage]?.label && (
-            <span className="header-stage-chip">
-              <span className="header-stage-chip-eyebrow">Current Level</span>
-              <span className="header-stage-chip-label">{STAGE_META[currentStage].label}</span>
-            </span>
-          )}
-          <RevealAt stage="7b" currentStage={currentStage}>
-            <SpendChip sb={sb} myParticipantId={myParticipantId} onClick={() => setActiveTab('usage')} />
-          </RevealAt>
-          <span className="header-user-name">{userName}</span>
-          <RevealAt stage="2" currentStage={currentStage}>
-            <button className="header-btn" onClick={() => setShowPreferences(true)}>Preferences</button>
-          </RevealAt>
-          <button className="header-btn" onClick={() => setShowExitConfirm(true)}>Exit Workshop</button>
+          <SettingsMenu
+            userName={userName}
+            currentStage={currentStage}
+            sb={sb}
+            myParticipantId={myParticipantId}
+            onOpenUsage={() => setActiveTab('usage')}
+            onOpenPreferences={() => setShowPreferences(true)}
+            onExit={() => setShowExitConfirm(true)}
+          />
         </div>
       </header>
 

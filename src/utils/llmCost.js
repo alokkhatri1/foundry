@@ -12,6 +12,12 @@ const RATES = {
     cacheWrite: 3.75,
     cacheRead: 0.30,
   },
+  'claude-haiku-4-5-20251001': {
+    input: 1.00,
+    output: 5.00,
+    cacheWrite: 1.25,
+    cacheRead: 0.10,
+  },
   // Fallback for unknown models — Sonnet 4 pricing so cost is non-zero but
   // not obviously wrong. If a new model lands, add it here.
   default: {

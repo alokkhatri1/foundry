@@ -1208,7 +1208,7 @@ function App() {
             'anthropic-dangerous-direct-browser-access': 'true',
           },
           body: JSON.stringify({
-            model: 'claude-sonnet-4-20250514',
+            model: 'claude-haiku-4-5-20251001',
             max_tokens: 4096,
             // System prompt + platform tools array are stable across the
             // agentic loop's turns; cache both for 10x-cheaper reads.
@@ -1230,9 +1230,9 @@ function App() {
           sb.logLlmUsage({
             participantId: myParticipantId,
             segment: 'chat',
-            model: 'claude-sonnet-4-20250514',
+            model: 'claude-haiku-4-5-20251001',
             usage: data.usage,
-            costUsd: computeCost(data.usage, 'claude-sonnet-4-20250514'),
+            costUsd: computeCost(data.usage, 'claude-haiku-4-5-20251001'),
           });
         }
         const toolUseBlocks = [];

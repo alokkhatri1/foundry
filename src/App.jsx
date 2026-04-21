@@ -1212,10 +1212,10 @@ function App() {
           },
           body: JSON.stringify({
             model: 'claude-haiku-4-5-20251001',
-            // Platform-chat replies are routing + short confirmations — a
-            // tight cap prevents Haiku from verbosity blowing the bill on
-            // an outlier turn. Typical reply is ~300 tokens.
-            max_tokens: 512,
+            // Platform-chat replies are routing + single-line confirmations.
+            // Output is the dominant remaining cost once caching kicks in;
+            // capping tight pushes Haiku toward ~100-token replies.
+            max_tokens: 256,
             // System prompt + platform tools array are stable across the
             // agentic loop's turns; cache both for 10x-cheaper reads.
             ...(systemPrompt ? { system: [{ type: 'text', text: systemPrompt, cache_control: { type: 'ephemeral' } }] } : {}),
@@ -1672,7 +1672,7 @@ When building something, create dependencies first: files before coworkers that 
 When answering questions, check current state with list/read tools if needed.
 
 ## Reply style — strict
-Answer in ≤2 short sentences unless the user explicitly asks for detail. After an action, a single-line confirmation is enough ("Created Ravi." / "Listed 3 coworkers."). No restating the user's request, no bullet-list recap, no closing pleasantries.${knowledgeSection}`;
+Answer in ONE sentence. If the user asks "how", a second sentence is allowed — never more. After an action, reply with a bare confirmation and nothing else ("Created Ravi." / "Listed 3 coworkers."). Never restate the user's request. Never bullet-list a recap. Never say "Let me know if…" or "Feel free to…". If you can't fit the answer in two sentences, ask the user what specifically they want to know.${knowledgeSection}`;
 
         const result = await callClaudeWithPlatformActions({
           systemPrompt: platformSystemPrompt,

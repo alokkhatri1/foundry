@@ -101,6 +101,30 @@ export default function AdminDashboard({ sb, user, onBack }) {
     await loadWorkshops();
   }
 
+  // Walk forward from the current stage to the last one, writing each reveal
+  // as its own stage_events row so the audit trail still records the
+  // intermediate jumps. Useful for dry-runs / internal reviews where the
+  // facilitator doesn't want to click through one at a time.
+  async function handleRevealAll() {
+    if (!selected) return;
+    const lastStage = STAGE_ORDER[STAGE_ORDER.length - 1];
+    let cursor = selected.current_stage || '1';
+    if (cursor === lastStage) {
+      alert('All stages are already revealed.');
+      return;
+    }
+    const remaining = [];
+    let walker = nextStage(cursor);
+    while (walker) { remaining.push(walker); walker = nextStage(walker); }
+    if (!confirm(`Reveal all ${remaining.length} remaining stages to every participant now? This skips the pacing — use only for dry-runs.`)) return;
+    for (const s of remaining) {
+      await sb.revealStage(selected.id, s, cursor, user.id);
+      cursor = s;
+    }
+    setSelected(prev => prev ? { ...prev, current_stage: lastStage } : prev);
+    await loadWorkshops();
+  }
+
   async function handleSelect(workshop) {
     setSelected(workshop);
     setDetailTab('stages');
@@ -300,10 +324,21 @@ export default function AdminDashboard({ sb, user, onBack }) {
               {/* Tab content */}
               {detailTab === 'stages' && (
                 <div className="admin-tab-content">
-                  <p className="admin-tab-intro">
-                    Reveal is monotonic — once a stage is revealed, it stays revealed. Sub-stages reveal in order. Current stage:{' '}
-                    <strong>{selected.current_stage || '1'}</strong>
-                  </p>
+                  <div className="admin-stage-header">
+                    <p className="admin-tab-intro" style={{ margin: 0 }}>
+                      Reveal is monotonic — once a stage is revealed, it stays revealed. Sub-stages reveal in order. Current stage:{' '}
+                      <strong>{selected.current_stage || '1'}</strong>
+                    </p>
+                    {!selected.deprecated_at && nextStage(selected.current_stage || '1') && (
+                      <button
+                        className="admin-stage-reveal-all"
+                        onClick={handleRevealAll}
+                        title="Reveal every remaining stage at once. Intended for dry-runs, not live facilitation."
+                      >
+                        Reveal All
+                      </button>
+                    )}
+                  </div>
                   <div className="admin-stage-list">
                     {STAGE_ORDER.map(s => {
                       const meta = STAGE_META[s];

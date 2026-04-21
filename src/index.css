@@ -572,6 +572,30 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
 }
 .admin-stage-reveal:hover { opacity: 0.9; }
 
+.admin-stage-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+.admin-stage-reveal-all {
+  background: var(--accent-gold);
+  color: #fff;
+  border: none;
+  border-radius: var(--radius-pill, 999px);
+  padding: 8px 18px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  cursor: pointer;
+  flex-shrink: 0;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+  transition: transform 0.1s, box-shadow 0.15s;
+}
+.admin-stage-reveal-all:hover { box-shadow: 0 2px 6px rgba(0,0,0,0.12); transform: translateY(-1px); }
+
 /* Admin card enhancements */
 .admin-card-top { cursor: pointer; }
 .admin-workshop-code-display {

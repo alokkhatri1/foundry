@@ -68,6 +68,7 @@ export function formatTokens(n) {
 // axis labels and list section headers.
 export const SEGMENT_LABELS = {
   chat: 'Chat',
+  chat_classifier: 'Chat intent classifier',
   coworker_chat: 'Coworker chats',
   workflow_run: 'Workflow runs',
   workflow_copilot: 'Workflow copilot',

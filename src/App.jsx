@@ -923,6 +923,75 @@ function App() {
     setLogs(prev => [...prev, { timestamp: Date.now(), ...entry }]);
   }
 
+  // ===== Intent classifier (platform chat) =====
+  // Tiny Haiku call that decides whether a user message needs platform-tool
+  // access or is pure Q&A. Used to skip the 12-tool schema on ~70% of turns,
+  // which drops those turns from ~$0.002 to ~$0.0007. Classifier itself costs
+  // ~$0.0003. Defaults to "action" on any error so tool access isn't silently
+  // lost — quality over cost when in doubt.
+  async function classifyPlatformIntent(userMessage) {
+    if (!apiKey) return 'action';
+    const model = 'claude-haiku-4-5-20251001';
+    try {
+      const response = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': apiKey,
+          'anthropic-version': '2023-06-01',
+          'anthropic-dangerous-direct-browser-access': 'true',
+        },
+        body: JSON.stringify({
+          model,
+          max_tokens: 3,
+          system: [{
+            type: 'text',
+            text: `You are a binary intent classifier.
+
+Reply with EXACTLY one word: "action" or "chat".
+
+"action" if the message asks to:
+- list / read / create / update / delete any files, coworkers, workflows, tools, or connectors
+- retrieve current platform state
+- run a workflow or connect an external service
+
+"chat" if the message:
+- asks a conceptual question, definition, or how-to
+- is greeting, small talk, or general conversation
+- asks for an explanation of a platform concept
+
+When unclear, default to "action".
+
+Examples:
+"list my coworkers" → action
+"how does this platform work?" → chat
+"create a coworker named Ravi" → action
+"what's a workflow?" → chat
+"show me files" → action
+"hello" → chat`,
+            cache_control: { type: 'ephemeral' },
+          }],
+          messages: [{ role: 'user', content: userMessage }],
+        }),
+      });
+      if (!response.ok) return 'action';
+      const data = await response.json();
+      if (data.usage) {
+        sb.logLlmUsage({
+          participantId: myParticipantId,
+          segment: 'chat_classifier',
+          model,
+          usage: data.usage,
+          costUsd: computeCost(data.usage, model),
+        });
+      }
+      const text = (data.content || []).filter(c => c.type === 'text').map(c => c.text).join('').trim().toLowerCase();
+      return text.startsWith('chat') ? 'chat' : 'action';
+    } catch {
+      return 'action';
+    }
+  }
+
   // ===== Claude API =====
   // Default segment 'chat' is correct for the free-text chat surface; callers
   // with a different context (refine_description, scorecard, etc.) should
@@ -931,7 +1000,10 @@ function App() {
     if (!apiKey) {
       return { success: false, error: 'No API key configured. Add your Anthropic API key in .env file.' };
     }
-    const model = 'claude-sonnet-4-20250514';
+    // Model is overridable per call — the no-tools platform-chat path and
+    // the intent classifier both use Haiku; workflow runs and refine-style
+    // callers stay on Sonnet by default.
+    const model = options.model || 'claude-sonnet-4-20250514';
     try {
       const response = await fetch('https://api.anthropic.com/v1/messages', {
         method: 'POST',
@@ -1665,15 +1737,42 @@ function App() {
           addMessage({ type: 'error', content: result.error });
         }
       } else {
-        // Stage 5a+: platform assistant with full tool access.
-        //
-        // Split the system prompt into a STABLE block (cached) and a VARIABLE
-        // block (not cached). Previously the stage guidance (fires only on
-        // first exchange) and knowledge section (varies per message) were
-        // folded into one big system string — the prefix changed across
-        // turns, so cache_control never hit. Now the stable platform
-        // description + user prefs cache once and stay hot.
-        const platformStableBlock = `${userPrefsForPlatform}You are the Foundry platform assistant for ${orgName}. You help users build and manage their AI coworker platform through natural language.
+        // Stage 5a+: intent classifier decides between a cheap no-tools
+        // chat and a full platform-tools chat. ~70% of messages are
+        // conceptual questions that don't need tool access; routing those
+        // away from the 12-schema platform-tools call cuts their cost
+        // from ~$0.002 to ~$0.0007. The classifier itself costs ~$0.0003
+        // per turn — cheap enough that the weighted average still wins
+        // even on tool-needing turns.
+        const userMessageString = typeof userMessage === 'string' ? userMessage : text;
+        const intent = await classifyPlatformIntent(userMessageString);
+
+        if (intent === 'chat') {
+          // No-tools chat path. Short system prompt, no tool schemas,
+          // Haiku. Typical cost ~$0.0007/turn.
+          const chatOnlySystem = `${userPrefsForPlatform}${stageGuidanceSection}You are the Foundry platform assistant for ${orgName}. Answer conversationally, briefly.
+
+The platform has: Files (knowledge docs + skill files), Coworkers (AI assistants), Workflows (step sequences with AI + human steps), Tools (connectors to external APIs).
+
+## Reply style — strict
+Answer in ONE sentence. Two sentences if explaining "how". Never restate the question. Never bullet-list a recap. Never say "Let me know if..." or "Feel free to...". If the user seems to want you to DO something (list, create, change), say: "Let me do that — one second." so they try again and the classifier routes them to the action path.${knowledgeSection}`;
+          const result = await callClaudeAPI(chatOnlySystem, userMessageString, { model: 'claude-haiku-4-5-20251001' });
+          updateActiveMessages(prev => prev.filter(m => m.id !== loadingId));
+          setIsLoading(false);
+          if (result.success) {
+            addMessage({ type: 'direct-response', content: result.content, label: 'Foundry' });
+          } else {
+            addMessage({ type: 'error', content: result.error });
+          }
+        } else {
+          // Action path: full platform assistant with all 12 tools.
+          //
+          // Split the system prompt into a STABLE block (cached) and a
+          // VARIABLE block (not cached). Stage guidance fires only on the
+          // first exchange and knowledge section changes with attached
+          // files — keeping them out of the cached prefix lets the stable
+          // part stay hot across turns.
+          const platformStableBlock = `${userPrefsForPlatform}You are the Foundry platform assistant for ${orgName}. You help users build and manage their AI coworker platform through natural language.
 
 The platform has these elements:
 - **Files**: Knowledge documents (policies, rules, reference) and instruction files (AI coworker behavior). Organized in department folders.
@@ -1687,32 +1786,29 @@ When answering questions, check current state with list/read tools if needed.
 ## Reply style — strict
 Answer in ONE sentence. If the user asks "how", a second sentence is allowed — never more. After an action, reply with a bare confirmation and nothing else ("Created Ravi." / "Listed 3 coworkers."). Never restate the user's request. Never bullet-list a recap. Never say "Let me know if…" or "Feel free to…". If you can't fit the answer in two sentences, ask the user what specifically they want to know.`;
 
-        // Everything below varies per turn — stage guidance fires only on
-        // the first exchange and knowledge section changes with attached
-        // files. Keep it uncached so the stable prefix above still hits
-        // the cache on turn 2+.
-        const platformVariableTail = `${stageGuidanceSection}${knowledgeSection}`;
+          const platformVariableTail = `${stageGuidanceSection}${knowledgeSection}`;
 
-        const result = await callClaudeWithPlatformActions({
-          systemBlocks: platformVariableTail.trim()
-            ? [
-                { type: 'text', text: platformStableBlock, cache_control: { type: 'ephemeral' } },
-                { type: 'text', text: platformVariableTail },
-              ]
-            : [
-                { type: 'text', text: platformStableBlock, cache_control: { type: 'ephemeral' } },
-              ],
-          userMessage,
-          onToolExecution: (execData) => addMessage({ type: 'tool_execution', ...execData }),
-        });
-        updateActiveMessages(prev => prev.filter(m => m.id !== loadingId));
-        setIsLoading(false);
-        if (result.success) {
-          const textContent = result.content.filter(c => c.type === 'text').map(c => c.text).join('\n');
-          if (textContent) addMessage({ type: 'direct-response', content: textContent, label: 'Foundry' });
-        } else {
-          const errorText = result.content?.[0]?.text || 'Unknown error';
-          addMessage({ type: 'error', content: errorText });
+          const result = await callClaudeWithPlatformActions({
+            systemBlocks: platformVariableTail.trim()
+              ? [
+                  { type: 'text', text: platformStableBlock, cache_control: { type: 'ephemeral' } },
+                  { type: 'text', text: platformVariableTail },
+                ]
+              : [
+                  { type: 'text', text: platformStableBlock, cache_control: { type: 'ephemeral' } },
+                ],
+            userMessage,
+            onToolExecution: (execData) => addMessage({ type: 'tool_execution', ...execData }),
+          });
+          updateActiveMessages(prev => prev.filter(m => m.id !== loadingId));
+          setIsLoading(false);
+          if (result.success) {
+            const textContent = result.content.filter(c => c.type === 'text').map(c => c.text).join('\n');
+            if (textContent) addMessage({ type: 'direct-response', content: textContent, label: 'Foundry' });
+          } else {
+            const errorText = result.content?.[0]?.text || 'Unknown error';
+            addMessage({ type: 'error', content: errorText });
+          }
         }
       }
     }

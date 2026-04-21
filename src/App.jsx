@@ -8,7 +8,7 @@ import WorkflowBuilder from './components/WorkflowBuilder';
 import CoworkerBuilder from './components/CoworkerBuilder';
 import ChatPanel from './components/ChatPanel';
 import ActivityDashboard from './components/ActivityDashboard';
-import UsageView, { useMyUsageTotal } from './components/UsageView';
+import UsageView, { useMyUsageTotal, useWorkshopUsageTotal } from './components/UsageView';
 import { formatUsd, formatTokens } from './utils/llmCost';
 import RevealAt, { STAGE_META, stageReached, normalizeStage } from './components/RevealAt';
 import { computeCost } from './utils/llmCost';
@@ -190,7 +190,10 @@ function SettingsMenu({ userName, currentStage, sb, myParticipantId, onOpenUsage
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
   const showSpend = stageReached(currentStage, '7b');
-  const spend = useMyUsageTotal(sb, showSpend ? myParticipantId : null);
+  // Workshop-wide total — matches the pedagogy of the Usage tab
+  // ("look how cheap the whole room is"). We always run the hook (can't
+  // call hooks conditionally) but only render its result after 7b.
+  const spend = useWorkshopUsageTotal(sb);
   const showPreferences = stageReached(currentStage, '2');
   const initial = (userName || '?').trim().charAt(0).toUpperCase();
   const stageLabel = currentStage ? STAGE_META[currentStage]?.label : null;
@@ -1889,6 +1892,7 @@ Be concise. Confirm actions after completing them.${knowledgeSection}`;
           <div className="tab-pane tab-pane-usage">
             <UsageView
               sb={sb}
+              participants={participants}
               myParticipantId={myParticipantId}
               showEducationalCues={showEducationalCues}
             />

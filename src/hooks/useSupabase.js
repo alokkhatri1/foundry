@@ -714,6 +714,36 @@ export default function useSupabase() {
     }
   }, []);
 
+  // Workshop-wide usage — every row tagged with this workshop, regardless
+  // of which participant spent it. Stage 7b's primary view uses this so
+  // the room sees the collective cost as pedagogy ("look how cheap a
+  // full mixed-team workshop actually is").
+  const loadWorkshopUsage = useCallback(async () => {
+    if (!isSupabaseConfigured || !roomIdRef.current) return [];
+    const { data, error } = await supabase
+      .from('llm_usage')
+      .select('*')
+      .eq('workshop_id', roomIdRef.current)
+      .order('created_at', { ascending: true });
+    if (error) {
+      console.warn('loadWorkshopUsage:', error.message);
+      return [];
+    }
+    return data || [];
+  }, []);
+
+  const subscribeToWorkshopUsage = useCallback((onInsert) => {
+    if (!isSupabaseConfigured || !roomIdRef.current) return () => {};
+    const channel = supabase
+      .channel(`llm-usage-workshop:${roomIdRef.current}`)
+      .on('postgres_changes', {
+        event: 'INSERT', schema: 'public', table: 'llm_usage',
+        filter: `workshop_id=eq.${roomIdRef.current}`,
+      }, (payload) => onInsert(payload.new))
+      .subscribe();
+    return () => supabase.removeChannel(channel);
+  }, []);
+
   // Load all workflow_run usage rows tagged with a given runId. Used by
   // the Observability run detail view to annotate each step with its cost.
   const loadRunUsage = useCallback(async (runId) => {
@@ -863,7 +893,8 @@ export default function useSupabase() {
     loadTools, saveTool, deleteTool,
     loadWorkflows, saveWorkflow, deleteWorkflow,
     saveMessage, saveWorkflowRun, loadWorkflowRuns, loadApprovals, loadAllRoomApprovals, logToolCall, logApproval,
-    logLlmUsage, loadMyUsage, subscribeToMyUsage, loadRunUsage,
+    logLlmUsage, loadMyUsage, subscribeToMyUsage,
+    loadWorkshopUsage, subscribeToWorkshopUsage, loadRunUsage,
     subscribeToRoom, trackPresence, leavePresence,
   };
 }

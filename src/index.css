@@ -6280,12 +6280,34 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
 .usage-empty-sub { margin-top: 8px; font-size: 13px; }
 
 .usage-totals {
-  display: flex; align-items: baseline; gap: 16px;
+  display: flex; align-items: center; justify-content: space-between; gap: 16px;
   padding: 20px 24px; background: var(--bg-warm);
   border-radius: var(--radius); margin-bottom: 24px; max-width: 720px;
 }
-.usage-total-cost { font-size: 36px; font-weight: 700; color: var(--accent-gold); letter-spacing: -0.02em; }
+.usage-total-label {
+  font-size: 11px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.08em; color: var(--text-muted); margin-bottom: 4px;
+}
+.usage-total-cost { font-size: 36px; font-weight: 700; color: var(--accent-gold); letter-spacing: -0.02em; line-height: 1; }
 .usage-total-tokens { font-size: 13px; color: var(--text-muted); }
+.usage-total-meta { font-size: 12px; color: var(--text-muted); text-align: right; line-height: 1.5; }
+
+.usage-participant-list { display: flex; flex-direction: column; gap: 6px; }
+.usage-participant-row {
+  display: grid;
+  grid-template-columns: 12px 140px 1fr auto auto;
+  gap: 12px; align-items: center;
+  padding: 8px 10px; border-radius: 8px;
+  font-size: 13px;
+}
+.usage-participant-row.is-you { background: rgba(200, 149, 108, 0.08); }
+.usage-participant-dot { width: 10px; height: 10px; border-radius: 50%; }
+.usage-participant-name { color: var(--text-dark); font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.usage-participant-you { color: var(--accent-gold); font-weight: 600; font-size: 11px; }
+.usage-participant-bar { height: 8px; background: var(--bg-warm); border-radius: var(--radius-pill); overflow: hidden; }
+.usage-participant-bar-fill { height: 100%; transition: width 0.2s; }
+.usage-participant-cost { color: var(--accent-gold); font-weight: 600; font-variant-numeric: tabular-nums; }
+.usage-participant-meta { color: var(--text-muted); font-size: 11px; font-variant-numeric: tabular-nums; }
 
 .usage-bar-section { max-width: 720px; margin-bottom: 28px; }
 .usage-bar-label {
@@ -6318,13 +6340,14 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
   border: 1px solid var(--border-color); border-radius: var(--radius);
 }
 .usage-event-row {
-  display: grid; grid-template-columns: 8px 1fr auto auto; gap: 10px;
+  display: grid; grid-template-columns: 8px 1fr auto auto auto; gap: 10px;
   align-items: center; padding: 8px 14px; font-size: 12px;
   border-bottom: 1px solid var(--border-color);
 }
 .usage-event-row:last-child { border-bottom: none; }
 .usage-event-dot { width: 8px; height: 8px; border-radius: 50%; }
 .usage-event-seg { color: var(--text-dark); font-weight: 500; }
+.usage-event-who { color: var(--text-muted); font-size: 11px; }
 .usage-event-cost { color: var(--accent-gold); font-weight: 600; font-variant-numeric: tabular-nums; }
 .usage-event-meta { color: var(--text-muted); font-variant-numeric: tabular-nums; }
 

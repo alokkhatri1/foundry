@@ -175,7 +175,8 @@ export default function UsageView({ sb, participants, myParticipantId, showEduca
                 <div className="usage-credits-banner-left">
                   <div className="usage-credits-banner-label">Your credits</div>
                   <div className="usage-credits-banner-value">
-                    {myCreditsLeft} <span className="usage-credits-banner-of">of {myCreditsTotal} left</span>
+                    <span className="usage-credits-banner-star" aria-hidden>✦</span>
+                    {myCreditsLeft.toLocaleString()}
                   </div>
                 </div>
                 <div className="usage-credits-banner-right">

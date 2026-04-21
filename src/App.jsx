@@ -231,13 +231,14 @@ function SettingsMenu({ userName, currentStage, sb, myParticipantId, creditsLeft
             {creditsLeft != null && (
               <div
                 className="header-settings-meta"
-                title="~1 credit = a typical chat. ~5 credits = a workflow run."
+                title={`${Math.max(0, creditsLeft)} of ${creditsTotal} credits left. ~1 credit = a typical chat. ~5 credits = a workflow run.`}
               >
                 <span className="header-settings-meta-label">Credits</span>
                 <span
-                  className={`header-settings-meta-value${creditsLow ? ' header-settings-meta-low' : ''}`}
+                  className={`header-settings-meta-value header-settings-credits${creditsLow ? ' header-settings-meta-low' : ''}`}
                 >
-                  {Math.max(0, creditsLeft)} / {creditsTotal}
+                  <span className="header-settings-credits-star" aria-hidden>✦</span>
+                  {Math.max(0, creditsLeft)}
                 </span>
               </div>
             )}
@@ -276,14 +277,15 @@ function SettingsMenu({ userName, currentStage, sb, myParticipantId, creditsLeft
 function CreditsChip({ creditsLeft, creditsTotal, onClick }) {
   if (creditsLeft == null) return null;
   const low = creditsLeft <= CREDITS_WARN_THRESHOLD;
+  const value = Math.max(0, creditsLeft);
   return (
     <span
       className={`header-credits-chip${low ? ' low' : ''}`}
       onClick={onClick}
-      title="Credits left. ~1 credit = a typical chat. ~5 credits = a workflow run."
+      title={`${value} of ${creditsTotal} credits left. ~1 credit = a typical chat. ~5 credits = a workflow run.`}
     >
-      <span className="header-credits-chip-value">{Math.max(0, creditsLeft)}</span>
-      <span className="header-credits-chip-of">/ {creditsTotal}</span>
+      <span className="header-credits-chip-star" aria-hidden>✦</span>
+      <span className="header-credits-chip-value">{value.toLocaleString()}</span>
       <span className="header-credits-chip-label">credits</span>
     </span>
   );

@@ -1045,9 +1045,9 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
 /* ===== Credits chip (header, post-7b) ===== */
 .header-credits-chip {
   display: inline-flex;
-  align-items: baseline;
-  gap: 4px;
-  padding: 6px 12px 6px 14px;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
   border-radius: var(--radius-pill);
   background: white;
   border: 1px solid var(--border-color);
@@ -1060,26 +1060,37 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
   border-color: var(--accent-error);
   background: #fdf0f0;
 }
+.header-credits-chip-star {
+  font-size: 13px;
+  color: var(--accent-gold);
+  line-height: 1;
+}
+.header-credits-chip.low .header-credits-chip-star { color: var(--accent-error); }
 .header-credits-chip-value {
   font-size: 14px;
   font-weight: 700;
-  color: var(--accent-gold);
+  color: var(--text-primary);
   font-variant-numeric: tabular-nums;
+  line-height: 1;
 }
 .header-credits-chip.low .header-credits-chip-value { color: var(--accent-error); }
-.header-credits-chip-of {
-  font-size: 10px;
-  color: var(--text-muted);
-  font-variant-numeric: tabular-nums;
-}
 .header-credits-chip-label {
-  font-size: 10px;
-  font-weight: 600;
-  color: var(--text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  margin-left: 2px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-primary);
+  line-height: 1;
 }
+.header-credits-chip.low .header-credits-chip-label { color: var(--accent-error); }
+.header-settings-credits {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.header-settings-credits-star {
+  color: var(--accent-gold);
+  font-size: 12px;
+}
+.header-settings-meta-low .header-settings-credits-star { color: var(--accent-error); }
 .header-stage-chip-eyebrow {
   font-size: 9px;
   font-weight: 600;
@@ -6375,10 +6386,11 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
   letter-spacing: 0.08em; color: var(--text-muted); margin-bottom: 2px;
 }
 .usage-credits-banner-value {
-  font-size: 28px; font-weight: 700; color: var(--accent-gold); line-height: 1;
+  font-size: 28px; font-weight: 700; color: var(--text-primary); line-height: 1;
   font-variant-numeric: tabular-nums;
+  display: inline-flex; align-items: center; gap: 8px;
 }
-.usage-credits-banner-of { font-size: 13px; color: var(--text-muted); font-weight: 500; }
+.usage-credits-banner-star { color: var(--accent-gold); font-size: 24px; }
 .usage-credits-banner-right { font-size: 13px; color: var(--text-body); line-height: 1.5; max-width: 420px; }
 
 .usage-participant-list { display: flex; flex-direction: column; gap: 6px; }

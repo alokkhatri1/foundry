@@ -1752,7 +1752,7 @@ Be concise. Confirm actions after completing them.${knowledgeSection}`;
           </RevealAt>
           <RevealAt stage="7b" currentStage={currentStage}>
             <button className={`tab-nav-item${activeTab === 'usage' ? ' active' : ''}`} onClick={() => setActiveTab('usage')}>
-              Usage
+              Economics
             </button>
           </RevealAt>
           <RevealAt stage="8" currentStage={currentStage}>

@@ -1956,7 +1956,7 @@ Answer in ONE sentence. If the user asks "how", a second sentence is allowed —
       )}
       <header className="app-header">
         <div className="app-header-left" onClick={() => { setActiveTab('chat'); setChatBadge(false); }} style={{ cursor: 'pointer' }}>
-          <span className="app-logo">S</span>
+          <span className="app-logo">F</span>
           <div>
             <h1>Foundry</h1>
             <span className="app-header-subtitle">{orgName}</span>

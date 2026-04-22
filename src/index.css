@@ -848,7 +848,7 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
   height: 36px;
   background: var(--text-dark);
   color: white;
-  border-radius: 50%;
+  border-radius: 8px;
   font-size: 16px;
   font-weight: 800;
 }

@@ -1,8 +1,24 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import RichText from './RichText';
+import useFileDraft from '../hooks/useFileDraft';
 
 export default function FileEditor({ file, onUpdateContent }) {
   const [mode, setMode] = useState('view');
+  const { draft, isDirty, updateDraft, save, confirmDiscard } = useFileDraft(
+    file?.id,
+    file?.content,
+    onUpdateContent,
+  );
+
+  useEffect(() => {
+    if (!isDirty) return;
+    function handleBeforeUnload(e) {
+      e.preventDefault();
+      e.returnValue = '';
+    }
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [isDirty]);
 
   if (!file) {
     return (
@@ -14,19 +30,45 @@ export default function FileEditor({ file, onUpdateContent }) {
 
   const isEmpty = !file.content || file.content.trim() === '';
 
+  function switchMode(next) {
+    if (next === 'view' && isDirty) {
+      if (!confirmDiscard('You have unsaved changes. Discard them and switch to View?')) return;
+    }
+    setMode(next);
+  }
+
+  function handleSave() {
+    if (save()) setMode('view');
+  }
+
+  function handleKeyDown(e) {
+    if ((e.metaKey || e.ctrlKey) && e.key === 's') {
+      e.preventDefault();
+      handleSave();
+    }
+  }
+
   return (
     <div className="file-editor">
       <div className="file-editor-header">
-        <h3><span style={{ color: 'var(--text-muted)' }}>{'\u2666'}</span> {file.name}</h3>
+        <h3><span style={{ color: 'var(--text-muted)' }}>{'\u2666'}</span> {file.name}{isDirty && <span style={{ color: 'var(--text-muted)', fontWeight: 400, fontSize: 12, marginLeft: 8 }}>• unsaved</span>}</h3>
         <div className="file-editor-modes">
           <button
             className={`file-editor-mode${mode === 'view' ? ' active' : ''}`}
-            onClick={() => setMode('view')}
+            onClick={() => switchMode('view')}
           >View</button>
           <button
             className={`file-editor-mode${mode === 'edit' ? ' active' : ''}`}
-            onClick={() => setMode('edit')}
+            onClick={() => switchMode('edit')}
           >Edit</button>
+          {mode === 'edit' && (
+            <button
+              className="file-editor-save"
+              onClick={handleSave}
+              disabled={!isDirty}
+              style={{ marginLeft: 6 }}
+            >Save</button>
+          )}
         </div>
       </div>
       <div className="file-editor-body">
@@ -40,8 +82,9 @@ export default function FileEditor({ file, onUpdateContent }) {
           </div>
         ) : (
           <textarea
-            value={file.content || ''}
-            onChange={e => onUpdateContent(file.id, e.target.value)}
+            value={draft}
+            onChange={e => updateDraft(e.target.value)}
+            onKeyDown={handleKeyDown}
             placeholder="Start writing..."
             spellCheck={false}
           />

@@ -524,18 +524,28 @@ function StepCard({ step, index, coworkers, tools, participants, onUpdate, onDel
 // visual — nodes are draggable and their positions persist, edges are
 // drawn read-only from the linear auto-migration. Wiring, typed handles,
 // and DAG runtime arrive in later phases.
-function WorkflowCanvas({ workflow, onUpdateWorkflow, fileTree, coworkers, tools, participants, activeRun, currentStepId, expandedStep, setExpandedStep, updateStep, deleteStep, validationErrors, showEducationalCues, callClaudeAPI, onSaveCoworkerToLibrary, onUpdateFileContent, apiKey, onCopilotUsage }) {
+function WorkflowCanvas({ workflow, onUpdateWorkflow, fileTree, coworkers, tools, participants, activeRun, currentStepId, expandedStep, setExpandedStep, updateStep, deleteStep, validationErrors, showEducationalCues, callClaudeAPI, onSaveCoworkerToLibrary, onUpdateFileContent, apiKey, onCopilotUsage, copilotState, onCopilotPatch, copilotHistoriesRef, copilotWfId }) {
   const [nodes, setNodes] = useState([]);
   const [edges, setEdges] = useState([]);
-  // Auto-open the copilot when this workflow has no real steps yet — the
-  // panel IS the empty state. User can still collapse it via the toggle.
-  const [copilotOpen, setCopilotOpen] = useState(
-    () => (workflow?.steps || []).filter(s => s.type !== 'trigger').length === 0
-  );
-  const [copilotMessages, setCopilotMessages] = useState([]);
-  const [copilotInput, setCopilotInput] = useState('');
-  const [copilotBusy, setCopilotBusy] = useState(false);
-  const copilotHistoryRef = useRef([]);
+  // Copilot state lives in the parent (WorkflowBuilder) so the transcript
+  // survives closing the panel and navigating back to the workflow list.
+  // If `open` is null, fall back to the auto-open heuristic: open when the
+  // workflow has no real steps yet — the panel acts as the empty state.
+  const copilotMessages = copilotState?.messages || [];
+  const copilotInput = copilotState?.input || '';
+  const copilotBusy = !!copilotState?.busy;
+  const copilotOpen = copilotState?.open == null
+    ? (workflow?.steps || []).filter(s => s.type !== 'trigger').length === 0
+    : !!copilotState.open;
+  const setCopilotOpen = useCallback((val) => {
+    const next = typeof val === 'function' ? val(copilotOpen) : val;
+    onCopilotPatch({ open: next });
+  }, [onCopilotPatch, copilotOpen]);
+  const setCopilotInput = useCallback((val) => onCopilotPatch({ input: val }), [onCopilotPatch]);
+  const setCopilotMessages = useCallback((val) => {
+    onCopilotPatch(prev => ({ messages: typeof val === 'function' ? val(prev.messages) : val }));
+  }, [onCopilotPatch]);
+  const setCopilotBusy = useCallback((val) => onCopilotPatch({ busy: val }), [onCopilotPatch]);
   const copilotScrollRef = useRef(null);
 
   // Derive canvas nodes from workflow.steps preserving any stored positions.
@@ -651,11 +661,14 @@ function WorkflowCanvas({ workflow, onUpdateWorkflow, fileTree, coworkers, tools
     setCopilotBusy(true);
 
     const workflowRef = { current: workflow };
+    const priorHistory = (copilotHistoriesRef && copilotWfId)
+      ? (copilotHistoriesRef.current[copilotWfId] || [])
+      : [];
     try {
       const { updatedHistory, updatedWorkflow } = await runCopilotTurn({
         apiKey,
         userMessage: text,
-        conversationHistory: copilotHistoryRef.current,
+        conversationHistory: priorHistory,
         workflow,
         coworkers,
         participants,
@@ -671,7 +684,9 @@ function WorkflowCanvas({ workflow, onUpdateWorkflow, fileTree, coworkers, tools
         },
         onUsage: onCopilotUsage,
       });
-      copilotHistoryRef.current = updatedHistory;
+      if (copilotHistoriesRef && copilotWfId) {
+        copilotHistoriesRef.current[copilotWfId] = updatedHistory;
+      }
       // updatedWorkflow is already committed via onWorkflowUpdate — nothing else to do here.
       void updatedWorkflow;
     } catch (err) {
@@ -679,7 +694,7 @@ function WorkflowCanvas({ workflow, onUpdateWorkflow, fileTree, coworkers, tools
     } finally {
       setCopilotBusy(false);
     }
-  }, [copilotInput, copilotBusy, apiKey, workflow, coworkers, participants, onUpdateWorkflow]);
+  }, [copilotInput, copilotBusy, apiKey, workflow, coworkers, participants, onUpdateWorkflow, setCopilotInput, setCopilotMessages, setCopilotBusy, copilotHistoriesRef, copilotWfId, onCopilotUsage]);
 
   return (
     <div className={`wf-canvas-layout${copilotOpen ? ' copilot-open' : ''}`}>
@@ -771,7 +786,7 @@ function WorkflowCanvas({ workflow, onUpdateWorkflow, fileTree, coworkers, tools
 }
 
 // ===== Workflow Editor =====
-function WorkflowEditor({ workflow, onUpdateWorkflow, fileTree, coworkers, tools, participants, onRun, isRunning, currentStepId, activeRun, onBack, showEducationalCues, callClaudeAPI, onSaveCoworkerToLibrary, onUpdateFileContent, apiKey, onCopilotUsage }) {
+function WorkflowEditor({ workflow, onUpdateWorkflow, fileTree, coworkers, tools, participants, onRun, isRunning, currentStepId, activeRun, onBack, showEducationalCues, callClaudeAPI, onSaveCoworkerToLibrary, onUpdateFileContent, apiKey, onCopilotUsage, copilotState, onCopilotPatch, copilotHistoriesRef, copilotWfId }) {
   const [expandedStep, setExpandedStep] = useState(null);
   const [showAddMenu, setShowAddMenu] = useState(false);
   const [validationErrors, setValidationErrors] = useState({});
@@ -871,12 +886,12 @@ function WorkflowEditor({ workflow, onUpdateWorkflow, fileTree, coworkers, tools
   return (
     <div className="workflow-builder">
       <div className="workflow-header-bar">
-        <button className="files-back-btn" onClick={onBack}>{'\u2190'} All Orchestrations</button>
+        <button className="files-back-btn" onClick={onBack}>{'\u2190'} All Workflows</button>
         <input
           className="workflow-name-input"
           value={workflow.name}
           onChange={e => onUpdateWorkflow({ ...workflow, name: e.target.value })}
-          placeholder="Orchestration name..."
+          placeholder="Workflow name..."
         />
         <div className="add-step-dropdown">
           <button className="add-step-btn" onClick={() => setShowAddMenu(!showAddMenu)} disabled={isRunning}>+ Add Step</button>
@@ -947,6 +962,10 @@ function WorkflowEditor({ workflow, onUpdateWorkflow, fileTree, coworkers, tools
         onUpdateFileContent={onUpdateFileContent}
         apiKey={apiKey}
         onCopilotUsage={onCopilotUsage}
+        copilotState={copilotState}
+        onCopilotPatch={onCopilotPatch}
+        copilotHistoriesRef={copilotHistoriesRef}
+        copilotWfId={copilotWfId}
       />
 
     </div>
@@ -958,7 +977,7 @@ function WorkflowCard({ workflow, coworkers, participants, onSelect, onDelete, o
   return (
     <div className="wf-card" onClick={() => onSelect(workflow.id)}>
       <div className="wf-card-top">
-        <div className="wf-card-name">{workflow.name || 'Untitled Orchestration'}</div>
+        <div className="wf-card-name">{workflow.name || 'Untitled Workflow'}</div>
         {isRunning && <span className="wf-card-running">Running</span>}
       </div>
       {/* Mini flow preview */}
@@ -994,8 +1013,28 @@ function WorkflowCard({ workflow, coworkers, participants, onSelect, onDelete, o
 // ===== Main Export =====
 export default function WorkflowBuilder({ workflows, onUpdateWorkflows, fileTree, coworkers, tools, onRun, workflowRuns = [], participants, currentUserName, showEducationalCues, callClaudeAPI, onSaveCoworkerToLibrary, onUpdateFileContent, apiKey, onCopilotUsage }) {
   const [selectedWorkflowId, setSelectedWorkflowId] = useState(null);
+  // Copilot transcript state lives up here so it survives closing the panel,
+  // navigating back to the list, and switching between workflows. History is
+  // a ref per workflow because it only needs to be readable by the async
+  // copilot turn, not drive renders.
+  const [copilotByWf, setCopilotByWf] = useState({});
+  const copilotHistoriesRef = useRef({});
 
   const selectedWorkflow = selectedWorkflowId ? workflows.find(w => w.id === selectedWorkflowId) : null;
+
+  const COPILOT_DEFAULTS = { messages: [], input: '', busy: false, open: null };
+  const copilotState = selectedWorkflowId
+    ? { ...COPILOT_DEFAULTS, ...(copilotByWf[selectedWorkflowId] || {}) }
+    : COPILOT_DEFAULTS;
+
+  function patchCopilot(patchOrFn) {
+    if (!selectedWorkflowId) return;
+    setCopilotByWf(prev => {
+      const curr = { ...COPILOT_DEFAULTS, ...(prev[selectedWorkflowId] || {}) };
+      const patch = typeof patchOrFn === 'function' ? patchOrFn(curr) : patchOrFn;
+      return { ...prev, [selectedWorkflowId]: { ...curr, ...patch } };
+    });
+  }
 
   function handleUpdateWorkflow(updatedWf) {
     onUpdateWorkflows(workflows.map(w => w.id === updatedWf.id ? updatedWf : w));
@@ -1078,6 +1117,10 @@ export default function WorkflowBuilder({ workflows, onUpdateWorkflows, fileTree
           onUpdateFileContent={onUpdateFileContent}
           apiKey={apiKey}
           onCopilotUsage={onCopilotUsage}
+          copilotState={copilotState}
+          onCopilotPatch={patchCopilot}
+          copilotHistoriesRef={copilotHistoriesRef}
+          copilotWfId={selectedWorkflowId}
         />
       </div>
     );

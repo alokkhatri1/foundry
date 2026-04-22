@@ -4,6 +4,7 @@ import EducationalCue from './EducationalCue';
 import Icon, { COWORKER_ICONS, hasIcon } from './Icon';
 import RevealAt, { stageReached } from './RevealAt';
 import RichText from './RichText';
+import useFileDraft from '../hooks/useFileDraft';
 
 const TOOL_REVEAL_STAGE = {
   'builtin-create-file': '5b',
@@ -316,8 +317,36 @@ function FilePicker({ fileTree, selectedIds, onChange, folderName, onUpdateConte
   const groups = getFilesByDept(fileTree, folderName);
   const selected = selectedIds.map(id => findNode(fileTree, id)).filter(Boolean);
   const previewFile = previewId ? findNode(fileTree, previewId) : null;
+  const { draft, isDirty, updateDraft, save, confirmDiscard } = useFileDraft(
+    previewFile?.id,
+    previewFile?.content,
+    onUpdateContent,
+  );
 
   useEffect(() => { setPreviewMode('view'); }, [previewId]);
+
+  function tryClosePreview() {
+    if (!confirmDiscard('You have unsaved changes. Close without saving?')) return;
+    setPreviewId(null);
+  }
+
+  function handleSave() {
+    if (save()) setPreviewMode('view');
+  }
+
+  function switchEditorMode(next) {
+    if (next === 'view' && isDirty) {
+      if (!confirmDiscard('You have unsaved changes. Discard them?')) return;
+    }
+    setPreviewMode(next);
+  }
+
+  function handleTextareaKeyDown(e) {
+    if ((e.metaKey || e.ctrlKey) && e.key === 's') {
+      e.preventDefault();
+      handleSave();
+    }
+  }
 
   function toggleFile(fileId) {
     if (selectedIds.includes(fileId)) onChange(selectedIds.filter(id => id !== fileId));
@@ -376,25 +405,42 @@ function FilePicker({ fileTree, selectedIds, onChange, folderName, onUpdateConte
         </div>
       )}
       {previewFile && createPortal(
-        <div className="ftp-preview-overlay" onClick={() => setPreviewId(null)}>
+        <div className="ftp-preview-overlay" onClick={tryClosePreview}>
           <div className="ftp-preview-modal" onClick={e => e.stopPropagation()}>
             <div className="ftp-preview-header">
-              <span className="ftp-preview-name">{previewFile.name.replace(/\.md$/, '')}</span>
+              <span className="ftp-preview-name">
+                {previewFile.name.replace(/\.md$/, '')}
+                {isDirty && <span style={{ color: 'var(--text-muted)', fontWeight: 400, fontSize: 12, marginLeft: 8 }}>• unsaved</span>}
+              </span>
               <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                {onUpdateContent && (
+                {onUpdateContent && previewMode === 'view' && (
                   <button
                     className="ftp-preview-action"
-                    onClick={() => setPreviewMode(previewMode === 'edit' ? 'view' : 'edit')}
-                  >{previewMode === 'edit' ? 'Save' : 'Edit'}</button>
+                    onClick={() => switchEditorMode('edit')}
+                  >Edit</button>
                 )}
-                <button className="ftp-preview-close" onClick={() => setPreviewId(null)}>{'\u2715'}</button>
+                {onUpdateContent && previewMode === 'edit' && (
+                  <>
+                    <button
+                      className="ftp-preview-action"
+                      onClick={() => switchEditorMode('view')}
+                    >Cancel</button>
+                    <button
+                      className="ftp-preview-action ftp-preview-save"
+                      onClick={handleSave}
+                      disabled={!isDirty}
+                    >Save</button>
+                  </>
+                )}
+                <button className="ftp-preview-close" onClick={tryClosePreview}>{'\u2715'}</button>
               </div>
             </div>
             {previewMode === 'edit' && onUpdateContent ? (
               <textarea
                 className="ftp-preview-textarea"
-                value={previewFile.content || ''}
-                onChange={e => onUpdateContent(previewFile.id, e.target.value)}
+                value={draft}
+                onChange={e => updateDraft(e.target.value)}
+                onKeyDown={handleTextareaKeyDown}
                 placeholder="Start writing..."
                 spellCheck={false}
                 autoFocus

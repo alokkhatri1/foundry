@@ -1583,6 +1583,23 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
   color: var(--text-dark);
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
 }
+.file-editor-save {
+  background: var(--accent-gold);
+  color: var(--bg-white);
+  border: none;
+  border-radius: var(--radius-pill, 999px);
+  padding: 5px 14px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.15s, background 0.15s;
+}
+.file-editor-save:hover:not(:disabled) { opacity: 0.85; }
+.file-editor-save:disabled {
+  background: var(--bg-warm);
+  color: var(--text-muted);
+  cursor: default;
+}
 .file-editor-body { flex: 1; overflow: hidden; }
 .file-editor-view {
   height: 100%;
@@ -5066,7 +5083,15 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
   border: 1px solid var(--border-color); background: var(--bg-white);
   cursor: pointer; transition: all 0.15s;
 }
-.ftp-preview-action:hover { border-color: var(--accent-gold); background: var(--bg-warm); }
+.ftp-preview-action:hover:not(:disabled) { border-color: var(--accent-gold); background: var(--bg-warm); }
+.ftp-preview-action:disabled { opacity: 0.5; cursor: default; }
+.ftp-preview-action.ftp-preview-save {
+  background: var(--accent-gold); color: var(--bg-white); border-color: var(--accent-gold);
+}
+.ftp-preview-action.ftp-preview-save:hover:not(:disabled) { opacity: 0.85; background: var(--accent-gold); }
+.ftp-preview-action.ftp-preview-save:disabled {
+  background: var(--bg-warm); color: var(--text-muted); border-color: var(--border-color);
+}
 .ftp-preview-content {
   padding: 10px 12px; font-size: 12px; color: var(--text-body);
   line-height: 1.6; white-space: pre-wrap;

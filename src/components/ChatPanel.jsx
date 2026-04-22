@@ -5,6 +5,7 @@ import ToolExecutionCard from './ToolExecutionCard';
 import EducationalCue from './EducationalCue';
 import RichText from './RichText';
 import { CoworkerGlyph } from './Icon';
+import useFileDraft from '../hooks/useFileDraft';
 
 function parseConfidence(text) {
   const match = text.match(/[Cc]onfidence\s*[Ss]core[:\s]*([01]?\.\d+|[01])/);
@@ -525,22 +526,61 @@ function ContextSidebar({ fileTree, selectedFileIds, onToggleFile, onToggleFolde
 function InlineEditor({ file, onUpdateContent, onClose }) {
   const [mode, setMode] = useState('view');
   const isEmpty = !file.content || file.content.trim() === '';
+  const { draft, isDirty, updateDraft, save, confirmDiscard } = useFileDraft(
+    file.id,
+    file.content,
+    onUpdateContent,
+  );
+
+  function switchMode(next) {
+    if (next === 'view' && isDirty) {
+      if (!confirmDiscard('You have unsaved changes. Discard them?')) return;
+    }
+    setMode(next);
+  }
+
+  function handleSave() {
+    if (save()) setMode('view');
+  }
+
+  function tryClose() {
+    if (!confirmDiscard('You have unsaved changes. Close without saving?')) return;
+    onClose();
+  }
+
+  function handleKeyDown(e) {
+    if ((e.metaKey || e.ctrlKey) && e.key === 's') {
+      e.preventDefault();
+      handleSave();
+    }
+  }
 
   return (
     <div className="ctx-editor">
       <div className="ctx-editor-header">
-        <span className="ctx-editor-filename">{file.name}</span>
+        <span className="ctx-editor-filename">
+          {file.name}
+          {isDirty && <span style={{ color: 'var(--text-muted)', fontWeight: 400, fontSize: 12, marginLeft: 8 }}>• unsaved</span>}
+        </span>
         <div className="file-editor-modes">
           <button
             className={`file-editor-mode${mode === 'view' ? ' active' : ''}`}
-            onClick={() => setMode('view')}
+            onClick={() => switchMode('view')}
           >View</button>
           <button
             className={`file-editor-mode${mode === 'edit' ? ' active' : ''}`}
-            onClick={() => setMode('edit')}
+            onClick={() => switchMode('edit')}
           >Edit</button>
+          {mode === 'edit' && (
+            <button
+              className="file-editor-save"
+              onClick={handleSave}
+              disabled={!isDirty}
+              style={{ marginLeft: 6 }}
+            >Save</button>
+          )}
         </div>
-        <button className="ctx-editor-close" onClick={onClose}>{'\u2715'}</button>
+        <button className="ctx-editor-close" onClick={tryClose}>{'\u2715'}</button>
       </div>
       {mode === 'view' ? (
         <div className="ctx-editor-view md-doc">
@@ -553,8 +593,9 @@ function InlineEditor({ file, onUpdateContent, onClose }) {
       ) : (
         <textarea
           className="ctx-editor-textarea"
-          value={file.content || ''}
-          onChange={e => onUpdateContent(file.id, e.target.value)}
+          value={draft}
+          onChange={e => updateDraft(e.target.value)}
+          onKeyDown={handleKeyDown}
           spellCheck={false}
         />
       )}

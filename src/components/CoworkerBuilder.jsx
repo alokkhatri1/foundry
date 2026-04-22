@@ -704,8 +704,8 @@ export default function CoworkerBuilder({ coworkers, onUpdateCoworkers, fileTree
   // get lost in the shared library as the workshop fills up. Anything
   // without a createdBy (legacy) falls into "mine" for the current user
   // rather than getting orphaned.
-  const myCoworkers = visibleCoworkers.filter(c => !c.createdBy || c.createdBy === userName);
-  const otherCoworkers = visibleCoworkers.filter(c => c.createdBy && c.createdBy !== userName);
+  const myCoworkers = visibleCoworkers.filter(c => c.createdBy === userName);
+  const otherCoworkers = visibleCoworkers.filter(c => c.createdBy !== userName);
 
   function handleCreate() {
     const newCw = {
@@ -740,7 +740,7 @@ export default function CoworkerBuilder({ coworkers, onUpdateCoworkers, fileTree
   }
 
   if (selectedCw) {
-    const editorReadOnly = !!(selectedCw.createdBy && selectedCw.createdBy !== userName);
+    const editorReadOnly = selectedCw.createdBy !== userName;
     return (
       <div className="panel panel-center">
         <CoworkerEditor

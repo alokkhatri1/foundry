@@ -1232,7 +1232,7 @@ export default function WorkflowBuilder({ workflows, onUpdateWorkflows, fileTree
   }
 
   if (selectedWorkflow) {
-    const editorReadOnly = !!(selectedWorkflow.createdBy && selectedWorkflow.createdBy !== currentUserName);
+    const editorReadOnly = selectedWorkflow.createdBy !== currentUserName;
     return (
       <div className="panel panel-center">
         <WorkflowEditor
@@ -1291,11 +1291,13 @@ export default function WorkflowBuilder({ workflows, onUpdateWorkflows, fileTree
             </div>
           </div>
         ) : (() => {
-          // Split so a participant's own workflows stay distinct from the
-          // shared room library. Legacy workflows with no createdBy fall into
-          // "mine" so pre-seeded content doesn't get orphaned.
-          const mine = workflows.filter(w => !w.createdBy || w.createdBy === currentUserName);
-          const others = workflows.filter(w => w.createdBy && w.createdBy !== currentUserName);
+          // Require explicit ownership to land in "mine" — otherwise a
+          // workflow created before we started stamping createdBy would
+          // masquerade as every participant's own. Unstamped items go to
+          // the shared "others" bucket alongside anything created by someone
+          // whose name doesn't match.
+          const mine = workflows.filter(w => w.createdBy === currentUserName);
+          const others = workflows.filter(w => w.createdBy !== currentUserName);
           const renderCard = (wf, readOnly) => (
             <WorkflowCard
               key={wf.id}

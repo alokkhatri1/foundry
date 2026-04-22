@@ -208,6 +208,7 @@ function summarizeWorkflow(workflow) {
     if (s.type === 'trigger') return `- [trigger ${s.id}] caseInput: ${s.caseInput ? `"${s.caseInput}"` : '(empty)'}`;
     if (s.type === 'agent') return `- [coworker ${s.id}] ${s.name || '(no name)'}${s.coworkerId ? ` (library ref ${s.coworkerId})` : ''}`;
     if (s.type === 'approval') return `- [review ${s.id}] assigneeId=${s.assigneeId || '(none)'} prompt="${s.prompt || ''}"`;
+    if (s.type === 'capture') return `- [capture ${s.id}] Capture Learning (terminal — wire the final output here; mode=${s.mode || 'knowledge'}, targetFileId=${s.targetFileId || '(unset)'})`;
     return `- [${s.type} ${s.id}]`;
   });
   const edgeLines = edges.map(e => `- ${e.source} → ${e.target}${e.sourceHandle && e.sourceHandle !== 'out' ? ` (${e.sourceHandle})` : ''}`);
@@ -228,9 +229,18 @@ function buildCopilotSystemPrompt({ workflow, coworkers, participants }) {
   return `You are the Workflow Copilot. You help people design mixed-team workflows (AI coworkers + human review steps) on a visual DAG canvas.
 
 ## How this works
-- The workflow is a DAG with three node types: Trigger (the case input), Coworker (an AI step), Review (a human approval gate).
+- The workflow is a DAG with four node types: Trigger (the case input), Coworker (an AI step), Review (a human approval gate), and Capture Learning (the terminal node where the final output compounds into knowledge or skills).
+- Every workflow is pre-seeded with a Trigger and a Capture node. You do NOT add them. Look for them in the "Current workflow state" below — you'll see their ids.
 - You cannot type into the canvas — every change goes through a tool call.
 - After each tool you call, the canvas updates live. You will see the new state on the next turn.
+
+## Wiring the Capture node (this matters)
+The Capture Learning node is always the final step. Whatever coworker or review produces the approved output, its outgoing edge MUST terminate at the pre-seeded Capture node. Without this edge, the workflow has no way to compound learning and the run ends orphaned.
+
+Rule of thumb for Build mode:
+- If the final step is a Review, wire its **approved** handle into Capture. (The **rejected** handle goes back upstream for revision, not to Capture.)
+- If the final step is a Coworker, wire its output into Capture directly.
+- Never wire Trigger straight into Capture — there has to be at least one Coworker or Review in between.
 
 ## Your flow: Discover → Preview → Build
 
@@ -260,6 +270,7 @@ Only call tools once the user has confirmed the plan (or their request was alrea
 - Set the Trigger input first if you have one.
 - Add every node, THEN connect them. Don't alternate.
 - Narrate one short line before each tool call so the user can follow the canvas updating.
+- Finish by connecting the last real step into the pre-seeded Capture node. If you forget this, the graph is incomplete.
 
 ## Shortcuts
 If the user's first message is already concrete — names real coworkers + a real human + a real sequence — you can skip Discover, go straight to a one-line Preview confirmation, then Build.

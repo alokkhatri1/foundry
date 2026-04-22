@@ -685,6 +685,12 @@ export default function CoworkerBuilder({ coworkers, onUpdateCoworkers, fileTree
         || (c.role || '').toLowerCase().includes(q)
       )
     : coworkers;
+  // Split into "mine" vs "built by others" so the user's own work doesn't
+  // get lost in the shared library as the workshop fills up. Anything
+  // without a createdBy (legacy) falls into "mine" for the current user
+  // rather than getting orphaned.
+  const myCoworkers = visibleCoworkers.filter(c => !c.createdBy || c.createdBy === userName);
+  const otherCoworkers = visibleCoworkers.filter(c => c.createdBy && c.createdBy !== userName);
 
   function handleCreate() {
     const newCw = {
@@ -773,30 +779,49 @@ export default function CoworkerBuilder({ coworkers, onUpdateCoworkers, fileTree
           <div className="cwb-empty-search">
             No coworkers match &ldquo;{searchQ}&rdquo;.
           </div>
-        ) : viewMode === 'grid' ? (
-          <div className="cw-list-grid">
-            {visibleCoworkers.map(cw => (
-              <CoworkerCard
-                key={cw.id}
-                coworker={cw}
-                onStartChat={handleStartChat}
-                onEdit={setSelectedCwId}
-                onDelete={handleDelete}
-              />
-            ))}
-          </div>
         ) : (
-          <div className="cwb-list">
-            {visibleCoworkers.map(cw => (
-              <CoworkerRow
-                key={cw.id}
-                coworker={cw}
-                onStartChat={handleStartChat}
-                onEdit={setSelectedCwId}
-                onDelete={handleDelete}
-              />
-            ))}
-          </div>
+          <>
+            {myCoworkers.length > 0 && (
+              <div className="cw-section">
+                <div className="cw-section-title">
+                  Built by you <span className="cw-section-count">{myCoworkers.length}</span>
+                </div>
+                {viewMode === 'grid' ? (
+                  <div className="cw-list-grid">
+                    {myCoworkers.map(cw => (
+                      <CoworkerCard key={cw.id} coworker={cw} onStartChat={handleStartChat} onEdit={setSelectedCwId} onDelete={handleDelete} />
+                    ))}
+                  </div>
+                ) : (
+                  <div className="cwb-list">
+                    {myCoworkers.map(cw => (
+                      <CoworkerRow key={cw.id} coworker={cw} onStartChat={handleStartChat} onEdit={setSelectedCwId} onDelete={handleDelete} />
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+            {otherCoworkers.length > 0 && (
+              <div className="cw-section">
+                <div className="cw-section-title">
+                  Built by others <span className="cw-section-count">{otherCoworkers.length}</span>
+                </div>
+                {viewMode === 'grid' ? (
+                  <div className="cw-list-grid">
+                    {otherCoworkers.map(cw => (
+                      <CoworkerCard key={cw.id} coworker={cw} onStartChat={handleStartChat} onEdit={setSelectedCwId} onDelete={handleDelete} />
+                    ))}
+                  </div>
+                ) : (
+                  <div className="cwb-list">
+                    {otherCoworkers.map(cw => (
+                      <CoworkerRow key={cw.id} coworker={cw} onStartChat={handleStartChat} onEdit={setSelectedCwId} onDelete={handleDelete} />
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </>
         )}
       </div>
     </div>

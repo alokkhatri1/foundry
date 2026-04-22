@@ -4602,6 +4602,29 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
   gap: 16px;
   align-content: start;
 }
+.cw-section { padding: 0; }
+.cw-section + .cw-section { margin-top: 4px; }
+.cw-section-title {
+  padding: 18px 24px 6px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: var(--text-muted);
+  display: flex; align-items: center; gap: 8px;
+}
+.cw-section-count {
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  color: var(--text-muted);
+  background: var(--bg-warm);
+  border-radius: var(--radius-pill, 999px);
+  padding: 1px 8px;
+  font-size: 10px;
+}
+/* Inside a cw-section, don't let cw-list-grid fight for flex height —
+   it's now wrapped by the section, so normalise back to block-flow. */
+.cw-section .cw-list-grid { flex: none; padding: 0 24px 8px; }
 .cw-list-empty {
   grid-column: 1 / -1;
   text-align: center;

@@ -69,7 +69,6 @@ export default function AdminDashboard({ sb, user, onBack }) {
   const [stats, setStats] = useState({});
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
-  const [newName, setNewName] = useState('');
   const [newOrg, setNewOrg] = useState('');
   const [creating, setCreating] = useState(false);
   const [selected, setSelected] = useState(null);
@@ -96,12 +95,12 @@ export default function AdminDashboard({ sb, user, onBack }) {
   useEffect(() => { loadWorkshops(); }, [loadWorkshops]);
 
   async function handleCreate() {
-    if (!newName.trim()) return;
+    const org = newOrg.trim();
+    if (!org) return;
     setCreating(true);
-    const result = await sb.createWorkshop(newName.trim(), newOrg.trim() || newName.trim(), user.id);
+    const result = await sb.createWorkshop(org, org, user.id);
     if (result) {
       setShowCreate(false);
-      setNewName('');
       setNewOrg('');
       await loadWorkshops();
     }
@@ -516,26 +515,19 @@ export default function AdminDashboard({ sb, user, onBack }) {
           <div className="modal-box" style={{ maxWidth: 440 }} onClick={e => e.stopPropagation()}>
             <h3>Create Workshop</h3>
             <p style={{ fontSize: 14, color: 'var(--text-muted)', marginBottom: 20 }}>
-              A unique code will be generated for participants to join.
+              A unique code will be generated for participants to join. The organization name appears under the Foundry logo for everyone in the room.
             </p>
-            <div className="landing-field" style={{ marginBottom: 12 }}>
-              <label>Workshop Name</label>
-              <input
-                type="text" value={newName} onChange={e => setNewName(e.target.value)}
-                placeholder="e.g., AI Coworkers Workshop" autoFocus
-                onKeyDown={e => e.key === 'Enter' && handleCreate()}
-              />
-            </div>
             <div className="landing-field" style={{ marginBottom: 16 }}>
               <label>Organization</label>
               <input
                 type="text" value={newOrg} onChange={e => setNewOrg(e.target.value)}
-                placeholder="e.g., Apex Bank"
+                placeholder="e.g., Apex Bank" autoFocus
+                onKeyDown={e => e.key === 'Enter' && handleCreate()}
               />
             </div>
             <div className="modal-actions">
               <button className="modal-btn cancel" onClick={() => setShowCreate(false)}>Cancel</button>
-              <button className="landing-join-btn" style={{ width: 'auto', padding: '10px 24px' }} onClick={handleCreate} disabled={!newName.trim() || creating}>
+              <button className="landing-join-btn" style={{ width: 'auto', padding: '10px 24px' }} onClick={handleCreate} disabled={!newOrg.trim() || creating}>
                 {creating ? 'Creating...' : 'Create Workshop'}
               </button>
             </div>

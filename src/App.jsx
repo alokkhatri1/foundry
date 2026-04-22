@@ -304,7 +304,7 @@ function App() {
 
   const [userName, setUserName] = useState(saved?.userName || '');
   const [workshopCode, setWorkshopCode] = useState(saved?.workshopCode || '');
-  const [orgName] = useState(saved?.orgName || 'My Organization');
+  const [orgName, setOrgName] = useState(saved?.orgName || 'My Organization');
   const [apiKey] = useState(saved?.apiKey || import.meta.env.VITE_ANTHROPIC_API_KEY || '');
   const [flatFiles, setFlatFiles] = useState(() => {
     // Initialize from localStorage tree if available
@@ -446,6 +446,7 @@ function App() {
         if (result?.error || !result?.id || !userName) return;
         const roomId = result.id;
         if (result.current_stage) setCurrentStage(normalizeStage(result.current_stage));
+        if (result.org_name) setOrgName(result.org_name);
 
         const myColor = participants.find(p => p.name === userName)?.color || COLORS[0];
         const authUser = await sb.getUser();
@@ -686,6 +687,7 @@ function App() {
     const roomId = result.id;
     if (result.current_stage) setCurrentStage(normalizeStage(result.current_stage));
     if (result.credit_allocation != null) setCreditAllocation(result.credit_allocation);
+    if (result.org_name) setOrgName(result.org_name);
 
     // Load from Supabase granular tables
     let files, cws, tls, wfs, runs;

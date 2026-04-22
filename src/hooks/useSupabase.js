@@ -225,7 +225,7 @@ export default function useSupabase() {
     if (!isSupabaseConfigured) return { error: 'not_configured' };
     const { data: room, error } = await supabase
       .from('rooms')
-      .select('id, deprecated_at, current_stage, credit_allocation')
+      .select('id, org_name, deprecated_at, current_stage, credit_allocation')
       .eq('code', code)
       .maybeSingle();
     if (error) { console.error('[sb] joinRoom:', error.message); return { error: 'db_error' }; }
@@ -235,6 +235,7 @@ export default function useSupabase() {
     console.log('[sb] joined room:', room.id);
     return {
       id: room.id,
+      org_name: room.org_name,
       current_stage: room.current_stage,
       credit_allocation: room.credit_allocation ?? 1000,
     };

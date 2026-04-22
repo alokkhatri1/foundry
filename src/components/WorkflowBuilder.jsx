@@ -645,8 +645,38 @@ function WorkflowCanvas({ workflow, onUpdateWorkflow, fileTree, coworkers, tools
   }, [workflow, fileTree, coworkers, tools, participants, activeRun, currentStepId, expandedStep, setExpandedStep, updateStep, deleteStep, validationErrors, showEducationalCues, callClaudeAPI, onSaveCoworkerToLibrary, onUpdateFileContent, handleDeleteEdge]);
 
   useEffect(() => {
-    setNodes(derivedNodes);
-    setEdges(derivedEdges);
+    // Don't blow away React Flow's internal node state on every render. When
+    // the derived set has the same ids as what's already on the canvas, patch
+    // each node in place (position, data, draggable) so mid-flight interactions
+    // (selection, hover, drag state) survive. Only replace wholesale when the
+    // id set actually changes — a node was added or removed.
+    setNodes(existing => {
+      const existingIds = new Set(existing.map(n => n.id));
+      const incomingIds = new Set(derivedNodes.map(n => n.id));
+      const sameIds =
+        existingIds.size === incomingIds.size &&
+        derivedNodes.every(n => existingIds.has(n.id));
+      if (!sameIds) return derivedNodes;
+      const byId = new Map(derivedNodes.map(n => [n.id, n]));
+      return existing.map(n => {
+        const d = byId.get(n.id);
+        if (!d) return n;
+        return { ...n, data: d.data, position: d.position, draggable: d.draggable };
+      });
+    });
+    setEdges(existing => {
+      const existingIds = new Set(existing.map(e => e.id));
+      const incomingIds = new Set(derivedEdges.map(e => e.id));
+      const sameIds =
+        existingIds.size === incomingIds.size &&
+        derivedEdges.every(e => existingIds.has(e.id));
+      if (!sameIds) return derivedEdges;
+      const byId = new Map(derivedEdges.map(e => [e.id, e]));
+      return existing.map(e => {
+        const d = byId.get(e.id);
+        return d ? { ...e, data: d.data, style: d.style, type: d.type } : e;
+      });
+    });
   }, [derivedNodes, derivedEdges]);
 
   const handleNodesChange = useCallback((changes) => {

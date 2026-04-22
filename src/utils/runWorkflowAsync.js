@@ -339,7 +339,6 @@ export async function executeWorkflowRun({
         try {
           await onCapture({
             fileId: step.targetFileId,
-            coworkerId: step.targetCoworkerId || null,
             mode: step.mode || 'knowledge',
             content: upstream,
             runId,
@@ -356,13 +355,13 @@ export async function executeWorkflowRun({
       }
 
       const summary = (step.mode || 'knowledge') === 'skills'
-        ? 'Refined coworker instructions'
-        : `Appended to workspace${step.targetCoworkerId ? ' + grew coworker knowledge' : ''}`;
+        ? 'Refined instructions'
+        : 'Appended to workspace';
       executed.set(nodeId, { output: summary });
       executionLog.push(nodeId);
       onStepUpdate(runId, stepIndex, { status: 'completed', output: summary, completedAt: Date.now() });
       onMessage({ type: 'status', content: `Captured: ${summary}` });
-      onLog({ type: 'workflow', message: `capture → file ${step.targetFileId}${step.targetCoworkerId ? ` + coworker ${step.targetCoworkerId}` : ''}` });
+      onLog({ type: 'workflow', message: `capture (${step.mode || 'knowledge'}) → file ${step.targetFileId}` });
     } else {
       // Unknown step type — skip.
       executed.set(nodeId, { output: '' });

@@ -1599,7 +1599,7 @@ Examples:
         }
         handleUpdateTree(newTree);
       },
-      onCapture: async ({ fileId, coworkerId, mode, content, runId: capRunId, runName }) => {
+      onCapture: async ({ fileId, mode, content, runId: capRunId, runName }) => {
         // Two modes. Knowledge (default): append the upstream output to a
         // file with a timestamp so the accumulation is visible run-over-run.
         // Skills: ask an LLM to read the current file + the latest run and
@@ -1636,20 +1636,10 @@ Examples:
           return;
         }
 
-        // Knowledge mode (default): append + optionally wire to coworker.
+        // Knowledge mode (default): append to the picked file.
         const header = `\n\n---\n**Captured ${new Date().toLocaleString()}** — ${runName || 'workflow run'}\n\n`;
         const nextContent = (file.content || '') + header + content;
         handleUpdateFileContent(fileId, nextContent);
-        if (coworkerId) {
-          setCoworkers(prev => (prev || []).map(cw => {
-            if (cw.id !== coworkerId) return cw;
-            const ids = new Set(cw.knowledgeFileIds || []);
-            if (!ids.has(fileId)) ids.add(fileId);
-            const nextCw = { ...cw, knowledgeFileIds: Array.from(ids) };
-            sb.saveCoworker?.(nextCw);
-            return nextCw;
-          }));
-        }
       },
     }).catch(err => {
       updateRun(runId, { status: 'error', completedAt: Date.now() });

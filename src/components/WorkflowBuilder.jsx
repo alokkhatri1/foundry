@@ -415,24 +415,10 @@ function StepCard({ step, index, coworkers, tools, participants, onUpdate, onDel
                       onUpdateContent={onUpdateFileContent}
                     />
                   </div>
-                  {mode === 'knowledge' && (
-                    <div className="step-config-row">
-                      <label>Also grow this coworker's knowledge (optional)</label>
-                      <select
-                        value={step.targetCoworkerId || ''}
-                        onChange={e => onUpdate({ ...step, targetCoworkerId: e.target.value })}
-                      >
-                        <option value="">— none —</option>
-                        {(coworkers || []).map(cw => (
-                          <option key={cw.id} value={cw.id}>{cw.name || 'Unnamed coworker'}</option>
-                        ))}
-                      </select>
-                    </div>
-                  )}
                   <div className="step-config-hint">
                     {mode === 'skills'
-                      ? 'An AI reads the current instructions and the latest run, proposes a minimal edit, and overwrites the file. Use on an instructions file — not a knowledge doc. Leave the file blank and the run completes without refining.'
-                      : 'The upstream output is appended to the file with a timestamp. If a coworker is picked, the file is also added to their knowledge — so the next run sees what this one produced. Leaving the file blank is fine — the run completes, nothing captured.'}
+                      ? 'An AI reads the current instructions and the latest run, proposes a minimal edit, and overwrites the file. Point it at a coworker\u2019s instructions file to sharpen how they work. Leave the file blank and the run completes without refining.'
+                      : 'The upstream output is appended to the file with a timestamp. Pick a file in the knowledge folder of a coworker to grow what they know run-over-run. Leaving the file blank is fine \u2014 the run completes, nothing captured.'}
                   </div>
                 </>
               );
@@ -842,7 +828,7 @@ function WorkflowEditor({ workflow, onUpdateWorkflow, fileTree, coworkers, tools
       name: defaultName,
       ...(type === 'agent' && { coworker: emptyCoworker() }),
       ...(type === 'approval' && { assigneeId: '', prompt: '', actions: ['Approve', 'Reject'] }),
-      ...(type === 'capture' && { mode: 'knowledge', targetFileId: '', targetCoworkerId: '' }),
+      ...(type === 'capture' && { mode: 'knowledge', targetFileId: '' }),
     };
     onUpdateWorkflow({ ...workflow, steps: [...workflow.steps, newStep] });
     setShowAddMenu(false);
@@ -1023,7 +1009,7 @@ export default function WorkflowBuilder({ workflows, onUpdateWorkflows, fileTree
     // auto-wire step; otherwise it would connect Trigger straight to Capture.
     const wfId = genWfId();
     const triggerStep = { id: 'trigger-' + wfId, type: 'trigger', name: 'Trigger', caseInput: '' };
-    const captureStep = { id: genStepId(), type: 'capture', name: 'Capture Learning', mode: 'knowledge', targetFileId: '', targetCoworkerId: '' };
+    const captureStep = { id: genStepId(), type: 'capture', name: 'Capture Learning', mode: 'knowledge', targetFileId: '' };
     const newWf = {
       id: wfId,
       name: 'New Workflow',

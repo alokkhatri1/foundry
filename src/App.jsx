@@ -314,7 +314,7 @@ function App() {
   const fileTree = useMemo(() => buildTree(flatFiles), [flatFiles]);
   const [workflows, setWorkflows] = useState(() => {
     const raw = saved?.workflows || (saved?.workflow ? [saved.workflow] : null);
-    if (!raw) return raw;
+    if (!raw) return [];
     return raw.map(ensureDagShape);
   });
   const [coworkers, setCoworkers] = useState(saved?.coworkers || null);

@@ -600,8 +600,6 @@ function ContextSidebar({ fileTree, selectedFileIds, onToggleFile, onToggleFolde
         </div>
       </div>
 
-      <div className="sl-spacer" />
-
       {/* AI Coworkers — Stage 5a. Room-wide list; anyone can chat with any
           coworker. The unified sidebar search narrows by name. */}
       {stageReached(currentStage, '5a') && visibleCoworkers.length > 0 && (

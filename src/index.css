@@ -3828,19 +3828,29 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
   background: #5c4a3a;
   color: rgba(255,255,255,0.75);
 }
+/* Each section is a fixed-share flex child: it owns a column slot of the
+   sidebar and scrolls inside itself. Growing one section (more files,
+   more coworkers) never pushes another off-screen, and there's no outer
+   sidebar scroll. The four sections split the remaining vertical space
+   equally; adjust the `flex` basis per section if one needs more room. */
 .sl-section {
   display: flex;
   flex-direction: column;
   padding: 12px 0 8px;
+  flex: 1 1 0;
+  min-height: 90px;
+  overflow: hidden;
 }
 .sl-section + .sl-section { border-top: 1px solid rgba(255,255,255,0.1); }
-.sl-context-section { flex-shrink: 0; padding-top: 12px; }
-.sl-spacer { flex: 1; }
+.sl-context-section { padding-top: 12px; }
+.sl-section-header { flex: 0 0 auto; }
 
-/* Each section's scrollable body. Individual max-heights per section so
-   Files, Chats, AI Coworkers, and Coworkers each stay bounded — one
-   section can't push the others off-screen when it gets big. */
+/* Each section's scrollable body takes all space below the header and
+   handles its own vertical scroll. No fixed max-heights — flex handles
+   sizing so sections stay balanced across viewport heights. */
 .sl-section-body {
+  flex: 1 1 auto;
+  min-height: 0;
   overflow-y: auto;
   scrollbar-width: thin;
   scrollbar-color: rgba(255,255,255,0.15) transparent;
@@ -3852,9 +3862,6 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
   border-radius: 3px;
 }
 .sl-section-body::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.22); }
-.sl-files-body   { max-height: 220px; }
-.sl-agents-body  { max-height: 168px; }
-.sl-people-body  { max-height: 168px; }
 
 /* Department headers */
 .sl-dept { margin-bottom: 2px; }
@@ -3952,9 +3959,11 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
 .sl-new-chat-btn:hover { color: white; }
 .sl-chat-list {
   display: flex; flex-direction: column;
-  /* Shows ~7 rows before scrolling kicks in. Each .sl-chat-item is
-     ~28px tall with padding, so 7 × 28 ≈ 196px. */
-  max-height: 196px;
+  /* Chats behave like every other section — fill the flex slot and scroll
+     internally when the list outgrows it. No fixed max-height so the slot
+     stays proportional to the other sections. */
+  flex: 1 1 auto;
+  min-height: 0;
   overflow-y: auto;
   scrollbar-width: thin;
   scrollbar-color: rgba(255,255,255,0.15) transparent;

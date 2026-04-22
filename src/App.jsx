@@ -475,7 +475,7 @@ function App() {
             return cws.map(cw => preserveToolConfigs(cw, prevById.get(cw.id)));
           });
         }
-        if (tls.length > 0) setTools(tls);
+        setTools(ensurePrebuiltTools(tls));
         if (wfs.length > 0) setWorkflows(wfs);
         // Merge cross-user runs into local state so everyone sees everyone's.
         // Local runs (started by this machine, not yet persisted) win by id.
@@ -705,7 +705,7 @@ function App() {
         const prevById = new Map((prev || []).map(c => [c.id, c]));
         return (cws || []).map(cw => preserveToolConfigs(cw, prevById.get(cw.id)));
       });
-      setTools(tls && tls.length > 0 ? tls : ensurePrebuiltTools(null));
+      setTools(ensurePrebuiltTools(tls || []));
       setWorkflows(wfs || []);
     } else {
       setFlatFiles([]);

@@ -39,10 +39,11 @@ function RunNode({ data }) {
   const cfg = NODE_STATE_COLOR[state] || NODE_STATE_COLOR.pending;
   const isTrigger = step?.type === 'trigger';
   const isReview = step?.type === 'approval';
+  const isLive = state === 'running' || state === 'waiting';
 
   return (
     <div
-      className={`run-node${selected ? ' selected' : ''}`}
+      className={`run-node${selected ? ' selected' : ''}${isLive ? ' live' : ''}`}
       style={{
         background: cfg.bg,
         borderColor: cfg.border,

@@ -1772,13 +1772,22 @@ Examples:
   }
 
 
-  function handleNudge(runId) {
+  async function handleNudge(runId) {
     const run = workflowRuns.find(r => r.id === runId);
     if (!run) return;
     const waitingStep = run.stepResults?.find(s => s.status === 'waiting');
-    const assignee = waitingStep?.assigneeName || 'the reviewer';
-    addMessage({ type: 'status', content: `${userName} nudged ${assignee} to review "${run.workflowName}"` });
-    addLog({ type: 'workflow', message: `nudge sent to ${assignee} for ${run.workflowName}` });
+    const assigneeName = waitingStep?.assigneeName || null;
+    // Resolve assignee's participant so the nudge lands as an actual DM in
+    // their inbox, not just a chat log message the sender can see.
+    const sender = (participants || []).find(p => p.name === userName);
+    const assignee = assigneeName ? (participants || []).find(p => p.name === assigneeName) : null;
+    const label = assigneeName || 'the reviewer';
+    if (sender && assignee) {
+      const text = `Nudge — please review "${run.workflowName}" when you get a moment.`;
+      await sb.sendDm(sender.id, assignee.id, text);
+    }
+    addMessage({ type: 'status', content: `${userName} nudged ${label} to review "${run.workflowName}"` });
+    addLog({ type: 'workflow', message: `nudge sent to ${label} for ${run.workflowName}` });
   }
 
   // ===== Direct Chat =====

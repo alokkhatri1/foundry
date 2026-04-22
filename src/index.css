@@ -4167,6 +4167,22 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
   transition: box-shadow 0.1s;
 }
 .run-node.selected { box-shadow: 0 0 0 2px var(--accent-gold), 0 1px 3px rgba(0,0,0,0.04); }
+/* Live step: pulsing ring so participants watching the Observability view
+   can spot at a glance which step is in flight or holding for review. */
+.run-node.live {
+  animation: run-node-live-pulse 1.8s ease-in-out infinite;
+}
+@keyframes run-node-live-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(74, 127, 181, 0.45); }
+  50%      { box-shadow: 0 0 0 8px rgba(74, 127, 181, 0);    }
+}
+.run-node.live.selected {
+  animation: run-node-live-pulse-selected 1.8s ease-in-out infinite;
+}
+@keyframes run-node-live-pulse-selected {
+  0%, 100% { box-shadow: 0 0 0 2px var(--accent-gold), 0 0 0 0 rgba(74, 127, 181, 0.45); }
+  50%      { box-shadow: 0 0 0 2px var(--accent-gold), 0 0 0 8px rgba(74, 127, 181, 0);    }
+}
 .run-node-top { display: flex; align-items: center; gap: 6px; margin-bottom: 4px; }
 .run-node-glyph {
   width: 18px; height: 18px; border-radius: 50%;
@@ -4249,6 +4265,8 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
 .rdetail-decisionlog-entry:last-child { margin-bottom: 0; }
 .rdetail-decisionlog-entry.approve { border-left-color: #5a9e6f; }
 .rdetail-decisionlog-entry.reject { border-left-color: #c45c5c; }
+.rdetail-decisionlog-entry.correction { border-left-color: #c8956c; }
+.rdetail-decisionlog-entry.escalate { border-left-color: #8a6fb0; }
 .rdetail-decisionlog-head {
   display: flex; align-items: center; gap: 10px; font-size: 12px;
 }
@@ -4258,6 +4276,8 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
 }
 .rdetail-decisionlog-action.approve { background: #e8f4ec; color: #5a9e6f; }
 .rdetail-decisionlog-action.reject { background: #fdf0f0; color: #c45c5c; }
+.rdetail-decisionlog-action.correction { background: #fdf0e6; color: #b37a2a; }
+.rdetail-decisionlog-action.escalate { background: #f0e8f7; color: #6f4fb0; }
 .rdetail-decisionlog-who { font-weight: 600; color: var(--text-dark); }
 .rdetail-decisionlog-when { margin-left: auto; color: var(--text-muted); font-size: 11px; }
 .rdetail-decisionlog-comment {

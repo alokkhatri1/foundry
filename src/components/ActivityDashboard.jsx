@@ -1,4 +1,15 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
+
+// Forces a re-render every `ms` so any relative-time rendering in the
+// subtree (timeAgo cards, etc.) advances without the underlying run
+// object mutating.
+function useTick(ms = 60_000) {
+  const [, setN] = useState(0);
+  useEffect(() => {
+    const id = setInterval(() => setN(n => n + 1), ms);
+    return () => clearInterval(id);
+  }, [ms]);
+}
 import EducationalCue from './EducationalCue';
 import { CoworkerGlyph } from './Icon';
 import RunDagView from './RunDagView';
@@ -22,6 +33,7 @@ const STATUS_CONFIG = {
   completed: { label: 'Completed', color: '#5a9e6f', bg: '#e8f4ec' },
   rejected: { label: 'Rejected', color: '#c45c5c', bg: '#fdf0f0' },
   error: { label: 'Error', color: '#c45c5c', bg: '#fdf0f0' },
+  cancelled: { label: 'Cancelled', color: '#8c7b68', bg: '#efeae2' },
 };
 
 const STEP_STATUS_ICON = {
@@ -346,16 +358,23 @@ function DecisionRow({ step, run, isSelected, onSelect, approvalsForStep, isOwne
           {isReview && stepApprovals.length > 0 && (
             <div className="rdetail-decisionlog">
               <div className="rdetail-decisionlog-title">Decision log</div>
-              {stepApprovals.map(a => (
-                <div key={a.id} className={`rdetail-decisionlog-entry ${a.action === 'Approve' ? 'approve' : 'reject'}`}>
+              {stepApprovals.map(a => {
+                const actionKind = a.action === 'Approve' ? 'approve'
+                  : a.action === 'Reject' ? 'reject'
+                  : a.action === 'Request Correction' ? 'correction'
+                  : a.action === 'Escalate' ? 'escalate'
+                  : 'reject';
+                return (
+                <div key={a.id} className={`rdetail-decisionlog-entry ${actionKind}`}>
                   <div className="rdetail-decisionlog-head">
-                    <span className={`rdetail-decisionlog-action ${a.action === 'Approve' ? 'approve' : 'reject'}`}>{a.action}</span>
+                    <span className={`rdetail-decisionlog-action ${actionKind}`}>{a.action}</span>
                     <span className="rdetail-decisionlog-who">by {a.resolved_by || 'unknown'}</span>
                     <span className="rdetail-decisionlog-when">{timeAgo(new Date(a.resolved_at).getTime())}</span>
                   </div>
                   {a.comment && <div className="rdetail-decisionlog-comment">&ldquo;{a.comment}&rdquo;</div>}
                 </div>
-              ))}
+                );
+              })}
             </div>
           )}
 
@@ -412,6 +431,8 @@ function DecisionRow({ step, run, isSelected, onSelect, approvalsForStep, isOwne
 
 // ===== Main Dashboard =====
 export default function ActivityDashboard({ workflowRuns, onApprovalAction, onCancelRun, onNudge, participants, currentUserName, coworkers, workflows, showEducationalCues, approvalsByRun, onLoadApprovals, currentStage, sb }) {
+  // Tick once a minute so timestamps like "5m ago" advance live.
+  useTick(60_000);
   const [selectedRunId, setSelectedRunId] = useState(null);
 
   const selectedRun = selectedRunId ? workflowRuns.find(r => r.id === selectedRunId) : null;
@@ -423,7 +444,7 @@ export default function ActivityDashboard({ workflowRuns, onApprovalAction, onCa
     .filter(r => r.status === 'running' || r.status === 'waiting_approval')
     .sort((a, b) => (b.startedAt || 0) - (a.startedAt || 0));
   const recentRuns = workflowRuns
-    .filter(r => r.status === 'completed' || r.status === 'rejected' || r.status === 'error')
+    .filter(r => r.status === 'completed' || r.status === 'rejected' || r.status === 'error' || r.status === 'cancelled')
     .sort((a, b) => (b.completedAt || b.startedAt || 0) - (a.completedAt || a.startedAt || 0));
   const pendingReviewCount = activeRuns.filter(r => r.status === 'waiting_approval').length;
   const [showRecent, setShowRecent] = useState(true);

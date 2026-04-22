@@ -42,10 +42,23 @@ function getFilesByDept(tree, folderName) {
   if (!tree?.children) return groups;
   for (const dept of tree.children) {
     if (!dept.children) continue;
-    const subfolder = dept.children.find(c => c.type === 'folder' && c.name === folderName);
-    if (!subfolder || !subfolder.children) continue;
-    const files = subfolder.children.filter(c => c.type === 'file');
-    if (files.length > 0) groups.push({ dept: dept.name, files });
+    if (folderName) {
+      // Scoped mode: only the named subfolder per department.
+      const subfolder = dept.children.find(c => c.type === 'folder' && c.name === folderName);
+      if (!subfolder || !subfolder.children) continue;
+      const files = subfolder.children.filter(c => c.type === 'file');
+      if (files.length > 0) groups.push({ dept: dept.name, files });
+    } else {
+      // Unscoped mode: every file under the department, across subfolders.
+      const files = [];
+      for (const child of dept.children) {
+        if (child.type === 'file') files.push(child);
+        else if (child.type === 'folder' && child.children) {
+          for (const grand of child.children) if (grand.type === 'file') files.push(grand);
+        }
+      }
+      if (files.length > 0) groups.push({ dept: dept.name, files });
+    }
   }
   return groups;
 }
@@ -331,7 +344,7 @@ function FilePicker({ fileTree, selectedIds, onChange, folderName, onUpdateConte
         <div className="ftp-browser">
           <div className="ftp-tree">
             {groups.length === 0 && (
-              <div className="ftp-empty">No {folderName} files found. Create them in the Files tab.</div>
+              <div className="ftp-empty">No {folderName || ''} files found. Create them in the Files tab.</div>
             )}
             {groups.map(g => {
               const isCollapsed = collapsedDepts[g.dept];

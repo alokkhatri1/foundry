@@ -4604,15 +4604,6 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
 }
 .cw-section { padding: 0; }
 .cw-section + .cw-section { margin-top: 4px; }
-.cw-section-title {
-  padding: 18px 24px 6px;
-  font-size: 11px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.6px;
-  color: var(--text-muted);
-  display: flex; align-items: center; gap: 8px;
-}
 .cw-section-count {
   font-weight: 600;
   letter-spacing: 0.3px;
@@ -4625,6 +4616,21 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
 /* Inside a cw-section, don't let cw-list-grid fight for flex height —
    it's now wrapped by the section, so normalise back to block-flow. */
 .cw-section .cw-list-grid { flex: none; padding: 0 24px 8px; }
+/* Override: my split-list variant of cw-section-title conflicted with an
+   older same-named rule further down that targets the editor pane. Pin
+   positioning/padding here so the two rules don't fight. */
+.cw-section > .cw-section-title {
+  padding: 18px 24px 8px;
+  margin: 0;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
 
 /* Read-only banner shown at top of the coworker editor when opened for a
    coworker built by another participant. Inputs inside are disabled via the

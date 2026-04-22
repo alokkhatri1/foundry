@@ -998,17 +998,13 @@ export default function WorkflowBuilder({ workflows, onUpdateWorkflows, fileTree
                 Clear all
               </button>
             )}
-            <button className="wf-create-btn" onClick={handleCreateWorkflow}>+ New Orchestration</button>
+            <button className="wf-create-btn" onClick={handleCreateWorkflow}>+ New Workflow</button>
           </div>
         </div>
         <div className="wf-list-grid">
           {workflows.length === 0 && (
             <div className="wf-list-empty">
               <p>No orchestrations yet.</p>
-              <button className="setup-btn-primary" onClick={handleCreateWorkflow} style={{ marginTop: 16 }}>
-                + Create your first orchestration
-                <span className="btn-arrow">&#x2197;</span>
-              </button>
             </div>
           )}
           {workflows.map(wf => (

@@ -775,7 +775,7 @@ export default function CoworkerBuilder({ coworkers, onUpdateCoworkers, fileTree
                 <input
                   type="text"
                   className="cwb-search cwb-search-inline"
-                  placeholder="Search\u2026"
+                  placeholder={'Search\u2026'}
                   value={searchQ}
                   onChange={e => setSearchQ(e.target.value)}
                 />

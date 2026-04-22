@@ -877,7 +877,7 @@ function WorkflowCanvas({ workflow, onUpdateWorkflow, fileTree, coworkers, tools
 }
 
 // ===== Workflow Editor =====
-function WorkflowEditor({ workflow, onUpdateWorkflow, fileTree, coworkers, tools, participants, onRun, isRunning, currentStepId, activeRun, onBack, showEducationalCues, callClaudeAPI, onSaveCoworkerToLibrary, onUpdateFileContent, apiKey, onCopilotUsage, copilotState, onCopilotPatch, copilotHistoriesRef, copilotWfId }) {
+function WorkflowEditor({ workflow, onUpdateWorkflow, fileTree, coworkers, tools, participants, onRun, onCancelRun, isRunning, currentStepId, activeRun, onBack, showEducationalCues, callClaudeAPI, onSaveCoworkerToLibrary, onUpdateFileContent, apiKey, onCopilotUsage, copilotState, onCopilotPatch, copilotHistoriesRef, copilotWfId }) {
   const confirm = useConfirm();
   const [expandedStep, setExpandedStep] = useState(null);
   const [showAddMenu, setShowAddMenu] = useState(false);
@@ -996,18 +996,28 @@ function WorkflowEditor({ workflow, onUpdateWorkflow, fileTree, coworkers, tools
             </div>
           )}
         </div>
-        <button
-          className="run-btn"
-          onClick={handleRun}
-          disabled={isRunning || realStepCount === 0 || !hasTriggerInput}
-          title={
-            realStepCount === 0 ? 'Add at least one step before running'
-            : !hasTriggerInput ? 'Add instructions or pick at least one document in the Trigger'
-            : ''
-          }
-        >
-          {isRunning ? 'Running\u2026' : 'Run'}
-        </button>
+        {isRunning ? (
+          <button
+            className="run-btn run-btn-stop"
+            onClick={() => activeRun && onCancelRun && onCancelRun(activeRun.id)}
+            title="Stop this run"
+          >
+            Stop
+          </button>
+        ) : (
+          <button
+            className="run-btn"
+            onClick={handleRun}
+            disabled={realStepCount === 0 || !hasTriggerInput}
+            title={
+              realStepCount === 0 ? 'Add at least one step before running'
+              : !hasTriggerInput ? 'Add instructions or pick at least one document in the Trigger'
+              : ''
+            }
+          >
+            Run
+          </button>
+        )}
       </div>
 
       {(activeRun && activeRun.status === 'completed') && (
@@ -1104,7 +1114,7 @@ function WorkflowCard({ workflow, coworkers, participants, onSelect, onDelete, o
 }
 
 // ===== Main Export =====
-export default function WorkflowBuilder({ workflows, onUpdateWorkflows, fileTree, coworkers, tools, onRun, workflowRuns = [], participants, currentUserName, showEducationalCues, callClaudeAPI, onSaveCoworkerToLibrary, onUpdateFileContent, apiKey, onCopilotUsage }) {
+export default function WorkflowBuilder({ workflows, onUpdateWorkflows, fileTree, coworkers, tools, onRun, onCancelRun, onCancelAllRuns, workflowRuns = [], participants, currentUserName, showEducationalCues, callClaudeAPI, onSaveCoworkerToLibrary, onUpdateFileContent, apiKey, onCopilotUsage }) {
   const confirm = useConfirm();
   const [selectedWorkflowId, setSelectedWorkflowId] = useState(null);
   // Copilot transcript state lives up here so it survives closing the panel,
@@ -1201,6 +1211,7 @@ export default function WorkflowBuilder({ workflows, onUpdateWorkflows, fileTree
           tools={tools}
           participants={participants}
           onRun={onRun}
+          onCancelRun={onCancelRun}
           isRunning={workflowRuns.some(r => r.workflowId === selectedWorkflow.id && (r.status === 'running' || r.status === 'waiting_approval'))}
           currentStepId={(() => { const run = workflowRuns.find(r => r.workflowId === selectedWorkflow.id && r.status === 'running'); return run?.stepResults?.find(s => s.status === 'running')?.stepId ?? null; })()}
           activeRun={(() => {
@@ -1237,8 +1248,13 @@ export default function WorkflowBuilder({ workflows, onUpdateWorkflows, fileTree
             <EducationalCue cueId="workflow-overview" show={showEducationalCues} />
           </div>
           <div style={{ display: 'flex', gap: 8 }}>
+            {(workflowRuns || []).some(r => r.status === 'running' || r.status === 'waiting_approval') && onCancelAllRuns && (
+              <button className="wf-stop-all-btn" onClick={onCancelAllRuns} title="Stop every active run in this room">
+                Stop all runs
+              </button>
+            )}
             {workflows.length > 0 && (
-              <button className="wf-clear-all-btn" onClick={handleClearAll} title="Delete every orchestration in this room">
+              <button className="wf-clear-all-btn" onClick={handleClearAll} title="Delete every workflow in this room">
                 Clear all
               </button>
             )}

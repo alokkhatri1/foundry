@@ -1655,6 +1655,37 @@ Examples:
     });
   }
 
+  function cancelSingleRun(runId) {
+    // Fire any pending approval resolver with a cancel signal so an awaiting
+    // executor bails out cleanly. If the run is already orphaned (resolver
+    // gone after a refresh) we still mark it cancelled in state + Supabase
+    // so it stops showing up as "running".
+    const resolver = approvalResolversRef.current.get(runId);
+    if (resolver) {
+      resolver({ action: 'Cancel', comment: '', resolvedBy: userName, cancelled: true });
+      approvalResolversRef.current.delete(runId);
+    }
+    setWorkflowRuns(prev => prev.map(r =>
+      r.id === runId && (r.status === 'running' || r.status === 'waiting_approval')
+        ? { ...r, status: 'cancelled', completedAt: Date.now() }
+        : r
+    ));
+    const run = workflowRuns.find(r => r.id === runId);
+    if (run) sb.saveWorkflowRun({ ...run, status: 'cancelled', completedAt: Date.now() });
+  }
+
+  function handleCancelRun(runId) {
+    cancelSingleRun(runId);
+    addMessage({ type: 'status', content: 'Run cancelled.' });
+  }
+
+  function handleCancelAllRuns() {
+    const active = (workflowRuns || []).filter(r => r.status === 'running' || r.status === 'waiting_approval');
+    if (active.length === 0) return;
+    for (const r of active) cancelSingleRun(r.id);
+    addMessage({ type: 'status', content: `Cancelled ${active.length} active run${active.length === 1 ? '' : 's'}.` });
+  }
+
   function handleApprovalAction(runId, msgId, action, comment) {
     // The in-memory resolver only exists in the browser tab that started
     // the run. If the page has been refreshed since then, the runtime is
@@ -2174,7 +2205,7 @@ Answer in ONE sentence. If the user asks "how", a second sentence is allowed —
         )}
         {activeTab === 'workflow' && (
           <div className="tab-pane tab-pane-workflow">
-            <WorkflowBuilder workflows={workflows} onUpdateWorkflows={handleUpdateWorkflows} fileTree={fileTree} onRun={runWorkflow} workflowRuns={workflowRuns} participants={participants} currentUserName={userName} coworkers={coworkers || []} tools={tools || []} showEducationalCues={showEducationalCues} callClaudeAPI={callClaudeAPI} onSaveCoworkerToLibrary={handleSaveCoworkerToLibrary} onUpdateFileContent={handleUpdateFileContent} apiKey={apiKey} onCopilotUsage={({ usage, model }) => sb.logLlmUsage({ participantId: myParticipantId, segment: 'workflow_copilot', model, usage, costUsd: computeCost(usage, model) })} />
+            <WorkflowBuilder workflows={workflows} onUpdateWorkflows={handleUpdateWorkflows} fileTree={fileTree} onRun={runWorkflow} onCancelRun={handleCancelRun} onCancelAllRuns={handleCancelAllRuns} workflowRuns={workflowRuns} participants={participants} currentUserName={userName} coworkers={coworkers || []} tools={tools || []} showEducationalCues={showEducationalCues} callClaudeAPI={callClaudeAPI} onSaveCoworkerToLibrary={handleSaveCoworkerToLibrary} onUpdateFileContent={handleUpdateFileContent} apiKey={apiKey} onCopilotUsage={({ usage, model }) => sb.logLlmUsage({ participantId: myParticipantId, segment: 'workflow_copilot', model, usage, costUsd: computeCost(usage, model) })} />
           </div>
         )}
         {activeTab === 'files' && (

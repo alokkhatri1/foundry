@@ -258,6 +258,14 @@ export async function executeWorkflowRun({
         assigneeName: step.assigneeName,
       });
 
+      // Cancellation signal from the UI. Mark the step skipped, halt the
+      // executor, and leave the run record to the caller to mark cancelled.
+      if (decision.cancelled || decision.action === 'Cancel') {
+        onStepUpdate(runId, stepIndex, { status: 'skipped', output: 'Cancelled by user', completedAt: Date.now() });
+        onMessage({ type: 'status', content: 'Run cancelled while awaiting review.' });
+        return;
+      }
+
       onStepUpdate(runId, stepIndex, { status: 'completed', output: `${decision.action}${decision.comment ? ': ' + decision.comment : ''}`, completedAt: Date.now() });
       onMessage({ type: 'status', content: `${decision.action}${decision.comment ? ' — "' + decision.comment + '"' : ''}` });
       onLog({ type: 'approval', message: `${userName}: ${decision.action}${decision.comment ? ' | "' + decision.comment + '"' : ''}` });

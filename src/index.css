@@ -3780,7 +3780,9 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
 .sl-new-chat-btn:hover { color: white; }
 .sl-chat-list {
   display: flex; flex-direction: column;
-  max-height: 360px;
+  /* Shows ~7 rows before scrolling kicks in. Each .sl-chat-item is
+     ~28px tall with padding, so 7 × 28 ≈ 196px. */
+  max-height: 196px;
   overflow-y: auto;
   scrollbar-width: thin;
   scrollbar-color: rgba(255,255,255,0.15) transparent;

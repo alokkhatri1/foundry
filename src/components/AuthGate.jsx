@@ -108,12 +108,8 @@ export default function AuthGate({ children, onJoin, workshopCode }) {
               <span className="landing-logo-text">Foundry</span>
             </div>
             <h1 className="landing-title">
-              Learn to build<br />
-              <span className="landing-highlight">AI-native teams</span>
+              Where you become <span className="landing-highlight">AI-native</span>.
             </h1>
-            <p className="landing-subtitle">
-              A hands-on workshop simulator. Create AI coworkers, give them knowledge and instructions, and wire them into real workflows.
-            </p>
           </div>
 
           <div className="landing-right">

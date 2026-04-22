@@ -58,8 +58,6 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
 
 /* Brand */
 .landing-brand { display: flex; align-items: center; gap: 10px; margin-bottom: 32px; }
-.landing-logo-wordmark { display: flex; flex-direction: column; line-height: 1.1; }
-.landing-logo-byline { font-size: 11px; font-weight: 500; color: var(--text-muted); letter-spacing: 0.02em; margin-top: 1px; }
 .landing-logo {
   width: 40px; height: 40px; border-radius: 10px; background: var(--text-dark);
   color: white; font-size: 20px; font-weight: 800;

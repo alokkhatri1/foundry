@@ -90,10 +90,7 @@ export default function AuthGate({ children, onJoin, workshopCode }) {
         <div className="landing-content" style={{ justifyContent: 'center' }}>
           <div className="landing-brand" style={{ margin: '0 auto' }}>
             <div className="landing-logo">F</div>
-            <div className="landing-logo-wordmark">
-              <span className="landing-logo-text">Foundry</span>
-              <span className="landing-logo-byline">by Alok Khatri</span>
-            </div>
+            <span className="landing-logo-text">Foundry</span>
           </div>
         </div>
       </div>

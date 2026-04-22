@@ -29,10 +29,7 @@ export default function JoinScreen({ user, isAdmin, onJoin, onSignOut, onAdminDa
         <div style={{ textAlign: 'center' }}>
           <div className="landing-brand" style={{ justifyContent: 'center', marginBottom: 16 }}>
             <div className="landing-logo">F</div>
-            <div className="landing-logo-wordmark">
-              <span className="landing-logo-text">Foundry</span>
-              <span className="landing-logo-byline">by Alok Khatri</span>
-            </div>
+            <span className="landing-logo-text">Foundry</span>
           </div>
           <h1 className="landing-title" style={{ fontSize: 36, textAlign: 'center' }}>
             Welcome, <span className="landing-highlight">{userName}</span>

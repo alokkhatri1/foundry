@@ -677,7 +677,7 @@ function App() {
   // Reflect unread count in browser tab title.
   useEffect(() => {
     const total = Object.values(unreadDmCounts).reduce((a, b) => a + b, 0);
-    document.title = total > 0 ? `(${total}) Foundry by Alok Khatri` : 'Foundry by Alok Khatri';
+    document.title = total > 0 ? `(${total}) Foundry` : 'Foundry';
   }, [unreadDmCounts]);
 
   async function handleJoin(name, code, authUserId, email) {

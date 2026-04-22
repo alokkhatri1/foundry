@@ -213,7 +213,7 @@ function DeletableEdge({ id, sourceX, sourceY, targetX, targetY, sourcePosition,
 const wfEdgeTypes = { deletable: DeletableEdge };
 
 // ===== Step Card =====
-function StepCard({ step, index, coworkers, tools, participants, onUpdate, onDelete, expanded, onToggleExpand, validationErrors, allSteps, currentStepId, stepResult, isDragging, dragOverPos, onDragStart, onDragOver, onDragEnd, onDrop, showEducationalCues, onCanvas, fileTree, callClaudeAPI, onUpdateFileContent }) {
+function StepCard({ step, index, coworkers, tools, participants, onUpdate, onDelete, expanded, onToggleExpand, validationErrors, allSteps, currentStepId, stepResult, isDragging, dragOverPos, onDragStart, onDragOver, onDragEnd, onDrop, showEducationalCues, onCanvas, fileTree, callClaudeAPI, onUpdateFileContent, readOnly }) {
   const isRunning = currentStepId === step.id;
   const assignedCw = step.type === 'agent' ? resolveStepCoworker(step, coworkers) : null;
   const assignedPerson = step.assigneeId ? participants?.find(p => p.id === step.assigneeId) : null;
@@ -339,7 +339,7 @@ function StepCard({ step, index, coworkers, tools, participants, onUpdate, onDel
           </div>
         )}
         {expanded && !stepResult?.output && (
-          <div className="step-card-body">
+          <fieldset className="step-card-body step-card-fieldset" disabled={readOnly}>
 
             {step.type === 'trigger' && (
               <>
@@ -571,7 +571,7 @@ function StepCard({ step, index, coworkers, tools, participants, onUpdate, onDel
             </div>
             )}
 
-          </div>
+          </fieldset>
         )}
       </div>
     </div>
@@ -583,7 +583,7 @@ function StepCard({ step, index, coworkers, tools, participants, onUpdate, onDel
 // visual — nodes are draggable and their positions persist, edges are
 // drawn read-only from the linear auto-migration. Wiring, typed handles,
 // and DAG runtime arrive in later phases.
-function WorkflowCanvas({ workflow, onUpdateWorkflow, fileTree, coworkers, tools, participants, activeRun, currentStepId, expandedStep, setExpandedStep, updateStep, deleteStep, validationErrors, showEducationalCues, callClaudeAPI, onSaveCoworkerToLibrary, onUpdateFileContent, apiKey, onCopilotUsage, copilotState, onCopilotPatch, copilotHistoriesRef, copilotWfId }) {
+function WorkflowCanvas({ workflow, onUpdateWorkflow, readOnly, fileTree, coworkers, tools, participants, activeRun, currentStepId, expandedStep, setExpandedStep, updateStep, deleteStep, validationErrors, showEducationalCues, callClaudeAPI, onSaveCoworkerToLibrary, onUpdateFileContent, apiKey, onCopilotUsage, copilotState, onCopilotPatch, copilotHistoriesRef, copilotWfId }) {
   const [nodes, setNodes] = useState([]);
   const [edges, setEdges] = useState([]);
   // Copilot state lives in the parent (WorkflowBuilder) so the transcript
@@ -624,13 +624,16 @@ function WorkflowCanvas({ workflow, onUpdateWorkflow, fileTree, coworkers, tools
         position: positions.get(step.id) || { x: 80, y: i * 240 },
         // Lock dragging while the node is open for editing — prevents a click
         // into an input field from being interpreted as a drag and shifting
-        // the node around the canvas. Collapsing re-enables drag.
-        draggable: !isExpanded,
+        // the node around the canvas. Collapsing re-enables drag. Also
+        // locked whenever readOnly so shared workflows can't be rearranged.
+        draggable: !isExpanded && !readOnly,
         data: {
           stepCardProps: {
             step, index: i, coworkers, tools, participants, fileTree,
-            onUpdate: (updated) => updateStep(i, updated),
-            onDelete: () => deleteStep(i),
+            onUpdate: readOnly ? () => {} : (updated) => updateStep(i, updated),
+            // Hide the hover-X on shared workflows — pass undefined so the
+            // node wrapper doesn't render its delete button.
+            onDelete: readOnly ? undefined : () => deleteStep(i),
             expanded: isExpanded,
             onToggleExpand: () => setExpandedStep(isExpanded ? null : i),
             validationErrors: validationErrors[step.id],
@@ -640,16 +643,18 @@ function WorkflowCanvas({ workflow, onUpdateWorkflow, fileTree, coworkers, tools
             callClaudeAPI,
             onSaveCoworkerToLibrary,
             onUpdateFileContent,
+            readOnly,
           },
         },
       };
     });
     const nextEdges = (workflow.edges || []).map(e => {
       const styled = styleEdge(e);
-      return { ...styled, data: { ...(styled.data || {}), onDelete: handleDeleteEdge } };
+      // Same story on edges — no hover-X when read-only.
+      return { ...styled, data: { ...(styled.data || {}), onDelete: readOnly ? undefined : handleDeleteEdge } };
     });
     return { derivedNodes: nextNodes, derivedEdges: nextEdges };
-  }, [workflow, fileTree, coworkers, tools, participants, activeRun, currentStepId, expandedStep, setExpandedStep, updateStep, deleteStep, validationErrors, showEducationalCues, callClaudeAPI, onSaveCoworkerToLibrary, onUpdateFileContent, handleDeleteEdge]);
+  }, [workflow, fileTree, coworkers, tools, participants, activeRun, currentStepId, expandedStep, setExpandedStep, updateStep, deleteStep, validationErrors, showEducationalCues, callClaudeAPI, onSaveCoworkerToLibrary, onUpdateFileContent, handleDeleteEdge, readOnly]);
 
   useEffect(() => {
     // Don't blow away React Flow's internal node state on every render. When
@@ -802,10 +807,13 @@ function WorkflowCanvas({ workflow, onUpdateWorkflow, fileTree, coworkers, tools
         edges={edges}
         nodeTypes={nodeTypes}
         edgeTypes={wfEdgeTypes}
-        onNodesChange={handleNodesChange}
-        onEdgesChange={handleEdgesChange}
-        onConnect={handleConnect}
-        nodesConnectable
+        onNodesChange={readOnly ? undefined : handleNodesChange}
+        onEdgesChange={readOnly ? undefined : handleEdgesChange}
+        onConnect={readOnly ? undefined : handleConnect}
+        nodesConnectable={!readOnly}
+        nodesDraggable={!readOnly}
+        edgesFocusable={!readOnly}
+        elementsSelectable
         fitView
         fitViewOptions={{ padding: 0.2, maxZoom: 1 }}
         proOptions={{ hideAttribution: true }}
@@ -828,15 +836,17 @@ function WorkflowCanvas({ workflow, onUpdateWorkflow, fileTree, coworkers, tools
           style={{ background: 'var(--bg-white)', border: '1px solid var(--border-color)', borderRadius: 6 }}
         />
       </ReactFlow>
-      <button
-        className={`wf-copilot-toggle${copilotOpen ? ' open' : ''}`}
-        onClick={() => setCopilotOpen(o => !o)}
-        title={copilotOpen ? 'Hide copilot' : 'Open copilot'}
-      >
-        {copilotOpen ? '\u2192' : '\u2190'} Copilot
-      </button>
+      {!readOnly && (
+        <button
+          className={`wf-copilot-toggle${copilotOpen ? ' open' : ''}`}
+          onClick={() => setCopilotOpen(o => !o)}
+          title={copilotOpen ? 'Hide copilot' : 'Open copilot'}
+        >
+          {copilotOpen ? '\u2192' : '\u2190'} Copilot
+        </button>
+      )}
     </div>
-    {copilotOpen && (
+    {!readOnly && copilotOpen && (
       <aside className="wf-copilot-panel">
         <div className="wf-copilot-header">
           <span className="wf-copilot-title">Workflow Copilot</span>
@@ -885,7 +895,7 @@ function WorkflowCanvas({ workflow, onUpdateWorkflow, fileTree, coworkers, tools
 }
 
 // ===== Workflow Editor =====
-function WorkflowEditor({ workflow, onUpdateWorkflow, fileTree, coworkers, tools, participants, onRun, onCancelRun, isRunning, currentStepId, activeRun, onBack, showEducationalCues, callClaudeAPI, onSaveCoworkerToLibrary, onUpdateFileContent, apiKey, onCopilotUsage, copilotState, onCopilotPatch, copilotHistoriesRef, copilotWfId }) {
+function WorkflowEditor({ workflow, onUpdateWorkflow, readOnly, fileTree, coworkers, tools, participants, onRun, onCancelRun, isRunning, currentStepId, activeRun, onBack, showEducationalCues, callClaudeAPI, onSaveCoworkerToLibrary, onUpdateFileContent, apiKey, onCopilotUsage, copilotState, onCopilotPatch, copilotHistoriesRef, copilotWfId }) {
   const confirm = useConfirm();
   const [expandedStep, setExpandedStep] = useState(null);
   const [showAddMenu, setShowAddMenu] = useState(false);
@@ -985,7 +995,7 @@ function WorkflowEditor({ workflow, onUpdateWorkflow, fileTree, coworkers, tools
   }
 
   return (
-    <div className="workflow-builder">
+    <div className={`workflow-builder${readOnly ? ' workflow-builder-readonly' : ''}`}>
       <div className="workflow-header-bar">
         <button className="files-back-btn" onClick={onBack}>{'\u2190'} All Workflows</button>
         <input
@@ -993,17 +1003,23 @@ function WorkflowEditor({ workflow, onUpdateWorkflow, fileTree, coworkers, tools
           value={workflow.name}
           onChange={e => onUpdateWorkflow({ ...workflow, name: e.target.value })}
           placeholder="Workflow name..."
+          disabled={readOnly}
         />
-        <div className="add-step-dropdown">
-          <button className="add-step-btn" onClick={() => setShowAddMenu(!showAddMenu)} disabled={isRunning}>+ Add Step</button>
-          {showAddMenu && (
-            <div className="add-step-menu">
-              <button className="add-step-option" onClick={() => addStep('agent')}><span className="dot agent"></span> Coworker Step</button>
-              <button className="add-step-option" onClick={() => addStep('approval')}><span className="dot approval"></span> Human Review</button>
-              <button className="add-step-option" onClick={() => addStep('capture')}><span className="dot capture"></span> Capture Learning</button>
-            </div>
-          )}
-        </div>
+        {readOnly && (
+          <div className="wf-readonly-banner">Read-only — built by {workflow.createdBy}</div>
+        )}
+        {!readOnly && (
+          <div className="add-step-dropdown">
+            <button className="add-step-btn" onClick={() => setShowAddMenu(!showAddMenu)} disabled={isRunning}>+ Add Step</button>
+            {showAddMenu && (
+              <div className="add-step-menu">
+                <button className="add-step-option" onClick={() => addStep('agent')}><span className="dot agent"></span> Coworker Step</button>
+                <button className="add-step-option" onClick={() => addStep('approval')}><span className="dot approval"></span> Human Review</button>
+                <button className="add-step-option" onClick={() => addStep('capture')}><span className="dot capture"></span> Capture Learning</button>
+              </div>
+            )}
+          </div>
+        )}
         {isRunning ? (
           <button
             className="run-btn run-btn-stop"
@@ -1056,6 +1072,7 @@ function WorkflowEditor({ workflow, onUpdateWorkflow, fileTree, coworkers, tools
       <WorkflowCanvas
         workflow={workflow}
         onUpdateWorkflow={onUpdateWorkflow}
+        readOnly={readOnly}
         fileTree={fileTree}
         coworkers={coworkers}
         tools={tools}
@@ -1084,7 +1101,7 @@ function WorkflowEditor({ workflow, onUpdateWorkflow, fileTree, coworkers, tools
 }
 
 // ===== Workflow Card =====
-function WorkflowCard({ workflow, coworkers, participants, onSelect, onDelete, onDuplicate, isRunning }) {
+function WorkflowCard({ workflow, coworkers, participants, onSelect, onDelete, onDuplicate, isRunning, readOnly }) {
   return (
     <div className="wf-card" onClick={() => onSelect(workflow.id)}>
       <div className="wf-card-top">
@@ -1114,8 +1131,12 @@ function WorkflowCard({ workflow, coworkers, participants, onSelect, onDelete, o
         <span>{(workflow.steps || []).filter(s => s.type !== 'trigger').length} steps</span>
       </div>
       <div className="wf-card-actions">
-        <button className="wf-card-action" onClick={e => { e.stopPropagation(); onDuplicate(workflow.id); }} title="Duplicate">Copy</button>
-        <button className="wf-card-action wf-card-action-delete" onClick={e => { e.stopPropagation(); onDelete(workflow.id); }} title="Delete">{'\u2715'}</button>
+        {/* Duplicate stays enabled either way — cloning a shared workflow
+            into your own copy is a legit flow, same as forking. */}
+        <button className="wf-card-action" onClick={e => { e.stopPropagation(); onDuplicate(workflow.id); }} title={readOnly ? 'Duplicate into your own copy' : 'Duplicate'}>Copy</button>
+        {!readOnly && (
+          <button className="wf-card-action wf-card-action-delete" onClick={e => { e.stopPropagation(); onDelete(workflow.id); }} title="Delete">{'\u2715'}</button>
+        )}
       </div>
     </div>
   );
@@ -1171,6 +1192,8 @@ export default function WorkflowBuilder({ workflows, onUpdateWorkflows, fileTree
         { id: captureStep.id, type: 'capture', position: { x: 240, y: 360 }, data: { ...captureStep } },
       ],
       edges: [],
+      createdBy: currentUserName,
+      createdAt: Date.now(),
     };
     onUpdateWorkflows([...workflows, newWf]);
     setSelectedWorkflowId(newWf.id);
@@ -1209,11 +1232,13 @@ export default function WorkflowBuilder({ workflows, onUpdateWorkflows, fileTree
   }
 
   if (selectedWorkflow) {
+    const editorReadOnly = !!(selectedWorkflow.createdBy && selectedWorkflow.createdBy !== currentUserName);
     return (
       <div className="panel panel-center">
         <WorkflowEditor
           workflow={selectedWorkflow}
-          onUpdateWorkflow={handleUpdateWorkflow}
+          onUpdateWorkflow={editorReadOnly ? () => {} : handleUpdateWorkflow}
+          readOnly={editorReadOnly}
           fileTree={fileTree}
           coworkers={coworkers}
           tools={tools}
@@ -1259,13 +1284,19 @@ export default function WorkflowBuilder({ workflows, onUpdateWorkflows, fileTree
             <button className="wf-create-btn" onClick={handleCreateWorkflow}>+ New Workflow</button>
           </div>
         </div>
-        <div className="wf-list-grid">
-          {workflows.length === 0 && (
+        {workflows.length === 0 ? (
+          <div className="wf-list-grid">
             <div className="wf-list-empty">
               <p>No workflows yet.</p>
             </div>
-          )}
-          {workflows.map(wf => (
+          </div>
+        ) : (() => {
+          // Split so a participant's own workflows stay distinct from the
+          // shared room library. Legacy workflows with no createdBy fall into
+          // "mine" so pre-seeded content doesn't get orphaned.
+          const mine = workflows.filter(w => !w.createdBy || w.createdBy === currentUserName);
+          const others = workflows.filter(w => w.createdBy && w.createdBy !== currentUserName);
+          const renderCard = (wf, readOnly) => (
             <WorkflowCard
               key={wf.id}
               workflow={wf}
@@ -1275,9 +1306,26 @@ export default function WorkflowBuilder({ workflows, onUpdateWorkflows, fileTree
               onDelete={handleDeleteWorkflow}
               onDuplicate={handleDuplicateWorkflow}
               isRunning={workflowRuns.some(r => r.workflowId === wf.id && (r.status === 'running' || r.status === 'waiting_approval'))}
+              readOnly={readOnly}
             />
-          ))}
-        </div>
+          );
+          return (
+            <>
+              {mine.length > 0 && (
+                <div className="wf-section">
+                  <div className="wf-section-title">Built by you <span className="wf-section-count">{mine.length}</span></div>
+                  <div className="wf-list-grid">{mine.map(wf => renderCard(wf, false))}</div>
+                </div>
+              )}
+              {others.length > 0 && (
+                <div className="wf-section">
+                  <div className="wf-section-title">Built by others <span className="wf-section-count">{others.length}</span></div>
+                  <div className="wf-list-grid">{others.map(wf => renderCard(wf, true))}</div>
+                </div>
+              )}
+            </>
+          );
+        })()}
       </div>
     </div>
   );

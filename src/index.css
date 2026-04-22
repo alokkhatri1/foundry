@@ -1841,6 +1841,53 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
 .wf-edge-delete-btn:hover {
   color: #c45c5c; border-color: #c45c5c; background: #fff6f5;
 }
+
+/* Workflow "Built by you" / "Built by others" section splits. Same visual
+   language as the coworker tab. */
+.wf-section { padding: 0; }
+.wf-section + .wf-section { margin-top: 4px; }
+.wf-section > .wf-section-title {
+  padding: 18px 24px 8px;
+  margin: 0;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: var(--text-muted);
+  display: flex; align-items: center; gap: 8px;
+}
+.wf-section-count {
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  color: var(--text-muted);
+  background: var(--bg-warm);
+  border-radius: var(--radius-pill, 999px);
+  padding: 1px 8px;
+  font-size: 10px;
+}
+.wf-section .wf-list-grid { flex: none; padding: 0 24px 8px; }
+
+/* Read-only banner on the workflow editor header — gold accent so it
+   reads as the app's own callout, parallels the coworker banner. */
+.wf-readonly-banner {
+  margin-left: auto;
+  padding: 6px 14px;
+  background: rgba(200, 149, 108, 0.14);
+  border: 1px solid var(--accent-gold, #c8956c);
+  border-radius: var(--radius-pill, 999px);
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--accent-gold, #c8956c);
+  letter-spacing: 0.2px;
+  white-space: nowrap;
+}
+.step-card-fieldset {
+  border: 0; padding: 0; margin: 0; min-width: 0;
+}
+.step-card-fieldset[disabled] textarea,
+.step-card-fieldset[disabled] input,
+.step-card-fieldset[disabled] select { background: var(--bg-warm); cursor: not-allowed; }
+.step-card-fieldset[disabled] button { cursor: not-allowed; }
 .wf-node-delete-btn {
   position: absolute;
   top: -10px; right: -10px;

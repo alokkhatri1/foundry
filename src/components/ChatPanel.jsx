@@ -143,13 +143,18 @@ function ChatMessage({ msg, onApprovalAction, onPickRecipient, onNudgeRecipient,
               </div>
             </>
           )}
-          {msg.resolved && (
-            <div className={`cl-approval-resolved ${msg.resolvedAction === 'Approve' ? 'approved' : 'rejected'}`}>
-              <span className="cl-approval-resolved-action">{msg.resolvedAction === 'Approve' ? '\u2713 Approved' : '\u2715 Rejected'}</span>
-              {msg.resolvedBy && <span className="cl-approval-resolved-by"> by {msg.resolvedBy}</span>}
-              {msg.resolvedComment && <div className="cl-approval-resolved-comment">"{msg.resolvedComment}"</div>}
-            </div>
-          )}
+          {msg.resolved && (() => {
+            const a = msg.resolvedAction;
+            const kind = a === 'Approve' ? 'approved' : a === 'Cancelled' ? 'cancelled' : 'rejected';
+            const label = a === 'Approve' ? '\u2713 Approved' : a === 'Cancelled' ? '\u2298 Cancelled' : '\u2715 Rejected';
+            return (
+              <div className={`cl-approval-resolved ${kind}`}>
+                <span className="cl-approval-resolved-action">{label}</span>
+                {msg.resolvedBy && <span className="cl-approval-resolved-by"> by {msg.resolvedBy}</span>}
+                {msg.resolvedComment && <div className="cl-approval-resolved-comment">"{msg.resolvedComment}"</div>}
+              </div>
+            );
+          })()}
         </div>
       </div>
     );

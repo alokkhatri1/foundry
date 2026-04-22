@@ -1666,6 +1666,17 @@ Examples:
       approvalResolversRef.current.delete(runId);
     }
     updateRun(runId, { status: 'cancelled', completedAt: Date.now() });
+    // Also retire any unresolved approval cards tied to this run so the
+    // Approve/Reject buttons don't sit there waiting for a resolver that's
+    // already been fired and deleted.
+    setConversations(prev => prev.map(c => ({
+      ...c,
+      messages: (c.messages || []).map(m =>
+        m.type === 'approval' && m.runId === runId && !m.resolved
+          ? { ...m, resolved: true, resolvedAction: 'Cancelled', resolvedBy: userName }
+          : m
+      ),
+    })));
   }
 
   function handleCancelRun(runId) {

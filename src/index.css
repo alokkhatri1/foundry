@@ -2913,6 +2913,11 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
   border: 1px solid #ebd0cd;
   color: #a0443e;
 }
+.cl-approval-resolved.cancelled {
+  background: var(--bg-warm);
+  border: 1px solid var(--border-color);
+  color: var(--text-muted);
+}
 .cl-approval-resolved-action { font-weight: 700; }
 .cl-approval-resolved-by { font-weight: 500; opacity: 0.8; }
 .cl-approval-resolved-comment {

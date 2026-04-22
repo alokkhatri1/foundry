@@ -2221,6 +2221,7 @@ Answer in ONE sentence. If the user asks "how", a second sentence is allowed —
               myParticipantId={myParticipantId}
               sb={sb}
               unreadDmCounts={unreadDmCounts}
+              workflowRuns={workflowRuns}
             />
           </div>
         )}

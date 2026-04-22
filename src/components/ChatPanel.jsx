@@ -320,7 +320,7 @@ function findNode(tree, id) {
 }
 
 // ===== Slack-style Context Sidebar =====
-function ContextSidebar({ fileTree, selectedFileIds, onToggleFile, onToggleFolder, onToggleSubfolder, onOpenFile, editingFileId, participants, currentUserName, coworkers, activeCoworkerId, onSelectCoworker, showEducationalCues, conversations, activeConvoId, onNewChat, onSelectConvo, onDeleteConvo, onOpenDm, activeDm, unreadDmCounts, currentStage, sb }) {
+function ContextSidebar({ fileTree, selectedFileIds, onToggleFile, onToggleFolder, onToggleSubfolder, onOpenFile, editingFileId, participants, currentUserName, coworkers, activeCoworkerId, onSelectCoworker, showEducationalCues, conversations, activeConvoId, onNewChat, onSelectConvo, onDeleteConvo, onOpenDm, activeDm, unreadDmCounts, currentStage, sb, workflowRuns }) {
   const [collapsedSections, setCollapsedSections] = useState(() => {
     // Default all folders to collapsed
     const collapsed = {};
@@ -466,13 +466,31 @@ function ContextSidebar({ fileTree, selectedFileIds, onToggleFile, onToggleFolde
         <div className="sl-chat-list">
           {sortedConvos.map(c => {
             const isRun = typeof c.id === 'string' && c.id.startsWith('convo-run-');
+            // Two visual states for run chats: live (run still
+            // running/waiting) vs completed (done / cancelled / error).
+            // Detection strips the "convo-run-" prefix to find the matching
+            // workflowRun and reads its status.
+            let runLive = false;
+            if (isRun) {
+              const runId = c.id.slice('convo-run-'.length);
+              const run = (workflowRuns || []).find(r => r.id === runId);
+              runLive = !!(run && (run.status === 'running' || run.status === 'waiting_approval'));
+            }
             return (
             <div
               key={c.id}
               className={`sl-chat-item${activeConvoId === c.id ? ' active' : ''}${isRun ? ' sl-chat-item-run' : ''}`}
               onClick={() => onSelectConvo(c.id)}
             >
-              {isRun && <span className="sl-chat-kind-glyph" title="Workflow run">{'\u25B8'}</span>}
+              {isRun && (
+                runLive ? (
+                  <span className="sl-chat-kind-glyph live" title="Live run">
+                    <span className="sl-chat-kind-dot" />
+                  </span>
+                ) : (
+                  <span className="sl-chat-kind-glyph done" title="Completed run">{'\u2713'}</span>
+                )
+              )}
               <span className="sl-chat-title">{c.title || 'New Chat'}</span>
               <span className="sl-chat-meta">{c.messages?.length || 0} msgs</span>
               {(conversations || []).length > 1 && (
@@ -680,7 +698,7 @@ function InlineEditor({ file, onUpdateContent, onClose }) {
 }
 
 // ===== Main ChatPanel =====
-export default function ChatPanel({ messages, onSendMessage, onApprovalAction, onPickRecipient, onNudgeRecipient, onGoToFiles, onRetry, isLoading, participants, currentUserName, fileTree, onUpdateFileContent, coworkers, showEducationalCues, conversations, activeConvoId, onNewChat, onSelectConvo, onDeleteConvo, onCoworkerChange, currentStage, activeDm, onOpenDm, onCloseDm, myParticipantId, sb, unreadDmCounts }) {
+export default function ChatPanel({ messages, onSendMessage, onApprovalAction, onPickRecipient, onNudgeRecipient, onGoToFiles, onRetry, isLoading, participants, currentUserName, fileTree, onUpdateFileContent, coworkers, showEducationalCues, conversations, activeConvoId, onNewChat, onSelectConvo, onDeleteConvo, onCoworkerChange, currentStage, activeDm, onOpenDm, onCloseDm, myParticipantId, sb, unreadDmCounts, workflowRuns }) {
   const [input, setInput] = useState('');
   const [selectedFileIds, setSelectedFileIds] = useState([]);
   const [editingFileId, setEditingFileId] = useState(null);
@@ -982,6 +1000,7 @@ export default function ChatPanel({ messages, onSendMessage, onApprovalAction, o
         activeDm={activeDm}
         unreadDmCounts={unreadDmCounts}
         currentStage={currentStage}
+        workflowRuns={workflowRuns}
         sb={sb}
       />
 

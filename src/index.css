@@ -5020,8 +5020,8 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
 /* File preview — promoted to a modal overlay so the edit surface is
    actually usable. The old inline panel was too cramped to type into. */
 .ftp-preview-overlay {
-  position: fixed; inset: 0; z-index: 1000;
-  background: rgba(0, 0, 0, 0.35);
+  position: fixed; inset: 0; z-index: 2000;
+  background: rgba(0, 0, 0, 0.4);
   display: flex; align-items: center; justify-content: center;
   padding: 32px;
 }
@@ -5029,8 +5029,8 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
   background: var(--bg-white);
   border-radius: var(--radius);
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.25);
-  width: min(760px, 100%);
-  max-height: calc(100vh - 64px);
+  width: min(1100px, calc(100vw - 64px));
+  height: min(820px, calc(100vh - 64px));
   display: flex; flex-direction: column;
   overflow: hidden;
 }

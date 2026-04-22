@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import EducationalCue from './EducationalCue';
 import Icon, { COWORKER_ICONS, hasIcon } from './Icon';
 import RevealAt, { stageReached } from './RevealAt';
@@ -374,7 +375,7 @@ function FilePicker({ fileTree, selectedIds, onChange, folderName, onUpdateConte
           </div>
         </div>
       )}
-      {previewFile && (
+      {previewFile && createPortal(
         <div className="ftp-preview-overlay" onClick={() => setPreviewId(null)}>
           <div className="ftp-preview-modal" onClick={e => e.stopPropagation()}>
             <div className="ftp-preview-header">
@@ -404,7 +405,8 @@ function FilePicker({ fileTree, selectedIds, onChange, folderName, onUpdateConte
               </div>
             )}
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

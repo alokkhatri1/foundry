@@ -985,8 +985,15 @@ function App() {
   // Update messages in the active conversation (for loading state management)
   function updateActiveMessages(updater) {
     setConversations(prev => {
+      // When activeConvoId is null (first send in a fresh chat before the
+      // state flush has propagated), target the most recent convo instead
+      // of no-op'ing — addMessage has just created it and is about to set
+      // it active on the next tick. Otherwise the loading bubble, status
+      // updates, etc. silently vanish.
+      const targetId = activeConvoId || prev[prev.length - 1]?.id;
+      if (!targetId) return prev;
       const updated = prev.map(c => {
-        if (c.id !== activeConvoId) return c;
+        if (c.id !== targetId) return c;
         return { ...c, messages: updater(c.messages) };
       });
       persistConversations(updated);

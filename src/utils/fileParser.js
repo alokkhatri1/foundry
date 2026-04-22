@@ -1,9 +1,12 @@
 import * as pdfjsLib from 'pdfjs-dist';
+import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 import mammoth from 'mammoth';
 import * as XLSX from 'xlsx';
 
-// Set PDF.js worker
-pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.mjs`;
+// Ship the PDF.js worker with the Vite bundle rather than pulling it from
+// cdnjs — version mismatches between the lib and the CDN mirror were
+// blowing up at runtime with "Failed to fetch dynamically imported module".
+pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
 
 const IMAGE_TYPES = ['image/png', 'image/jpeg', 'image/gif', 'image/webp'];
 const PDF_TYPES = ['application/pdf'];

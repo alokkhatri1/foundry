@@ -59,13 +59,8 @@ function ChatMessage({ msg, onApprovalAction, onPickRecipient, onNudgeRecipient,
         <div className="cl-nudge">
           <div className="cl-nudge-icon">{'\uD83D\uDD14'}</div>
           <div className="cl-nudge-body">
-            <div className="cl-nudge-headline">
-              <strong>{msg.fromName}</strong> pinged <strong>{msg.toName}</strong>
-            </div>
-            <div className="cl-nudge-sub">
-              Please review <em>&ldquo;{msg.workflowName}&rdquo;</em>
-              {msg.delivered === false && <span className="cl-nudge-undelivered"> — couldn't deliver DM</span>}
-            </div>
+            <div className="cl-nudge-headline"><strong>{msg.fromName}</strong> nudged you</div>
+            <div className="cl-nudge-sub">Please review this step.</div>
           </div>
         </div>
       </div>

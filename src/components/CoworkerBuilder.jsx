@@ -664,32 +664,33 @@ export default function CoworkerBuilder({ coworkers, onUpdateCoworkers, fileTree
             <p className="cw-list-subtitle">AI team members that process cases, review documents, and make assessments.</p>
             <EducationalCue cueId="coworkers-overview" show={showEducationalCues} />
           </div>
-          <button className="cw-hire-btn" onClick={handleCreate}>+ New Coworker</button>
-        </div>
-
-        {coworkers.length > 0 && (
-          <div className="cwb-toolbar">
-            <input
-              type="text"
-              className="cwb-search"
-              placeholder="Search by name or role\u2026"
-              value={searchQ}
-              onChange={e => setSearchQ(e.target.value)}
-            />
-            <div className="cwb-view-toggle">
-              <button
-                className={`cwb-view-btn${viewMode === 'grid' ? ' active' : ''}`}
-                onClick={() => setViewMode('grid')}
-                title="Grid view"
-              >Grid</button>
-              <button
-                className={`cwb-view-btn${viewMode === 'list' ? ' active' : ''}`}
-                onClick={() => setViewMode('list')}
-                title="List view"
-              >List</button>
-            </div>
+          <div className="cw-list-actions">
+            {coworkers.length > 0 && (
+              <>
+                <input
+                  type="text"
+                  className="cwb-search cwb-search-inline"
+                  placeholder="Search\u2026"
+                  value={searchQ}
+                  onChange={e => setSearchQ(e.target.value)}
+                />
+                <div className="cwb-view-toggle">
+                  <button
+                    className={`cwb-view-btn${viewMode === 'grid' ? ' active' : ''}`}
+                    onClick={() => setViewMode('grid')}
+                    title="Grid view"
+                  >Grid</button>
+                  <button
+                    className={`cwb-view-btn${viewMode === 'list' ? ' active' : ''}`}
+                    onClick={() => setViewMode('list')}
+                    title="List view"
+                  >List</button>
+                </div>
+              </>
+            )}
+            <button className="cw-hire-btn" onClick={handleCreate}>+ New Coworker</button>
           </div>
-        )}
+        </div>
 
         {coworkers.length === 0 ? (
           <div className="cw-list-grid">

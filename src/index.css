@@ -4604,6 +4604,18 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
   gap: 12px;
   margin-bottom: 16px;
 }
+.cw-list-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+.cwb-search-inline {
+  flex: 0 0 auto;
+  width: 180px;
+  padding: 8px 12px;
+  font-size: 13px;
+}
 .cwb-search {
   flex: 1;
   padding: 10px 14px;

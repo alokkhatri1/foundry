@@ -4637,15 +4637,16 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
    native <fieldset disabled> wrapper; the banner makes the read-only state
    legible to the user. */
 .cwb-readonly-banner {
-  margin-left: 12px;
-  padding: 4px 12px;
-  background: var(--bg-warm);
-  border: 1px solid var(--border-color);
+  margin-left: auto;
+  padding: 6px 14px;
+  background: rgba(200, 149, 108, 0.14);
+  border: 1px solid var(--accent-gold, #c8956c);
   border-radius: var(--radius-pill, 999px);
   font-size: 12px;
-  font-weight: 600;
-  color: var(--text-muted);
+  font-weight: 700;
+  color: var(--accent-gold, #c8956c);
   letter-spacing: 0.2px;
+  white-space: nowrap;
 }
 .cwb-editor-fieldset {
   border: 0;
@@ -5212,6 +5213,7 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
 .cwb-editor { display: flex; flex-direction: column; flex: 1; overflow: hidden; }
 .cwb-editor-header {
   padding: 12px 24px; border-bottom: 1px solid var(--border-color); flex-shrink: 0;
+  display: flex; align-items: center; gap: 12px;
 }
 .cwb-editor-scroll { flex: 1; overflow-y: auto; background: var(--bg-warm); }
 .cwb-editor-content { max-width: 600px; margin: 0 auto; padding: 28px 24px 64px; display: flex; flex-direction: column; gap: 16px; }

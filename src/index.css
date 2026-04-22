@@ -2801,14 +2801,62 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
 }
 
 /* Approval gate */
-.cl-approval-context {
-  font-size: 13px;
-  color: var(--text-muted);
-  margin-top: 8px;
-  padding-top: 8px;
-  border-top: 1px solid var(--border-color);
-  white-space: pre-wrap;
+.cl-approval-prompt {
+  font-size: 15px;
+  color: var(--text-dark);
+  font-weight: 500;
+  line-height: 1.45;
+  margin-top: 4px;
+  margin-bottom: 4px;
 }
+.cl-approval-context-wrap {
+  margin-top: 14px;
+  padding: 12px 14px;
+  background: var(--bg-warm);
+  border-radius: var(--radius);
+  border: 1px solid var(--border-color);
+}
+.cl-approval-context-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin-bottom: 8px;
+}
+.cl-approval-context {
+  font-size: 13.5px;
+  color: var(--text-body);
+  line-height: 1.55;
+  max-height: 220px;
+  overflow: hidden;
+  position: relative;
+  mask-image: linear-gradient(to bottom, #000 0%, #000 80%, transparent 100%);
+  -webkit-mask-image: linear-gradient(to bottom, #000 0%, #000 80%, transparent 100%);
+}
+.cl-approval-context.expanded {
+  max-height: none;
+  mask-image: none;
+  -webkit-mask-image: none;
+}
+.cl-approval-context .rt-h,
+.cl-approval-context .rt-p,
+.cl-approval-context .rt-ul,
+.cl-approval-context .rt-ol { font-size: 13.5px; line-height: 1.55; }
+.cl-approval-context .rt-h1 { font-size: 15px; }
+.cl-approval-context .rt-h2 { font-size: 14px; }
+.cl-approval-context-toggle {
+  display: inline-block;
+  margin-top: 10px;
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--accent-gold);
+  cursor: pointer;
+}
+.cl-approval-context-toggle:hover { text-decoration: underline; }
 .cl-approval-comment {
   width: 100%;
   margin-top: 12px;
@@ -2846,14 +2894,28 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
   margin-top: 6px;
 }
 .cl-approval-resolved {
-  margin-top: 10px;
-  font-weight: 700;
-  font-size: 14px;
-  color: var(--text-dark);
+  margin-top: 14px;
+  padding: 10px 14px;
+  border-radius: var(--radius);
+  font-size: 13px;
 }
+.cl-approval-resolved.approved {
+  background: #edf4ed;
+  border: 1px solid #cfe0d2;
+  color: #3f6b4c;
+}
+.cl-approval-resolved.rejected {
+  background: #fbeeed;
+  border: 1px solid #ebd0cd;
+  color: #a0443e;
+}
+.cl-approval-resolved-action { font-weight: 700; }
+.cl-approval-resolved-by { font-weight: 500; opacity: 0.8; }
 .cl-approval-resolved-comment {
+  margin-top: 6px;
   font-weight: 400;
-  color: var(--text-muted);
+  font-style: italic;
+  opacity: 0.9;
 }
 
 /* Recipient picker (Ask Human) */

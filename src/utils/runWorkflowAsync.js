@@ -234,13 +234,20 @@ export async function executeWorkflowRun({
       onRunUpdate(runId, { status: 'waiting_approval' });
 
       const upstreamDraft = predBlocks.join('\n\n---\n\n');
+      // Cleaner version for the reviewer's card: skip the "### nodeLabel"
+      // prefixes that get baked into predBlocks for coworker context passing.
+      // With a single predecessor those headers are just noise; with multiple,
+      // we still want them so the reviewer can tell outputs apart.
+      const reviewerContext = fPreds.length <= 1
+        ? (executed.get(fPreds[0]?.source)?.output ?? '')
+        : upstreamDraft;
 
       onMessage({
         type: 'approval',
         runId,
         prompt: step.prompt || 'Review the upstream output and approve or reject with feedback',
         actions: ['Approve', 'Reject'],
-        previousOutput: upstreamDraft,
+        previousOutput: reviewerContext,
         resolved: false,
       });
 

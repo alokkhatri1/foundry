@@ -48,6 +48,7 @@ function AssistantAvatar({ label, coworkerAvatar }) {
 
 function ChatMessage({ msg, onApprovalAction, onPickRecipient, onNudgeRecipient, onGoToFiles, onRetry, participants, currentUserName, showEducationalCues }) {
   const [comment, setComment] = useState('');
+  const [contextExpanded, setContextExpanded] = useState(false);
   const sender = msg.participantName ? participants?.find(p => p.name === msg.participantName) : null;
 
   if (msg.type === 'status') return <div className="cl-status"><span>{msg.content}</span></div>;
@@ -91,16 +92,33 @@ function ChatMessage({ msg, onApprovalAction, onPickRecipient, onNudgeRecipient,
 
   if (msg.type === 'approval') {
     const isActive = !msg.resolved;
+    const rawContext = msg.previousOutput || '';
+    const CONTEXT_PREVIEW_CHARS = 600;
+    const isLong = rawContext.length > CONTEXT_PREVIEW_CHARS;
+    const previewText = isLong && !contextExpanded
+      ? rawContext.slice(0, CONTEXT_PREVIEW_CHARS).replace(/\s+\S*$/, '')
+      : rawContext;
     return (
       <div className="cl-row cl-row-ai">
         <AssistantAvatar label="!" />
         <div className="cl-bubble cl-bubble-approval">
           <div className="cl-bubble-label approval">Review step</div>
-          <div className="cl-bubble-content">{msg.prompt || 'Review the upstream output and approve or reject with feedback.'}</div>
+          <div className="cl-approval-prompt">{msg.prompt || 'Review the upstream output and approve or reject with feedback.'}</div>
           <EducationalCue cueId="chat-approval-gate" show={showEducationalCues} />
-          {msg.previousOutput && (
-            <div className="cl-approval-context">
-              {msg.previousOutput.length > 400 ? msg.previousOutput.slice(0, 400) + '...' : msg.previousOutput}
+          {rawContext && (
+            <div className="cl-approval-context-wrap">
+              <div className="cl-approval-context-label">Upstream output</div>
+              <div className={`cl-approval-context md-doc${contextExpanded ? ' expanded' : ''}`}>
+                <RichText content={previewText} />
+              </div>
+              {isLong && (
+                <button
+                  className="cl-approval-context-toggle"
+                  onClick={() => setContextExpanded(v => !v)}
+                >
+                  {contextExpanded ? 'Show less' : 'Show full output'}
+                </button>
+              )}
             </div>
           )}
           {isActive && (
@@ -126,9 +144,10 @@ function ChatMessage({ msg, onApprovalAction, onPickRecipient, onNudgeRecipient,
             </>
           )}
           {msg.resolved && (
-            <div className="cl-approval-resolved">
-              {msg.resolvedAction}
-              {msg.resolvedComment && <span className="cl-approval-resolved-comment"> — "{msg.resolvedComment}"</span>}
+            <div className={`cl-approval-resolved ${msg.resolvedAction === 'Approve' ? 'approved' : 'rejected'}`}>
+              <span className="cl-approval-resolved-action">{msg.resolvedAction === 'Approve' ? '\u2713 Approved' : '\u2715 Rejected'}</span>
+              {msg.resolvedBy && <span className="cl-approval-resolved-by"> by {msg.resolvedBy}</span>}
+              {msg.resolvedComment && <div className="cl-approval-resolved-comment">"{msg.resolvedComment}"</div>}
             </div>
           )}
         </div>

@@ -1656,6 +1656,18 @@ Examples:
   }
 
   function handleApprovalAction(runId, msgId, action, comment) {
+    // Flip the approval card to its resolved state across every conversation
+    // so the buttons disappear and a confirmation shows in their place. The
+    // card lives on the run's dedicated conversation, which isn't guaranteed
+    // to be the currently-active one, so we walk them all.
+    setConversations(prev => prev.map(c => ({
+      ...c,
+      messages: (c.messages || []).map(m =>
+        m.id === msgId
+          ? { ...m, resolved: true, resolvedAction: action, resolvedComment: comment, resolvedBy: userName }
+          : m
+      ),
+    })));
     // Try run-specific resolver first
     const resolver = approvalResolversRef.current.get(runId);
     if (resolver) {

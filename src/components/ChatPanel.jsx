@@ -381,11 +381,14 @@ function ContextSidebar({ fileTree, selectedFileIds, onToggleFile, onToggleFolde
     setCollapsedSections(prev => ({ ...prev, [id]: !prev[id] }));
   }
 
-  // The main-chat sidebar is "my workspace": files, coworkers, and chats I
-  // created. Ownership is matched at every level of the tree so a dept
-  // folder, subfolder, and leaf all need to trace back to me before they
-  // render. The Files tab exposes the full shared library — this is just
-  // the per-participant slice for quick access while chatting.
+  // Two-state sidebar:
+  //   • Idle (no search): "my workspace" — only files, folders, and AI
+  //     coworkers the current participant created show up. Humans and
+  //     chats are user-local already.
+  //   • Typing a query: scope widens to the whole workshop so anything
+  //     anyone built that matches the query becomes reachable. Search is
+  //     an explicit "show me everything" affordance, not a filter on the
+  //     already-scoped list.
   const q = searchFilter.trim().toLowerCase();
   const matchesQuery = (text) => !q || (text || '').toLowerCase().includes(q);
   const ownedByMe = (node) => node?.createdBy === currentUserName;
@@ -396,24 +399,37 @@ function ContextSidebar({ fileTree, selectedFileIds, onToggleFile, onToggleFolde
     return node.children.some(hasMyFileDeep);
   };
   function getDepartments() {
-    const deptRaw = (fileTree.children || [])
-      .filter(dept => ownedByMe(dept) || hasMyFileDeep(dept))
-      .map(dept => {
-        const subfolders = (dept.children || [])
-          .filter(sub => ownedByMe(sub) || hasMyFileDeep(sub))
-          .map(subfolder => {
-            const myFiles = (subfolder.children || []).filter(c => c.type === 'file' && ownedByMe(c));
-            const filtered = q ? myFiles.filter(f => matchesQuery(f.name.replace(/\.md$/, ''))) : myFiles;
-            return { id: subfolder.id, name: subfolder.name, files: filtered, hasMatch: filtered.length > 0 };
-          });
+    if (q) {
+      // Search-wide view: every dept/subfolder/file in the workshop is
+      // eligible; results narrow down to whatever matches the query.
+      const deptRaw = (fileTree.children || []).map(dept => {
+        const subfolders = (dept.children || []).map(subfolder => {
+          const files = (subfolder.children || []).filter(c => c.type === 'file');
+          const filtered = files.filter(f => matchesQuery(f.name.replace(/\.md$/, '')));
+          return { id: subfolder.id, name: subfolder.name, files: filtered, hasMatch: filtered.length > 0 };
+        });
         return { id: dept.id, name: dept.name, subfolders };
       });
-    if (!q) return deptRaw;
-    return deptRaw
-      .filter(dept => dept.subfolders.some(sf => sf.hasMatch))
+      return deptRaw
+        .filter(dept => dept.subfolders.some(sf => sf.hasMatch))
+        .map(dept => ({
+          ...dept,
+          subfolders: dept.subfolders.filter(sf => sf.hasMatch),
+        }));
+    }
+    // Idle view: only my own folders/files.
+    return (fileTree.children || [])
+      .filter(dept => ownedByMe(dept) || hasMyFileDeep(dept))
       .map(dept => ({
-        ...dept,
-        subfolders: dept.subfolders.filter(sf => sf.hasMatch),
+        id: dept.id,
+        name: dept.name,
+        subfolders: (dept.children || [])
+          .filter(sub => ownedByMe(sub) || hasMyFileDeep(sub))
+          .map(subfolder => ({
+            id: subfolder.id,
+            name: subfolder.name,
+            files: (subfolder.children || []).filter(c => c.type === 'file' && ownedByMe(c)),
+          })),
       }));
   }
 
@@ -453,12 +469,12 @@ function ContextSidebar({ fileTree, selectedFileIds, onToggleFile, onToggleFolde
     return base.filter(c => matchesQuery(c.title || 'New Chat'));
   })();
 
-  // AI Coworkers in the main sidebar are scoped to the ones I built. The
-  // Coworker Builder tab lists everyone's for discovery; this sidebar is
-  // my day-to-day roster. Search narrows the roster further.
-  const visibleCoworkers = (coworkers || [])
-    .filter(cw => ownedByMe(cw))
-    .filter(cw => matchesQuery(cw.name));
+  // AI Coworkers follow the same two-state rule as Files: idle shows the
+  // ones I built; typing a query widens to the whole roster so any peer's
+  // coworker matching the term is reachable.
+  const visibleCoworkers = q
+    ? (coworkers || []).filter(cw => matchesQuery(cw.name))
+    : (coworkers || []).filter(ownedByMe);
 
   return (
     <div className="sl-sidebar">

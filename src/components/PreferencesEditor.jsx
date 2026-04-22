@@ -43,7 +43,7 @@ export default function PreferencesEditor({ initialContent, onSave, onClose }) {
         </p>
         <div className="modal-actions" style={{ marginTop: 16 }}>
           <button className="modal-btn cancel" onClick={onClose}>Cancel</button>
-          <button className="landing-join-btn" style={{ width: 'auto', padding: '10px 24px' }} onClick={handleSave} disabled={saving}>
+          <button className="modal-btn primary" onClick={handleSave} disabled={saving}>
             {saving ? 'Saving...' : 'Save'}
           </button>
         </div>

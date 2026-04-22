@@ -323,6 +323,7 @@ function ContextSidebar({ fileTree, selectedFileIds, onToggleFile, onToggleFolde
     return collapsed;
   });
   const [searchFilter, setSearchFilter] = useState('');
+  const [chatSearch, setChatSearch] = useState('');
 
   if (!fileTree) return null;
 
@@ -363,14 +364,26 @@ function ContextSidebar({ fileTree, selectedFileIds, onToggleFile, onToggleFolde
   const activeFiles = selectedFileIds.map(id => findNode(fileTree, id)).filter(Boolean);
 
   // Chats render newest-first, with the currently-active chat hoisted to the
-  // top so the highlighted row is always the one you're reading. Otherwise a
-  // new run spawning a fresh chat buries the active one under it.
-  const sortedConvos = (() => {
-    const base = [...(conversations || [])].reverse();
-    if (!activeConvoId) return base;
-    const active = base.find(c => c.id === activeConvoId);
-    if (!active) return base;
-    return [active, ...base.filter(c => c.id !== activeConvoId)];
+  // top so the highlighted row is always the one you're reading. When the
+  // user searches, we apply the filter across the full list. Otherwise we
+  // cap the sidebar at 10 most-recent so older chats don't wallpaper the
+  // whole sidebar — they stay discoverable via search.
+  const { sortedConvos, hiddenCount } = (() => {
+    let base = [...(conversations || [])].reverse();
+    if (activeConvoId) {
+      const active = base.find(c => c.id === activeConvoId);
+      if (active) base = [active, ...base.filter(c => c.id !== activeConvoId)];
+    }
+    const q = chatSearch.trim().toLowerCase();
+    if (q) {
+      const filtered = base.filter(c => (c.title || 'New Chat').toLowerCase().includes(q));
+      return { sortedConvos: filtered, hiddenCount: 0 };
+    }
+    const LIMIT = 10;
+    return {
+      sortedConvos: base.slice(0, LIMIT),
+      hiddenCount: Math.max(0, base.length - LIMIT),
+    };
   })();
 
   return (
@@ -433,6 +446,20 @@ function ContextSidebar({ fileTree, selectedFileIds, onToggleFile, onToggleFolde
           <span className="sl-section-name">Chats</span>
           <button className="sl-new-chat-btn" onClick={onNewChat}>+ New</button>
         </div>
+        {(conversations || []).length > 3 && (
+          <div className="sl-chat-search-wrap">
+            <input
+              type="text"
+              className="sl-chat-search"
+              placeholder="Search chats..."
+              value={chatSearch}
+              onChange={e => setChatSearch(e.target.value)}
+            />
+            {chatSearch && (
+              <button className="sl-chat-search-clear" onClick={() => setChatSearch('')} title="Clear">{'\u2715'}</button>
+            )}
+          </div>
+        )}
         <div className="sl-chat-list">
           {sortedConvos.map(c => (
             <div
@@ -442,13 +469,19 @@ function ContextSidebar({ fileTree, selectedFileIds, onToggleFile, onToggleFolde
             >
               <span className="sl-chat-title">{c.title || 'New Chat'}</span>
               <span className="sl-chat-meta">{c.messages?.length || 0} msgs</span>
-              {sortedConvos.length > 1 && (
+              {(conversations || []).length > 1 && (
                 <button className="sl-chat-delete" onClick={e => { e.stopPropagation(); onDeleteConvo(c.id); }}>{'\u2715'}</button>
               )}
             </div>
           ))}
-          {sortedConvos.length === 0 && (
+          {sortedConvos.length === 0 && chatSearch && (
+            <div className="sl-chat-empty" style={{ cursor: 'default' }}>No chats match "{chatSearch}"</div>
+          )}
+          {sortedConvos.length === 0 && !chatSearch && (
             <div className="sl-chat-empty" onClick={onNewChat}>Start a conversation</div>
+          )}
+          {hiddenCount > 0 && (
+            <div className="sl-chat-hidden-hint">+{hiddenCount} more — search to find them</div>
           )}
         </div>
       </div>

@@ -108,8 +108,11 @@ export default function AuthGate({ children, onJoin, workshopCode }) {
               <span className="landing-logo-text">Foundry</span>
             </div>
             <h1 className="landing-title">
-              Where you become <span className="landing-highlight">AI-native</span>.
+              The platform where you become <span className="landing-highlight">AI Native</span>.
             </h1>
+            <p className="landing-subtitle">
+              Built on the AI Nativity framework.
+            </p>
           </div>
 
           <div className="landing-right">

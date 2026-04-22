@@ -1006,7 +1006,7 @@ function WorkflowEditor({ workflow, onUpdateWorkflow, readOnly, fileTree, cowork
           disabled={readOnly}
         />
         {readOnly && (
-          <div className="wf-readonly-banner">Read-only — built by {workflow.createdBy}</div>
+          <div className="wf-readonly-banner">Read-only — built by {workflow.createdBy || 'another participant'}</div>
         )}
         {!readOnly && (
           <div className="add-step-dropdown">

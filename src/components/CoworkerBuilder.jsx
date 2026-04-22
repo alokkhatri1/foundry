@@ -535,7 +535,7 @@ function CoworkerEditor({ coworker, onUpdate, onBack, fileTree, callClaudeAPI, s
         <button className="files-back-btn" onClick={onBack}>{'\u2190'} Back</button>
         {readOnly && (
           <div className="cwb-readonly-banner" title="This coworker was built by another participant — you can view it but not change it.">
-            Read-only — built by {coworker.createdBy}
+            Read-only — built by {coworker.createdBy || 'another participant'}
           </div>
         )}
       </div>

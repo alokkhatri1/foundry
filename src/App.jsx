@@ -1599,13 +1599,44 @@ Examples:
         }
         handleUpdateTree(newTree);
       },
-      onCapture: async ({ fileId, coworkerId, content, runName }) => {
-        // Append the upstream output to a workspace file, timestamped so the
-        // accumulation is visible. If a coworker was also picked, make sure
-        // the file is in their knowledgeFileIds — so the next run inherits
-        // what this one produced (the "knowledge compounds" loop).
+      onCapture: async ({ fileId, coworkerId, mode, content, runId: capRunId, runName }) => {
+        // Two modes. Knowledge (default): append the upstream output to a
+        // file with a timestamp so the accumulation is visible run-over-run.
+        // Skills: ask an LLM to read the current file + the latest run and
+        // propose a minimal edit, then overwrite. Facts accumulate, skills
+        // distill — different compounding shapes.
         const file = flatFiles.find(f => f.id === fileId);
         if (!file) throw new Error('Target file not found');
+
+        if (mode === 'skills') {
+          const systemPrompt = [
+            'You are refining the instructions of an AI coworker based on a recent run.',
+            'Output ONLY the new full instructions text. No preamble, no explanation, no code fences.',
+            'If no edit is warranted, output exactly the string: NO_CHANGE',
+            'Preserve what works. Sharpen decision rules. Add guidance for edge cases that came up. Stay concise — do not bloat.',
+          ].join('\n');
+          const userMessage = [
+            '## Current Instructions',
+            (file.content || '').trim() || '(empty)',
+            '',
+            '## Latest Run Output',
+            content,
+            '',
+            '## Task',
+            'Propose a minimal edit to the instructions that captures any new pattern, rule, or correction revealed by this run.',
+          ].join('\n');
+          const result = await callClaudeAPI(systemPrompt, userMessage, {
+            segment: 'workflow_capture',
+            segmentRefId: `${capRunId}:skills-refine`,
+          });
+          if (!result.success) throw new Error(result.error || 'Skills refinement failed');
+          const proposed = (result.content || '').trim();
+          if (!proposed || proposed === 'NO_CHANGE') return;
+          handleUpdateFileContent(fileId, proposed);
+          return;
+        }
+
+        // Knowledge mode (default): append + optionally wire to coworker.
         const header = `\n\n---\n**Captured ${new Date().toLocaleString()}** — ${runName || 'workflow run'}\n\n`;
         const nextContent = (file.content || '') + header + content;
         handleUpdateFileContent(fileId, nextContent);

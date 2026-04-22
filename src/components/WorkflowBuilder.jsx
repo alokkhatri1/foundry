@@ -381,34 +381,62 @@ function StepCard({ step, index, coworkers, tools, participants, onUpdate, onDel
               );
             })()}
 
-            {step.type === 'capture' && (
-              <>
-                <div className="step-config-row">
-                  <label>Append output to file</label>
-                  <FilePicker
-                    fileTree={fileTree}
-                    selectedIds={step.targetFileId ? [step.targetFileId] : []}
-                    onChange={ids => onUpdate({ ...step, targetFileId: ids[ids.length - 1] || '' })}
-                    onUpdateContent={onUpdateFileContent}
-                  />
-                </div>
-                <div className="step-config-row">
-                  <label>Also grow this coworker's knowledge (optional)</label>
-                  <select
-                    value={step.targetCoworkerId || ''}
-                    onChange={e => onUpdate({ ...step, targetCoworkerId: e.target.value })}
-                  >
-                    <option value="">— none —</option>
-                    {(coworkers || []).map(cw => (
-                      <option key={cw.id} value={cw.id}>{cw.name || 'Unnamed coworker'}</option>
-                    ))}
-                  </select>
-                </div>
-                <div className="step-config-hint">
-                  After the upstream step succeeds, the output is appended to the file. If a coworker is picked, the file is also added to their knowledge — so the next run sees what this one produced. Leaving this blank is fine — the run completes, nothing gets captured.
-                </div>
-              </>
-            )}
+            {step.type === 'capture' && (() => {
+              const mode = step.mode || 'knowledge';
+              return (
+                <>
+                  <div className="step-config-row">
+                    <label>What kind of learning?</label>
+                    <div className="capture-mode-toggle">
+                      <button
+                        type="button"
+                        className={`capture-mode-btn${mode === 'knowledge' ? ' active' : ''}`}
+                        onClick={() => onUpdate({ ...step, mode: 'knowledge' })}
+                      >
+                        <span className="capture-mode-title">Append to knowledge</span>
+                        <span className="capture-mode-desc">Each run adds a precedent to the file.</span>
+                      </button>
+                      <button
+                        type="button"
+                        className={`capture-mode-btn${mode === 'skills' ? ' active' : ''}`}
+                        onClick={() => onUpdate({ ...step, mode: 'skills' })}
+                      >
+                        <span className="capture-mode-title">Refine skills</span>
+                        <span className="capture-mode-desc">AI edits the instructions based on this run.</span>
+                      </button>
+                    </div>
+                  </div>
+                  <div className="step-config-row">
+                    <label>{mode === 'skills' ? 'Instructions file to refine' : 'Append output to file'}</label>
+                    <FilePicker
+                      fileTree={fileTree}
+                      selectedIds={step.targetFileId ? [step.targetFileId] : []}
+                      onChange={ids => onUpdate({ ...step, targetFileId: ids[ids.length - 1] || '' })}
+                      onUpdateContent={onUpdateFileContent}
+                    />
+                  </div>
+                  {mode === 'knowledge' && (
+                    <div className="step-config-row">
+                      <label>Also grow this coworker's knowledge (optional)</label>
+                      <select
+                        value={step.targetCoworkerId || ''}
+                        onChange={e => onUpdate({ ...step, targetCoworkerId: e.target.value })}
+                      >
+                        <option value="">— none —</option>
+                        {(coworkers || []).map(cw => (
+                          <option key={cw.id} value={cw.id}>{cw.name || 'Unnamed coworker'}</option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+                  <div className="step-config-hint">
+                    {mode === 'skills'
+                      ? 'An AI reads the current instructions and the latest run, proposes a minimal edit, and overwrites the file. Use on an instructions file — not a knowledge doc. Leave the file blank and the run completes without refining.'
+                      : 'The upstream output is appended to the file with a timestamp. If a coworker is picked, the file is also added to their knowledge — so the next run sees what this one produced. Leaving the file blank is fine — the run completes, nothing captured.'}
+                  </div>
+                </>
+              );
+            })()}
 
             {step.type === 'approval' && (
               <>
@@ -814,7 +842,7 @@ function WorkflowEditor({ workflow, onUpdateWorkflow, fileTree, coworkers, tools
       name: defaultName,
       ...(type === 'agent' && { coworker: emptyCoworker() }),
       ...(type === 'approval' && { assigneeId: '', prompt: '', actions: ['Approve', 'Reject'] }),
-      ...(type === 'capture' && { targetFileId: '', targetCoworkerId: '' }),
+      ...(type === 'capture' && { mode: 'knowledge', targetFileId: '', targetCoworkerId: '' }),
     };
     onUpdateWorkflow({ ...workflow, steps: [...workflow.steps, newStep] });
     setShowAddMenu(false);
@@ -995,7 +1023,7 @@ export default function WorkflowBuilder({ workflows, onUpdateWorkflows, fileTree
     // auto-wire step; otherwise it would connect Trigger straight to Capture.
     const wfId = genWfId();
     const triggerStep = { id: 'trigger-' + wfId, type: 'trigger', name: 'Trigger', caseInput: '' };
-    const captureStep = { id: genStepId(), type: 'capture', name: 'Capture Learning', targetFileId: '', targetCoworkerId: '' };
+    const captureStep = { id: genStepId(), type: 'capture', name: 'Capture Learning', mode: 'knowledge', targetFileId: '', targetCoworkerId: '' };
     const newWf = {
       id: wfId,
       name: 'New Workflow',

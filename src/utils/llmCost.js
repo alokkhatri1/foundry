@@ -72,6 +72,7 @@ export const SEGMENT_LABELS = {
   coworker_chat: 'Coworker chats',
   workflow_run: 'Workflow runs',
   workflow_copilot: 'Workflow copilot',
+  workflow_capture: 'Skills refinement',
   refine_description: 'Coworker refinement',
   scorecard: 'Graduation scorecard',
 };

@@ -340,6 +340,7 @@ export async function executeWorkflowRun({
           await onCapture({
             fileId: step.targetFileId,
             coworkerId: step.targetCoworkerId || null,
+            mode: step.mode || 'knowledge',
             content: upstream,
             runId,
             runName: workflow.name,
@@ -354,7 +355,9 @@ export async function executeWorkflowRun({
         }
       }
 
-      const summary = `Appended to workspace${step.targetCoworkerId ? ' + grew coworker knowledge' : ''}`;
+      const summary = (step.mode || 'knowledge') === 'skills'
+        ? 'Refined coworker instructions'
+        : `Appended to workspace${step.targetCoworkerId ? ' + grew coworker knowledge' : ''}`;
       executed.set(nodeId, { output: summary });
       executionLog.push(nodeId);
       onStepUpdate(runId, stepIndex, { status: 'completed', output: summary, completedAt: Date.now() });

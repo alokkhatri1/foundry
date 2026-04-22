@@ -1563,6 +1563,10 @@ Examples:
       createdAt: Date.now(),
       messages: [],
     }]);
+    // Focus the new run's chat so the user sees its status lines and agent
+    // replies stream in. Without this, a second run's output lands in a
+    // conversation the user isn't looking at and the run feels broken.
+    setActiveConvoId(runConvoId);
 
     // Fire and forget — runs concurrently
     executeWorkflowRun({

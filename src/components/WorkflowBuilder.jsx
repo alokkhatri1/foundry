@@ -270,7 +270,7 @@ function StepCard({ step, index, coworkers, tools, participants, onUpdate, onDel
             Rejected: {String(stepResult.output).slice(0, 160)}
           </div>
         )}
-        {expanded && stepResult && stepResult.output && (
+        {expanded && stepResult?.output && (
           <div className="step-card-body">
             <div className="step-output-label">Output</div>
             <div className="step-output-body md-doc"><RichText content={String(stepResult.output)} /></div>
@@ -279,7 +279,7 @@ function StepCard({ step, index, coworkers, tools, participants, onUpdate, onDel
             )}
           </div>
         )}
-        {expanded && !stepResult && (
+        {expanded && !stepResult?.output && (
           <div className="step-card-body">
 
             {step.type === 'trigger' && (

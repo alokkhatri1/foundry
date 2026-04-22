@@ -695,9 +695,6 @@ export default function CoworkerBuilder({ coworkers, onUpdateCoworkers, fileTree
           <div className="cw-list-grid">
             <div className="cw-list-empty">
               <p>No coworkers yet.</p>
-              <button className="setup-btn-primary" onClick={handleCreate} style={{ marginTop: 16 }}>
-                + Create your first coworker<span className="btn-arrow">&#x2197;</span>
-              </button>
             </div>
           </div>
         ) : visibleCoworkers.length === 0 ? (

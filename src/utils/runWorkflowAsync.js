@@ -313,7 +313,13 @@ export async function executeWorkflowRun({
         }
         if (!prevReviewId) {
           onRunUpdate(runId, { status: 'rejected', completedAt: Date.now() });
-          onMessage({ type: 'status', content: `Workflow finally rejected (no previous human to revise with, no rejected path wired)` });
+          onMessage({
+            type: 'final_rejected',
+            workflowName: workflow.name,
+            reviewerName: decision.resolvedBy || userName || 'Reviewer',
+            stepLabel: nodeLabel(step),
+            comment: decision.comment || '',
+          });
           onLog({ type: 'workflow', message: 'status: FINAL_REJECTED' });
           return;
         }

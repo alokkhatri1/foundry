@@ -53,6 +53,29 @@ function ChatMessage({ msg, onApprovalAction, onPickRecipient, onNudgeRecipient,
 
   if (msg.type === 'status') return <div className="cl-status"><span>{msg.content}</span></div>;
 
+  if (msg.type === 'final_rejected') {
+    return (
+      <div className="cl-row cl-row-ai">
+        <div className="cl-final-rejected">
+          <div className="cl-final-rejected-icon">{'\u2715'}</div>
+          <div className="cl-final-rejected-body">
+            <div className="cl-final-rejected-headline">
+              Run rejected
+              {msg.reviewerName && <span className="cl-final-rejected-by"> by {msg.reviewerName}</span>}
+            </div>
+            <div className="cl-final-rejected-sub">
+              There's no earlier review step to bounce back to, so the run ends here.
+              {msg.comment && <div className="cl-final-rejected-comment">&ldquo;{msg.comment}&rdquo;</div>}
+              <div className="cl-final-rejected-hint">
+                To allow revision next time, add an earlier Review step or wire the Reject handle back to a Coworker.
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   if (msg.type === 'nudge') {
     return (
       <div className="cl-row cl-row-ai">

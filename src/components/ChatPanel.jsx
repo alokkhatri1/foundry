@@ -338,7 +338,16 @@ function ContextSidebar({ fileTree, selectedFileIds, onToggleFile, onToggleFolde
   // Resolve active files for pinned section
   const activeFiles = selectedFileIds.map(id => findNode(fileTree, id)).filter(Boolean);
 
-  const sortedConvos = [...(conversations || [])].reverse();
+  // Chats render newest-first, with the currently-active chat hoisted to the
+  // top so the highlighted row is always the one you're reading. Otherwise a
+  // new run spawning a fresh chat buries the active one under it.
+  const sortedConvos = (() => {
+    const base = [...(conversations || [])].reverse();
+    if (!activeConvoId) return base;
+    const active = base.find(c => c.id === activeConvoId);
+    if (!active) return base;
+    return [active, ...base.filter(c => c.id !== activeConvoId)];
+  })();
 
   return (
     <div className="sl-sidebar">

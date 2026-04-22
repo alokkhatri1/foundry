@@ -1638,7 +1638,7 @@ Examples:
   function handleNudge(runId) {
     const run = workflowRuns.find(r => r.id === runId);
     if (!run) return;
-    const waitingStep = run.stepResults.find(s => s.status === 'waiting');
+    const waitingStep = run.stepResults?.find(s => s.status === 'waiting');
     const assignee = waitingStep?.assigneeName || 'the reviewer';
     addMessage({ type: 'status', content: `${userName} nudged ${assignee} to review "${run.workflowName}"` });
     addLog({ type: 'workflow', message: `nudge sent to ${assignee} for ${run.workflowName}` });

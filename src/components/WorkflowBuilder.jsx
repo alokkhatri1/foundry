@@ -962,7 +962,7 @@ export default function WorkflowBuilder({ workflows, onUpdateWorkflows, fileTree
           participants={participants}
           onRun={onRun}
           isRunning={workflowRuns.some(r => r.workflowId === selectedWorkflow.id && (r.status === 'running' || r.status === 'waiting_approval'))}
-          currentStepId={(() => { const run = workflowRuns.find(r => r.workflowId === selectedWorkflow.id && r.status === 'running'); return run ? run.stepResults.find(s => s.status === 'running')?.stepId : null; })()}
+          currentStepId={(() => { const run = workflowRuns.find(r => r.workflowId === selectedWorkflow.id && r.status === 'running'); return run?.stepResults?.find(s => s.status === 'running')?.stepId ?? null; })()}
           activeRun={(() => {
             // Most recent run for this workflow — shown live while running, and
             // sticks around in "completed"/"rejected" state so the runner sees

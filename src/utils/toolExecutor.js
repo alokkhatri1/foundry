@@ -256,7 +256,10 @@ const RESEARCH_TEMPLATES = {
     async execute(p, callClaudeAPI) {
       if (!callClaudeAPI) return { success: false, output: 'Research unavailable (no API).' };
       const systemPrompt = 'You are a research assistant. Produce a concise research brief on the topic below. Use markdown with clear sections (Overview, Key Points, Notes). Be accurate and specific. Do not fabricate sources.';
-      const result = await callClaudeAPI(systemPrompt, `Research topic: ${p.topic}`);
+      // Short, bounded text task — Haiku is sufficient and ~5x cheaper than Sonnet.
+      const result = await callClaudeAPI(systemPrompt, `Research topic: ${p.topic}`, {
+        segment: 'tool_research', model: 'claude-haiku-4-5-20251001',
+      });
       return {
         success: !!result.success,
         output: result.success ? result.content : `Research failed: ${result.error || 'unknown'}`,
@@ -291,7 +294,10 @@ const PROCESS_TEMPLATES = {
       if (!callClaudeAPI) return { success: false, output: 'Processing unavailable (no API).' };
       const systemPrompt = 'You process documents. Given a document and an instruction, follow the instruction precisely on the document and return the result. Stay focused on the instruction.';
       const userMsg = `Instruction: ${p.instruction}\n\nDocument (${file.name}):\n${file.content}`;
-      const result = await callClaudeAPI(systemPrompt, userMsg);
+      // Bounded document processing — Haiku handles this well at ~5x less cost.
+      const result = await callClaudeAPI(systemPrompt, userMsg, {
+        segment: 'tool_process', model: 'claude-haiku-4-5-20251001',
+      });
       return {
         success: !!result.success,
         output: result.success ? result.content : `Processing failed: ${result.error || 'unknown'}`,

@@ -269,7 +269,12 @@ function summarizeWorkflow(workflow) {
   return `NODES:\n${stepLines.join('\n') || '(none)'}\n\nEDGES:\n${edgeLines.join('\n') || '(none)'}`;
 }
 
-function buildCopilotSystemPrompt({ workflow, coworkers, participants, fileTree }) {
+// Split the system prompt into a stable prefix (instructions + coworker /
+// human / file lists — changes rarely within a conversation) and a dynamic
+// suffix (the current workflow state — mutates on every tool call). The
+// prefix gets marked cache_control so turns 2+ read from prompt cache at
+// ~10x cheaper than a fresh input. The suffix rides dynamic.
+function buildCopilotPromptPrefix({ coworkers, participants, fileTree }) {
   const cwLines = (coworkers || [])
     .filter(c => c.name?.trim())
     .map(c => `- ${c.name}${c.role ? ` — ${c.role.slice(0, 120)}` : ''}`)
@@ -352,8 +357,11 @@ For configure_capture, pick a file name from the right list (mode=knowledge uses
 ${knowledgeLines}
 ### skills
 ${skillsLines}
+`;
+}
 
-## Current workflow state
+function buildCopilotPromptDynamic({ workflow }) {
+  return `## Current workflow state
 ${summarizeWorkflow(workflow)}
 `;
 }
@@ -392,9 +400,15 @@ export async function runCopilotTurn({
   let turns = 0;
   const MAX_TURNS = 10;
 
+  // Stable prefix — instructions + coworker / human / file lists. Computed
+  // once per user message and reused across the agentic loop's turns. This
+  // is the block that gets cache_control so turns 2+ hit the prompt cache
+  // instead of paying full input price again.
+  const stablePrefix = buildCopilotPromptPrefix({ coworkers, participants, fileTree });
+
   while (turns < MAX_TURNS) {
     turns++;
-    const systemPrompt = buildCopilotSystemPrompt({ workflow: currentWorkflow, coworkers, participants, fileTree });
+    const dynamicSuffix = buildCopilotPromptDynamic({ workflow: currentWorkflow });
 
     let data;
     try {
@@ -409,11 +423,15 @@ export async function runCopilotTurn({
         body: JSON.stringify({
           model: 'claude-sonnet-4-20250514',
           max_tokens: 2000,
-          // The copilot system prompt changes only when the workflow state,
-          // coworker list, or participant list changes. Within a back-to-back
-          // conversation it's usually stable for 2–5 turns — cache it. Tools
-          // are invariant across calls.
-          system: [{ type: 'text', text: systemPrompt, cache_control: { type: 'ephemeral' } }],
+          // Prefix (stable — instructions, coworker/human/file lists) gets
+          // cache_control so turns 2+ read from prompt cache. Suffix
+          // (dynamic — current workflow state, mutates every tool call)
+          // flows uncached. Tools array is invariant, caches on its last
+          // tool's marker.
+          system: [
+            { type: 'text', text: stablePrefix, cache_control: { type: 'ephemeral' } },
+            { type: 'text', text: dynamicSuffix },
+          ],
           messages,
           tools: COPILOT_TOOL_SCHEMAS.length > 0
             ? COPILOT_TOOL_SCHEMAS.map((t, i) => i === COPILOT_TOOL_SCHEMAS.length - 1 ? { ...t, cache_control: { type: 'ephemeral' } } : t)

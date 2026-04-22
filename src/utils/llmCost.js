@@ -75,6 +75,8 @@ export const SEGMENT_LABELS = {
   workflow_capture: 'Skills refinement',
   refine_description: 'Coworker refinement',
   scorecard: 'Graduation scorecard',
+  tool_research: 'Research tool',
+  tool_process: 'Process-document tool',
 };
 
 export function labelForSegment(s) {

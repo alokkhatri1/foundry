@@ -161,7 +161,9 @@ Given a rough description, write a clear role description (3-5 sentences) that c
 4. What its output should look like
 
 Write in second person ("You are...", "You analyze...", "You produce..."). Be specific and actionable — this text directly shapes how the AI behaves at runtime. Return ONLY the description text, nothing else.`,
-      role.trim()
+      role.trim(),
+      // Short text polishing task — Haiku is plenty, ~5x cheaper than Sonnet.
+      { segment: 'refine_description', model: 'claude-haiku-4-5-20251001' },
     );
     setGenerating(false);
     if (result.success) {

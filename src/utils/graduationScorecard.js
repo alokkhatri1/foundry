@@ -22,18 +22,20 @@ export const LEVEL_COLORS = {
   4: '#8b6fb0',
 };
 
-function countWhere(list, pred) {
-  return (list || []).filter(pred).length;
-}
-
-function level(value, thresholds) {
-  // thresholds = [awareness, application, mastery, influence]
-  // returns the highest level whose threshold is met.
-  let best = 0;
-  for (let i = 0; i < thresholds.length; i++) {
-    if (value >= thresholds[i]) best = i + 1;
+// Walk a file tree looking for files whose ancestor folder chain contains a
+// folder with the given name (e.g. 'skills' or 'knowledge'). Returns a flat
+// list of matching file nodes. Used instead of regex-on-filename because the
+// real convention is folder-based, not name-based.
+function filesInFolderNamed(tree, folderName) {
+  const acc = [];
+  function walk(node, withinTarget) {
+    if (!node) return;
+    const here = withinTarget || (node.type === 'folder' && node.name === folderName);
+    if (node.type === 'file' && withinTarget) acc.push(node);
+    for (const child of node.children || []) walk(child, here);
   }
-  return best;
+  walk(tree, false);
+  return acc;
 }
 
 export function computeScorecard({
@@ -45,12 +47,17 @@ export function computeScorecard({
   flatFiles = [],
   approvals = [],
   participants = [],
+  tools = [],
+  fileTree = null,
+  userPreferences = '',
 }) {
   const myMessages = (conversations || []).reduce((sum, c) => sum + (c.messages || []).filter(m => m.type === 'user').length, 0);
   const myCoworkers = (coworkers || []).filter(c => c.createdBy === userName);
   const myWorkflows = (workflows || []).filter(w => w.createdBy === userName);
   const myRuns = (workflowRuns || []).filter(r => r.startedBy === userName);
   const myFiles = (flatFiles || []).filter(f => !f.createdBy || f.createdBy === userName);
+  const myRealFiles = myFiles.filter(f => f.type === 'file');
+  const myTools = (tools || []).filter(t => !t.isPrebuilt && (!t.createdBy || t.createdBy === userName));
 
   // Approvals I personally resolved (any action), split by whose run.
   const myApprovals = (approvals || []).filter(a => a.resolved_by === userName);
@@ -68,10 +75,18 @@ export function computeScorecard({
     return run && run.startedBy === userName;
   });
 
-  // Skill + knowledge file ids referenced by OTHER participants' coworkers —
-  // evidence that a file I created shaped someone else's coworker.
-  const myFileIds = new Set(myFiles.map(f => f.id));
+  // Folder-based skills + knowledge detection. Falls back to regex-on-name
+  // when no fileTree is passed (test harness) so callers don't have to
+  // always thread it.
+  const skillsFilesAll = fileTree ? filesInFolderNamed(fileTree, 'skills') : myRealFiles.filter(f => /skill|instruction/i.test(f.name || ''));
+  const skillFiles = skillsFilesAll.filter(f => !f.createdBy || f.createdBy === userName);
+  const skillUsedInMyCoworkers = myCoworkers.some(c =>
+    (c.instructionFileIds || []).some(id => skillFiles.some(f => f.id === id))
+  );
   const othersCoworkers = (coworkers || []).filter(c => c.createdBy && c.createdBy !== userName);
+  const mySkillsUsedByOthers = skillFiles.filter(f =>
+    othersCoworkers.some(c => (c.instructionFileIds || []).includes(f.id))
+  ).length;
   const myFilesUsedByOthers = myFiles.filter(f =>
     othersCoworkers.some(c =>
       (c.instructionFileIds || []).includes(f.id)
@@ -79,9 +94,8 @@ export function computeScorecard({
     )
   );
 
-  // My coworkers DM'd by someone else — approximated by any DM thread
-  // that references one of my coworkers by name in its title. Crude but
-  // non-zero signal; fine for MVP.
+  // Someone else sent a DM to one of my coworkers — tracked by DM threads
+  // whose title matches a coworker name I own.
   const myCoworkerNames = new Set(myCoworkers.map(c => c.name));
   const coworkersDmdByOthers = (conversations || []).filter(c =>
     c.kind === 'dm' && myCoworkerNames.has(c.title)
@@ -92,26 +106,25 @@ export function computeScorecard({
 
   const dimensions = [];
 
-  // 1. Personalization (Preferences)
-  const prefFile = myFiles.find(f => /prefer|preference/i.test(f.name || ''));
-  const prefLen = (prefFile?.content || '').length;
+  // 1. Personalization (Preferences) — reads the actual user_preferences
+  //    content (threaded in from Supabase), not a file named "preferences".
+  const prefs = (userPreferences || '').trim();
   dimensions.push({
     key: 'personalization',
     label: 'Personalization',
     hint: 'Teaching the AI your voice and role.',
     level: (() => {
-      if (myMessages === 0) return 0;
-      if (!prefFile || prefLen < 10) return 1;
-      if (prefLen < 100) return 2;
+      if (myMessages === 0 && prefs.length === 0) return 0;
+      if (prefs.length === 0) return 1;
+      if (prefs.length < 80) return 2;
       return 3;
     })(),
-    evidence: prefFile
-      ? `Preferences file: ${prefLen} chars.`
+    evidence: prefs.length > 0
+      ? `Preferences: ${prefs.length} chars${prefs.length >= 80 ? ' (detailed)' : ''}.`
       : myMessages > 0 ? 'Chatted, but no preferences written yet.' : 'No activity.',
   });
 
   // 2. Grounding (Files as context)
-  const myRealFiles = myFiles.filter(f => f.type === 'file');
   dimensions.push({
     key: 'grounding',
     label: 'Grounding',
@@ -119,40 +132,40 @@ export function computeScorecard({
     level: (() => {
       const n = myRealFiles.length;
       if (n === 0) return 0;
-      const infl = myFilesUsedByOthers.length > 0 ? 4 : 0;
-      return Math.max(infl, level(n, [1, 1, 3, 999]));
+      if (myFilesUsedByOthers.length > 0) return 4;
+      if (n >= 5) return 3;
+      if (n >= 2) return 2;
+      return 1;
     })(),
     evidence: myRealFiles.length === 0
       ? 'No files uploaded.'
       : `${myRealFiles.length} file${myRealFiles.length === 1 ? '' : 's'} in your folders${myFilesUsedByOthers.length > 0 ? ` · ${myFilesUsedByOthers.length} used by others` : ''}.`,
   });
 
-  // 3. Skill authoring (files containing instructions, e.g. in /skills/)
-  const skillFiles = myRealFiles.filter(f => /skill|instruction/i.test(f.name || '') || /^\s*#\s*Skill/i.test(f.content || ''));
-  const skillUsedInMyCoworkers = myCoworkers.some(c =>
-    (c.instructionFileIds || []).some(id => skillFiles.some(f => f.id === id))
-  );
-  const mySkillsUsedByOthers = skillFiles.filter(f =>
-    othersCoworkers.some(c => (c.instructionFileIds || []).includes(f.id))
-  ).length;
+  // 3. Skill authoring — now folder-based (/skills/) instead of name regex.
   dimensions.push({
     key: 'skills',
     label: 'Skill authoring',
     hint: 'Writing reusable instructions that shape coworker behavior.',
     level: (() => {
       if (skillFiles.length === 0) return 0;
-      if (!skillUsedInMyCoworkers) return 2;
       if (mySkillsUsedByOthers > 0) return 4;
-      if (skillFiles.length > 1) return 3;
-      return 2;
+      if (skillUsedInMyCoworkers && skillFiles.length >= 2) return 3;
+      if (skillUsedInMyCoworkers) return 2;
+      return 1;
     })(),
     evidence: skillFiles.length === 0
       ? 'No skill files authored.'
       : `${skillFiles.length} skill file${skillFiles.length === 1 ? '' : 's'}${skillUsedInMyCoworkers ? ' · used in your coworker' : ''}${mySkillsUsedByOthers ? ` · reused by ${mySkillsUsedByOthers} of others' coworkers` : ''}.`,
   });
 
-  // 4. Coworker creation
-  const richCoworkers = myCoworkers.filter(c => (c.role || '').trim().length > 40 || (c.toolIds || []).length > 0);
+  // 4. Coworker creation — compound Mastery gate (role + instruction files +
+  //    tool) instead of a flat 40-char role threshold.
+  const richCoworker = myCoworkers.find(c =>
+    (c.role || '').trim().length > 40
+    && (c.instructionFileIds || []).length > 0
+    && (c.toolIds || []).length > 0
+  );
   dimensions.push({
     key: 'coworkers',
     label: 'Coworker creation',
@@ -160,15 +173,42 @@ export function computeScorecard({
     level: (() => {
       if (myCoworkers.length === 0) return 0;
       if (coworkersDmdByOthers > 0) return 4;
-      if (myCoworkers.length >= 2 && richCoworkers.length >= 1) return 3;
-      return 2;
+      if (myCoworkers.length >= 2 && richCoworker) return 3;
+      if (myCoworkers.some(c => (c.role || '').trim().length > 0 || (c.instructionFileIds || []).length > 0)) return 2;
+      return 1;
     })(),
     evidence: myCoworkers.length === 0
       ? 'No coworkers built.'
-      : `${myCoworkers.length} coworker${myCoworkers.length === 1 ? '' : 's'}: ${myCoworkers.map(c => c.name).slice(0, 3).join(', ')}${myCoworkers.length > 3 ? '…' : ''}${coworkersDmdByOthers > 0 ? ' · DM\'d by peers' : ''}.`,
+      : `${myCoworkers.length} coworker${myCoworkers.length === 1 ? '' : 's'}: ${myCoworkers.map(c => c.name).slice(0, 3).join(', ')}${myCoworkers.length > 3 ? '\u2026' : ''}${coworkersDmdByOthers > 0 ? ' · DM\'d by peers' : ''}.`,
   });
 
-  // 5. Mixed-team collaboration (reviews — sending and resolving)
+  // 5. Tools / Connectors — new dimension. Counts participant-authored tools
+  //    (non-prebuilt) plus coworkers that actually wire a tool in.
+  const myCoworkersWithTools = myCoworkers.filter(c => (c.toolIds || []).length > 0);
+  const myToolsUsedByOthers = myTools.filter(t =>
+    othersCoworkers.some(c => (c.toolIds || []).includes(t.id))
+  ).length;
+  dimensions.push({
+    key: 'tools',
+    label: 'Tools & connectors',
+    hint: 'Extending coworkers with external actions.',
+    level: (() => {
+      if (myTools.length === 0 && myCoworkersWithTools.length === 0) return 0;
+      if (myToolsUsedByOthers > 0) return 4;
+      if (myTools.length >= 1 && myCoworkersWithTools.length >= 1) return 3;
+      if (myCoworkersWithTools.length >= 1) return 2;
+      return 1;
+    })(),
+    evidence: (() => {
+      const parts = [];
+      if (myTools.length) parts.push(`${myTools.length} tool${myTools.length === 1 ? '' : 's'} built`);
+      if (myCoworkersWithTools.length) parts.push(`${myCoworkersWithTools.length} coworker${myCoworkersWithTools.length === 1 ? '' : 's'} armed`);
+      if (myToolsUsedByOthers) parts.push(`${myToolsUsedByOthers} used by others`);
+      return parts.length ? parts.join(' · ') + '.' : 'No tools built yet.';
+    })(),
+  });
+
+  // 6. Mixed-team collaboration (reviews — sending and resolving)
   dimensions.push({
     key: 'collaboration',
     label: 'Mixed-team collaboration',
@@ -191,7 +231,7 @@ export function computeScorecard({
     })(),
   });
 
-  // 6. Orchestration
+  // 7. Orchestration
   const myRunsWithHumanReview = myRuns.filter(r =>
     (r.stepResults || []).some(s => s.type === 'approval' && s.status === 'completed')
   );
@@ -219,21 +259,64 @@ export function computeScorecard({
     })(),
   });
 
-  // 7. Observability
-  const nudgesGiven = 0; // not persisted cross-session; treat as unknown
+  // 8. Capture Learning — new dimension. Did they configure a Capture step,
+  //    did it run successfully, did knowledge/skills actually compound?
+  const myCaptureSteps = myWorkflows.flatMap(w =>
+    (w.steps || []).filter(s => s.type === 'capture')
+  );
+  const myConfiguredCaptures = myCaptureSteps.filter(s => s.targetFileId);
+  const myCaptureRunsCompleted = myRuns.filter(r =>
+    (r.stepResults || []).some(s => s.type === 'capture' && s.status === 'completed' && s.output && !/^not configured/i.test(String(s.output)))
+  ).length;
+  const myCaptureFiles = new Set(myConfiguredCaptures.map(s => s.targetFileId));
+  const myCapturedFilesUsedByOthers = [...myCaptureFiles].filter(fid =>
+    othersCoworkers.some(c =>
+      (c.instructionFileIds || []).includes(fid) || (c.knowledgeFileIds || []).includes(fid)
+    )
+  ).length;
+  dimensions.push({
+    key: 'capture',
+    label: 'Capture learning',
+    hint: 'Turning a run into compounding knowledge or refined skills.',
+    level: (() => {
+      if (myCaptureSteps.length === 0) return 0;
+      if (myCapturedFilesUsedByOthers > 0) return 4;
+      if (myCaptureRunsCompleted >= 2) return 3;
+      if (myCaptureRunsCompleted >= 1) return 2;
+      return 1;
+    })(),
+    evidence: (() => {
+      const parts = [];
+      if (myConfiguredCaptures.length) parts.push(`${myConfiguredCaptures.length} capture step${myConfiguredCaptures.length === 1 ? '' : 's'} configured`);
+      if (myCaptureRunsCompleted) parts.push(`${myCaptureRunsCompleted} successful run${myCaptureRunsCompleted === 1 ? '' : 's'}`);
+      if (myCapturedFilesUsedByOthers) parts.push(`file${myCapturedFilesUsedByOthers === 1 ? '' : 's'} reused by peers`);
+      return parts.length ? parts.join(' · ') + '.' : 'No capture steps configured.';
+    })(),
+  });
+
+  // 9. Observability — now weighted toward actual review signals (decisions
+  //    + activity on your runs) rather than re-counting unrelated activity.
+  const runsInRoom = (workflowRuns || []).length;
   dimensions.push({
     key: 'observability',
     label: 'Observability',
-    hint: 'Following the trail of what the mixed team did.',
+    hint: 'Watching the mixed team work and acting on what you see.',
     level: (() => {
-      if ((workflowRuns || []).length === 0) return 0;
-      if (myApprovals.length > 0) return 3;
-      if (myRuns.length > 0) return 2;
+      if (runsInRoom === 0) return 0;
+      // Distinct runs I had decision-log involvement on — as reviewer or as
+      // owner whose run produced decisions.
+      const distinctRunsTouched = new Set([
+        ...myApprovals.map(a => a.run_id),
+        ...approvalsOnMyRuns.map(a => a.run_id),
+      ]);
+      if (distinctPeopleIReviewedFor.size >= 2 || distinctRunsTouched.size >= 3) return 4;
+      if (myApprovals.length >= 2) return 3;
+      if (myApprovals.length >= 1 || approvalsOnMyRuns.length >= 1) return 2;
       return 1;
     })(),
-    evidence: (workflowRuns || []).length === 0
-      ? 'No runs recorded yet.'
-      : `${(workflowRuns || []).length} run${(workflowRuns || []).length === 1 ? '' : 's'} visible in the room, ${myApprovals.length} decision${myApprovals.length === 1 ? '' : 's'} by you.`,
+    evidence: runsInRoom === 0
+      ? 'No runs to watch yet.'
+      : `${runsInRoom} run${runsInRoom === 1 ? '' : 's'} visible, ${myApprovals.length} decision${myApprovals.length === 1 ? '' : 's'} by you${approvalsOnMyRuns.length ? `, ${approvalsOnMyRuns.length} on your runs` : ''}.`,
   });
 
   // Overall band — lowest level across dimensions the user has started

@@ -14,6 +14,9 @@ export default function GraduationScreen({
   workflowRuns,
   flatFiles,
   participants,
+  tools,
+  fileTree,
+  userPreferences,
   loadAllRoomApprovals,
   onSignOut,
   embedded = false,
@@ -35,9 +38,9 @@ export default function GraduationScreen({
     if (approvals === null) return null;
     return computeScorecard({
       userName, conversations, coworkers, workflows, workflowRuns,
-      flatFiles, participants, approvals,
+      flatFiles, participants, approvals, tools, fileTree, userPreferences,
     });
-  }, [userName, conversations, coworkers, workflows, workflowRuns, flatFiles, participants, approvals]);
+  }, [userName, conversations, coworkers, workflows, workflowRuns, flatFiles, participants, approvals, tools, fileTree, userPreferences]);
 
   const totalMessages = (conversations || []).reduce((sum, c) => sum + (c.messages?.length || 0), 0);
   const filesCount = (flatFiles || []).filter(f => f.type === 'file').length;

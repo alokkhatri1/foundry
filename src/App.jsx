@@ -2084,6 +2084,9 @@ Answer in ONE sentence. If the user asks "how", a second sentence is allowed —
         workflowRuns={workflowRuns}
         flatFiles={flatFiles}
         participants={participants}
+        tools={tools}
+        fileTree={fileTree}
+        userPreferences={userPreferences}
         loadAllRoomApprovals={sb.loadAllRoomApprovals}
         onSignOut={() => {
           try { localStorage.removeItem('sandbox:state'); } catch {}
@@ -2319,6 +2322,9 @@ Answer in ONE sentence. If the user asks "how", a second sentence is allowed —
               workflowRuns={workflowRuns}
               flatFiles={flatFiles}
               participants={participants}
+              tools={tools}
+              fileTree={fileTree}
+              userPreferences={userPreferences}
               loadAllRoomApprovals={sb.loadAllRoomApprovals}
             />
           </div>

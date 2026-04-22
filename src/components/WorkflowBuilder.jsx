@@ -1004,7 +1004,7 @@ export default function WorkflowBuilder({ workflows, onUpdateWorkflows, fileTree
         <div className="wf-list-grid">
           {workflows.length === 0 && (
             <div className="wf-list-empty">
-              <p>No orchestrations yet.</p>
+              <p>No workflows yet.</p>
             </div>
           )}
           {workflows.map(wf => (

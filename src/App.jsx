@@ -1545,10 +1545,21 @@ Examples:
     // reply / approval note lands in a single conversation rather than
     // spawning a new "New Chat" for each message (which it used to, because
     // addMessage falls back to creating a convo when activeConvoId is stale).
+    // Title pulls a clean snippet off the Trigger's Instructions so ten runs
+    // of the same workflow read as ten distinct pieces of work instead of a
+    // stack of "Run: New Workflow" — the workflow name tails the snippet as
+    // a subtle suffix.
     const runConvoId = 'convo-run-' + runId;
+    const snippet = (() => {
+      const trigger = (workflow.steps || []).find(s => s.type === 'trigger');
+      const raw = (trigger?.caseInput || '').replace(/^#+\s*/gm, '').replace(/\s+/g, ' ').trim();
+      if (!raw) return null;
+      return raw.length > 45 ? raw.slice(0, 45).replace(/\s+\S*$/, '') + '\u2026' : raw;
+    })();
+    const runTitle = snippet ? `${snippet} \u2014 ${workflow.name}` : `Run: ${workflow.name}`;
     setConversations(prev => [...prev, {
       id: runConvoId,
-      title: `Run: ${workflow.name}`,
+      title: runTitle,
       createdAt: Date.now(),
       messages: [],
     }]);

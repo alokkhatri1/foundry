@@ -4355,6 +4355,25 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
   display: flex; align-items: center; gap: 10px; padding: 12px 16px;
   font-size: 13px; color: var(--text-muted); border-top: 1px solid var(--border-color);
 }
+.rdetail-step-empty {
+  padding: 12px 16px; font-size: 13px; color: var(--text-muted); font-style: italic;
+  border-top: 1px solid var(--border-color);
+}
+.rdetail-step-error {
+  padding: 12px 16px; font-size: 13px; color: #a0443e;
+  background: #fbeeed; border-top: 1px solid #ebd0cd;
+}
+/* When the output block holds markdown, RichText drops its own spacing;
+   override the block wrapper so it doesn't look too loose. */
+.rdetail-step-output.md-doc {
+  white-space: normal;
+}
+.rdetail-step-output.md-doc .rt-p { margin: 4px 0; font-size: 13px; }
+.rdetail-step-output.md-doc .rt-h1 { font-size: 15px; margin-top: 4px; }
+.rdetail-step-output.md-doc .rt-h2 { font-size: 14px; }
+.rdetail-step-output.md-doc .rt-h3 { font-size: 13px; }
+.rdetail-step-output.md-doc .rt-ul,
+.rdetail-step-output.md-doc .rt-ol { font-size: 13px; margin: 4px 0; }
 /* Decision log — shown when a Review step is expanded in RunDetail. Each
    entry is one decision (Approve/Reject) with who, when, and any comment
    they left. Visible to everyone in the room via realtime sync. */

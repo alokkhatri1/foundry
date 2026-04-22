@@ -13,6 +13,7 @@ function useTick(ms = 60_000) {
 import EducationalCue from './EducationalCue';
 import { CoworkerGlyph } from './Icon';
 import RunDagView from './RunDagView';
+import RichText from './RichText';
 import { stageReached } from './RevealAt';
 
 function isIconOrImage(avatar) {
@@ -200,7 +201,7 @@ function RunDetailView({ run, onBack, onApprovalAction, onCancelRun, onNudge, sh
             workflow={workflow}
             run={runWithApprovals}
             selectedStepId={selectedStepId}
-            onSelectStep={setSelectedStepId}
+            onSelectStep={(id) => setSelectedStepId(curr => curr === id ? null : id)}
             costByStepId={showCost ? costByStepId : null}
           />
         </div>
@@ -210,7 +211,7 @@ function RunDetailView({ run, onBack, onApprovalAction, onCancelRun, onNudge, sh
           <DecisionList
             run={run}
             selectedStepId={selectedStepId}
-            onSelectStep={setSelectedStepId}
+            onSelectStep={(id) => setSelectedStepId(curr => curr === id ? null : id)}
             approvalsForStep={approvalsForStep}
             isOwner={isOwner}
             onApprovalAction={onApprovalAction}
@@ -349,12 +350,51 @@ function DecisionRow({ step, run, isSelected, onSelect, approvalsForStep, isOwne
 
       {isSelected && (
         <div className="rdetail-v2-row-expand" onClick={e => e.stopPropagation()}>
-          {/* Coworker output */}
-          {!isReview && step.status === 'completed' && step.output && (
-            <div className="rdetail-step-output">{step.output}</div>
+          {/* Trigger — show the case input the run started with */}
+          {isTrigger && step.output && (
+            <div className="rdetail-step-output md-doc"><RichText content={String(step.output)} /></div>
+          )}
+          {isTrigger && !step.output && (
+            <div className="rdetail-step-empty">No case input captured.</div>
           )}
 
-          {/* Decision log for review steps */}
+          {/* Coworker — output rendered as markdown so headings/lists read
+              cleanly, plus status placeholders for non-terminal states. */}
+          {!isReview && !isTrigger && step.type !== 'capture' && state === 'completed' && step.output && (
+            <div className="rdetail-step-output md-doc"><RichText content={String(step.output)} /></div>
+          )}
+          {!isReview && !isTrigger && step.type !== 'capture' && state === 'running' && (
+            <div className="rdetail-step-running">
+              <div className="cl-loading"><span></span><span></span><span></span></div>
+              <span>Processing\u2026</span>
+            </div>
+          )}
+          {!isReview && !isTrigger && step.type !== 'capture' && state === 'error' && (
+            <div className="rdetail-step-error">
+              {step.output ? String(step.output) : 'Step errored with no detail.'}
+            </div>
+          )}
+          {!isReview && !isTrigger && step.type !== 'capture' && (state === 'pending' || !state) && (
+            <div className="rdetail-step-empty">Hasn't run yet.</div>
+          )}
+          {!isReview && !isTrigger && step.type !== 'capture' && state === 'skipped' && (
+            <div className="rdetail-step-empty">Skipped during this run.</div>
+          )}
+
+          {/* Capture — what compounded into which file. The runtime writes a
+              short summary to step.output, so we lean on that rather than
+              threading the workflow config down here. */}
+          {step.type === 'capture' && state === 'completed' && (
+            <div className="rdetail-step-output">{step.output || 'Captured.'}</div>
+          )}
+          {step.type === 'capture' && state !== 'completed' && (
+            <div className="rdetail-step-empty">
+              {state === 'skipped' ? 'Skipped.' : state === 'running' ? 'Capturing\u2026' : 'Hasn\'t run yet.'}
+            </div>
+          )}
+
+          {/* Review — decision log of past resolutions. Shown regardless of
+              current state so participants can see the history. */}
           {isReview && stepApprovals.length > 0 && (
             <div className="rdetail-decisionlog">
               <div className="rdetail-decisionlog-title">Decision log</div>
@@ -407,20 +447,22 @@ function DecisionRow({ step, run, isSelected, onSelect, approvalsForStep, isOwne
             </div>
           )}
 
-          {/* Waiting on someone else */}
+          {/* Waiting on someone else — show a friendly note with nudge. */}
           {isReview && state === 'waiting' && !isOwner && (
             <div className="rdetail-step-approval">
               <div className="rdetail-step-approval-prompt" style={{ color: 'var(--text-muted)' }}>
-                Waiting on {step.assigneeName || 'a reviewer'}. Only {run.startedBy} (who started this run) can resolve it from this view.
+                Waiting on {step.assigneeName || 'a reviewer'}. {run.startedBy ? `Only ${run.startedBy} can resolve this here.` : ''}
               </div>
+              <button className="rcard-nudge" style={{ marginTop: 8 }} onClick={() => onNudge(run.id)}>
+                Nudge {step.assigneeName || 'reviewer'}
+              </button>
             </div>
           )}
 
-          {/* Coworker in flight */}
-          {!isReview && state === 'running' && (
-            <div className="rdetail-step-running">
-              <div className="cl-loading"><span></span><span></span><span></span></div>
-              <span>Processing...</span>
+          {/* Review that hasn't been reached yet in this run */}
+          {isReview && state !== 'waiting' && stepApprovals.length === 0 && (
+            <div className="rdetail-step-empty">
+              {state === 'skipped' ? 'Skipped.' : state === 'pending' || !state ? 'Hasn\'t been reached yet.' : 'No decision recorded.'}
             </div>
           )}
         </div>

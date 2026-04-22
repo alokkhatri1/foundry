@@ -1,8 +1,12 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, createContext, useContext } from 'react';
 import { supabase } from '../supabase';
 import useSupabase from '../hooks/useSupabase';
 import JoinScreen from './JoinScreen';
 import AdminDashboard from './AdminDashboard';
+
+const AuthContext = createContext({ isAdmin: false, openAdmin: () => {} });
+
+export function useAuth() { return useContext(AuthContext); }
 
 export default function AuthGate({ children, onJoin, workshopCode }) {
   const sb = useSupabase();
@@ -147,6 +151,11 @@ export default function AuthGate({ children, onJoin, workshopCode }) {
     );
   }
 
-  // Authenticated + in workshop — render the app
-  return children;
+  // Authenticated + in workshop — render the app. Expose isAdmin and a
+  // setter so the in-workshop UI can offer a jump-back-to-admin shortcut.
+  return (
+    <AuthContext.Provider value={{ isAdmin, openAdmin: () => setShowAdmin(true) }}>
+      {children}
+    </AuthContext.Provider>
+  );
 }

@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useMemo } from 'react';
 import './App.css';
-import AuthGate from './components/AuthGate';
+import AuthGate, { useAuth } from './components/AuthGate';
 import GraduationScreen from './components/GraduationScreen';
 import FileExplorer from './components/FileExplorer';
 import FileEditor from './components/FileEditor';
@@ -189,6 +189,7 @@ function SpendChip({ sb, myParticipantId, onClick }) {
 function SettingsMenu({ userName, currentStage, sb, myParticipantId, creditsLeft, creditsTotal, onOpenUsage, onOpenPreferences, onExit }) {
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
+  const { isAdmin, openAdmin } = useAuth();
   const showSpend = stageReached(currentStage, '7b');
   // Workshop-wide total — matches the pedagogy of the Usage tab
   // ("look how cheap the whole room is"). We always run the hook (can't
@@ -255,6 +256,12 @@ function SettingsMenu({ userName, currentStage, sb, myParticipantId, creditsLeft
             )}
           </div>
           <div className="header-settings-divider" />
+          {isAdmin && (
+            <button
+              className="header-settings-item"
+              onClick={() => { openAdmin?.(); setOpen(false); }}
+            >Admin Panel</button>
+          )}
           {showPreferences && (
             <button
               className="header-settings-item"

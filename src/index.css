@@ -5017,7 +5017,23 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
 .ftp-dept-count { font-weight: 400; font-size: 10px; color: var(--text-muted); }
 .ftp-empty { padding: 16px; font-size: 13px; color: var(--text-muted); text-align: center; }
 
-/* File preview */
+/* File preview — promoted to a modal overlay so the edit surface is
+   actually usable. The old inline panel was too cramped to type into. */
+.ftp-preview-overlay {
+  position: fixed; inset: 0; z-index: 1000;
+  background: rgba(0, 0, 0, 0.35);
+  display: flex; align-items: center; justify-content: center;
+  padding: 32px;
+}
+.ftp-preview-modal {
+  background: var(--bg-white);
+  border-radius: var(--radius);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.25);
+  width: min(760px, 100%);
+  max-height: calc(100vh - 64px);
+  display: flex; flex-direction: column;
+  overflow: hidden;
+}
 .ftp-preview {
   border-left: 1px solid var(--border-color); background: var(--bg-white);
   flex: 1; min-width: 200px; overflow-y: auto;
@@ -5057,10 +5073,21 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
 }
 .ftp-preview-textarea {
   width: 100%; box-sizing: border-box; border: none; outline: none; resize: none;
-  padding: 10px 12px; font-family: var(--font-mono, monospace); font-size: 12px;
+  padding: 16px 20px; font-family: var(--font-mono, monospace); font-size: 13px;
   line-height: 1.6; color: var(--text-body); background: var(--bg-white);
-  min-height: 240px;
+  flex: 1; min-height: 360px;
 }
+.ftp-preview-modal .ftp-preview-content {
+  flex: 1;
+  padding: 16px 20px;
+  font-size: 14px;
+  line-height: 1.65;
+  overflow-y: auto;
+}
+.ftp-preview-modal .ftp-preview-header {
+  padding: 12px 16px;
+}
+.ftp-preview-modal .ftp-preview-name { font-size: 14px; }
 
 /* Tool dropdown */
 .ftp-tool-dropdown {

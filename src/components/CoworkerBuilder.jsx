@@ -372,35 +372,38 @@ function FilePicker({ fileTree, selectedIds, onChange, folderName, onUpdateConte
               );
             })}
           </div>
-          {previewFile && (
-            <div className="ftp-preview">
-              <div className="ftp-preview-header">
-                <span className="ftp-preview-name">{previewFile.name.replace(/\.md$/, '')}</span>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                  {onUpdateContent && (
-                    <button
-                      className="ftp-preview-action"
-                      onClick={() => setPreviewMode(previewMode === 'edit' ? 'view' : 'edit')}
-                    >{previewMode === 'edit' ? 'Save' : 'Edit'}</button>
-                  )}
-                  <button className="ftp-preview-close" onClick={() => setPreviewId(null)}>{'\u2715'}</button>
-                </div>
+        </div>
+      )}
+      {previewFile && (
+        <div className="ftp-preview-overlay" onClick={() => setPreviewId(null)}>
+          <div className="ftp-preview-modal" onClick={e => e.stopPropagation()}>
+            <div className="ftp-preview-header">
+              <span className="ftp-preview-name">{previewFile.name.replace(/\.md$/, '')}</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                {onUpdateContent && (
+                  <button
+                    className="ftp-preview-action"
+                    onClick={() => setPreviewMode(previewMode === 'edit' ? 'view' : 'edit')}
+                  >{previewMode === 'edit' ? 'Save' : 'Edit'}</button>
+                )}
+                <button className="ftp-preview-close" onClick={() => setPreviewId(null)}>{'\u2715'}</button>
               </div>
-              {previewMode === 'edit' && onUpdateContent ? (
-                <textarea
-                  className="ftp-preview-textarea"
-                  value={previewFile.content || ''}
-                  onChange={e => onUpdateContent(previewFile.id, e.target.value)}
-                  placeholder="Start writing..."
-                  spellCheck={false}
-                />
-              ) : (
-                <div className="ftp-preview-content">
-                  {previewFile.content ? <RichText content={previewFile.content} /> : <em style={{ color: 'var(--text-muted)' }}>Empty file</em>}
-                </div>
-              )}
             </div>
-          )}
+            {previewMode === 'edit' && onUpdateContent ? (
+              <textarea
+                className="ftp-preview-textarea"
+                value={previewFile.content || ''}
+                onChange={e => onUpdateContent(previewFile.id, e.target.value)}
+                placeholder="Start writing..."
+                spellCheck={false}
+                autoFocus
+              />
+            ) : (
+              <div className="ftp-preview-content">
+                {previewFile.content ? <RichText content={previewFile.content} /> : <em style={{ color: 'var(--text-muted)' }}>Empty file</em>}
+              </div>
+            )}
+          </div>
         </div>
       )}
     </div>

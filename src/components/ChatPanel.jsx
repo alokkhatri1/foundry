@@ -363,27 +363,18 @@ function ContextSidebar({ fileTree, selectedFileIds, onToggleFile, onToggleFolde
   // Resolve active files for pinned section
   const activeFiles = selectedFileIds.map(id => findNode(fileTree, id)).filter(Boolean);
 
-  // Chats render newest-first, with the currently-active chat hoisted to the
-  // top so the highlighted row is always the one you're reading. When the
-  // user searches, we apply the filter across the full list. Otherwise we
-  // cap the sidebar at 10 most-recent so older chats don't wallpaper the
-  // whole sidebar — they stay discoverable via search.
-  const { sortedConvos, hiddenCount } = (() => {
+  // Chats render newest-first, active chat hoisted to the top. Full history
+  // stays available — the list itself scrolls when it gets long. Search
+  // filters by title across everything.
+  const sortedConvos = (() => {
     let base = [...(conversations || [])].reverse();
     if (activeConvoId) {
       const active = base.find(c => c.id === activeConvoId);
       if (active) base = [active, ...base.filter(c => c.id !== activeConvoId)];
     }
     const q = chatSearch.trim().toLowerCase();
-    if (q) {
-      const filtered = base.filter(c => (c.title || 'New Chat').toLowerCase().includes(q));
-      return { sortedConvos: filtered, hiddenCount: 0 };
-    }
-    const LIMIT = 10;
-    return {
-      sortedConvos: base.slice(0, LIMIT),
-      hiddenCount: Math.max(0, base.length - LIMIT),
-    };
+    if (!q) return base;
+    return base.filter(c => (c.title || 'New Chat').toLowerCase().includes(q));
   })();
 
   return (
@@ -479,9 +470,6 @@ function ContextSidebar({ fileTree, selectedFileIds, onToggleFile, onToggleFolde
           )}
           {sortedConvos.length === 0 && !chatSearch && (
             <div className="sl-chat-empty" onClick={onNewChat}>Start a conversation</div>
-          )}
-          {hiddenCount > 0 && (
-            <div className="sl-chat-hidden-hint">+{hiddenCount} more — search to find them</div>
           )}
         </div>
       </div>

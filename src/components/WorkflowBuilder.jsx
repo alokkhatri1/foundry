@@ -54,10 +54,27 @@ function getAllFolders(tree, path = []) {
 // position comes from workflow.nodes[i].position; the step's config lives in
 // data.stepCardProps. The drag-handle and drop-zone behavior inside StepCard
 // is suppressed when onCanvas is true — position drag happens via React Flow.
+// Small X button rendered at the top-right of each deletable node. Stays
+// hidden until the user hovers the node, then fades in red. Calls the same
+// onDelete the step card's header uses so confirmation + removal stay in
+// sync. Not rendered for the Trigger — it's pre-seeded and removing it
+// would break the whole run contract.
+function NodeDeleteButton({ onDelete }) {
+  if (!onDelete) return null;
+  return (
+    <button
+      className="wf-node-delete-btn"
+      onClick={(e) => { e.stopPropagation(); onDelete(); }}
+      title="Delete step"
+    >{'\u2715'}</button>
+  );
+}
+
 function CoworkerStepNode({ data }) {
   return (
     <div className="wf-canvas-node" style={{ width: 420 }}>
       <Handle type="target" position={Position.Top} id="in" className="wf-handle wf-handle-in" />
+      <NodeDeleteButton onDelete={data.stepCardProps?.onDelete} />
       <StepCard {...data.stepCardProps} onCanvas />
       <Handle type="source" position={Position.Bottom} id="out" className="wf-handle wf-handle-out" />
     </div>
@@ -71,6 +88,7 @@ function ReviewStepNode({ data }) {
   return (
     <div className="wf-canvas-node wf-review-node" style={{ width: 420 }}>
       <Handle type="target" position={Position.Top} id="in" className="wf-handle wf-handle-in" />
+      <NodeDeleteButton onDelete={data.stepCardProps?.onDelete} />
       <StepCard {...data.stepCardProps} onCanvas />
       <div className="wf-review-outputs">
         <span className="wf-review-output-label approved">Approved</span>
@@ -95,7 +113,8 @@ function ReviewStepNode({ data }) {
 }
 
 // Trigger node — the canonical entry point. No input handle (nothing upstream),
-// one output wire carrying the case input into the first real step.
+// one output wire carrying the case input into the first real step. Not
+// deletable — the runtime requires a trigger on every workflow.
 function TriggerNode({ data }) {
   return (
     <div className="wf-canvas-node wf-trigger-node" style={{ width: 420 }}>
@@ -113,6 +132,7 @@ function CaptureStepNode({ data }) {
   return (
     <div className="wf-canvas-node wf-capture-node" style={{ width: 420 }}>
       <Handle type="target" position={Position.Top} id="in" className="wf-handle wf-handle-in" />
+      <NodeDeleteButton onDelete={data.stepCardProps?.onDelete} />
       <StepCard {...data.stepCardProps} onCanvas />
     </div>
   );
@@ -288,7 +308,7 @@ function StepCard({ step, index, coworkers, tools, participants, onUpdate, onDel
           </span>
           {statusBadge}
           <span className="step-actions">
-            {!stepResult && step.type !== 'trigger' && (
+            {!onCanvas && !stepResult && step.type !== 'trigger' && (
               <button className="step-action-btn step-delete-btn" onClick={e => { e.stopPropagation(); onDelete(); }} title="Delete">{'\u2715'}</button>
             )}
             <span className={`step-chevron${expanded ? ' open' : ''}`}>{'\u25BE'}</span>

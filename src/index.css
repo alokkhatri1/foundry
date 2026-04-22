@@ -1841,6 +1841,23 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
 .wf-edge-delete-btn:hover {
   color: #c45c5c; border-color: #c45c5c; background: #fff6f5;
 }
+.wf-node-delete-btn {
+  position: absolute;
+  top: -10px; right: -10px;
+  width: 26px; height: 26px; border-radius: 50%;
+  background: var(--bg-white); border: 1.5px solid var(--border-color);
+  color: var(--text-muted); font-size: 12px; font-weight: 600;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; opacity: 0; transition: opacity 0.15s, color 0.15s, border-color 0.15s, background 0.15s;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+  padding: 0; line-height: 1;
+  z-index: 10;
+}
+.wf-canvas-node:hover .wf-node-delete-btn,
+.wf-node-delete-btn:hover { opacity: 1; }
+.wf-node-delete-btn:hover {
+  color: #c45c5c; border-color: #c45c5c; background: #fff6f5;
+}
 
 /* ===== Confirm Dialog ===== */
 .confirm-overlay {

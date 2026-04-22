@@ -54,22 +54,17 @@ function ChatMessage({ msg, onApprovalAction, onPickRecipient, onNudgeRecipient,
   if (msg.type === 'status') return <div className="cl-status"><span>{msg.content}</span></div>;
 
   if (msg.type === 'final_rejected') {
+    const isSelf = msg.reviewerName && msg.reviewerName === currentUserName;
+    const subject = isSelf ? 'You' : (msg.reviewerName || 'The reviewer');
     return (
       <div className="cl-row cl-row-ai">
         <div className="cl-final-rejected">
           <div className="cl-final-rejected-icon">{'\u2715'}</div>
           <div className="cl-final-rejected-body">
             <div className="cl-final-rejected-headline">
-              Run rejected
-              {msg.reviewerName && <span className="cl-final-rejected-by"> by {msg.reviewerName}</span>}
+              {subject} rejected the workflow step.
             </div>
-            <div className="cl-final-rejected-sub">
-              There's no earlier review step to bounce back to, so the run ends here.
-              {msg.comment && <div className="cl-final-rejected-comment">&ldquo;{msg.comment}&rdquo;</div>}
-              <div className="cl-final-rejected-hint">
-                To allow revision next time, add an earlier Review step or wire the Reject handle back to a Coworker.
-              </div>
-            </div>
+            {msg.comment && <div className="cl-final-rejected-comment">&ldquo;{msg.comment}&rdquo;</div>}
           </div>
         </div>
       </div>
@@ -1139,6 +1134,10 @@ export default function ChatPanel({ messages, onSendMessage, onApprovalAction, o
                   // the approval card now shows this state inline instead.
                   if (m.type === 'error' && typeof m.content === 'string'
                       && m.content.includes("run's runtime isn't active")) return false;
+                  // Drop the legacy jargon "Workflow finally rejected (...)"
+                  // status line — superseded by the final_rejected card type.
+                  if (m.type === 'status' && typeof m.content === 'string'
+                      && m.content.startsWith('Workflow finally rejected')) return false;
                   return true;
                 }).map((msg, i) => (
                   <ChatMessage key={msg.id || i} msg={msg} onApprovalAction={onApprovalAction} onPickRecipient={onPickRecipient} onNudgeRecipient={onNudgeRecipient} onGoToFiles={onGoToFiles} onRetry={onRetry} participants={participants} currentUserName={currentUserName} showEducationalCues={showEducationalCues} />

@@ -876,7 +876,11 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
   font-weight: 500;
   color: var(--text-body);
   border-radius: var(--radius-pill);
-  transition: all 0.2s;
+  /* Scope the transition so font-weight / badge visibility snap instantly.
+     `all 0.2s` was morphing every property simultaneously on old + new
+     tab, which made neighbouring badges and counts appear "active" for
+     the 200 ms of the switch. */
+  transition: color 0.15s, background 0.15s;
   position: relative;
   white-space: nowrap;
 }

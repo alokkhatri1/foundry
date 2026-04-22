@@ -1841,6 +1841,57 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
 .wf-edge-delete-btn:hover {
   color: #c45c5c; border-color: #c45c5c; background: #fff6f5;
 }
+
+/* ===== Confirm Dialog ===== */
+.confirm-overlay {
+  position: fixed; inset: 0; z-index: 3000;
+  background: rgba(0, 0, 0, 0.35);
+  display: flex; align-items: center; justify-content: center;
+  padding: 24px;
+  animation: confirm-fade 0.12s ease-out;
+}
+@keyframes confirm-fade { from { opacity: 0; } to { opacity: 1; } }
+.confirm-modal {
+  background: var(--bg-white);
+  border-radius: var(--radius);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.18);
+  width: min(440px, 100%);
+  padding: 24px 24px 20px;
+  animation: confirm-pop 0.14s ease-out;
+}
+@keyframes confirm-pop {
+  from { opacity: 0; transform: translateY(6px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+.confirm-title {
+  font-size: 15px; font-weight: 700; color: var(--text-dark);
+  margin-bottom: 8px;
+}
+.confirm-message {
+  font-size: 14px; line-height: 1.5; color: var(--text-body);
+  margin-bottom: 20px;
+}
+.confirm-actions {
+  display: flex; justify-content: flex-end; gap: 8px;
+}
+.confirm-btn {
+  padding: 8px 18px; border-radius: var(--radius-pill, 999px);
+  font-size: 13px; font-weight: 600;
+  cursor: pointer; border: 1px solid transparent;
+  transition: background 0.12s, border-color 0.12s, color 0.12s, opacity 0.12s;
+}
+.confirm-btn-cancel {
+  background: var(--bg-white); border-color: var(--border-color); color: var(--text-body);
+}
+.confirm-btn-cancel:hover { background: var(--bg-warm); }
+.confirm-btn-primary {
+  background: var(--text-dark); color: var(--bg-white); border-color: var(--text-dark);
+}
+.confirm-btn-primary:hover { opacity: 0.85; }
+.confirm-btn-danger {
+  background: #c45c5c; border-color: #c45c5c;
+}
+.confirm-btn-danger:hover { background: #b04e4e; border-color: #b04e4e; opacity: 1; }
 .react-flow__edge.selected .react-flow__edge-path { stroke: var(--text-dark); stroke-width: 3; }
 .wf-canvas-empty {
   position: absolute;

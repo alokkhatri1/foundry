@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { useConfirm } from '../components/ConfirmDialog';
 
 // Local draft state for a file editor. Keeps keystrokes out of the persistent
 // store until the user explicitly hits Save, and exposes a dirty flag so the
@@ -8,6 +9,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 // resets to the new file's content. `fileContent` follows the upstream value
 // so remote updates are picked up when the draft is clean.
 export default function useFileDraft(fileId, fileContent, onSave) {
+  const confirm = useConfirm();
   const [draft, setDraft] = useState(fileContent || '');
   const dirtyRef = useRef(false);
   const lastFileIdRef = useRef(fileId);
@@ -37,15 +39,20 @@ export default function useFileDraft(fileId, fileContent, onSave) {
     return true;
   }, [isDirty, onSave, fileId, draft]);
 
-  const confirmDiscard = useCallback((message) => {
+  const confirmDiscard = useCallback(async (message) => {
     if (!isDirty) return true;
-    const ok = window.confirm(message || 'You have unsaved changes. Discard them?');
+    const ok = await confirm({
+      title: 'Unsaved changes',
+      message: message || 'You have unsaved changes. Discard them?',
+      confirmLabel: 'Discard',
+      danger: true,
+    });
     if (ok) {
       setDraft(fileContent || '');
       dirtyRef.current = false;
     }
     return ok;
-  }, [isDirty, fileContent]);
+  }, [isDirty, fileContent, confirm]);
 
   return { draft, isDirty, updateDraft, save, confirmDiscard };
 }

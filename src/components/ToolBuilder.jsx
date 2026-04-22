@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { executeTool } from '../utils/toolExecutor';
 import { CONNECTOR_PROVIDERS } from '../data/connectorProviders';
 import EducationalCue from './EducationalCue';
+import { useConfirm } from './ConfirmDialog';
 
 let toolCounter = Date.now();
 function genToolId() { return 'tool-' + (toolCounter++); }
@@ -107,6 +108,7 @@ function ToolCard({ tool, onSelect, onDelete }) {
 
 // ===== Tool Editor =====
 function ToolEditor({ tool, onUpdate, onBack, onDelete, fileTree, callClaudeAPI, showEducationalCues }) {
+  const confirm = useConfirm();
   const [testInput, setTestInput] = useState('');
   const [testOutput, setTestOutput] = useState(null);
   const [testing, setTesting] = useState(false);
@@ -149,7 +151,7 @@ function ToolEditor({ tool, onUpdate, onBack, onDelete, fileTree, callClaudeAPI,
           {provider && <span className="tl-builtin-badge" style={{ background: provider.color + '18', color: provider.color }}>{provider.name}</span>}
         </span>
         {onDelete && (
-          <button className="tl-duplicate-btn" style={{ color: 'var(--accent-error)' }} onClick={() => { if (confirm('Delete this connector?')) onDelete(tool.id); }}>Delete</button>
+          <button className="tl-duplicate-btn" style={{ color: 'var(--accent-error)' }} onClick={async () => { if (await confirm({ message: 'Delete this connector?', danger: true })) onDelete(tool.id); }}>Delete</button>
         )}
       </div>
 
@@ -231,6 +233,7 @@ function ToolEditor({ tool, onUpdate, onBack, onDelete, fileTree, callClaudeAPI,
 
 // ===== Main ToolBuilder =====
 export default function ToolBuilder({ tools, onUpdateTools, fileTree, callClaudeAPI, showEducationalCues }) {
+  const confirm = useConfirm();
   const [selectedToolId, setSelectedToolId] = useState(null);
   const [showPicker, setShowPicker] = useState(false);
   const selectedTool = selectedToolId ? tools.find(t => t.id === selectedToolId) : null;
@@ -286,10 +289,11 @@ export default function ToolBuilder({ tools, onUpdateTools, fileTree, callClaude
     onUpdateTools(tools.map(t => t.id === updatedTool.id ? updatedTool : t));
   }
 
-  function handleDeleteTool(toolId) {
+  async function handleDeleteTool(toolId) {
     const tool = tools.find(t => t.id === toolId);
     if (tool?.isPrebuilt) return;
-    if (!confirm('Delete this connector?')) return;
+    const ok = await confirm({ message: 'Delete this connector?', danger: true });
+    if (!ok) return;
     onUpdateTools(tools.filter(t => t.id !== toolId));
     if (selectedToolId === toolId) setSelectedToolId(null);
   }

@@ -14,6 +14,7 @@ import RevealAt, { STAGE_META, stageReached, normalizeStage } from './components
 import { computeCost, costToCredits, DEFAULT_CREDIT_ALLOCATION, CREDITS_WARN_THRESHOLD } from './utils/llmCost';
 import { buildStageGuidance } from './data/stageGuidance';
 import PreferencesEditor from './components/PreferencesEditor';
+import { useConfirm } from './components/ConfirmDialog';
 import {
   createStarterFolders,
   createStarterWorkflow,
@@ -301,6 +302,7 @@ function CreditsChip({ creditsLeft, creditsTotal, onClick }) {
 function App() {
   const saved = loadState();
   const sb = useSupabase();
+  const confirm = useConfirm();
 
   const [userName, setUserName] = useState(saved?.userName || '');
   const [workshopCode, setWorkshopCode] = useState(saved?.workshopCode || '');
@@ -758,8 +760,14 @@ function App() {
     persistLocal({ userName: name, workshopCode: code, workflows, coworkers, tools, workflowRuns: runs, participants: newParticipants, selectedDeptId: saved?.selectedDeptId || 'dept-credit' });
   }
 
-  function handleReset() {
-    if (!confirm('This will clear all your local content (files, coworkers, workflows, chats). Continue?')) return;
+  async function handleReset() {
+    const ok = await confirm({
+      title: 'Clear local content',
+      message: 'This will clear all your local content (files, coworkers, workflows, chats). Continue?',
+      confirmLabel: 'Clear',
+      danger: true,
+    });
+    if (!ok) return;
     setFlatFiles([]);
     setWorkflows([]);
     setCoworkers([]);

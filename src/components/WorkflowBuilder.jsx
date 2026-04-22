@@ -6,6 +6,7 @@ import { CoworkerGlyph } from './Icon';
 import RichText from './RichText';
 import { AvatarDisplay, AvatarPicker, DescriptionSection, FilePicker } from './CoworkerBuilder';
 import { runCopilotTurn } from '../utils/workflowCopilot';
+import { useConfirm } from './ConfirmDialog';
 
 // Resolve a step's coworker data. New-style steps embed the full coworker
 // config at step.coworker (self-contained, decoupled from the shared pool).
@@ -827,6 +828,7 @@ function WorkflowCanvas({ workflow, onUpdateWorkflow, fileTree, coworkers, tools
 
 // ===== Workflow Editor =====
 function WorkflowEditor({ workflow, onUpdateWorkflow, fileTree, coworkers, tools, participants, onRun, isRunning, currentStepId, activeRun, onBack, showEducationalCues, callClaudeAPI, onSaveCoworkerToLibrary, onUpdateFileContent, apiKey, onCopilotUsage, copilotState, onCopilotPatch, copilotHistoriesRef, copilotWfId }) {
+  const confirm = useConfirm();
   const [expandedStep, setExpandedStep] = useState(null);
   const [showAddMenu, setShowAddMenu] = useState(false);
   const [validationErrors, setValidationErrors] = useState({});
@@ -844,9 +846,10 @@ function WorkflowEditor({ workflow, onUpdateWorkflow, fileTree, coworkers, tools
     onUpdateWorkflow({ ...workflow, steps });
   }
 
-  function deleteStep(index) {
+  async function deleteStep(index) {
     if (workflow.steps[index]?.type === 'trigger') return;
-    if (!confirm('Delete this step?')) return;
+    const ok = await confirm({ message: 'Delete this step?', danger: true });
+    if (!ok) return;
     onUpdateWorkflow({ ...workflow, steps: workflow.steps.filter((_, i) => i !== index) });
     setExpandedStep(null);
   }
@@ -1052,6 +1055,7 @@ function WorkflowCard({ workflow, coworkers, participants, onSelect, onDelete, o
 
 // ===== Main Export =====
 export default function WorkflowBuilder({ workflows, onUpdateWorkflows, fileTree, coworkers, tools, onRun, workflowRuns = [], participants, currentUserName, showEducationalCues, callClaudeAPI, onSaveCoworkerToLibrary, onUpdateFileContent, apiKey, onCopilotUsage }) {
+  const confirm = useConfirm();
   const [selectedWorkflowId, setSelectedWorkflowId] = useState(null);
   // Copilot transcript state lives up here so it survives closing the panel,
   // navigating back to the list, and switching between workflows. History is
@@ -1104,8 +1108,9 @@ export default function WorkflowBuilder({ workflows, onUpdateWorkflows, fileTree
     setSelectedWorkflowId(newWf.id);
   }
 
-  function handleDeleteWorkflow(wfId) {
-    if (!confirm('Delete this workflow?')) return;
+  async function handleDeleteWorkflow(wfId) {
+    const ok = await confirm({ message: 'Delete this workflow?', danger: true });
+    if (!ok) return;
     onUpdateWorkflows(workflows.filter(w => w.id !== wfId));
     if (selectedWorkflowId === wfId) setSelectedWorkflowId(null);
   }
@@ -1122,9 +1127,15 @@ export default function WorkflowBuilder({ workflows, onUpdateWorkflows, fileTree
     onUpdateWorkflows([...workflows, copy]);
   }
 
-  function handleClearAll() {
+  async function handleClearAll() {
     if (workflows.length === 0) return;
-    if (!confirm(`Delete all ${workflows.length} orchestration${workflows.length === 1 ? '' : 's'} in this room? This affects every participant and cannot be undone.`)) return;
+    const ok = await confirm({
+      title: 'Clear all workflows',
+      message: `Delete all ${workflows.length} workflow${workflows.length === 1 ? '' : 's'} in this room? This affects every participant and cannot be undone.`,
+      confirmLabel: 'Delete all',
+      danger: true,
+    });
+    if (!ok) return;
     onUpdateWorkflows([]);
     setSelectedWorkflowId(null);
   }

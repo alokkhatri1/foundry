@@ -532,9 +532,10 @@ function InlineEditor({ file, onUpdateContent, onClose }) {
     onUpdateContent,
   );
 
-  function switchMode(next) {
+  async function switchMode(next) {
     if (next === 'view' && isDirty) {
-      if (!confirmDiscard('You have unsaved changes. Discard them?')) return;
+      const ok = await confirmDiscard('You have unsaved changes. Discard them?');
+      if (!ok) return;
     }
     setMode(next);
   }
@@ -543,8 +544,9 @@ function InlineEditor({ file, onUpdateContent, onClose }) {
     if (save()) setMode('view');
   }
 
-  function tryClose() {
-    if (!confirmDiscard('You have unsaved changes. Close without saving?')) return;
+  async function tryClose() {
+    const ok = await confirmDiscard('You have unsaved changes. Close without saving?');
+    if (!ok) return;
     onClose();
   }
 

@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { STAGE_ORDER, STAGE_META, stageReached, nextStage } from './RevealAt';
+import { useConfirm } from './ConfirmDialog';
 
 // Per-participant credit allocation editor. Small inline row above the
 // stage list — big enough to notice, small enough not to steal focus from
@@ -65,6 +66,7 @@ function WorkshopRow({ w, selected, onSelect, copied, onCopy, stats, dim }) {
 }
 
 export default function AdminDashboard({ sb, user, onBack }) {
+  const confirm = useConfirm();
   const [workshops, setWorkshops] = useState([]);
   const [stats, setStats] = useState({});
   const [loading, setLoading] = useState(true);
@@ -108,7 +110,13 @@ export default function AdminDashboard({ sb, user, onBack }) {
   }
 
   async function handleDelete(workshopId) {
-    if (!confirm('Delete this workshop and all its data? This cannot be undone.')) return;
+    const ok = await confirm({
+      title: 'Delete workshop',
+      message: 'Delete this workshop and all its data? This cannot be undone.',
+      confirmLabel: 'Delete',
+      danger: true,
+    });
+    if (!ok) return;
     await sb.deleteWorkshop(workshopId);
     if (selected?.id === workshopId) setSelected(null);
     setMenuOpen(false);
@@ -116,7 +124,12 @@ export default function AdminDashboard({ sb, user, onBack }) {
   }
 
   async function handleDeprecate(workshopId) {
-    if (!confirm('Deprecate this workshop? Participants will be moved to an ended screen. Data is preserved read-only as a past workshop.')) return;
+    const ok = await confirm({
+      title: 'Deprecate workshop',
+      message: 'Participants will be moved to an ended screen. Data is preserved read-only as a past workshop.',
+      confirmLabel: 'Deprecate',
+    });
+    if (!ok) return;
     await sb.deprecateWorkshop(workshopId);
     if (selected?.id === workshopId) setSelected(prev => prev ? { ...prev, deprecated_at: new Date().toISOString() } : prev);
     setMenuOpen(false);
@@ -126,7 +139,12 @@ export default function AdminDashboard({ sb, user, onBack }) {
   async function handleReveal(toStage) {
     if (!selected) return;
     const fromStage = selected.current_stage || '1';
-    if (!confirm(`Reveal Stage ${toStage} (${STAGE_META[toStage]?.label}) to all participants? This is one-way — reveal is monotonic.`)) return;
+    const ok = await confirm({
+      title: `Reveal Stage ${toStage}`,
+      message: `Reveal Stage ${toStage} (${STAGE_META[toStage]?.label}) to all participants? This is one-way — reveal is monotonic.`,
+      confirmLabel: 'Reveal',
+    });
+    if (!ok) return;
     await sb.revealStage(selected.id, toStage, fromStage, user.id);
     setSelected(prev => prev ? { ...prev, current_stage: toStage } : prev);
     await loadWorkshops();
@@ -147,7 +165,12 @@ export default function AdminDashboard({ sb, user, onBack }) {
     const remaining = [];
     let walker = nextStage(cursor);
     while (walker) { remaining.push(walker); walker = nextStage(walker); }
-    if (!confirm(`Reveal all ${remaining.length} remaining stages to every participant now? This skips the pacing — use only for dry-runs.`)) return;
+    const ok = await confirm({
+      title: 'Reveal all remaining stages',
+      message: `Reveal all ${remaining.length} remaining stages to every participant now? This skips the pacing — use only for dry-runs.`,
+      confirmLabel: 'Reveal all',
+    });
+    if (!ok) return;
     for (const s of remaining) {
       await sb.revealStage(selected.id, s, cursor, user.id);
       cursor = s;

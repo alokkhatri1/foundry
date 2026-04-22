@@ -3,6 +3,7 @@ import { KNOWLEDGE_TEMPLATE, INSTRUCTION_TEMPLATE } from '../data/starterContent
 import { parseFile, getFileIcon, getFileCategory } from '../utils/fileParser';
 import EducationalCue from './EducationalCue';
 import { stageReached } from './RevealAt';
+import { useConfirm } from './ConfirmDialog';
 
 const SKILL_TEMPLATE = INSTRUCTION_TEMPLATE;
 
@@ -117,6 +118,7 @@ function getFolderDescription(name) {
 }
 
 export default function FileExplorer({ fileTree, selectedFileId, onSelectFile, onUpdateTree, onSelectDepartment, showEducationalCues, currentStage }) {
+  const confirm = useConfirm();
   const [currentFolderId, setCurrentFolderId] = useState(fileTree.id);
   const [showModal, setShowModal] = useState(false);
   const [modalMode, setModalMode] = useState('folder');
@@ -272,9 +274,10 @@ export default function FileExplorer({ fileTree, selectedFileId, onSelectFile, o
     setTemplateContent('');
   }
 
-  function handleDelete(e, nodeId) {
+  async function handleDelete(e, nodeId) {
     e.stopPropagation();
-    if (!confirm('Delete this item?')) return;
+    const ok = await confirm({ message: 'Delete this item?', danger: true });
+    if (!ok) return;
     const updatedTree = JSON.parse(JSON.stringify(fileTree));
 
     function removeFromParent(node) {

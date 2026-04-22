@@ -30,9 +30,10 @@ export default function FileEditor({ file, onUpdateContent }) {
 
   const isEmpty = !file.content || file.content.trim() === '';
 
-  function switchMode(next) {
+  async function switchMode(next) {
     if (next === 'view' && isDirty) {
-      if (!confirmDiscard('You have unsaved changes. Discard them and switch to View?')) return;
+      const ok = await confirmDiscard('You have unsaved changes. Discard them and switch to View?');
+      if (!ok) return;
     }
     setMode(next);
   }

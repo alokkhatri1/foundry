@@ -5,6 +5,7 @@ import Icon, { COWORKER_ICONS, hasIcon } from './Icon';
 import RevealAt, { stageReached } from './RevealAt';
 import RichText from './RichText';
 import useFileDraft from '../hooks/useFileDraft';
+import { useConfirm } from './ConfirmDialog';
 
 const TOOL_REVEAL_STAGE = {
   'builtin-create-file': '5b',
@@ -325,8 +326,9 @@ function FilePicker({ fileTree, selectedIds, onChange, folderName, onUpdateConte
 
   useEffect(() => { setPreviewMode('view'); }, [previewId]);
 
-  function tryClosePreview() {
-    if (!confirmDiscard('You have unsaved changes. Close without saving?')) return;
+  async function tryClosePreview() {
+    const ok = await confirmDiscard('You have unsaved changes. Close without saving?');
+    if (!ok) return;
     setPreviewId(null);
   }
 
@@ -334,9 +336,10 @@ function FilePicker({ fileTree, selectedIds, onChange, folderName, onUpdateConte
     if (save()) setPreviewMode('view');
   }
 
-  function switchEditorMode(next) {
+  async function switchEditorMode(next) {
     if (next === 'view' && isDirty) {
-      if (!confirmDiscard('You have unsaved changes. Discard them?')) return;
+      const ok = await confirmDiscard('You have unsaved changes. Discard them?');
+      if (!ok) return;
     }
     setPreviewMode(next);
   }
@@ -667,6 +670,7 @@ function CoworkerEditor({ coworker, onUpdate, onBack, fileTree, callClaudeAPI, s
 export { AvatarDisplay, AvatarPicker, DescriptionSection, FilePicker, isImageAvatar, isIconAvatar, iconName, DEFAULT_ICON };
 
 export default function CoworkerBuilder({ coworkers, onUpdateCoworkers, fileTree, tools, userName, callClaudeAPI, showEducationalCues, currentStage, onStartChat, participants, onUpdateFileContent }) {
+  const confirm = useConfirm();
   const [selectedCwId, setSelectedCwId] = useState(null);
   const [searchQ, setSearchQ] = useState('');
   const [viewMode, setViewMode] = useState('grid'); // 'grid' | 'list'
@@ -705,8 +709,9 @@ export default function CoworkerBuilder({ coworkers, onUpdateCoworkers, fileTree
     onUpdateCoworkers(coworkers.map(c => c.id === updatedCw.id ? updatedCw : c));
   }
 
-  function handleDelete(cwId) {
-    if (!confirm('Delete this coworker?')) return;
+  async function handleDelete(cwId) {
+    const ok = await confirm({ message: 'Delete this coworker?', danger: true });
+    if (!ok) return;
     onUpdateCoworkers(coworkers.filter(c => c.id !== cwId));
     if (selectedCwId === cwId) setSelectedCwId(null);
   }

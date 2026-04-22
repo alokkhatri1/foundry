@@ -1,9 +1,22 @@
 # Deployment
 
-Production is served by **Vercel**, wired to the `main` branch of the GitHub
-repo [`alokkhatri1/foundry`](https://github.com/alokkhatri1/foundry). Every
-push to `main` triggers an automatic build + deploy. There is no staging
-environment yet.
+Production is served by **Vercel** at **[foundry.alokkhatri.com](https://foundry.alokkhatri.com)**,
+wired to the `main` branch of the GitHub repo
+[`alokkhatri1/foundry`](https://github.com/alokkhatri1/foundry). Every push to
+`main` triggers an automatic build + deploy. There is no staging environment yet.
+
+## Domain setup
+
+- Custom domain `foundry.alokkhatri.com` is configured as the Vercel production
+  domain. The underlying `*.vercel.app` URL still resolves but shouldn't be
+  shared with participants.
+- DNS is managed by **Netlify DNS** (not GoDaddy — GoDaddy only registers the
+  name and delegates to Netlify nameservers). The `foundry` subdomain is a
+  CNAME to `cname.vercel-dns.com`.
+- SSL is auto-provisioned by Vercel once the CNAME resolves.
+- Supabase auth **Site URL** must match the custom domain
+  (`https://foundry.alokkhatri.com`) or OAuth will bounce users back to the
+  `*.vercel.app` URL after Google sign-in.
 
 ## Deploy checklist
 

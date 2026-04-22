@@ -2456,6 +2456,9 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
 .workflow-step-card.skipped { opacity: 0.55; }
 .workflow-step-card.skipped.on-canvas { box-shadow: none; }
 .step-status-badge.skipped { background: #e0ded8; color: var(--text-muted); }
+.step-status-badge.unconfigured {
+  background: #fdf0df; color: #b37a2a; font-weight: 600;
+}
 /* Phase 7: run-state overlays on canvas nodes. Pulses while running/waiting
    so the current step is unmistakable even at a zoomed-out glance; solid
    tinted glow for completed/rejected so state is readable after the run. */

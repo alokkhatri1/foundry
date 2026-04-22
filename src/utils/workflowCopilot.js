@@ -67,6 +67,18 @@ const COPILOT_TOOL_SCHEMAS = [
       required: ['nodeId'],
     },
   },
+  {
+    name: 'configure_capture',
+    description: "Set the mode and target file on the pre-seeded Capture Learning node so it compounds into an actual file on run completion. 'knowledge' appends the upstream output to the file. 'skills' LLM-refines the file's instructions based on the run. targetFileName must exactly match a file in the Available files list below.",
+    input_schema: {
+      type: 'object',
+      properties: {
+        mode: { type: 'string', description: "'knowledge' (append) or 'skills' (refine instructions)" },
+        targetFileName: { type: 'string', description: 'Exact filename from the Available files list' },
+      },
+      required: ['mode', 'targetFileName'],
+    },
+  },
 ];
 
 // ===== Tool executor =====
@@ -192,9 +204,51 @@ function applyCopilotTool(name, input, workflow, ctx) {
         result: `Deleted node ${nodeId}.`,
       };
     }
+    case 'configure_capture': {
+      const mode = input.mode === 'skills' ? 'skills' : 'knowledge';
+      const target = (input.targetFileName || '').trim().toLowerCase();
+      const captureStep = (workflow.steps || []).find(s => s.type === 'capture');
+      if (!captureStep) return { error: 'This workflow has no Capture Learning node.' };
+      const wantFolder = mode === 'skills' ? 'skills' : 'knowledge';
+      const file = findFileInFolder(ctx.fileTree, wantFolder, target);
+      if (!file) {
+        const available = listFilesInFolder(ctx.fileTree, wantFolder).map(f => f.name).join(', ') || '(none)';
+        return { error: `No ${wantFolder} file named "${input.targetFileName}". Available ${wantFolder} files: ${available}` };
+      }
+      const steps = (workflow.steps || []).map(s =>
+        s.id === captureStep.id ? { ...s, mode, targetFileId: file.id } : s
+      );
+      return {
+        workflow: { ...workflow, steps },
+        result: `Configured Capture: ${mode} into "${file.name}".`,
+      };
+    }
     default:
       return { error: `Unknown tool: ${name}` };
   }
+}
+
+function walkFiles(node, acc, subfolder) {
+  if (!node) return;
+  if (node.type === 'file' && node.name?.toLowerCase().endsWith('.md')) {
+    acc.push({ id: node.id, name: node.name.replace(/\.md$/, ''), subfolder });
+    return;
+  }
+  if (node.type === 'folder') {
+    const nextSubfolder = (node.name === 'knowledge' || node.name === 'skills') ? node.name : subfolder;
+    for (const child of node.children || []) walkFiles(child, acc, nextSubfolder);
+  }
+}
+
+function listFilesInFolder(fileTree, subfolderName) {
+  if (!fileTree) return [];
+  const acc = [];
+  walkFiles(fileTree, acc, null);
+  return acc.filter(f => f.subfolder === subfolderName);
+}
+
+function findFileInFolder(fileTree, subfolderName, nameLower) {
+  return listFilesInFolder(fileTree, subfolderName).find(f => f.name.toLowerCase() === nameLower) || null;
 }
 
 // ===== System prompt =====
@@ -215,7 +269,7 @@ function summarizeWorkflow(workflow) {
   return `NODES:\n${stepLines.join('\n') || '(none)'}\n\nEDGES:\n${edgeLines.join('\n') || '(none)'}`;
 }
 
-function buildCopilotSystemPrompt({ workflow, coworkers, participants }) {
+function buildCopilotSystemPrompt({ workflow, coworkers, participants, fileTree }) {
   const cwLines = (coworkers || [])
     .filter(c => c.name?.trim())
     .map(c => `- ${c.name}${c.role ? ` — ${c.role.slice(0, 120)}` : ''}`)
@@ -225,6 +279,11 @@ function buildCopilotSystemPrompt({ workflow, coworkers, participants }) {
     .filter(p => (p.kind || 'human') === 'human')
     .map(p => `- ${p.name}${p.online ? ' (online)' : ' (offline)'}`)
     .join('\n') || '(no humans in the workshop yet)';
+
+  const knowledgeFiles = listFilesInFolder(fileTree, 'knowledge');
+  const skillsFiles = listFilesInFolder(fileTree, 'skills');
+  const knowledgeLines = knowledgeFiles.map(f => `- ${f.name}`).join('\n') || '(none)';
+  const skillsLines = skillsFiles.map(f => `- ${f.name}`).join('\n') || '(none)';
 
   return `You are the Workflow Copilot. You help people design mixed-team workflows (AI coworkers + human review steps) on a visual DAG canvas.
 
@@ -287,6 +346,13 @@ ${cwLines}
 ## Workshop humans (use these exact names for Review assignees)
 ${humanLines}
 
+## Available files
+For configure_capture, pick a file name from the right list (mode=knowledge uses these):
+### knowledge
+${knowledgeLines}
+### skills
+${skillsLines}
+
 ## Current workflow state
 ${summarizeWorkflow(workflow)}
 `;
@@ -305,6 +371,7 @@ export async function runCopilotTurn({
   workflow,
   coworkers,
   participants,
+  fileTree,
   onWorkflowUpdate,
   onNarration,
   onError,
@@ -320,14 +387,14 @@ export async function runCopilotTurn({
     { role: 'user', content: userMessage },
   ];
   let currentWorkflow = workflow;
-  const ctx = { coworkers, participants };
+  const ctx = { coworkers, participants, fileTree };
 
   let turns = 0;
   const MAX_TURNS = 10;
 
   while (turns < MAX_TURNS) {
     turns++;
-    const systemPrompt = buildCopilotSystemPrompt({ workflow: currentWorkflow, coworkers, participants });
+    const systemPrompt = buildCopilotSystemPrompt({ workflow: currentWorkflow, coworkers, participants, fileTree });
 
     let data;
     try {

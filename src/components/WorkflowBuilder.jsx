@@ -260,11 +260,18 @@ function StepCard({ step, index, coworkers, tools, participants, onUpdate, onDel
     ? String(stepResult.output).replace(/\s+/g, ' ').slice(0, 140) + (String(stepResult.output).length > 140 ? '\u2026' : '')
     : null;
 
+  // Warn when a Capture step has no target file picked — it will soft-land
+  // at runtime (no-op with a status message) so the run still finishes, but
+  // the user probably didn't mean that. Shown on the collapsed card so it's
+  // visible without having to expand.
+  const captureNotConfigured = step.type === 'capture' && !step.targetFileId && !stepResult;
+
   const statusBadge = isRunning || runStatus === 'running' ? <span className="step-status-badge running"><span className="step-status-spinner" /> Running</span>
     : isWaiting ? <span className="step-status-badge waiting">Waiting on {assignedPerson?.name || 'a reviewer'}</span>
     : isCompleted ? <span className="step-status-badge done">{'\u2713'} Done</span>
     : isRejected ? <span className="step-status-badge rejected">Rejected</span>
     : isSkipped ? <span className="step-status-badge skipped">Skipped</span>
+    : captureNotConfigured ? <span className="step-status-badge unconfigured">Not configured</span>
     : null;
 
   return (
@@ -502,6 +509,7 @@ function StepCard({ step, index, coworkers, tools, participants, onUpdate, onDel
                   <label>Review prompt</label>
                   <textarea value={step.prompt || ''} onChange={e => onUpdate({ ...step, prompt: e.target.value })} placeholder="What should the reviewer check?" />
                 </div>
+                {validationErrors?.noReviewPrompt && <div className="validation-error">Tell the reviewer what to decide on before running</div>}
                 <div className="step-config-hint">
                   On reject the run bounces back to the previous review step for revision (or final-rejects if there's no prior human review).
                 </div>
@@ -762,6 +770,7 @@ function WorkflowCanvas({ workflow, onUpdateWorkflow, fileTree, coworkers, tools
         workflow,
         coworkers,
         participants,
+        fileTree,
         onWorkflowUpdate: (next) => {
           workflowRef.current = next;
           onUpdateWorkflow(next);
@@ -936,7 +945,7 @@ function WorkflowEditor({ workflow, onUpdateWorkflow, fileTree, coworkers, tools
       id: genStepId(), type,
       name: defaultName,
       ...(type === 'agent' && { coworker: emptyCoworker() }),
-      ...(type === 'approval' && { assigneeId: '', prompt: '', actions: ['Approve', 'Reject'] }),
+      ...(type === 'approval' && { assigneeId: '', prompt: '' }),
       ...(type === 'capture' && { mode: 'knowledge', targetFileId: '' }),
     };
     onUpdateWorkflow({ ...workflow, steps: [...workflow.steps, newStep] });
@@ -953,6 +962,9 @@ function WorkflowEditor({ workflow, onUpdateWorkflow, fileTree, coworkers, tools
         const cw = step.coworker || (step.coworkerId ? (coworkers || []).find(c => c.id === step.coworkerId) : null);
         if (!cw?.name?.trim()) { errors[step.id].noAgent = true; valid = false; }
       }
+      if (step.type === 'approval' && !step.prompt?.trim()) {
+        errors[step.id].noReviewPrompt = true; valid = false;
+      }
       if (step.type === 'trigger' && !step.caseInput?.trim() && !(step.fileIds?.length)) { errors[step.id].noCaseInput = true; valid = false; }
       // Capture: no validation block. An unconfigured Capture soft-lands at
       // run time (nothing captured, run completes) so participants can Run
@@ -963,14 +975,14 @@ function WorkflowEditor({ workflow, onUpdateWorkflow, fileTree, coworkers, tools
   }
 
   function handleRun() {
-    const { valid } = validate();
+    const { valid, errors } = validate();
     if (!valid) {
-      // If trigger is missing both instructions + documents, expand it so
-      // the user sees where to type/pick.
-      if (triggerStep && !hasTriggerInput) {
-        const triggerIdx = workflow.steps.findIndex(s => s.id === triggerStep.id);
-        if (triggerIdx >= 0) setExpandedStep(triggerIdx);
-      }
+      // Expand the first step with an error so the user can see and fix it.
+      const firstBadIdx = workflow.steps.findIndex(s => {
+        const e = errors[s.id] || {};
+        return Object.keys(e).length > 0;
+      });
+      if (firstBadIdx >= 0) setExpandedStep(firstBadIdx);
       return;
     }
     onRun(workflow.id);

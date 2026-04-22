@@ -2255,6 +2255,7 @@ Answer in ONE sentence. If the user asks "how", a second sentence is allowed —
             <ActivityDashboard
               workflowRuns={workflowRuns}
               onApprovalAction={handleApprovalAction}
+              onCancelRun={handleCancelRun}
               onNudge={handleNudge}
               participants={participants}
               currentUserName={userName}

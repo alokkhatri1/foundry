@@ -85,7 +85,7 @@ function RunCard({ run, onClick, onNudge, showEducationalCues }) {
 // node selects it on both sides; the sidebar row expands inline with the
 // step's output, decision log, or (if it's the run owner's turn) the
 // approval form.
-function RunDetailView({ run, onBack, onApprovalAction, onNudge, showEducationalCues, currentUserName, approvals, onLoadApprovals, workflows, currentStage, sb }) {
+function RunDetailView({ run, onBack, onApprovalAction, onCancelRun, onNudge, showEducationalCues, currentUserName, approvals, onLoadApprovals, workflows, currentStage, sb }) {
   const showCost = stageReached(currentStage, '7b');
   const [costByStepId, setCostByStepId] = useState({});
 
@@ -166,6 +166,14 @@ function RunDetailView({ run, onBack, onApprovalAction, onNudge, showEducational
           Started by {run.startedBy} {'\u00B7'} {timeAgo(run.startedAt)}
           {run.completedAt && <> {'\u00B7'} Finished {timeAgo(run.completedAt)}</>}
         </div>
+        {isOwner && (run.status === 'running' || run.status === 'waiting_approval') && onCancelRun && (
+          <button
+            className="run-btn run-btn-stop"
+            style={{ marginLeft: 'auto' }}
+            onClick={() => onCancelRun(run.id)}
+            title="Stop this run"
+          >Stop</button>
+        )}
         <EducationalCue cueId="activity-run-status" show={showEducationalCues} />
       </div>
 
@@ -403,7 +411,7 @@ function DecisionRow({ step, run, isSelected, onSelect, approvalsForStep, isOwne
 }
 
 // ===== Main Dashboard =====
-export default function ActivityDashboard({ workflowRuns, onApprovalAction, onNudge, participants, currentUserName, coworkers, workflows, showEducationalCues, approvalsByRun, onLoadApprovals, currentStage, sb }) {
+export default function ActivityDashboard({ workflowRuns, onApprovalAction, onCancelRun, onNudge, participants, currentUserName, coworkers, workflows, showEducationalCues, approvalsByRun, onLoadApprovals, currentStage, sb }) {
   const [selectedRunId, setSelectedRunId] = useState(null);
 
   const selectedRun = selectedRunId ? workflowRuns.find(r => r.id === selectedRunId) : null;
@@ -426,6 +434,7 @@ export default function ActivityDashboard({ workflowRuns, onApprovalAction, onNu
         run={selectedRun}
         onBack={() => setSelectedRunId(null)}
         onApprovalAction={onApprovalAction}
+        onCancelRun={onCancelRun}
         onNudge={onNudge}
         showEducationalCues={showEducationalCues}
         currentUserName={currentUserName}

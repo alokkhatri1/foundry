@@ -1449,9 +1449,9 @@ Examples:
     setWorkflowRuns(prev => {
       const updated = prev.map(r => r.id === runId ? { ...r, ...updates } : r);
       persistLocal({ workflowRuns: updated });
-      // Sync completed/errored runs to Supabase
+      // Sync terminal statuses to Supabase so refreshing doesn't resurrect them
       const run = updated.find(r => r.id === runId);
-      if (run && (updates.status === 'completed' || updates.status === 'error')) {
+      if (run && (updates.status === 'completed' || updates.status === 'error' || updates.status === 'cancelled')) {
         sb.saveWorkflowRun(run);
       }
       return updated;
@@ -1665,13 +1665,7 @@ Examples:
       resolver({ action: 'Cancel', comment: '', resolvedBy: userName, cancelled: true });
       approvalResolversRef.current.delete(runId);
     }
-    setWorkflowRuns(prev => prev.map(r =>
-      r.id === runId && (r.status === 'running' || r.status === 'waiting_approval')
-        ? { ...r, status: 'cancelled', completedAt: Date.now() }
-        : r
-    ));
-    const run = workflowRuns.find(r => r.id === runId);
-    if (run) sb.saveWorkflowRun({ ...run, status: 'cancelled', completedAt: Date.now() });
+    updateRun(runId, { status: 'cancelled', completedAt: Date.now() });
   }
 
   function handleCancelRun(runId) {

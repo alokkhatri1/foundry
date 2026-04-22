@@ -509,7 +509,6 @@ function StepCard({ step, index, coworkers, tools, participants, onUpdate, onDel
                   <label>Review prompt</label>
                   <textarea value={step.prompt || ''} onChange={e => onUpdate({ ...step, prompt: e.target.value })} placeholder="What should the reviewer check?" />
                 </div>
-                {validationErrors?.noReviewPrompt && <div className="validation-error">Tell the reviewer what to decide on before running</div>}
                 <div className="step-config-hint">
                   On reject the run bounces back to the previous review step for revision (or final-rejects if there's no prior human review).
                 </div>
@@ -961,9 +960,6 @@ function WorkflowEditor({ workflow, onUpdateWorkflow, fileTree, coworkers, tools
       if (step.type === 'agent') {
         const cw = step.coworker || (step.coworkerId ? (coworkers || []).find(c => c.id === step.coworkerId) : null);
         if (!cw?.name?.trim()) { errors[step.id].noAgent = true; valid = false; }
-      }
-      if (step.type === 'approval' && !step.prompt?.trim()) {
-        errors[step.id].noReviewPrompt = true; valid = false;
       }
       if (step.type === 'trigger' && !step.caseInput?.trim() && !(step.fileIds?.length)) { errors[step.id].noCaseInput = true; valid = false; }
       // Capture: no validation block. An unconfigured Capture soft-lands at

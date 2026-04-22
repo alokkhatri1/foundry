@@ -1064,6 +1064,11 @@ export default function ChatPanel({ messages, onSendMessage, onApprovalAction, o
                   if (m.type === 'tool_execution' && !stageReached(currentStage, '5a')) return false;
                   // Hide orchestration / approval messages before Stage 7 (Orchestration).
                   if ((m.type === 'approval' || m.type === 'workflow_start' || m.type === 'workflow_end') && !stageReached(currentStage, '6')) return false;
+                  // Drop the legacy "runtime isn't active" error bubbles left
+                  // in history by earlier Approve clicks on orphaned runs —
+                  // the approval card now shows this state inline instead.
+                  if (m.type === 'error' && typeof m.content === 'string'
+                      && m.content.includes("run's runtime isn't active")) return false;
                   return true;
                 }).map((msg, i) => (
                   <ChatMessage key={msg.id || i} msg={msg} onApprovalAction={onApprovalAction} onPickRecipient={onPickRecipient} onNudgeRecipient={onNudgeRecipient} onGoToFiles={onGoToFiles} onRetry={onRetry} participants={participants} currentUserName={currentUserName} showEducationalCues={showEducationalCues} />

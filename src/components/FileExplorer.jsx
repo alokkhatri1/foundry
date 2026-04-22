@@ -545,62 +545,103 @@ export default function FileExplorer({ fileTree, selectedFileId, onSelectFile, o
           </div>
         )}
 
-        {/* Folders first */}
-        {items.filter(i => i.type === 'folder').map(folder => (
-          <div
-            key={folder.id}
-            className={`drive-card drive-card-folder${dropTargetId === folder.id ? ' drop-target' : ''}${dragItemId === folder.id ? ' dragging' : ''}`}
-            onClick={() => handleItemClick(folder)}
-            draggable
-            onDragStart={e => handleDragStart(e, folder.id)}
-            onDragOver={e => handleDragOverFolder(e, folder.id)}
-            onDragLeave={e => handleDragLeaveFolder(e)}
-            onDrop={e => handleDropOnFolder(e, folder.id)}
-            onDragEnd={handleDragEnd}
-          >
-            <div className="drive-card-icon">
-              <FolderIcon color={getFolderColor(folder.name)} />
-            </div>
-            <div className="drive-card-name">{folder.name}</div>
-            {getFolderDescription(folder.name) && (
-              <div className="drive-card-desc">{getFolderDescription(folder.name)}</div>
-            )}
-            {folder.children && (
-              <div className="drive-card-meta">
-                {folder.children.filter(c => c.type === 'folder').length > 0 &&
-                  `${folder.children.filter(c => c.type === 'folder').length} folders`}
-                {folder.children.filter(c => c.type === 'folder').length > 0 &&
-                  folder.children.filter(c => c.type === 'file').length > 0 && ', '}
-                {folder.children.filter(c => c.type === 'file').length > 0 &&
-                  `${folder.children.filter(c => c.type === 'file').length} files`}
+        {(() => {
+          // Root view splits top-level folders into "Built by you" and
+          // "Built by others" — mirrors the Workflow and Coworker lists so
+          // participants can find their own work at a glance without it
+          // getting lost in a shared library. Inside a folder we fall back
+          // to the normal flat list (files + child folders) since ownership
+          // only matters at the dept level for this UI.
+          const folderItems = items.filter(i => i.type === 'folder');
+          const fileItems = items.filter(i => i.type === 'file');
+          const renderFolderCard = (folder) => (
+            <div
+              key={folder.id}
+              className={`drive-card drive-card-folder${dropTargetId === folder.id ? ' drop-target' : ''}${dragItemId === folder.id ? ' dragging' : ''}`}
+              onClick={() => handleItemClick(folder)}
+              draggable
+              onDragStart={e => handleDragStart(e, folder.id)}
+              onDragOver={e => handleDragOverFolder(e, folder.id)}
+              onDragLeave={e => handleDragLeaveFolder(e)}
+              onDrop={e => handleDropOnFolder(e, folder.id)}
+              onDragEnd={handleDragEnd}
+            >
+              <div className="drive-card-icon">
+                <FolderIcon color={getFolderColor(folder.name)} />
               </div>
-            )}
-            {folder.name !== 'knowledge' && folder.name !== 'skills' && (
-              <button className="drive-card-delete" onClick={e => handleDelete(e, folder.id)} title="Delete">{'\u2715'}</button>
-            )}
-          </div>
-        ))}
+              <div className="drive-card-name">{folder.name}</div>
+              {getFolderDescription(folder.name) && (
+                <div className="drive-card-desc">{getFolderDescription(folder.name)}</div>
+              )}
+              {folder.children && (
+                <div className="drive-card-meta">
+                  {folder.children.filter(c => c.type === 'folder').length > 0 &&
+                    `${folder.children.filter(c => c.type === 'folder').length} folders`}
+                  {folder.children.filter(c => c.type === 'folder').length > 0 &&
+                    folder.children.filter(c => c.type === 'file').length > 0 && ', '}
+                  {folder.children.filter(c => c.type === 'file').length > 0 &&
+                    `${folder.children.filter(c => c.type === 'file').length} files`}
+                </div>
+              )}
+              {folder.name !== 'knowledge' && folder.name !== 'skills' && folder.createdBy === userName && (
+                <button className="drive-card-delete" onClick={e => handleDelete(e, folder.id)} title="Delete">{'\u2715'}</button>
+              )}
+            </div>
+          );
+          const renderFileCard = (file) => (
+            <div
+              key={file.id}
+              className={`drive-card drive-card-file${selectedFileId === file.id ? ' selected' : ''}${dragItemId === file.id ? ' dragging' : ''}`}
+              onClick={() => handleItemClick(file)}
+              draggable
+              onDragStart={e => handleDragStart(e, file.id)}
+              onDragEnd={handleDragEnd}
+            >
+              <div className="drive-card-icon">
+                <FileIcon />
+              </div>
+              <div className="drive-card-name">{file.name}</div>
+              <div className="drive-card-meta">
+                {file.content ? `${file.content.split('\n').length} lines` : 'Empty'}
+              </div>
+              {file.createdBy === userName && (
+                <button className="drive-card-delete" onClick={e => handleDelete(e, file.id)} title="Delete">{'\u2715'}</button>
+              )}
+            </div>
+          );
 
-        {/* Then files */}
-        {items.filter(i => i.type === 'file').map(file => (
-          <div
-            key={file.id}
-            className={`drive-card drive-card-file${selectedFileId === file.id ? ' selected' : ''}${dragItemId === file.id ? ' dragging' : ''}`}
-            onClick={() => handleItemClick(file)}
-            draggable
-            onDragStart={e => handleDragStart(e, file.id)}
-            onDragEnd={handleDragEnd}
-          >
-            <div className="drive-card-icon">
-              <FileIcon />
-            </div>
-            <div className="drive-card-name">{file.name}</div>
-            <div className="drive-card-meta">
-              {file.content ? `${file.content.split('\n').length} lines` : 'Empty'}
-            </div>
-            <button className="drive-card-delete" onClick={e => handleDelete(e, file.id)} title="Delete">{'\u2715'}</button>
-          </div>
-        ))}
+          if (!isRoot) {
+            return (
+              <>
+                {folderItems.map(renderFolderCard)}
+                {fileItems.map(renderFileCard)}
+              </>
+            );
+          }
+
+          const mineFolders = folderItems.filter(f => f.createdBy === userName);
+          const othersFolders = folderItems.filter(f => f.createdBy !== userName);
+          return (
+            <>
+              {mineFolders.length > 0 && (
+                <>
+                  <div className="drive-section-title">
+                    Built by you <span className="drive-section-count">{mineFolders.length}</span>
+                  </div>
+                  {mineFolders.map(renderFolderCard)}
+                </>
+              )}
+              {othersFolders.length > 0 && (
+                <>
+                  <div className="drive-section-title">
+                    Built by others <span className="drive-section-count">{othersFolders.length}</span>
+                  </div>
+                  {othersFolders.map(renderFolderCard)}
+                </>
+              )}
+            </>
+          );
+        })()}
       </div>
 
       {/* Create modal */}

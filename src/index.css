@@ -1352,6 +1352,32 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
   align-content: start;
 }
 
+/* Section split ("Built by you" / "Built by others") on the Files root.
+   Same language as the Workflows + Coworker tabs. The title spans the full
+   grid row so cards below it line up on a fresh row. */
+.drive-section-title {
+  grid-column: 1 / -1;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: var(--text-muted);
+  padding: 14px 0 4px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.drive-section-title:first-child { padding-top: 4px; }
+.drive-section-count {
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  color: var(--text-muted);
+  background: var(--bg-warm);
+  border-radius: var(--radius-pill, 999px);
+  padding: 1px 8px;
+  font-size: 10px;
+}
+
 /* Cards */
 .drive-card {
   display: flex;

@@ -381,25 +381,33 @@ function ContextSidebar({ fileTree, selectedFileIds, onToggleFile, onToggleFolde
     setCollapsedSections(prev => ({ ...prev, [id]: !prev[id] }));
   }
 
-  // Files are shared across the whole room — everyone can read anyone's
-  // work. Discovery is handled by the unified sidebar search below, not by
-  // ownership filters. Departments and subfolders render as-is; the search
-  // term narrows what's visible when the user wants a specific file.
+  // The main-chat sidebar is "my workspace": files, coworkers, and chats I
+  // created. Ownership is matched at every level of the tree so a dept
+  // folder, subfolder, and leaf all need to trace back to me before they
+  // render. The Files tab exposes the full shared library — this is just
+  // the per-participant slice for quick access while chatting.
   const q = searchFilter.trim().toLowerCase();
   const matchesQuery = (text) => !q || (text || '').toLowerCase().includes(q);
+  const ownedByMe = (node) => node?.createdBy === currentUserName;
+  const hasMyFileDeep = (node) => {
+    if (!node) return false;
+    if (node.type === 'file') return ownedByMe(node);
+    if (!Array.isArray(node.children)) return false;
+    return node.children.some(hasMyFileDeep);
+  };
   function getDepartments() {
-    const deptRaw = (fileTree.children || []).map(dept => {
-      const subfolders = (dept.children || []).map(subfolder => {
-        const files = (subfolder.children || []).filter(c => c.type === 'file');
-        const filtered = q
-          ? files.filter(f => matchesQuery(f.name.replace(/\.md$/, '')))
-          : files;
-        return { id: subfolder.id, name: subfolder.name, files: filtered, hasMatch: filtered.length > 0 };
+    const deptRaw = (fileTree.children || [])
+      .filter(dept => ownedByMe(dept) || hasMyFileDeep(dept))
+      .map(dept => {
+        const subfolders = (dept.children || [])
+          .filter(sub => ownedByMe(sub) || hasMyFileDeep(sub))
+          .map(subfolder => {
+            const myFiles = (subfolder.children || []).filter(c => c.type === 'file' && ownedByMe(c));
+            const filtered = q ? myFiles.filter(f => matchesQuery(f.name.replace(/\.md$/, ''))) : myFiles;
+            return { id: subfolder.id, name: subfolder.name, files: filtered, hasMatch: filtered.length > 0 };
+          });
+        return { id: dept.id, name: dept.name, subfolders };
       });
-      return { id: dept.id, name: dept.name, subfolders };
-    });
-    // When searching, collapse away departments that yielded no file hits so
-    // the sidebar shows a tight list instead of many empty folders.
     if (!q) return deptRaw;
     return deptRaw
       .filter(dept => dept.subfolders.some(sf => sf.hasMatch))
@@ -445,8 +453,12 @@ function ContextSidebar({ fileTree, selectedFileIds, onToggleFile, onToggleFolde
     return base.filter(c => matchesQuery(c.title || 'New Chat'));
   })();
 
-  // AI Coworkers are shared room-wide; the unified search narrows by name.
-  const visibleCoworkers = (coworkers || []).filter(cw => matchesQuery(cw.name));
+  // AI Coworkers in the main sidebar are scoped to the ones I built. The
+  // Coworker Builder tab lists everyone's for discovery; this sidebar is
+  // my day-to-day roster. Search narrows the roster further.
+  const visibleCoworkers = (coworkers || [])
+    .filter(cw => ownedByMe(cw))
+    .filter(cw => matchesQuery(cw.name));
 
   return (
     <div className="sl-sidebar">

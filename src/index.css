@@ -3793,7 +3793,12 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
-  overflow-y: auto;
+  /* The whole sidebar stays the height of the viewport — only section
+     bodies scroll internally. A growing Coworkers list never pushes Files
+     off the page, and there's no "scroll the entire sidebar" behavior. */
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
   background: #5c4a3a;
   color: rgba(255,255,255,0.75);
 }

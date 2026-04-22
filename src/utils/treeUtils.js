@@ -35,6 +35,7 @@ export function buildTree(flatFiles) {
       name: f.name,
       type: f.type,
       ...(f.type === 'file' ? { content: f.content || '' } : { children: [] }),
+      createdBy: f.createdBy ?? f.created_by ?? null,
       _sort: f.sortOrder ?? f.sort_order ?? 0,
       _parentId: f.parentId ?? f.parent_id ?? null,
     });
@@ -96,6 +97,7 @@ export function flattenTree(tree, roomId) {
       type: node.type,
       content: node.content || null,
       sort_order: order,
+      created_by: node.createdBy ?? node.created_by ?? null,
     });
     if (node.children) {
       node.children.forEach((child, i) => walk(child, node.id, i));
@@ -135,6 +137,7 @@ export function mapFileRow(row) {
     content: row.content,
     sortOrder: row.sort_order ?? 0,
     roomId: row.room_id,
+    createdBy: row.created_by ?? null,
   };
 }
 

@@ -364,8 +364,9 @@ function ContextSidebar({ fileTree, selectedFileIds, onToggleFile, onToggleFolde
     }
     return collapsed;
   });
+  // One sidebar-wide search term: filters Files, Chats, and AI Coworkers
+  // simultaneously so the sidebar doesn't grow multiple input chrome.
   const [searchFilter, setSearchFilter] = useState('');
-  const [chatSearch, setChatSearch] = useState('');
 
   if (!fileTree) return null;
 
@@ -380,17 +381,32 @@ function ContextSidebar({ fileTree, selectedFileIds, onToggleFile, onToggleFolde
     setCollapsedSections(prev => ({ ...prev, [id]: !prev[id] }));
   }
 
-  // Build department-level groups with their subfolders
+  // Files are shared across the whole room — everyone can read anyone's
+  // work. Discovery is handled by the unified sidebar search below, not by
+  // ownership filters. Departments and subfolders render as-is; the search
+  // term narrows what's visible when the user wants a specific file.
+  const q = searchFilter.trim().toLowerCase();
+  const matchesQuery = (text) => !q || (text || '').toLowerCase().includes(q);
   function getDepartments() {
-    return (fileTree.children || []).map(dept => ({
-      id: dept.id,
-      name: dept.name,
-      subfolders: (dept.children || []).map(subfolder => ({
-        id: subfolder.id,
-        name: subfolder.name,
-        files: (subfolder.children || []).filter(c => c.type === 'file'),
-      })),
-    }));
+    const deptRaw = (fileTree.children || []).map(dept => {
+      const subfolders = (dept.children || []).map(subfolder => {
+        const files = (subfolder.children || []).filter(c => c.type === 'file');
+        const filtered = q
+          ? files.filter(f => matchesQuery(f.name.replace(/\.md$/, '')))
+          : files;
+        return { id: subfolder.id, name: subfolder.name, files: filtered, hasMatch: filtered.length > 0 };
+      });
+      return { id: dept.id, name: dept.name, subfolders };
+    });
+    // When searching, collapse away departments that yielded no file hits so
+    // the sidebar shows a tight list instead of many empty folders.
+    if (!q) return deptRaw;
+    return deptRaw
+      .filter(dept => dept.subfolders.some(sf => sf.hasMatch))
+      .map(dept => ({
+        ...dept,
+        subfolders: dept.subfolders.filter(sf => sf.hasMatch),
+      }));
   }
 
   const departments = getDepartments();
@@ -407,30 +423,48 @@ function ContextSidebar({ fileTree, selectedFileIds, onToggleFile, onToggleFolde
     if (ua !== ub) return ub - ua;
     return (a.name || '').localeCompare(b.name || '');
   };
-  const online = humanParticipants.filter(p => p.online).sort(sortByUnread);
-  const offline = humanParticipants.filter(p => !p.online).sort(sortByUnread);
+  // Unified search also narrows the humans list by name.
+  const visibleHumans = humanParticipants.filter(p => matchesQuery(p.name));
+  const online = visibleHumans.filter(p => p.online).sort(sortByUnread);
+  const offline = visibleHumans.filter(p => !p.online).sort(sortByUnread);
   const activeCount = selectedFileIds.length;
-  const filterTerm = searchFilter.toLowerCase().trim();
 
   // Resolve active files for pinned section
   const activeFiles = selectedFileIds.map(id => findNode(fileTree, id)).filter(Boolean);
 
   // Chats render newest-first, active chat hoisted to the top. Full history
-  // stays available — the list itself scrolls when it gets long. Search
-  // filters by title across everything.
+  // stays available — the list itself scrolls when it gets long. The unified
+  // sidebar search also filters by chat title.
   const sortedConvos = (() => {
     let base = [...(conversations || [])].reverse();
     if (activeConvoId) {
       const active = base.find(c => c.id === activeConvoId);
       if (active) base = [active, ...base.filter(c => c.id !== activeConvoId)];
     }
-    const q = chatSearch.trim().toLowerCase();
     if (!q) return base;
-    return base.filter(c => (c.title || 'New Chat').toLowerCase().includes(q));
+    return base.filter(c => matchesQuery(c.title || 'New Chat'));
   })();
+
+  // AI Coworkers are shared room-wide; the unified search narrows by name.
+  const visibleCoworkers = (coworkers || []).filter(cw => matchesQuery(cw.name));
 
   return (
     <div className="sl-sidebar">
+      {/* Unified sidebar search — filters Files, Chats, and AI Coworkers
+          simultaneously so the sidebar only ever carries one input pill. */}
+      <div className="sl-sidebar-search-wrap">
+        <input
+          type="text"
+          className="sl-sidebar-search"
+          placeholder={'Search files, chats, coworkers\u2026'}
+          value={searchFilter}
+          onChange={e => setSearchFilter(e.target.value)}
+        />
+        {searchFilter && (
+          <button className="sl-sidebar-search-clear" onClick={() => setSearchFilter('')} title="Clear">{'\u2715'}</button>
+        )}
+      </div>
+
       {/* Files — Stage 3 */}
       {stageReached(currentStage, '3') && (
       <div className="sl-section sl-context-section">
@@ -440,7 +474,9 @@ function ContextSidebar({ fileTree, selectedFileIds, onToggleFile, onToggleFolde
         <div className="sl-section-body sl-files-body">
 
         {departments.map(dept => {
-          const isDeptCollapsed = collapsedSections[dept.id];
+          // When searching, force every dept/subfolder open so the user sees
+          // the matches without having to click through collapsed groups.
+          const isDeptCollapsed = !q && collapsedSections[dept.id];
           return (
             <div key={dept.id} className="sl-dept">
               <div className="sl-dept-header" onClick={() => toggleSection(dept.id)}>
@@ -448,7 +484,7 @@ function ContextSidebar({ fileTree, selectedFileIds, onToggleFile, onToggleFolde
                 <span className="sl-dept-name">{dept.name}</span>
               </div>
               {!isDeptCollapsed && dept.subfolders.map(subfolder => {
-                const isCollapsed = collapsedSections[subfolder.id];
+                const isCollapsed = !q && collapsedSections[subfolder.id];
                 const subfolderFileIds = subfolder.files.map(f => f.id);
                 const folderAllOn = subfolderFileIds.length > 0 && subfolderFileIds.every(id => selectedFileIds.includes(id));
                 return (
@@ -491,20 +527,6 @@ function ContextSidebar({ fileTree, selectedFileIds, onToggleFile, onToggleFolde
           <span className="sl-section-name">Chats</span>
           <button className="sl-new-chat-btn" onClick={onNewChat}>+ New</button>
         </div>
-        {(conversations || []).length > 3 && (
-          <div className="sl-chat-search-wrap">
-            <input
-              type="text"
-              className="sl-chat-search"
-              placeholder="Search chats..."
-              value={chatSearch}
-              onChange={e => setChatSearch(e.target.value)}
-            />
-            {chatSearch && (
-              <button className="sl-chat-search-clear" onClick={() => setChatSearch('')} title="Clear">{'\u2715'}</button>
-            )}
-          </div>
-        )}
         <div className="sl-chat-list">
           {sortedConvos.map(c => {
             const isRun = typeof c.id === 'string' && c.id.startsWith('convo-run-');
@@ -541,10 +563,10 @@ function ContextSidebar({ fileTree, selectedFileIds, onToggleFile, onToggleFolde
             </div>
             );
           })}
-          {sortedConvos.length === 0 && chatSearch && (
-            <div className="sl-chat-empty" style={{ cursor: 'default' }}>No chats match "{chatSearch}"</div>
+          {sortedConvos.length === 0 && q && (
+            <div className="sl-chat-empty" style={{ cursor: 'default' }}>No chats match "{searchFilter}"</div>
           )}
-          {sortedConvos.length === 0 && !chatSearch && (
+          {sortedConvos.length === 0 && !q && (
             <div className="sl-chat-empty" onClick={onNewChat}>Start a conversation</div>
           )}
         </div>
@@ -552,16 +574,17 @@ function ContextSidebar({ fileTree, selectedFileIds, onToggleFile, onToggleFolde
 
       <div className="sl-spacer" />
 
-      {/* AI Coworkers — Stage 5a */}
-      {stageReached(currentStage, '5a') && coworkers && coworkers.length > 0 && (
+      {/* AI Coworkers — Stage 5a. Room-wide list; anyone can chat with any
+          coworker. The unified sidebar search narrows by name. */}
+      {stageReached(currentStage, '5a') && visibleCoworkers.length > 0 && (
         <div className="sl-section sl-agents-section">
           <div className="sl-section-header" onClick={() => toggleSection('agents')}>
             <span className="sl-section-name">AI Coworkers</span>
-            <span className="sl-section-count">{coworkers.length}</span>
+            <span className="sl-section-count">{visibleCoworkers.length}</span>
           </div>
-          {!collapsedSections['agents'] && (
+          {(q || !collapsedSections['agents']) && (
           <div className="sl-section-body sl-agents-body">
-          {[...coworkers].sort(sortByUnread).map(cw => {
+          {[...visibleCoworkers].sort(sortByUnread).map(cw => {
             const unread = (unreadDmCounts && unreadDmCounts[cw.name]) || 0;
             const canDm = stageReached(currentStage, '5a') && sb?.getCoworkerParticipantId;
             const isMine = cw.createdBy && cw.createdBy === currentUserName;
@@ -608,13 +631,15 @@ function ContextSidebar({ fileTree, selectedFileIds, onToggleFile, onToggleFolde
         </div>
       )}
 
-      {/* Co-workers / People */}
+      {/* Co-workers / People — hidden entirely when the search filters all
+          humans out, so an active search doesn't leave an empty stub. */}
+      {(q ? visibleHumans.length > 0 : true) && (
       <div className="sl-section sl-people-section">
         <div className="sl-section-header" onClick={() => toggleSection('people')}>
           <span className="sl-section-name">Coworkers</span>
           <span className="sl-section-count">{online.length}</span>
         </div>
-        {!collapsedSections['people'] && (
+        {(q || !collapsedSections['people']) && (
           <div className="sl-section-body sl-people-body">
             {online.map(p => {
               const isMe = p.name === currentUserName;
@@ -652,6 +677,7 @@ function ContextSidebar({ fileTree, selectedFileIds, onToggleFile, onToggleFolde
           </div>
         )}
       </div>
+      )}
     </div>
   );
 }

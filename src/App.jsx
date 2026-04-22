@@ -1238,6 +1238,7 @@ Examples:
               name,
               type: 'file',
               content,
+              createdBy: userName,
             };
             const cfg = coworker?.toolConfigs?.['builtin-create-file'];
             const configuredFolder = cfg?.folderId
@@ -1341,6 +1342,7 @@ Examples:
       tools,
       coworkers,
       workflows,
+      userName,
       onUpdateTree: handleUpdateTree,
       onUpdateFileContent: handleUpdateFileContent,
       onUpdateTools: handleUpdateTools,
@@ -1609,6 +1611,7 @@ Examples:
           name,
           type: 'file',
           content,
+          createdBy: userName,
         };
         const configuredFolder = destination?.folderId
           ? newTree.children.find(c => c.id === destination.folderId && c.type === 'folder')
@@ -2273,7 +2276,7 @@ Answer in ONE sentence. If the user asks "how", a second sentence is allowed —
                 <FileEditor file={selectedFile} onUpdateContent={handleUpdateFileContent} />
               </div>
             ) : (
-              <FileExplorer fileTree={fileTree} selectedFileId={selectedFileId} onSelectFile={setSelectedFileId} onUpdateTree={handleUpdateTree} onSelectDepartment={setSelectedDeptId} showEducationalCues={showEducationalCues} currentStage={currentStage} />
+              <FileExplorer fileTree={fileTree} selectedFileId={selectedFileId} onSelectFile={setSelectedFileId} onUpdateTree={handleUpdateTree} onSelectDepartment={setSelectedDeptId} showEducationalCues={showEducationalCues} currentStage={currentStage} userName={userName} />
             )}
           </div>
         )}

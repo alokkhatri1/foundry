@@ -218,9 +218,22 @@ export default function AdminDashboard({ sb, user, onBack }) {
   // Coworkers have mirror rows in participants (kind='ai') for DM routing.
   // Those are bookkeeping, not people — filter them out of the admin view.
   const humanParticipants = participants.filter(p => (p.kind || 'human') === 'human');
+  // Starter seed + platform-assistant output is stamped with synthetic
+  // authors (System / Platform Assistant). The admin view reports what
+  // the cohort actually built, so those get filtered out across Files,
+  // Coworkers, and Workflows. Anything with no author is treated as
+  // system scaffolding too — participant creations always carry a name.
+  const SYSTEM_AUTHORS = new Set(['System', 'Platform Assistant']);
+  const isParticipantAuthored = (item) => {
+    const author = item?.created_by || item?.createdBy;
+    return !!author && !SYSTEM_AUTHORS.has(author);
+  };
+  const participantFiles = (content.files || []).filter(f => f.type === 'file' && isParticipantAuthored(f));
+  const participantCoworkers = (content.coworkers || []).filter(isParticipantAuthored);
+  const participantWorkflows = (content.workflows || []).filter(isParticipantAuthored);
   const active = workshops.filter(w => !w.deprecated_at);
   const past = workshops.filter(w => w.deprecated_at);
-  const fileCount = selected ? (content.files?.filter(f => f.type === 'file').length || 0) : 0;
+  const fileCount = participantFiles.length;
   const folderCount = selected ? (content.files?.filter(f => f.type === 'folder').length || 0) : 0;
 
   return (
@@ -369,11 +382,11 @@ export default function AdminDashboard({ sb, user, onBack }) {
                   <div className="admin-stat-label">Files</div>
                 </div>
                 <div className="admin-stat">
-                  <div className="admin-stat-num">{content.coworkers?.length || 0}</div>
+                  <div className="admin-stat-num">{participantCoworkers.length}</div>
                   <div className="admin-stat-label">Coworkers</div>
                 </div>
                 <div className="admin-stat">
-                  <div className="admin-stat-num">{content.workflows?.length || 0}</div>
+                  <div className="admin-stat-num">{participantWorkflows.length}</div>
                   <div className="admin-stat-label">Workflows</div>
                 </div>
               </div>
@@ -472,8 +485,8 @@ export default function AdminDashboard({ sb, user, onBack }) {
               {detailTab === 'content' && (
                 <div className="admin-tab-content">
                   <div className="admin-content-section">
-                    <h3 className="admin-content-title">Coworkers ({content.coworkers?.length || 0})</h3>
-                    {(content.coworkers || []).map(cw => (
+                    <h3 className="admin-content-title">Coworkers ({participantCoworkers.length})</h3>
+                    {participantCoworkers.map(cw => (
                       <div key={cw.id} className="admin-content-item">
                         <span className="admin-content-avatar" style={{ background: cw.color || '#4a7fb5' }}>{cw.avatar?.startsWith('icon:') ? '?' : (cw.avatar || '?')}</span>
                         <div>
@@ -483,32 +496,35 @@ export default function AdminDashboard({ sb, user, onBack }) {
                         {cw.created_by && <span className="admin-content-by">by {cw.created_by}</span>}
                       </div>
                     ))}
-                    {(content.coworkers || []).length === 0 && <p className="admin-empty">No coworkers created yet.</p>}
+                    {participantCoworkers.length === 0 && <p className="admin-empty">No coworkers built by participants yet.</p>}
                   </div>
 
                   <div className="admin-content-section">
                     <h3 className="admin-content-title">Files ({fileCount} files, {folderCount} folders)</h3>
-                    {(content.files || []).filter(f => f.type === 'file').map(f => (
+                    {participantFiles.map(f => (
                       <div key={f.id} className="admin-content-item">
                         <span style={{ fontSize: 14, opacity: 0.5 }}>{'\uD83D\uDCC4'}</span>
-                        <div className="admin-content-name">{f.name}</div>
+                        <div>
+                          <div className="admin-content-name">{f.name}</div>
+                          {f.created_by && <div className="admin-content-meta">by {f.created_by}</div>}
+                        </div>
                       </div>
                     ))}
-                    {fileCount === 0 && <p className="admin-empty">No files created yet.</p>}
+                    {fileCount === 0 && <p className="admin-empty">No files uploaded by participants yet.</p>}
                   </div>
 
                   <div className="admin-content-section">
-                    <h3 className="admin-content-title">Workflows ({content.workflows?.length || 0})</h3>
-                    {(content.workflows || []).map(wf => (
+                    <h3 className="admin-content-title">Workflows ({participantWorkflows.length})</h3>
+                    {participantWorkflows.map(wf => (
                       <div key={wf.id} className="admin-content-item">
                         <span style={{ fontSize: 14, opacity: 0.5 }}>{'\uD83D\uDD04'}</span>
                         <div>
                           <div className="admin-content-name">{wf.name}</div>
-                          <div className="admin-content-meta">{wf.steps?.length || 0} steps</div>
+                          <div className="admin-content-meta">{wf.steps?.length || 0} steps{wf.created_by ? ` · by ${wf.created_by}` : ''}</div>
                         </div>
                       </div>
                     ))}
-                    {(content.workflows || []).length === 0 && <p className="admin-empty">No workflows created yet.</p>}
+                    {participantWorkflows.length === 0 && <p className="admin-empty">No workflows built by participants yet.</p>}
                   </div>
                 </div>
               )}

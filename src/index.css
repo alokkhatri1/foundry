@@ -4031,6 +4031,42 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
 }
 .sl-chat-search-clear:hover { color: rgba(255,255,255,0.85); }
 
+/* Unified sidebar search — sits at the top, filters every section below. */
+.sl-sidebar-search-wrap {
+  position: relative;
+  padding: 12px 12px 10px;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+  margin-bottom: 4px;
+}
+.sl-sidebar-search {
+  width: 100%;
+  box-sizing: border-box;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: var(--radius-pill, 999px);
+  padding: 7px 30px 7px 14px;
+  font-size: 12px;
+  color: rgba(255,255,255,0.9);
+  outline: none;
+  transition: background 0.12s, border-color 0.12s;
+}
+.sl-sidebar-search::placeholder { color: rgba(255,255,255,0.35); }
+.sl-sidebar-search:focus {
+  background: rgba(255,255,255,0.1);
+  border-color: rgba(255,255,255,0.2);
+}
+.sl-sidebar-search-clear {
+  position: absolute;
+  right: 20px; top: 50%;
+  transform: translateY(-50%);
+  background: none; border: none;
+  color: rgba(255,255,255,0.4);
+  font-size: 11px;
+  cursor: pointer;
+  padding: 2px 4px;
+}
+.sl-sidebar-search-clear:hover { color: rgba(255,255,255,0.85); }
+
 .sl-section-count {
   font-size: 10px; color: rgba(255,255,255,0.3);
 }

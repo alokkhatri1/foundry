@@ -117,7 +117,7 @@ function getFolderDescription(name) {
   return null;
 }
 
-export default function FileExplorer({ fileTree, selectedFileId, onSelectFile, onUpdateTree, onSelectDepartment, showEducationalCues, currentStage }) {
+export default function FileExplorer({ fileTree, selectedFileId, onSelectFile, onUpdateTree, onSelectDepartment, showEducationalCues, currentStage, userName }) {
   const confirm = useConfirm();
   const [currentFolderId, setCurrentFolderId] = useState(fileTree.id);
   const [showModal, setShowModal] = useState(false);
@@ -249,14 +249,15 @@ export default function FileExplorer({ fileTree, selectedFileId, onSelectFile, o
         // Always write both subfolders. Skills is hidden by the stage-4 UI
         // filter until the reveal, so the data is consistent no matter when
         // the folder was created.
-        children.push({ id: genId(), name: 'knowledge', type: 'folder', children: [] });
-        children.push({ id: genId(), name: 'skills', type: 'folder', children: [] });
+        children.push({ id: genId(), name: 'knowledge', type: 'folder', children: [], createdBy: userName });
+        children.push({ id: genId(), name: 'skills', type: 'folder', children: [], createdBy: userName });
       }
       parent.children.push({
         id: genId(),
         name: newName.trim(),
         type: 'folder',
         children,
+        createdBy: userName,
       });
     } else {
       const fileName = newName.trim().endsWith('.md') ? newName.trim() : newName.trim() + '.md';
@@ -265,6 +266,7 @@ export default function FileExplorer({ fileTree, selectedFileId, onSelectFile, o
         name: fileName,
         type: 'file',
         content: templateContent || '',
+        createdBy: userName,
       });
     }
 
@@ -399,6 +401,7 @@ export default function FileExplorer({ fileTree, selectedFileId, onSelectFile, o
         name: parsed.fileName,
         type: 'file',
         content: parsed.type === 'text' ? parsed.content : `# ${file.name}\n\n[Image file — content not displayable as text]`,
+        createdBy: userName,
       });
     }
 

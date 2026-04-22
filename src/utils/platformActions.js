@@ -291,6 +291,7 @@ export function executePlatformAction(toolName, input, ctx) {
         name: fileName,
         type: 'file',
         content: input.content,
+        createdBy: ctx.userName,
       });
       ctx.onUpdateTree(newTree);
       ctx.fileTree = newTree;

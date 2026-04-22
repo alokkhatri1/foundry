@@ -139,9 +139,9 @@ export default function useSupabase() {
   const loadWorkshopContent = useCallback(async (roomId) => {
     if (!isSupabaseConfigured) return {};
     const [files, coworkers, workflows] = await Promise.all([
-      supabase.from('files').select('id, name, type, parent_id').eq('room_id', roomId),
+      supabase.from('files').select('id, name, type, parent_id, created_by').eq('room_id', roomId),
       supabase.from('coworkers').select('id, name, role, avatar, color, created_by, created_at').eq('room_id', roomId),
-      supabase.from('workflows').select('id, name, steps, created_at').eq('room_id', roomId),
+      supabase.from('workflows').select('id, name, steps, created_by, created_at').eq('room_id', roomId),
     ]);
     return {
       files: files.data || [],
@@ -475,6 +475,7 @@ export default function useSupabase() {
       type: file.type,
       content: file.content || null,
       sort_order: file.sortOrder ?? file.sort_order ?? 0,
+      created_by: file.createdBy ?? file.created_by ?? null,
       updated_at: new Date().toISOString(),
     }, { onConflict: 'id' });
     if (error) console.error('[sb] saveFile:', error.message);
@@ -488,12 +489,21 @@ export default function useSupabase() {
 
   const saveFilesBatch = useCallback(async (files) => {
     if (!isSupabaseConfigured || !roomIdRef.current) return;
-    const rows = files.map(f => ({
-      id: f.id, room_id: f.room_id || roomIdRef.current,
-      parent_id: f.parent_id || null, name: f.name, type: f.type,
-      content: f.content || null, sort_order: f.sort_order ?? 0,
-      updated_at: new Date().toISOString(),
-    }));
+    const rows = files.map(f => {
+      const row = {
+        id: f.id, room_id: f.room_id || roomIdRef.current,
+        parent_id: f.parent_id || null, name: f.name, type: f.type,
+        content: f.content || null, sort_order: f.sort_order ?? 0,
+        updated_at: new Date().toISOString(),
+      };
+      // Only set created_by when we actually have a value — omitting the key
+      // lets Supabase preserve any existing stamp on re-upsert (e.g. a user's
+      // file getting re-written by a tree migration pass that doesn't know
+      // the author).
+      const createdBy = f.created_by ?? f.createdBy ?? null;
+      if (createdBy) row.created_by = createdBy;
+      return row;
+    });
     const { error } = await supabase.from('files').upsert(rows, { onConflict: 'id' });
     if (error) console.error('[sb] saveFilesBatch:', error.message);
   }, []);

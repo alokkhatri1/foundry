@@ -215,6 +215,9 @@ export default function AdminDashboard({ sb, user, onBack }) {
   }
 
   const onlineNames = new Set(onlineUsers.map(u => u.name));
+  // Coworkers have mirror rows in participants (kind='ai') for DM routing.
+  // Those are bookkeeping, not people — filter them out of the admin view.
+  const humanParticipants = participants.filter(p => (p.kind || 'human') === 'human');
   const active = workshops.filter(w => !w.deprecated_at);
   const past = workshops.filter(w => w.deprecated_at);
   const fileCount = selected ? (content.files?.filter(f => f.type === 'file').length || 0) : 0;
@@ -354,7 +357,7 @@ export default function AdminDashboard({ sb, user, onBack }) {
               {/* Stats bar */}
               <div className="admin-stats-bar">
                 <div className="admin-stat">
-                  <div className="admin-stat-num">{participants.length}</div>
+                  <div className="admin-stat-num">{humanParticipants.length}</div>
                   <div className="admin-stat-label">Participants</div>
                 </div>
                 <div className="admin-stat">
@@ -449,11 +452,11 @@ export default function AdminDashboard({ sb, user, onBack }) {
 
               {detailTab === 'participants' && (
                 <div className="admin-tab-content">
-                  {participants.length === 0 ? (
+                  {humanParticipants.length === 0 ? (
                     <p className="admin-empty">No participants yet. Share the code to get started.</p>
                   ) : (
                     <div className="admin-participants">
-                      {participants.map(p => (
+                      {humanParticipants.map(p => (
                         <div key={p.id} className="admin-participant">
                           <span className="admin-participant-dot" style={{ background: onlineNames.has(p.name) ? 'var(--accent-system)' : 'var(--border-color)' }} />
                           <span className="admin-participant-name">{p.name}</span>

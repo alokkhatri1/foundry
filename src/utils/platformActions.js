@@ -520,6 +520,7 @@ export function executePlatformAction(toolName, input, ctx) {
         id: 'wf-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6),
         name: input.name,
         steps: resolvedSteps,
+        createdBy: ctx.userName,
       };
       const newWorkflows = [...(ctx.workflows || []), newWorkflow];
       ctx.onUpdateWorkflows(newWorkflows);

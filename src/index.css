@@ -4625,6 +4625,42 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
 /* Inside a cw-section, don't let cw-list-grid fight for flex height —
    it's now wrapped by the section, so normalise back to block-flow. */
 .cw-section .cw-list-grid { flex: none; padding: 0 24px 8px; }
+
+/* Read-only banner shown at top of the coworker editor when opened for a
+   coworker built by another participant. Inputs inside are disabled via the
+   native <fieldset disabled> wrapper; the banner makes the read-only state
+   legible to the user. */
+.cwb-readonly-banner {
+  margin-left: 12px;
+  padding: 4px 12px;
+  background: var(--bg-warm);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-pill, 999px);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+  letter-spacing: 0.2px;
+}
+.cwb-editor-fieldset {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  min-width: 0;
+}
+.cwb-editor-fieldset[disabled] {
+  opacity: 0.92;
+}
+.cwb-editor-fieldset[disabled] .cwb-name-input,
+.cwb-editor-fieldset[disabled] .cwb-desc-input,
+.cwb-editor-fieldset[disabled] textarea,
+.cwb-editor-fieldset[disabled] input {
+  background: var(--bg-warm);
+  cursor: not-allowed;
+}
+.cwb-editor-fieldset[disabled] .cwb-identity-avatar-btn,
+.cwb-editor-fieldset[disabled] .ftp-browse-btn,
+.cwb-editor-fieldset[disabled] .cwb-desc-gen-btn,
+.cwb-editor-fieldset[disabled] button { cursor: not-allowed; }
 .cw-list-empty {
   grid-column: 1 / -1;
   text-align: center;

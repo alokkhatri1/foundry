@@ -467,7 +467,7 @@ function FilePicker({ fileTree, selectedIds, onChange, folderName, onUpdateConte
 // Compact one-liner row — avatar + name + role + status + edit/delete. Used
 // when the coworker list gets long and scanning cards top-to-bottom becomes
 // painful. Click the row to chat, click Edit to open the editor.
-function CoworkerRow({ coworker, onStartChat, onEdit, onDelete }) {
+function CoworkerRow({ coworker, onStartChat, onEdit, onDelete, readOnly }) {
   const instrCount = coworker.instructionFileIds?.length || 0;
   const isReady = instrCount > 0;
   return (
@@ -479,14 +479,20 @@ function CoworkerRow({ coworker, onStartChat, onEdit, onDelete }) {
         <span className="cwb-card-dot" />
         {isReady ? 'Ready' : 'Needs setup'}
       </span>
-      <button className="cwb-row-edit" onClick={e => { e.stopPropagation(); onEdit(coworker.id); }} title="Edit">Edit</button>
-      <button className="cwb-row-delete" onClick={e => { e.stopPropagation(); onDelete(coworker.id); }} title="Delete">{'\u2715'}</button>
+      {readOnly ? (
+        <button className="cwb-row-edit" onClick={e => { e.stopPropagation(); onEdit(coworker.id); }} title="View (read-only)">View</button>
+      ) : (
+        <>
+          <button className="cwb-row-edit" onClick={e => { e.stopPropagation(); onEdit(coworker.id); }} title="Edit">Edit</button>
+          <button className="cwb-row-delete" onClick={e => { e.stopPropagation(); onDelete(coworker.id); }} title="Delete">{'\u2715'}</button>
+        </>
+      )}
     </div>
   );
 }
 
 // ===== Coworker Card =====
-function CoworkerCard({ coworker, onStartChat, onEdit, onDelete }) {
+function CoworkerCard({ coworker, onStartChat, onEdit, onDelete, readOnly }) {
   const instrCount = coworker.instructionFileIds?.length || 0;
   const isReady = instrCount > 0;
 
@@ -507,27 +513,35 @@ function CoworkerCard({ coworker, onStartChat, onEdit, onDelete }) {
         <button
           className="cwb-card-edit"
           onClick={e => { e.stopPropagation(); onEdit(coworker.id); }}
-          title="Edit"
+          title={readOnly ? 'View (read-only)' : 'Edit'}
         >
-          Edit
+          {readOnly ? 'View' : 'Edit'}
         </button>
       </div>
-      <button className="cwb-card-delete" onClick={e => { e.stopPropagation(); onDelete(coworker.id); }} title="Delete">{'\u2715'}</button>
+      {!readOnly && (
+        <button className="cwb-card-delete" onClick={e => { e.stopPropagation(); onDelete(coworker.id); }} title="Delete">{'\u2715'}</button>
+      )}
     </div>
   );
 }
 
 // ===== Coworker Editor =====
-function CoworkerEditor({ coworker, onUpdate, onBack, fileTree, callClaudeAPI, showEducationalCues, tools, currentStage, participants, onUpdateFileContent }) {
+function CoworkerEditor({ coworker, onUpdate, onBack, fileTree, callClaudeAPI, showEducationalCues, tools, currentStage, participants, onUpdateFileContent, readOnly }) {
   const [showAvatarPicker, setShowAvatarPicker] = useState(false);
 
   return (
-    <div className="cwb-editor">
+    <div className={`cwb-editor${readOnly ? ' cwb-editor-readonly' : ''}`}>
       <div className="cwb-editor-header">
         <button className="files-back-btn" onClick={onBack}>{'\u2190'} Back</button>
+        {readOnly && (
+          <div className="cwb-readonly-banner" title="This coworker was built by another participant — you can view it but not change it.">
+            Read-only — built by {coworker.createdBy}
+          </div>
+        )}
       </div>
 
       <div className="cwb-editor-scroll">
+        <fieldset className="cwb-editor-fieldset" disabled={readOnly}>
         <div className="cwb-editor-content">
           {/* Identity — name + avatar */}
           <div className="cwb-section cwb-section-identity">
@@ -661,6 +675,7 @@ function CoworkerEditor({ coworker, onUpdate, onBack, fileTree, callClaudeAPI, s
           </RevealAt>
 
         </div>
+        </fieldset>
       </div>
     </div>
   );
@@ -725,9 +740,22 @@ export default function CoworkerBuilder({ coworkers, onUpdateCoworkers, fileTree
   }
 
   if (selectedCw) {
+    const editorReadOnly = !!(selectedCw.createdBy && selectedCw.createdBy !== userName);
     return (
       <div className="panel panel-center">
-        <CoworkerEditor coworker={selectedCw} onUpdate={handleUpdate} onBack={() => setSelectedCwId(null)} fileTree={fileTree} callClaudeAPI={callClaudeAPI} showEducationalCues={showEducationalCues} tools={tools} currentStage={currentStage} participants={participants} onUpdateFileContent={onUpdateFileContent} />
+        <CoworkerEditor
+          coworker={selectedCw}
+          onUpdate={editorReadOnly ? () => {} : handleUpdate}
+          onBack={() => setSelectedCwId(null)}
+          fileTree={fileTree}
+          callClaudeAPI={callClaudeAPI}
+          showEducationalCues={showEducationalCues}
+          tools={tools}
+          currentStage={currentStage}
+          participants={participants}
+          onUpdateFileContent={onUpdateFileContent}
+          readOnly={editorReadOnly}
+        />
       </div>
     );
   }
@@ -809,13 +837,13 @@ export default function CoworkerBuilder({ coworkers, onUpdateCoworkers, fileTree
                 {viewMode === 'grid' ? (
                   <div className="cw-list-grid">
                     {otherCoworkers.map(cw => (
-                      <CoworkerCard key={cw.id} coworker={cw} onStartChat={handleStartChat} onEdit={setSelectedCwId} onDelete={handleDelete} />
+                      <CoworkerCard key={cw.id} coworker={cw} onStartChat={handleStartChat} onEdit={setSelectedCwId} onDelete={handleDelete} readOnly />
                     ))}
                   </div>
                 ) : (
                   <div className="cwb-list">
                     {otherCoworkers.map(cw => (
-                      <CoworkerRow key={cw.id} coworker={cw} onStartChat={handleStartChat} onEdit={setSelectedCwId} onDelete={handleDelete} />
+                      <CoworkerRow key={cw.id} coworker={cw} onStartChat={handleStartChat} onEdit={setSelectedCwId} onDelete={handleDelete} readOnly />
                     ))}
                   </div>
                 )}

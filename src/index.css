@@ -1827,6 +1827,20 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
 .wf-review-output-label.approved { color: #5a9e6f; }
 .wf-review-output-label.rejected { color: #c45c5c; }
 .react-flow__edge-path { stroke: var(--accent-gold, #c8956c); stroke-width: 2; }
+.wf-edge-delete-btn {
+  width: 22px; height: 22px; border-radius: 50%;
+  background: var(--bg-white); border: 1.5px solid var(--border-color);
+  color: var(--text-muted); font-size: 12px; font-weight: 600;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; opacity: 0; transition: opacity 0.15s, color 0.15s, border-color 0.15s, transform 0.15s;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  padding: 0; line-height: 1;
+}
+.react-flow__edge:hover .wf-edge-delete-btn,
+.wf-edge-delete-btn:hover { opacity: 1; }
+.wf-edge-delete-btn:hover {
+  color: #c45c5c; border-color: #c45c5c; background: #fff6f5;
+}
 .react-flow__edge.selected .react-flow__edge-path { stroke: var(--text-dark); stroke-width: 3; }
 .wf-canvas-empty {
   position: absolute;

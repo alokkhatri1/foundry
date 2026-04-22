@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import ReactFlow, { Background, Controls, MiniMap, Handle, Position, applyNodeChanges, applyEdgeChanges, addEdge } from 'reactflow';
+import ReactFlow, { Background, Controls, MiniMap, Handle, Position, applyNodeChanges, applyEdgeChanges, addEdge, BaseEdge, EdgeLabelRenderer, getBezierPath } from 'reactflow';
 import 'reactflow/dist/style.css';
 import EducationalCue from './EducationalCue';
 import { CoworkerGlyph } from './Icon';
@@ -152,13 +152,44 @@ function styleEdge(e) {
   const isRejected = (e.sourceHandle || '') === 'rejected';
   return {
     ...e,
-    type: 'default',
+    type: 'deletable',
     style: {
       stroke: isRejected ? '#c45c5c' : '#c8956c',
       strokeWidth: 2,
     },
   };
 }
+
+// Custom edge with a hover-revealed X button so users can delete connections
+// without having to discover the React Flow "select + Backspace" keyboard
+// shortcut. The button rides at the midpoint of the bezier curve.
+function DeletableEdge({ id, sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition, style, markerEnd, data }) {
+  const [edgePath, labelX, labelY] = getBezierPath({
+    sourceX, sourceY, sourcePosition, targetX, targetY, targetPosition,
+  });
+  return (
+    <>
+      <BaseEdge id={id} path={edgePath} style={style} markerEnd={markerEnd} />
+      <EdgeLabelRenderer>
+        <button
+          className="wf-edge-delete-btn"
+          style={{
+            position: 'absolute',
+            transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY}px)`,
+            pointerEvents: 'all',
+          }}
+          onClick={(e) => {
+            e.stopPropagation();
+            if (data?.onDelete) data.onDelete(id);
+          }}
+          title="Delete connection"
+        >{'\u2715'}</button>
+      </EdgeLabelRenderer>
+    </>
+  );
+}
+
+const wfEdgeTypes = { deletable: DeletableEdge };
 
 // ===== Step Card =====
 function StepCard({ step, index, coworkers, tools, participants, onUpdate, onDelete, expanded, onToggleExpand, validationErrors, allSteps, currentStepId, stepResult, isDragging, dragOverPos, onDragStart, onDragOver, onDragEnd, onDrop, showEducationalCues, onCanvas, fileTree, callClaudeAPI, onUpdateFileContent }) {
@@ -548,6 +579,11 @@ function WorkflowCanvas({ workflow, onUpdateWorkflow, fileTree, coworkers, tools
   const setCopilotBusy = useCallback((val) => onCopilotPatch({ busy: val }), [onCopilotPatch]);
   const copilotScrollRef = useRef(null);
 
+  const handleDeleteEdge = useCallback((edgeId) => {
+    const nextEdges = (workflow.edges || []).filter(e => e.id !== edgeId);
+    onUpdateWorkflow({ ...workflow, edges: nextEdges });
+  }, [workflow, onUpdateWorkflow]);
+
   // Derive canvas nodes from workflow.steps preserving any stored positions.
   const { derivedNodes, derivedEdges } = useMemo(() => {
     const positions = new Map((workflow.nodes || []).map(n => [n.id, n.position]));
@@ -580,9 +616,12 @@ function WorkflowCanvas({ workflow, onUpdateWorkflow, fileTree, coworkers, tools
         },
       };
     });
-    const nextEdges = (workflow.edges || []).map(styleEdge);
+    const nextEdges = (workflow.edges || []).map(e => {
+      const styled = styleEdge(e);
+      return { ...styled, data: { ...(styled.data || {}), onDelete: handleDeleteEdge } };
+    });
     return { derivedNodes: nextNodes, derivedEdges: nextEdges };
-  }, [workflow, fileTree, coworkers, tools, participants, activeRun, currentStepId, expandedStep, setExpandedStep, updateStep, deleteStep, validationErrors, showEducationalCues, callClaudeAPI, onSaveCoworkerToLibrary, onUpdateFileContent]);
+  }, [workflow, fileTree, coworkers, tools, participants, activeRun, currentStepId, expandedStep, setExpandedStep, updateStep, deleteStep, validationErrors, showEducationalCues, callClaudeAPI, onSaveCoworkerToLibrary, onUpdateFileContent, handleDeleteEdge]);
 
   useEffect(() => {
     setNodes(derivedNodes);
@@ -703,6 +742,7 @@ function WorkflowCanvas({ workflow, onUpdateWorkflow, fileTree, coworkers, tools
         nodes={nodes}
         edges={edges}
         nodeTypes={nodeTypes}
+        edgeTypes={wfEdgeTypes}
         onNodesChange={handleNodesChange}
         onEdgesChange={handleEdgesChange}
         onConnect={handleConnect}
@@ -710,7 +750,7 @@ function WorkflowCanvas({ workflow, onUpdateWorkflow, fileTree, coworkers, tools
         fitView
         fitViewOptions={{ padding: 0.2, maxZoom: 1 }}
         proOptions={{ hideAttribution: true }}
-        defaultEdgeOptions={{ type: 'default', animated: false, style: { stroke: '#c8956c', strokeWidth: 2 } }}
+        defaultEdgeOptions={{ type: 'deletable', animated: false, style: { stroke: '#c8956c', strokeWidth: 2 } }}
         nodeDragThreshold={5}
       >
         <Background gap={20} size={1} color="#d4ccc2" />

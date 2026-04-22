@@ -323,11 +323,15 @@ export async function executeWorkflowRun({
       // coworker's knowledge). Runs stop here — no downstream edges.
       const upstream = predBlocks.join('\n\n---\n\n');
       if (!step.targetFileId) {
-        onStepUpdate(runId, stepIndex, { status: 'error', output: 'No target file configured' });
-        onMessage({ type: 'error', content: `"${nodeLabel(step)}" has no target file — pick one in the step config.` });
-        onLog({ type: 'error', message: `${nodeLabel(step)} | no target file` });
-        executed.set(nodeId, { output: '' });
+        // Soft-land: unconfigured Capture is a no-op, not an error. Lets the
+        // rest of the run complete so participants can iterate without
+        // configuring Capture upfront.
+        const summary = 'Not configured — nothing captured';
+        executed.set(nodeId, { output: summary });
         executionLog.push(nodeId);
+        onStepUpdate(runId, stepIndex, { status: 'completed', output: summary, completedAt: Date.now() });
+        onMessage({ type: 'status', content: `${nodeLabel(step)}: no target file picked — skipping capture this run` });
+        onLog({ type: 'workflow', message: `${nodeLabel(step)} | skipped (no target)` });
         continue;
       }
 

@@ -405,9 +405,8 @@ function StepCard({ step, index, coworkers, tools, participants, onUpdate, onDel
                   </select>
                 </div>
                 <div className="step-config-hint">
-                  After the upstream step succeeds, the output is appended to the file. If a coworker is picked, the file is also added to their knowledge — so the next run sees what this one produced.
+                  After the upstream step succeeds, the output is appended to the file. If a coworker is picked, the file is also added to their knowledge — so the next run sees what this one produced. Leaving this blank is fine — the run completes, nothing gets captured.
                 </div>
-                {validationErrors?.noCaptureTarget && <div className="validation-error">Pick a file to append to</div>}
               </>
             )}
 
@@ -832,7 +831,9 @@ function WorkflowEditor({ workflow, onUpdateWorkflow, fileTree, coworkers, tools
         if (!cw?.name?.trim()) { errors[step.id].noAgent = true; valid = false; }
       }
       if (step.type === 'trigger' && !step.caseInput?.trim() && !(step.fileIds?.length)) { errors[step.id].noCaseInput = true; valid = false; }
-      if (step.type === 'capture' && !step.targetFileId) { errors[step.id].noCaptureTarget = true; valid = false; }
+      // Capture: no validation block. An unconfigured Capture soft-lands at
+      // run time (nothing captured, run completes) so participants can Run
+      // freely and come back to configure Capture later.
     });
     setValidationErrors(errors);
     return { valid, errors };
@@ -986,7 +987,25 @@ export default function WorkflowBuilder({ workflows, onUpdateWorkflows, fileTree
   }
 
   function handleCreateWorkflow() {
-    const newWf = { id: genWfId(), name: 'New Orchestration', steps: [] };
+    // Seed every new workflow with Trigger + Capture Learning already on the
+    // canvas. They're left UNWIRED so the participant draws the edges through
+    // whatever Coworker/Review steps they drop in between — which is the
+    // whole point of the pattern (and what the Copilot chat helps with).
+    // Providing nodes[] with positions tells ensureDagShape to skip its
+    // auto-wire step; otherwise it would connect Trigger straight to Capture.
+    const wfId = genWfId();
+    const triggerStep = { id: 'trigger-' + wfId, type: 'trigger', name: 'Trigger', caseInput: '' };
+    const captureStep = { id: genStepId(), type: 'capture', name: 'Capture Learning', targetFileId: '', targetCoworkerId: '' };
+    const newWf = {
+      id: wfId,
+      name: 'New Workflow',
+      steps: [triggerStep, captureStep],
+      nodes: [
+        { id: triggerStep.id, type: 'trigger', position: { x: 240, y: 0 }, data: { ...triggerStep } },
+        { id: captureStep.id, type: 'capture', position: { x: 240, y: 360 }, data: { ...captureStep } },
+      ],
+      edges: [],
+    };
     onUpdateWorkflows([...workflows, newWf]);
     setSelectedWorkflowId(newWf.id);
   }

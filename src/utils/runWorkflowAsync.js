@@ -134,6 +134,17 @@ export async function executeWorkflowRun({
     const step = stepById.get(nodeId);
     const stepIndex = indexById.get(nodeId);
 
+    if (!step) {
+      // Edge points at a node id that no longer has a matching step — can
+      // happen after a copilot build leaves orphans, or after a delete that
+      // didn't clean up its edges. Skip the phantom so the rest of the DAG
+      // can still run instead of crashing the whole execution.
+      executed.set(nodeId, { output: '' });
+      executionLog.push(nodeId);
+      onMessage({ type: 'status', content: `Skipped ${nodeId} — no matching step on this workflow.` });
+      continue;
+    }
+
     onRunUpdate(runId, { currentStepIndex: stepIndex, status: 'running' });
 
     if (step.type === 'trigger') {

@@ -626,7 +626,7 @@ export default function FileExplorer({ fileTree, selectedFileId, onSelectFile, o
               {mineFolders.length > 0 && (
                 <>
                   <div className="drive-section-title">
-                    Built by you <span className="drive-section-count">{mineFolders.length}</span>
+                    Added by you <span className="drive-section-count">{mineFolders.length}</span>
                   </div>
                   {mineFolders.map(renderFolderCard)}
                 </>
@@ -634,7 +634,7 @@ export default function FileExplorer({ fileTree, selectedFileId, onSelectFile, o
               {othersFolders.length > 0 && (
                 <>
                   <div className="drive-section-title">
-                    Built by others <span className="drive-section-count">{othersFolders.length}</span>
+                    Added by others <span className="drive-section-count">{othersFolders.length}</span>
                   </div>
                   {othersFolders.map(renderFolderCard)}
                 </>

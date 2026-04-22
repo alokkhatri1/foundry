@@ -1694,14 +1694,20 @@ Examples:
   function handleApprovalAction(runId, msgId, action, comment) {
     // The in-memory resolver only exists in the browser tab that started
     // the run. If the page has been refreshed since then, the runtime is
-    // gone and there's nothing to resolve. Surface that instead of silently
-    // eating the click.
+    // gone and there's nothing to resolve. Retire the card inline with a
+    // friendly 'Stale' state instead of spamming a red error in chat.
     const resolver = approvalResolversRef.current.get(runId);
     if (!resolver) {
-      addMessage({
-        type: 'error',
-        content: 'This review can\'t be resolved from here — the run\'s runtime isn\'t active in this tab (likely the page was refreshed since the run started). Start a new run to try again.',
-      });
+      if (msgId) {
+        setConversations(prev => prev.map(c => ({
+          ...c,
+          messages: (c.messages || []).map(m =>
+            m.id === msgId
+              ? { ...m, resolved: true, resolvedAction: 'Stale' }
+              : m
+          ),
+        })));
+      }
       return;
     }
     // Flip the approval card to its resolved state across every conversation

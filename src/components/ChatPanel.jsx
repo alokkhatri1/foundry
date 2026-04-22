@@ -145,6 +145,16 @@ function ChatMessage({ msg, onApprovalAction, onPickRecipient, onNudgeRecipient,
           )}
           {msg.resolved && (() => {
             const a = msg.resolvedAction;
+            if (a === 'Stale') {
+              return (
+                <div className="cl-approval-resolved stale">
+                  <span className="cl-approval-resolved-action">{'\u231B'} This review is no longer live</span>
+                  <div className="cl-approval-resolved-note">
+                    The run that requested this review ended before you could respond (the page was refreshed). Start a new run if you still need this reviewed.
+                  </div>
+                </div>
+              );
+            }
             const kind = a === 'Approve' ? 'approved' : a === 'Cancelled' ? 'cancelled' : 'rejected';
             const label = a === 'Approve' ? '\u2713 Approved' : a === 'Cancelled' ? '\u2298 Cancelled' : '\u2715 Rejected';
             return (

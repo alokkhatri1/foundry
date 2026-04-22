@@ -471,7 +471,7 @@ function CoworkerRow({ coworker, onStartChat, onEdit, onDelete, readOnly }) {
   const instrCount = coworker.instructionFileIds?.length || 0;
   const isReady = instrCount > 0;
   return (
-    <div className="cwb-row" onClick={() => onStartChat(coworker.id)} title="Click to chat">
+    <div className="cwb-row" onClick={() => onStartChat(coworker.id)}>
       <AvatarDisplay avatar={coworker.avatar} color={coworker.color} size={32} />
       <div className="cwb-row-name">{coworker.name || 'Untitled'}</div>
       <div className="cwb-row-role">{coworker.role ? (coworker.role.length > 80 ? coworker.role.slice(0, 80) + '\u2026' : coworker.role) : 'No role defined'}</div>
@@ -497,7 +497,7 @@ function CoworkerCard({ coworker, onStartChat, onEdit, onDelete, readOnly }) {
   const isReady = instrCount > 0;
 
   return (
-    <div className="cwb-card" onClick={() => onStartChat(coworker.id)} title="Click to chat">
+    <div className="cwb-card" onClick={() => onStartChat(coworker.id)}>
       <div className="cwb-card-top">
         <AvatarDisplay avatar={coworker.avatar} color={coworker.color} size={42} />
         <div className="cwb-card-info">

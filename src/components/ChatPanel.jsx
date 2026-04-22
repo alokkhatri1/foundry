@@ -907,8 +907,7 @@ export default function ChatPanel({ messages, onSendMessage, onApprovalAction, o
 
     return (
       <div className="cl-input-area">
-        <input type="file" ref={fileInputRef} style={{ display: 'none' }} multiple onChange={handleFileSelect}
-          accept=".pdf,.doc,.docx,.xls,.xlsx,.csv,.txt,.md,.json,.png,.jpg,.jpeg,.gif,.webp" />
+        <input type="file" ref={fileInputRef} style={{ display: 'none' }} multiple onChange={handleFileSelect} />
         <div className="cl-input-row">
           <div className="cl-context-info">
             {activeDm

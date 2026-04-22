@@ -385,6 +385,7 @@ function ContextSidebar({ fileTree, selectedFileIds, onToggleFile, onToggleFolde
         <div className="sl-section-header">
           <span className="sl-section-name">Files</span>
         </div>
+        <div className="sl-section-body sl-files-body">
 
         {departments.map(dept => {
           const isDeptCollapsed = collapsedSections[dept.id];
@@ -428,6 +429,7 @@ function ContextSidebar({ fileTree, selectedFileIds, onToggleFile, onToggleFolde
             </div>
           );
         })}
+        </div>
       </div>
       )}
 
@@ -483,7 +485,9 @@ function ContextSidebar({ fileTree, selectedFileIds, onToggleFile, onToggleFolde
             <span className="sl-section-name">AI Coworkers</span>
             <span className="sl-section-count">{coworkers.length}</span>
           </div>
-          {!collapsedSections['agents'] && coworkers.map(cw => {
+          {!collapsedSections['agents'] && (
+          <div className="sl-section-body sl-agents-body">
+          {coworkers.map(cw => {
             const unread = (unreadDmCounts && unreadDmCounts[cw.name]) || 0;
             const canDm = stageReached(currentStage, '5a') && sb?.getCoworkerParticipantId;
             const isMine = cw.createdBy && cw.createdBy === currentUserName;
@@ -525,6 +529,8 @@ function ContextSidebar({ fileTree, selectedFileIds, onToggleFile, onToggleFolde
               </div>
             );
           })}
+          </div>
+          )}
         </div>
       )}
 
@@ -535,7 +541,7 @@ function ContextSidebar({ fileTree, selectedFileIds, onToggleFile, onToggleFolde
           <span className="sl-section-count">{online.length}</span>
         </div>
         {!collapsedSections['people'] && (
-          <>
+          <div className="sl-section-body sl-people-body">
             {online.map(p => {
               const isMe = p.name === currentUserName;
               const isActive = activeDm?.name === p.name;
@@ -569,7 +575,7 @@ function ContextSidebar({ fileTree, selectedFileIds, onToggleFile, onToggleFolde
                 </div>
               );
             })}
-          </>
+          </div>
         )}
       </div>
     </div>

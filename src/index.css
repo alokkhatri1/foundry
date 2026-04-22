@@ -3684,6 +3684,25 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
 .sl-context-section { flex-shrink: 0; padding-top: 12px; }
 .sl-spacer { flex: 1; }
 
+/* Each section's scrollable body. Individual max-heights per section so
+   Files, Chats, AI Coworkers, and Coworkers each stay bounded — one
+   section can't push the others off-screen when it gets big. */
+.sl-section-body {
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255,255,255,0.15) transparent;
+}
+.sl-section-body::-webkit-scrollbar { width: 6px; }
+.sl-section-body::-webkit-scrollbar-track { background: transparent; }
+.sl-section-body::-webkit-scrollbar-thumb {
+  background: rgba(255,255,255,0.12);
+  border-radius: 3px;
+}
+.sl-section-body::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.22); }
+.sl-files-body   { max-height: 220px; }
+.sl-agents-body  { max-height: 168px; }
+.sl-people-body  { max-height: 168px; }
+
 /* Department headers */
 .sl-dept { margin-bottom: 2px; }
 .sl-dept-header {

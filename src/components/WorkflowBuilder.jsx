@@ -1248,16 +1248,6 @@ export default function WorkflowBuilder({ workflows, onUpdateWorkflows, fileTree
             <EducationalCue cueId="workflow-overview" show={showEducationalCues} />
           </div>
           <div style={{ display: 'flex', gap: 8 }}>
-            {(workflowRuns || []).some(r => r.status === 'running' || r.status === 'waiting_approval') && onCancelAllRuns && (
-              <button className="wf-stop-all-btn" onClick={onCancelAllRuns} title="Stop every active run in this room">
-                Stop all runs
-              </button>
-            )}
-            {workflows.length > 0 && (
-              <button className="wf-clear-all-btn" onClick={handleClearAll} title="Delete every workflow in this room">
-                Clear all
-              </button>
-            )}
             <button className="wf-create-btn" onClick={handleCreateWorkflow}>+ New Workflow</button>
           </div>
         </div>

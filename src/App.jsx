@@ -1656,25 +1656,32 @@ Examples:
   }
 
   function handleApprovalAction(runId, msgId, action, comment) {
-    // Flip the approval card to its resolved state across every conversation
-    // so the buttons disappear and a confirmation shows in their place. The
-    // card lives on the run's dedicated conversation, which isn't guaranteed
-    // to be the currently-active one, so we walk them all.
-    setConversations(prev => prev.map(c => ({
-      ...c,
-      messages: (c.messages || []).map(m =>
-        m.id === msgId
-          ? { ...m, resolved: true, resolvedAction: action, resolvedComment: comment, resolvedBy: userName }
-          : m
-      ),
-    })));
-    // Try run-specific resolver first
+    // The in-memory resolver only exists in the browser tab that started
+    // the run. If the page has been refreshed since then, the runtime is
+    // gone and there's nothing to resolve. Surface that instead of silently
+    // eating the click.
     const resolver = approvalResolversRef.current.get(runId);
-    if (resolver) {
-      resolver({ action, comment, resolvedBy: userName });
-      approvalResolversRef.current.delete(runId);
+    if (!resolver) {
+      addMessage({
+        type: 'error',
+        content: 'This review can\'t be resolved from here — the run\'s runtime isn\'t active in this tab (likely the page was refreshed since the run started). Start a new run to try again.',
+      });
+      return;
     }
-    // Log to Supabase
+    // Flip the approval card to its resolved state across every conversation
+    // so the buttons disappear and a confirmation shows in their place.
+    if (msgId) {
+      setConversations(prev => prev.map(c => ({
+        ...c,
+        messages: (c.messages || []).map(m =>
+          m.id === msgId
+            ? { ...m, resolved: true, resolvedAction: action, resolvedComment: comment, resolvedBy: userName }
+            : m
+        ),
+      })));
+    }
+    resolver({ action, comment, resolvedBy: userName });
+    approvalResolversRef.current.delete(runId);
     sb.logApproval({ runId, action, comment, resolvedBy: userName });
   }
 

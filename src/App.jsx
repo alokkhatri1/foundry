@@ -1599,6 +1599,27 @@ Examples:
         }
         handleUpdateTree(newTree);
       },
+      onCapture: async ({ fileId, coworkerId, content, runName }) => {
+        // Append the upstream output to a workspace file, timestamped so the
+        // accumulation is visible. If a coworker was also picked, make sure
+        // the file is in their knowledgeFileIds — so the next run inherits
+        // what this one produced (the "knowledge compounds" loop).
+        const file = flatFiles.find(f => f.id === fileId);
+        if (!file) throw new Error('Target file not found');
+        const header = `\n\n---\n**Captured ${new Date().toLocaleString()}** — ${runName || 'workflow run'}\n\n`;
+        const nextContent = (file.content || '') + header + content;
+        handleUpdateFileContent(fileId, nextContent);
+        if (coworkerId) {
+          setCoworkers(prev => (prev || []).map(cw => {
+            if (cw.id !== coworkerId) return cw;
+            const ids = new Set(cw.knowledgeFileIds || []);
+            if (!ids.has(fileId)) ids.add(fileId);
+            const nextCw = { ...cw, knowledgeFileIds: Array.from(ids) };
+            sb.saveCoworker?.(nextCw);
+            return nextCw;
+          }));
+        }
+      },
     }).catch(err => {
       updateRun(runId, { status: 'error', completedAt: Date.now() });
       addMessage({ type: 'error', content: `Workflow error: ${err.message}` });

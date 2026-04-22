@@ -104,7 +104,20 @@ function TriggerNode({ data }) {
   );
 }
 
-const nodeTypes = { agent: CoworkerStepNode, approval: ReviewStepNode, trigger: TriggerNode };
+// Capture node — a terminal step that writes the upstream output into a
+// workspace file and (optionally) wires that file into a coworker's
+// knowledge. Meant to be the final step: the loop that lets the system
+// get smarter with every run. No output handle — runs stop here.
+function CaptureStepNode({ data }) {
+  return (
+    <div className="wf-canvas-node wf-capture-node" style={{ width: 420 }}>
+      <Handle type="target" position={Position.Top} id="in" className="wf-handle wf-handle-in" />
+      <StepCard {...data.stepCardProps} onCanvas />
+    </div>
+  );
+}
+
+const nodeTypes = { agent: CoworkerStepNode, approval: ReviewStepNode, trigger: TriggerNode, capture: CaptureStepNode };
 
 // Cycle prevention: before adding a new edge A→B, walk forward from B via
 // the existing edges and reject if we can reach A. Rejected-path edges are
@@ -222,7 +235,10 @@ function StepCard({ step, index, coworkers, tools, participants, onUpdate, onDel
                 : ((allSteps || []).filter(s => s.type !== 'trigger').findIndex(s => s.id === step.id) + 1)}
           </span>
           <span className={`step-type-label ${step.type}`}>
-            {step.type === 'agent' ? 'Coworker' : step.type === 'approval' ? 'Review' : 'Trigger'}
+            {step.type === 'agent' ? 'Coworker'
+              : step.type === 'approval' ? 'Review'
+              : step.type === 'capture' ? 'Capture'
+              : 'Trigger'}
           </span>
           {assignee && (
             <span className="step-assignee-badge" style={{ background: assignee.color || '#ccc' }}>
@@ -234,7 +250,9 @@ function StepCard({ step, index, coworkers, tools, participants, onUpdate, onDel
               ? (assignedCw?.name?.trim() || 'New Coworker')
               : step.type === 'approval'
                 ? (assignedPerson?.name || 'Review')
-                : step.name}
+                : step.type === 'capture'
+                  ? (step.name || 'Capture Learning')
+                  : step.name}
           </span>
           {statusBadge}
           <span className="step-actions">
@@ -363,6 +381,36 @@ function StepCard({ step, index, coworkers, tools, participants, onUpdate, onDel
               );
             })()}
 
+            {step.type === 'capture' && (
+              <>
+                <div className="step-config-row">
+                  <label>Append output to file</label>
+                  <FilePicker
+                    fileTree={fileTree}
+                    selectedIds={step.targetFileId ? [step.targetFileId] : []}
+                    onChange={ids => onUpdate({ ...step, targetFileId: ids[ids.length - 1] || '' })}
+                    onUpdateContent={onUpdateFileContent}
+                  />
+                </div>
+                <div className="step-config-row">
+                  <label>Also grow this coworker's knowledge (optional)</label>
+                  <select
+                    value={step.targetCoworkerId || ''}
+                    onChange={e => onUpdate({ ...step, targetCoworkerId: e.target.value })}
+                  >
+                    <option value="">— none —</option>
+                    {(coworkers || []).map(cw => (
+                      <option key={cw.id} value={cw.id}>{cw.name || 'Unnamed coworker'}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="step-config-hint">
+                  After the upstream step succeeds, the output is appended to the file. If a coworker is picked, the file is also added to their knowledge — so the next run sees what this one produced.
+                </div>
+                {validationErrors?.noCaptureTarget && <div className="validation-error">Pick a file to append to</div>}
+              </>
+            )}
+
             {step.type === 'approval' && (
               <>
                 <EducationalCue cueId="workflow-approval-step" show={showEducationalCues} />
@@ -399,7 +447,7 @@ function StepCard({ step, index, coworkers, tools, participants, onUpdate, onDel
                 upstream draft at the moment of approval) is saved to the
                 configured folder on run completion. Not applicable to the
                 trigger (it has no output of its own). */}
-            {step.type !== 'trigger' && (
+            {step.type !== 'trigger' && step.type !== 'capture' && (
             <div className="step-save-block">
               <label className="step-save-toggle">
                 <input
@@ -758,11 +806,16 @@ function WorkflowEditor({ workflow, onUpdateWorkflow, fileTree, coworkers, tools
   }
 
   function addStep(type) {
+    const defaultName = type === 'agent' ? 'New Coworker'
+      : type === 'approval' ? 'Human Review'
+      : type === 'capture' ? 'Capture Learning'
+      : 'New Step';
     const newStep = {
       id: genStepId(), type,
-      name: type === 'agent' ? 'New Coworker' : 'Human Review',
+      name: defaultName,
       ...(type === 'agent' && { coworker: emptyCoworker() }),
       ...(type === 'approval' && { assigneeId: '', prompt: '', actions: ['Approve', 'Reject'] }),
+      ...(type === 'capture' && { targetFileId: '', targetCoworkerId: '' }),
     };
     onUpdateWorkflow({ ...workflow, steps: [...workflow.steps, newStep] });
     setShowAddMenu(false);
@@ -779,6 +832,7 @@ function WorkflowEditor({ workflow, onUpdateWorkflow, fileTree, coworkers, tools
         if (!cw?.name?.trim()) { errors[step.id].noAgent = true; valid = false; }
       }
       if (step.type === 'trigger' && !step.caseInput?.trim() && !(step.fileIds?.length)) { errors[step.id].noCaseInput = true; valid = false; }
+      if (step.type === 'capture' && !step.targetFileId) { errors[step.id].noCaptureTarget = true; valid = false; }
     });
     setValidationErrors(errors);
     return { valid, errors };
@@ -814,6 +868,7 @@ function WorkflowEditor({ workflow, onUpdateWorkflow, fileTree, coworkers, tools
             <div className="add-step-menu">
               <button className="add-step-option" onClick={() => addStep('agent')}><span className="dot agent"></span> Coworker Step</button>
               <button className="add-step-option" onClick={() => addStep('approval')}><span className="dot approval"></span> Human Review</button>
+              <button className="add-step-option" onClick={() => addStep('capture')}><span className="dot capture"></span> Capture Learning</button>
             </div>
           )}
         </div>
@@ -898,6 +953,7 @@ function WorkflowCard({ workflow, coworkers, participants, onSelect, onDelete, o
             ? <CoworkerGlyph avatar={cw?.avatar} size={12} color="#ffffff" />
             : step.type === 'approval' ? '\uD83D\uDC64'
             : step.type === 'trigger' ? '\u25B6'
+            : step.type === 'capture' ? '\uD83D\uDCDA'
             : '\u2699\uFE0F';
           return (
             <span key={step.id} className="wf-card-flow-item">

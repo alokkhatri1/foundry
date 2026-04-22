@@ -14,6 +14,7 @@ function nodeLabel(step) {
   if (!step) return 'Node';
   if (step.type === 'trigger') return 'Case Input';
   if (step.type === 'agent') return step.coworker?.name || step.name || 'Coworker';
+  if (step.type === 'capture') return step.name || 'Capture';
   return step.name || 'Review';
 }
 
@@ -46,6 +47,7 @@ export async function executeWorkflowRun({
   onLog,                // (entry) => void
   getApprovalDecision,  // (runId, stepId, config) => Promise<{action, comment}>
   onSaveStepOutput,     // ({stepName, content, name, destination}) => void — per-step save when step.save.enabled
+  onCapture,            // ({fileId, coworkerId, content, runId}) => void — terminal append for capture steps
 }) {
   const steps = workflow.steps || [];
   const indexById = new Map(steps.map((s, i) => [s.id, i]));
@@ -315,6 +317,45 @@ export async function executeWorkflowRun({
 
       // Re-enqueue bounce targets to drive the revision loop.
       queue = [...bounceTargets];
+    } else if (step.type === 'capture') {
+      // Capture: terminal append. Takes the upstream output and writes it
+      // into a workspace file (and optionally wires that file into a
+      // coworker's knowledge). Runs stop here — no downstream edges.
+      const upstream = predBlocks.join('\n\n---\n\n');
+      if (!step.targetFileId) {
+        onStepUpdate(runId, stepIndex, { status: 'error', output: 'No target file configured' });
+        onMessage({ type: 'error', content: `"${nodeLabel(step)}" has no target file — pick one in the step config.` });
+        onLog({ type: 'error', message: `${nodeLabel(step)} | no target file` });
+        executed.set(nodeId, { output: '' });
+        executionLog.push(nodeId);
+        continue;
+      }
+
+      if (onCapture) {
+        try {
+          await onCapture({
+            fileId: step.targetFileId,
+            coworkerId: step.targetCoworkerId || null,
+            content: upstream,
+            runId,
+            runName: workflow.name,
+          });
+        } catch (err) {
+          onStepUpdate(runId, stepIndex, { status: 'error', output: err?.message || 'Capture failed' });
+          onMessage({ type: 'error', content: `Capture failed: ${err?.message || err}` });
+          onLog({ type: 'error', message: `${nodeLabel(step)} | capture failed: ${err?.message || err}` });
+          executed.set(nodeId, { output: '' });
+          executionLog.push(nodeId);
+          continue;
+        }
+      }
+
+      const summary = `Appended to workspace${step.targetCoworkerId ? ' + grew coworker knowledge' : ''}`;
+      executed.set(nodeId, { output: summary });
+      executionLog.push(nodeId);
+      onStepUpdate(runId, stepIndex, { status: 'completed', output: summary, completedAt: Date.now() });
+      onMessage({ type: 'status', content: `Captured: ${summary}` });
+      onLog({ type: 'workflow', message: `capture → file ${step.targetFileId}${step.targetCoworkerId ? ` + coworker ${step.targetCoworkerId}` : ''}` });
     } else {
       // Unknown step type — skip.
       executed.set(nodeId, { output: '' });

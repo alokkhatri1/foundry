@@ -1855,6 +1855,10 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
 .step-type-label.approval { background: #fdf0e6; color: #b8784e; }
 .step-type-label.system { background: #e8f4ec; color: var(--accent-system); }
 .step-type-label.trigger { background: #e1efe4; color: var(--accent-system, #5a8f6b); }
+.step-type-label.capture { background: #efe8f7; color: #6f4fb0; }
+.step-number.capture { background: #6f4fb0; }
+.wf-canvas-node.wf-capture-node .workflow-step-card { border-color: #6f4fb0; }
+.add-step-option .dot.capture { background: #6f4fb0; }
 .step-name { flex: 1; font-weight: 600; font-size: 14px; color: var(--text-dark); }
 .step-name-input { flex: 1; font-weight: 600; font-size: 14px; border: none; outline: none; background: transparent; padding: 0; }
 .step-actions { display: flex; gap: 4px; }

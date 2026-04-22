@@ -35,9 +35,10 @@ const STEP_STATUS_ICON = {
 // ===== Run Card =====
 function RunCard({ run, onClick, onNudge, showEducationalCues }) {
   const cfg = STATUS_CONFIG[run.status] || STATUS_CONFIG.running;
-  const completedSteps = run.stepResults.filter(s => s.status === 'completed').length;
-  const totalSteps = run.stepResults.length;
-  const waitingStep = run.stepResults.find(s => s.status === 'waiting');
+  const stepResults = run.stepResults || [];
+  const completedSteps = stepResults.filter(s => s.status === 'completed').length;
+  const totalSteps = stepResults.length;
+  const waitingStep = stepResults.find(s => s.status === 'waiting');
 
   return (
     <div className="rcard" onClick={() => onClick(run.id)}>
@@ -48,7 +49,7 @@ function RunCard({ run, onClick, onNudge, showEducationalCues }) {
 
       {/* Progress bar */}
       <div className="rcard-progress">
-        {run.stepResults.map((step, i) => (
+        {stepResults.map((step, i) => (
           <div key={i} className="rcard-progress-item">
             {i > 0 && <span className="rcard-progress-line" style={{ background: step.status === 'completed' ? cfg.color : 'var(--border-color)' }}></span>}
             <span className={`rcard-progress-dot ${step.status}`} style={step.status === 'completed' || step.status === 'running' ? { background: cfg.color } : {}}>

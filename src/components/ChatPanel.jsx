@@ -464,19 +464,23 @@ function ContextSidebar({ fileTree, selectedFileIds, onToggleFile, onToggleFolde
           </div>
         )}
         <div className="sl-chat-list">
-          {sortedConvos.map(c => (
+          {sortedConvos.map(c => {
+            const isRun = typeof c.id === 'string' && c.id.startsWith('convo-run-');
+            return (
             <div
               key={c.id}
-              className={`sl-chat-item${activeConvoId === c.id ? ' active' : ''}`}
+              className={`sl-chat-item${activeConvoId === c.id ? ' active' : ''}${isRun ? ' sl-chat-item-run' : ''}`}
               onClick={() => onSelectConvo(c.id)}
             >
+              {isRun && <span className="sl-chat-kind-glyph" title="Workflow run">{'\u25B8'}</span>}
               <span className="sl-chat-title">{c.title || 'New Chat'}</span>
               <span className="sl-chat-meta">{c.messages?.length || 0} msgs</span>
               {(conversations || []).length > 1 && (
                 <button className="sl-chat-delete" onClick={e => { e.stopPropagation(); onDeleteConvo(c.id); }}>{'\u2715'}</button>
               )}
             </div>
-          ))}
+            );
+          })}
           {sortedConvos.length === 0 && chatSearch && (
             <div className="sl-chat-empty" style={{ cursor: 'default' }}>No chats match "{chatSearch}"</div>
           )}

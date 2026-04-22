@@ -365,8 +365,18 @@ function ContextSidebar({ fileTree, selectedFileIds, onToggleFile, onToggleFolde
   // Humans only — AI coworker mirror participants (kind='ai') are rendered
   // via the separate AI Coworkers section.
   const humanParticipants = (participants || []).filter(p => (p.kind || 'human') === 'human');
-  const online = humanParticipants.filter(p => p.online);
-  const offline = humanParticipants.filter(p => !p.online);
+  // Sort so anyone with an unread DM floats to the top of their online/
+  // offline bucket — this makes nudges and fresh replies visibly bubble up
+  // instead of being buried mid-list. Within each tier (unread > read)
+  // keep stable alphabetical order so the list doesn't shuffle randomly.
+  const sortByUnread = (a, b) => {
+    const ua = (unreadDmCounts && unreadDmCounts[a.name]) || 0;
+    const ub = (unreadDmCounts && unreadDmCounts[b.name]) || 0;
+    if (ua !== ub) return ub - ua;
+    return (a.name || '').localeCompare(b.name || '');
+  };
+  const online = humanParticipants.filter(p => p.online).sort(sortByUnread);
+  const offline = humanParticipants.filter(p => !p.online).sort(sortByUnread);
   const activeCount = selectedFileIds.length;
   const filterTerm = searchFilter.toLowerCase().trim();
 
@@ -519,7 +529,7 @@ function ContextSidebar({ fileTree, selectedFileIds, onToggleFile, onToggleFolde
           </div>
           {!collapsedSections['agents'] && (
           <div className="sl-section-body sl-agents-body">
-          {coworkers.map(cw => {
+          {[...coworkers].sort(sortByUnread).map(cw => {
             const unread = (unreadDmCounts && unreadDmCounts[cw.name]) || 0;
             const canDm = stageReached(currentStage, '5a') && sb?.getCoworkerParticipantId;
             const isMine = cw.createdBy && cw.createdBy === currentUserName;

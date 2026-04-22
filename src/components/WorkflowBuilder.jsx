@@ -391,7 +391,7 @@ function StepCard({ step, index, coworkers, tools, participants, onUpdate, onDel
                       <button
                         type="button"
                         className={`capture-mode-btn${mode === 'knowledge' ? ' active' : ''}`}
-                        onClick={() => onUpdate({ ...step, mode: 'knowledge' })}
+                        onClick={() => onUpdate({ ...step, mode: 'knowledge', targetFileId: mode === 'knowledge' ? step.targetFileId : '' })}
                       >
                         <span className="capture-mode-title">Append to knowledge</span>
                         <span className="capture-mode-desc">Each run adds a precedent to the file.</span>
@@ -399,7 +399,7 @@ function StepCard({ step, index, coworkers, tools, participants, onUpdate, onDel
                       <button
                         type="button"
                         className={`capture-mode-btn${mode === 'skills' ? ' active' : ''}`}
-                        onClick={() => onUpdate({ ...step, mode: 'skills' })}
+                        onClick={() => onUpdate({ ...step, mode: 'skills', targetFileId: mode === 'skills' ? step.targetFileId : '' })}
                       >
                         <span className="capture-mode-title">Refine skills</span>
                         <span className="capture-mode-desc">AI edits the instructions based on this run.</span>
@@ -413,6 +413,7 @@ function StepCard({ step, index, coworkers, tools, participants, onUpdate, onDel
                       selectedIds={step.targetFileId ? [step.targetFileId] : []}
                       onChange={ids => onUpdate({ ...step, targetFileId: ids[ids.length - 1] || '' })}
                       onUpdateContent={onUpdateFileContent}
+                      folderName={mode === 'skills' ? 'skills' : 'knowledge'}
                     />
                   </div>
                   <div className="step-config-hint">

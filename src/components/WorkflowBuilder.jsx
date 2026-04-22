@@ -267,16 +267,25 @@ function StepCard({ step, index, coworkers, tools, participants, onUpdate, onDel
             {step.type === 'trigger' && (
               <>
                 <div className="step-config-row">
-                  <label>Case Input</label>
+                  <label>Instructions</label>
                   <textarea
                     value={step.caseInput || ''}
                     onChange={e => onUpdate({ ...step, caseInput: e.target.value })}
-                    placeholder="Describe the case this workflow should process. The first coworker step sees this directly; downstream steps also receive upstream outputs."
-                    rows={5}
+                    placeholder="What should the first coworker do with the documents? e.g., 'Review the contract and flag any non-standard clauses.'"
+                    rows={4}
+                  />
+                </div>
+                <div className="step-config-row">
+                  <label>Documents</label>
+                  <FilePicker
+                    fileTree={fileTree}
+                    selectedIds={step.fileIds || []}
+                    onChange={ids => onUpdate({ ...step, fileIds: ids })}
+                    onUpdateContent={onUpdateFileContent}
                   />
                 </div>
                 <div className="step-config-hint">
-                  The header Run button fires with whatever is in this field. Fill it in, press Run, watch the token walk down the chain.
+                  Both flow into the first coworker step when you press Run.
                 </div>
               </>
             )}
@@ -709,7 +718,7 @@ function WorkflowEditor({ workflow, onUpdateWorkflow, fileTree, coworkers, tools
   const [dragOverHalf, setDragOverHalf] = useState(null);
 
   const triggerStep = (workflow.steps || []).find(s => s.type === 'trigger');
-  const hasCaseInput = !!triggerStep?.caseInput?.trim();
+  const hasTriggerInput = !!triggerStep?.caseInput?.trim() || (triggerStep?.fileIds?.length || 0) > 0;
   const realStepCount = (workflow.steps || []).filter(s => s.type !== 'trigger').length;
 
   function updateStep(index, updatedStep) {
@@ -769,7 +778,7 @@ function WorkflowEditor({ workflow, onUpdateWorkflow, fileTree, coworkers, tools
         const cw = step.coworker || (step.coworkerId ? (coworkers || []).find(c => c.id === step.coworkerId) : null);
         if (!cw?.name?.trim()) { errors[step.id].noAgent = true; valid = false; }
       }
-      if (step.type === 'trigger' && !step.caseInput?.trim()) { errors[step.id].noCaseInput = true; valid = false; }
+      if (step.type === 'trigger' && !step.caseInput?.trim() && !(step.fileIds?.length)) { errors[step.id].noCaseInput = true; valid = false; }
     });
     setValidationErrors(errors);
     return { valid, errors };
@@ -778,8 +787,9 @@ function WorkflowEditor({ workflow, onUpdateWorkflow, fileTree, coworkers, tools
   function handleRun() {
     const { valid } = validate();
     if (!valid) {
-      // If trigger is missing case input, expand it so the user sees where to type.
-      if (triggerStep && !hasCaseInput) {
+      // If trigger is missing both instructions + documents, expand it so
+      // the user sees where to type/pick.
+      if (triggerStep && !hasTriggerInput) {
         const triggerIdx = workflow.steps.findIndex(s => s.id === triggerStep.id);
         if (triggerIdx >= 0) setExpandedStep(triggerIdx);
       }
@@ -810,10 +820,10 @@ function WorkflowEditor({ workflow, onUpdateWorkflow, fileTree, coworkers, tools
         <button
           className="run-btn"
           onClick={handleRun}
-          disabled={isRunning || realStepCount === 0 || !hasCaseInput}
+          disabled={isRunning || realStepCount === 0 || !hasTriggerInput}
           title={
             realStepCount === 0 ? 'Add at least one step before running'
-            : !hasCaseInput ? 'Fill in the Trigger case input before running'
+            : !hasTriggerInput ? 'Add instructions or pick at least one document in the Trigger'
             : ''
           }
         >

@@ -1478,16 +1478,25 @@ Examples:
       return;
     }
 
-    // Case input now lives on the Trigger step. autoInput is kept as a
-    // backdoor for programmatic callers (tests, replays) — otherwise the
-    // header Run button fires with whatever the user typed into the Trigger.
+    // Case input is assembled from the Trigger step's two fields:
+    // Instructions (free text) + Documents (file picks from the workspace).
+    // autoInput remains a backdoor for programmatic callers (tests, replays).
     let caseInput = autoInput || null;
     if (!caseInput) {
       const triggerStep = (workflow.steps || []).find(s => s.type === 'trigger');
-      caseInput = triggerStep?.caseInput?.trim() || null;
+      const instructions = triggerStep?.caseInput?.trim() || '';
+      const fileIds = triggerStep?.fileIds || [];
+      const docs = fileIds
+        .map(id => flatFiles.find(f => f.id === id))
+        .filter(f => f && (f.content || '').trim())
+        .map(f => `### ${f.name}\n${f.content.trim()}`);
+      const parts = [];
+      if (instructions) parts.push(`## Instructions\n${instructions}`);
+      if (docs.length > 0) parts.push(`## Documents\n${docs.join('\n\n')}`);
+      caseInput = parts.length > 0 ? parts.join('\n\n') : null;
     }
     if (!caseInput) {
-      addMessage({ type: 'error', content: 'Fill in the Trigger case input before running.' });
+      addMessage({ type: 'error', content: 'Add instructions or pick at least one document in the Trigger before running.' });
       return;
     }
 

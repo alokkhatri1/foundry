@@ -294,7 +294,7 @@ function SendMessageConfig({ participants, config, onChange }) {
 
 // ===== File Picker =====
 // Exported below for reuse from WorkflowBuilder's inline Coworker node.
-function FilePicker({ fileTree, selectedIds, onChange, folderName, onUpdateContent }) {
+export function FilePicker({ fileTree, selectedIds, onChange, folderName, onUpdateContent }) {
   const [open, setOpen] = useState(false);
   const [previewId, setPreviewId] = useState(null);
   const [previewMode, setPreviewMode] = useState('view');

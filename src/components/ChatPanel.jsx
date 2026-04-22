@@ -53,6 +53,25 @@ function ChatMessage({ msg, onApprovalAction, onPickRecipient, onNudgeRecipient,
 
   if (msg.type === 'status') return <div className="cl-status"><span>{msg.content}</span></div>;
 
+  if (msg.type === 'nudge') {
+    return (
+      <div className="cl-row cl-row-ai">
+        <div className="cl-nudge">
+          <div className="cl-nudge-icon">{'\uD83D\uDD14'}</div>
+          <div className="cl-nudge-body">
+            <div className="cl-nudge-headline">
+              <strong>{msg.fromName}</strong> pinged <strong>{msg.toName}</strong>
+            </div>
+            <div className="cl-nudge-sub">
+              Please review <em>&ldquo;{msg.workflowName}&rdquo;</em>
+              {msg.delivered === false && <span className="cl-nudge-undelivered"> — couldn't deliver DM</span>}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   if (msg.type === 'user') {
     return (
       <div className="cl-row cl-row-user">

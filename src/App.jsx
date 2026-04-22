@@ -1782,11 +1782,19 @@ Examples:
     const sender = (participants || []).find(p => p.name === userName);
     const assignee = assigneeName ? (participants || []).find(p => p.name === assigneeName) : null;
     const label = assigneeName || 'the reviewer';
+    let delivered = false;
     if (sender && assignee) {
       const text = `Nudge — please review "${run.workflowName}" when you get a moment.`;
-      await sb.sendDm(sender.id, assignee.id, text);
+      const result = await sb.sendDm(sender.id, assignee.id, text);
+      delivered = !result?.error;
     }
-    addMessage({ type: 'status', content: `${userName} nudged ${label} to review "${run.workflowName}"` });
+    addMessage({
+      type: 'nudge',
+      fromName: userName,
+      toName: label,
+      workflowName: run.workflowName,
+      delivered,
+    });
     addLog({ type: 'workflow', message: `nudge sent to ${label} for ${run.workflowName}` });
   }
 

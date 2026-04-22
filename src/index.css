@@ -2926,6 +2926,39 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
   border: 1px solid var(--border-color);
   color: var(--text-body);
 }
+
+/* Nudge card — fires when the run owner pings the reviewer. Warmer than a
+   status line, quieter than an error. */
+.cl-nudge {
+  display: flex; align-items: center; gap: 12px;
+  margin: 10px auto; max-width: 640px;
+  padding: 10px 14px;
+  background: #fdf0e6;
+  border: 1px solid #ebd0ad;
+  border-radius: var(--radius);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+}
+.cl-nudge-icon {
+  width: 32px; height: 32px;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--bg-white);
+  border: 1px solid #ebd0ad;
+  border-radius: 50%;
+  font-size: 15px;
+  flex-shrink: 0;
+}
+.cl-nudge-body { flex: 1; min-width: 0; }
+.cl-nudge-headline {
+  font-size: 13.5px; color: #7a5130; font-weight: 500;
+}
+.cl-nudge-headline strong { font-weight: 700; color: var(--text-dark); }
+.cl-nudge-sub {
+  font-size: 12.5px; color: var(--text-muted);
+  margin-top: 2px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.cl-nudge-sub em { font-style: normal; color: var(--text-body); }
+.cl-nudge-undelivered { color: #c45c5c; font-weight: 600; }
 .cl-approval-resolved-note {
   margin-top: 6px;
   font-size: 12.5px;

@@ -1083,10 +1083,14 @@ Examples:
     if (!apiKey) {
       return { success: false, error: 'No API key configured. Add your Anthropic API key in .env file.' };
     }
-    // Model is overridable per call — the no-tools platform-chat path and
-    // the intent classifier both use Haiku; workflow runs and refine-style
-    // callers stay on Sonnet by default.
-    const model = options.model || 'claude-sonnet-4-20250514';
+    // Default model is Haiku 4.5. Sonnet's RPM tier limits were the
+    // bottleneck during cohort-scale load — every participant's coworker
+    // chat and workflow-run step landed on the same bucket. Haiku 4.5 has
+    // far higher ceilings and handles the shapes of output these paths
+    // produce (policy checks, short assessments, structured summaries)
+    // with minimal quality loss. Callers that genuinely need deeper
+    // reasoning can pass `options.model` explicitly.
+    const model = options.model || 'claude-haiku-4-5-20251001';
     try {
       const response = await claudeFetch('https://api.anthropic.com/v1/messages', {
         method: 'POST',
@@ -1148,7 +1152,10 @@ Examples:
     let messages = [{ role: 'user', content: typeof userMessage === 'string' ? userMessage : userMessage }];
     const allContent = [];
     let turns = 0;
-    const model = 'claude-sonnet-4-20250514';
+    // Haiku 4.5 for the agentic coworker loop — same reasoning as the
+    // default above. Multi-participant coworker chats were the other big
+    // Sonnet consumer during load. Haiku handles tool_use reliably.
+    const model = 'claude-haiku-4-5-20251001';
     // 'coworker_chat' for any coworker-backed turn; 'workflow_run' when the
     // workflow runner invokes this function via its own wrapper (sets
     // usageSegment explicitly). Falls back to chat for safety.

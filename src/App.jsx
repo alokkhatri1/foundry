@@ -1102,10 +1102,12 @@ Examples:
         },
         body: JSON.stringify({
           model,
-          // Workflow-run coworker steps do need more runway than chat turns
-          // (they produce structured assessments), so keep 1000 — still below
-          // the earlier 2000-4096 ceilings and caps the outlier cost per call.
-          max_tokens: 1000,
+          // 600 tokens covers the vast majority of coworker chat + workflow
+          // step outputs (most finish under 500). Tighter cap directly
+          // reduces TPM pressure during cohort-scale load, where the single
+          // shared Anthropic org is the bottleneck. Structured assessments
+          // truncate gracefully at this ceiling.
+          max_tokens: 600,
           // Cache the system prompt so repeated turns with the same coworker /
           // skills / knowledge hit the 10x-cheaper cache_read rate. Claude
           // ignores cache_control below its 1024-token minimum gracefully.
@@ -1174,7 +1176,11 @@ Examples:
           },
           body: JSON.stringify({
             model,
-            max_tokens: 2000,
+            // Tool-calling turns rarely need more than ~1000 tokens — the
+            // assistant's narration around tool calls is usually short.
+            // 1200 leaves headroom for the occasional longer synthesis
+            // turn without blowing up TPM across a cohort.
+            max_tokens: 1200,
             // System prompt (role + skills + knowledge + tool guidance) is
             // identical across turns of a coworker chat — cache it. Tools
             // are also marked cacheable via the last-tool trick above.

@@ -31,6 +31,7 @@ import { executeTool, toolToClaudeSchema, toolFromClaudeName } from './utils/too
 import { PLATFORM_TOOL_SCHEMAS, TOOL_DISPLAY_NAMES, TOOL_ICONS, executePlatformAction } from './utils/platformActions';
 import useSupabase from './hooks/useSupabase';
 import { buildTree, flattenTree, mapFileRow, mapCoworkerRow, mapToolRow, mapWorkflowRow, preserveToolConfigs, ensureDagShape } from './utils/treeUtils';
+import { claudeFetch } from './utils/claudeFetch';
 
 const STORAGE_KEY = 'sandbox:state';
 
@@ -1015,7 +1016,7 @@ function App() {
     if (!apiKey) return 'action';
     const model = 'claude-haiku-4-5-20251001';
     try {
-      const response = await fetch('https://api.anthropic.com/v1/messages', {
+      const response = await claudeFetch('https://api.anthropic.com/v1/messages', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -1087,7 +1088,7 @@ Examples:
     // callers stay on Sonnet by default.
     const model = options.model || 'claude-sonnet-4-20250514';
     try {
-      const response = await fetch('https://api.anthropic.com/v1/messages', {
+      const response = await claudeFetch('https://api.anthropic.com/v1/messages', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -1156,7 +1157,7 @@ Examples:
     while (turns < 10) {
       turns++;
       try {
-        const response = await fetch('https://api.anthropic.com/v1/messages', {
+        const response = await claudeFetch('https://api.anthropic.com/v1/messages', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -1358,7 +1359,7 @@ Examples:
     while (turns < 10) {
       turns++;
       try {
-        const response = await fetch('https://api.anthropic.com/v1/messages', {
+        const response = await claudeFetch('https://api.anthropic.com/v1/messages', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',

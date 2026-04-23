@@ -5,6 +5,8 @@
 // The canvas re-renders live because the mutations flow through the existing
 // onUpdateWorkflow path (same as drag-and-drop edits).
 
+import { claudeFetch } from './claudeFetch';
+
 // ===== Tool schemas =====
 // These go to Claude as the callable surface. The underlying implementations
 // live in applyCopilotTool below. Keep the descriptions prescriptive — Claude
@@ -412,7 +414,7 @@ export async function runCopilotTurn({
 
     let data;
     try {
-      const response = await fetch('https://api.anthropic.com/v1/messages', {
+      const response = await claudeFetch('https://api.anthropic.com/v1/messages', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

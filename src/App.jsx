@@ -715,6 +715,15 @@ function App() {
   }, [unreadDmCounts]);
 
   async function handleJoin(name, code, authUserId, email) {
+    try {
+      return await runHandleJoin(name, code, authUserId, email);
+    } catch (err) {
+      console.error('[join] handleJoin threw:', err);
+      return { error: 'join_failed', message: err?.message || 'Unknown error joining workshop' };
+    }
+  }
+
+  async function runHandleJoin(name, code, authUserId, email) {
     const result = await sb.joinRoom(code);
     if (result?.error) return result;
     const roomId = result.id;

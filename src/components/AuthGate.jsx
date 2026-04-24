@@ -12,8 +12,30 @@ export default function AuthGate({ children, onJoin, workshopCode }) {
   const sb = useSupabase();
   const [session, setSession] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [isAdmin, setIsAdmin] = useState(false);
+  // Tri-state so the UI can distinguish "still checking" from "definitely not
+  // admin" from "check failed". Before this, `isAdmin: false` covered all
+  // three cases and the Admin Dashboard button just silently never appeared,
+  // which read as "I can't log in" during the 04-23 session.
+  const [adminStatus, setAdminStatus] = useState('unknown'); // 'unknown' | 'yes' | 'no' | 'error'
+  const [adminError, setAdminError] = useState(null);
+  const isAdmin = adminStatus === 'yes';
   const [showAdmin, setShowAdmin] = useState(false);
+
+  // Manual retry for when the initial check failed (e.g. RLS blip). Called
+  // from JoinScreen's "Retry admin check" link when adminStatus === 'error'.
+  async function retryAdminCheck() {
+    if (!session?.user) return;
+    setAdminStatus('unknown');
+    setAdminError(null);
+    try {
+      const admin = await sb.checkIsAdmin(session.user.id);
+      setAdminStatus(admin ? 'yes' : 'no');
+    } catch (err) {
+      console.error('[auth] retry checkIsAdmin failed:', err);
+      setAdminStatus('error');
+      setAdminError(err?.message || 'Admin check failed');
+    }
+  }
 
   useEffect(() => {
     let mounted = true;
@@ -60,10 +82,27 @@ export default function AuthGate({ children, onJoin, workshopCode }) {
       if (mounted) {
         setSession(s);
         if (s?.user) {
-          const admin = await sb.checkIsAdmin(s.user.id);
-          setIsAdmin(admin);
+          await resolveAdmin(s.user.id);
+        } else {
+          setAdminStatus('no');
         }
         setLoading(false);
+      }
+    }
+
+    async function resolveAdmin(userId) {
+      if (!mounted) return;
+      setAdminStatus('unknown');
+      setAdminError(null);
+      try {
+        const admin = await sb.checkIsAdmin(userId);
+        if (!mounted) return;
+        setAdminStatus(admin ? 'yes' : 'no');
+      } catch (err) {
+        console.error('[auth] checkIsAdmin failed:', err);
+        if (!mounted) return;
+        setAdminStatus('error');
+        setAdminError(err?.message || 'Admin check failed');
       }
     }
 
@@ -74,8 +113,8 @@ export default function AuthGate({ children, onJoin, workshopCode }) {
       console.log('[auth] state change:', _event, s?.user?.email);
       if (mounted) {
         setSession(s);
-        if (s?.user) sb.checkIsAdmin(s.user.id).then(a => mounted && setIsAdmin(a));
-        else setIsAdmin(false);
+        if (s?.user) resolveAdmin(s.user.id);
+        else setAdminStatus('no');
         setLoading(false);
       }
     });
@@ -143,6 +182,9 @@ export default function AuthGate({ children, onJoin, workshopCode }) {
       <JoinScreen
         user={session.user}
         isAdmin={isAdmin}
+        adminStatus={adminStatus}
+        adminError={adminError}
+        onRetryAdminCheck={retryAdminCheck}
         onJoin={onJoin}
         onSignOut={() => sb.signOut()}
         onAdminDashboard={() => setShowAdmin(true)}

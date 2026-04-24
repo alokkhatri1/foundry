@@ -1,6 +1,6 @@
 import { useState } from 'react';
 
-export default function JoinScreen({ user, isAdmin, onJoin, onSignOut, onAdminDashboard }) {
+export default function JoinScreen({ user, isAdmin, adminStatus, adminError, onRetryAdminCheck, onJoin, onSignOut, onAdminDashboard }) {
   const [code, setCode] = useState('');
   const [error, setError] = useState('');
   const [joining, setJoining] = useState(false);
@@ -11,14 +11,28 @@ export default function JoinScreen({ user, isAdmin, onJoin, onSignOut, onAdminDa
     if (!code.trim()) { setError('Please enter a workshop code.'); return; }
     setError('');
     setJoining(true);
-    const result = await onJoin(userName, code.trim().toUpperCase(), user?.id, user?.email);
-    if (result?.error) {
-      const msg = result.error === 'not_found'
-        ? 'Workshop code not found.'
-        : result.error === 'deprecated'
-        ? 'This workshop has ended.'
-        : 'Could not join workshop.';
-      setError(msg);
+    // Defense in depth: if onJoin throws (e.g. any sb.* call in the join
+    // chain rejects), we must still clear the spinner and show something
+    // actionable — otherwise the button sits on "Joining…" forever and the
+    // user thinks the app is dead. App.handleJoin already wraps its own
+    // sequence in try/catch, but we keep this catch in case a future caller
+    // forgets to.
+    try {
+      const result = await onJoin(userName, code.trim().toUpperCase(), user?.id, user?.email);
+      if (result?.error) {
+        const msg = result.error === 'not_found'
+          ? 'Workshop code not found.'
+          : result.error === 'deprecated'
+          ? 'This workshop has ended.'
+          : result.message
+          ? `Could not join workshop: ${result.message}`
+          : 'Could not join workshop. Please try again.';
+        setError(msg);
+        setJoining(false);
+      }
+    } catch (err) {
+      console.error('[join] unexpected error:', err);
+      setError('Something went wrong joining the workshop. Please try again.');
       setJoining(false);
     }
   }
@@ -59,9 +73,19 @@ export default function JoinScreen({ user, isAdmin, onJoin, onSignOut, onAdminDa
             {joining ? 'Joining...' : 'Join Workshop'}
           </button>
 
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 16 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 16, alignItems: 'center' }}>
             {isAdmin && (
               <button className="landing-admin-link" onClick={onAdminDashboard}>Admin Dashboard</button>
+            )}
+            {adminStatus === 'error' && (
+              <button
+                className="landing-admin-link"
+                onClick={onRetryAdminCheck}
+                title={adminError || 'Admin check failed'}
+                style={{ color: '#b8453d' }}
+              >
+                Admin check failed — Retry
+              </button>
             )}
             <button className="landing-admin-link" onClick={onSignOut} style={{ marginLeft: 'auto' }}>Sign Out</button>
           </div>

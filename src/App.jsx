@@ -186,11 +186,11 @@ function getKnowledgeForDepartment(tree, deptId) {
 let msgId = Date.now();
 function genMsgId() { return 'm-' + (msgId++); }
 
-// Header chip showing live running spend. Subscribes to llm_usage inserts
-// for this participant and re-renders the dollar total. Mounted only
-// post-7b so we don't pay for a realtime channel before the reveal.
-function SpendChip({ sb, myParticipantId, onClick }) {
-  const { total, tokenTotal } = useMyUsageTotal(sb, myParticipantId);
+// Header chip showing live running spend. Takes total + tokens from a
+// single App-level useMyUsageTotal subscription — previously had its own,
+// which doubled the realtime channel count and let the two subscriptions'
+// accumulators drift. Mounted only post-7b.
+function SpendChip({ total, tokenTotal, onClick }) {
   return (
     <span
       className="header-spend-chip"
@@ -419,7 +419,9 @@ function App() {
   // placement triggered a Temporal Dead Zone crash in production builds
   // because the minifier couldn't hoist the hook call above the useState
   // declarations it referenced.
-  const { total: myUsdSpend } = useMyUsageTotal(sb, myParticipantId);
+  // Single source of truth for this user's usage — dedup-by-id inside the
+  // hook means the credits budget gate can't get double-counted rows.
+  const { total: myUsdSpend, tokenTotal: myTokenTotal } = useMyUsageTotal(sb, myParticipantId);
   const creditsTotal = creditAllocation + myCreditBonus;
   const creditsUsed = costToCredits(myUsdSpend);
   const creditsLeft = creditsTotal - creditsUsed;

@@ -268,38 +268,52 @@ export default function UsageView({ sb, participants, myParticipantId, showEduca
   );
 }
 
+// Row-tokens helper shared by both usage hooks.
+function rowTokens(r) {
+  return (r.input_tokens || 0) + (r.output_tokens || 0)
+    + (r.cache_creation_input_tokens || 0) + (r.cache_read_input_tokens || 0);
+}
+
 // Live workshop total hook — used by the settings menu to show cohort
 // spend at a glance. Seeds from loadWorkshopUsage, subscribes for inserts.
+//
+// Dedup by row id: the initial SELECT and the realtime subscription can
+// return the same row (race: an INSERT that happens between the SELECT
+// snapshot and the subscription-ready window gets picked up by both).
+// Before this guard, affected users had their spend double-counted and
+// credits ran out early. Tracking seen ids makes the accumulation
+// idempotent regardless of arrival order.
 export function useWorkshopUsageTotal(sb) {
   const [total, setTotal] = useState(0);
   const [tokenTotal, setTokenTotal] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
+    const seenIds = new Set();
+
+    function addRowOnce(row) {
+      if (!row?.id || seenIds.has(row.id)) return;
+      seenIds.add(row.id);
+      setTotal(prev => prev + Number(row.cost_usd || 0));
+      setTokenTotal(prev => prev + rowTokens(row));
+    }
+
     sb.loadWorkshopUsage().then((data) => {
       if (cancelled) return;
-      let c = 0, t = 0;
-      for (const r of data) {
-        c += Number(r.cost_usd || 0);
-        t += (r.input_tokens || 0) + (r.output_tokens || 0)
-          + (r.cache_creation_input_tokens || 0) + (r.cache_read_input_tokens || 0);
-      }
-      setTotal(c);
-      setTokenTotal(t);
+      for (const r of data) addRowOnce(r);
     });
-    const unsub = sb.subscribeToWorkshopUsage((row) => {
-      setTotal(prev => prev + Number(row.cost_usd || 0));
-      setTokenTotal(prev => prev
-        + (row.input_tokens || 0) + (row.output_tokens || 0)
-        + (row.cache_creation_input_tokens || 0) + (row.cache_read_input_tokens || 0));
-    });
+    const unsub = sb.subscribeToWorkshopUsage((row) => addRowOnce(row));
     return () => { cancelled = true; unsub?.(); };
   }, [sb]);
 
   return { total, tokenTotal };
 }
 
-// Kept for any caller that still wants the per-participant total.
+// Per-participant total — drives the credits budget gate, so correctness
+// matters. Same dedup-by-id discipline as useWorkshopUsageTotal. This hook
+// is now the single source of truth for a user's spend; App.jsx calls it
+// once and passes the result down instead of each display site opening
+// its own load+subscribe pair.
 export function useMyUsageTotal(sb, myParticipantId) {
   const [total, setTotal] = useState(0);
   const [tokenTotal, setTokenTotal] = useState(0);
@@ -307,23 +321,20 @@ export function useMyUsageTotal(sb, myParticipantId) {
   useEffect(() => {
     if (!myParticipantId) return;
     let cancelled = false;
+    const seenIds = new Set();
+
+    function addRowOnce(row) {
+      if (!row?.id || seenIds.has(row.id)) return;
+      seenIds.add(row.id);
+      setTotal(prev => prev + Number(row.cost_usd || 0));
+      setTokenTotal(prev => prev + rowTokens(row));
+    }
+
     sb.loadMyUsage(myParticipantId).then((data) => {
       if (cancelled) return;
-      let c = 0, t = 0;
-      for (const r of data) {
-        c += Number(r.cost_usd || 0);
-        t += (r.input_tokens || 0) + (r.output_tokens || 0)
-          + (r.cache_creation_input_tokens || 0) + (r.cache_read_input_tokens || 0);
-      }
-      setTotal(c);
-      setTokenTotal(t);
+      for (const r of data) addRowOnce(r);
     });
-    const unsub = sb.subscribeToMyUsage(myParticipantId, (row) => {
-      setTotal(prev => prev + Number(row.cost_usd || 0));
-      setTokenTotal(prev => prev
-        + (row.input_tokens || 0) + (row.output_tokens || 0)
-        + (row.cache_creation_input_tokens || 0) + (row.cache_read_input_tokens || 0));
-    });
+    const unsub = sb.subscribeToMyUsage(myParticipantId, (row) => addRowOnce(row));
     return () => { cancelled = true; unsub?.(); };
   }, [sb, myParticipantId]);
 

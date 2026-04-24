@@ -466,25 +466,6 @@ export default function useSupabase() {
     return () => supabase.removeChannel(channel);
   }, []);
 
-  // Subscribe to every DM in the room, regardless of participant. Used to route
-  // replies to pending ask_human calls whose resolver lives on this client (the
-  // participant who initiated the AI chat).
-  const subscribeToAllRoomDms = useCallback((onNewMessage) => {
-    if (!isSupabaseConfigured || !roomIdRef.current) return () => {};
-    const uniq = Math.random().toString(36).slice(2, 10);
-    const channel = supabase.channel(`dms-all:${roomIdRef.current}:${uniq}`)
-      .on('postgres_changes', {
-        event: 'INSERT',
-        schema: 'public',
-        table: 'direct_messages',
-        filter: `room_id=eq.${roomIdRef.current}`,
-      }, (payload) => {
-        onNewMessage(payload.new);
-      })
-      .subscribe();
-    return () => supabase.removeChannel(channel);
-  }, []);
-
   // ===== Files (granular) =====
   // Metadata-only list: deliberately omits `content`. File contents are
   // tens of KB each (markdown bodies, AI outputs, uploaded docs) and
@@ -578,7 +559,10 @@ export default function useSupabase() {
   // ===== Coworkers (granular) =====
   const loadCoworkers = useCallback(async () => {
     if (!isSupabaseConfigured || !roomIdRef.current) return [];
-    const { data, error } = await supabase.from('coworkers').select('*').eq('room_id', roomIdRef.current);
+    const { data, error } = await supabase
+      .from('coworkers')
+      .select('id, name, role, avatar, color, instruction_file_ids, knowledge_file_ids, tool_ids, tool_configs, created_by, created_at')
+      .eq('room_id', roomIdRef.current);
     if (error) { console.error('[sb] loadCoworkers:', error.message); return []; }
     return (data || []).map(mapCoworkerRow);
   }, []);
@@ -630,7 +614,10 @@ export default function useSupabase() {
   // ===== Tools (granular) =====
   const loadTools = useCallback(async () => {
     if (!isSupabaseConfigured || !roomIdRef.current) return [];
-    const { data, error } = await supabase.from('tools').select('*').eq('room_id', roomIdRef.current);
+    const { data, error } = await supabase
+      .from('tools')
+      .select('id, name, type, description, icon, is_builtin, config, created_by, created_at')
+      .eq('room_id', roomIdRef.current);
     if (error) { console.error('[sb] loadTools:', error.message); return []; }
     return (data || []).map(mapToolRow);
   }, []);
@@ -656,7 +643,10 @@ export default function useSupabase() {
   // ===== Workflows (granular) =====
   const loadWorkflows = useCallback(async () => {
     if (!isSupabaseConfigured || !roomIdRef.current) return [];
-    const { data, error } = await supabase.from('workflows').select('*').eq('room_id', roomIdRef.current);
+    const { data, error } = await supabase
+      .from('workflows')
+      .select('id, name, steps, nodes, edges, created_by, created_at')
+      .eq('room_id', roomIdRef.current);
     if (error) { console.error('[sb] loadWorkflows:', error.message); return []; }
     return (data || []).map(mapWorkflowRow);
   }, []);
@@ -727,11 +717,17 @@ export default function useSupabase() {
   // Load every workflow run in the current room so all participants see
   // everyone's runs (Stage 7 observability). Capped at 100 most-recent to
   // keep the initial payload small; older runs can be fetched on demand.
+  //
+  // Deliberately omits `case_input` — the trigger input can be large (full
+  // attached documents) and no list-view consumer renders it. Realtime
+  // UPDATEs carry the full row, so a run that gets updated after load
+  // auto-hydrates case_input anyway. Keeps step_results since that drives
+  // live progress UI across WorkflowBuilder / ActivityDashboard / RunDagView.
   const loadWorkflowRuns = useCallback(async () => {
     if (!isSupabaseConfigured || !roomIdRef.current) return [];
     const { data, error } = await supabase
       .from('workflow_runs')
-      .select('*')
+      .select('id, room_id, workflow_id, workflow_name, status, current_step_index, started_by, step_results, started_at, completed_at')
       .eq('room_id', roomIdRef.current)
       .order('started_at', { ascending: false })
       .limit(100);
@@ -757,13 +753,19 @@ export default function useSupabase() {
   // Load every approval across the room. Used by the graduation scorecard
   // to compute reviews-resolved counts per participant without having to
   // open each run's detail view first.
+  //
+  // Bounded to 1000 rows (most-recent) and scoped to the fields graduation
+  // actually reads (run_id, resolved_by, resolved_at). Unlimited was fine
+  // for a fresh workshop but grows forever — the query would keep getting
+  // slower each session.
   const loadAllRoomApprovals = useCallback(async () => {
     if (!isSupabaseConfigured || !roomIdRef.current) return [];
     const { data, error } = await supabase
       .from('approvals')
-      .select('*')
+      .select('id, run_id, action, resolved_by, resolved_at')
       .eq('room_id', roomIdRef.current)
-      .order('resolved_at', { ascending: true });
+      .order('resolved_at', { ascending: false })
+      .limit(1000);
     if (error) { console.error('[sb] loadAllRoomApprovals:', error.message); return []; }
     return data || [];
   }, []);
@@ -821,11 +823,15 @@ export default function useSupabase() {
   // of which participant spent it. Stage 7b's primary view uses this so
   // the room sees the collective cost as pedagogy ("look how cheap a
   // full mixed-team workshop actually is").
+  //
+  // Trimmed to the columns UsageView actually aggregates over. Skips
+  // segment_ref_id (large per row) and anything else not needed for the
+  // chart — keeps the seed payload small even for a chatty room.
   const loadWorkshopUsage = useCallback(async () => {
     if (!isSupabaseConfigured || !roomIdRef.current) return [];
     const { data, error } = await supabase
       .from('llm_usage')
-      .select('*')
+      .select('id, participant_id, segment, model, input_tokens, output_tokens, cache_creation_input_tokens, cache_read_input_tokens, cost_usd, created_at')
       .eq('workshop_id', roomIdRef.current)
       .order('created_at', { ascending: true });
     if (error) {
@@ -858,7 +864,7 @@ export default function useSupabase() {
     if (!isSupabaseConfigured || !roomIdRef.current || !runId) return [];
     const { data, error } = await supabase
       .from('llm_usage')
-      .select('*')
+      .select('id, segment_ref_id, model, input_tokens, output_tokens, cache_creation_input_tokens, cache_read_input_tokens, cost_usd, created_at')
       .eq('workshop_id', roomIdRef.current)
       .eq('segment', 'workflow_run')
       .like('segment_ref_id', `${runId}:%`);
@@ -873,7 +879,7 @@ export default function useSupabase() {
     if (!isSupabaseConfigured || !roomIdRef.current || !participantId) return [];
     const { data, error } = await supabase
       .from('llm_usage')
-      .select('*')
+      .select('id, segment, model, input_tokens, output_tokens, cache_creation_input_tokens, cache_read_input_tokens, cost_usd, created_at')
       .eq('workshop_id', roomIdRef.current)
       .eq('participant_id', participantId)
       .order('created_at', { ascending: true });
@@ -911,7 +917,21 @@ export default function useSupabase() {
   const subscribeToRoom = useCallback((handlers) => {
     if (!isSupabaseConfigured || !roomIdRef.current) return () => {};
 
-    const channel = supabase.channel(`room-sync:${roomIdRef.current}`)
+    // Defensive cleanup: if a prior channel wasn't properly disposed (e.g. the
+    // caller forgot to run the unsub, or handleJoin and the reload useEffect
+    // both fire), removing it here stops the Supabase client from returning
+    // the stale subscribed channel and throwing "cannot add postgres_changes
+    // callbacks ... after subscribe()". Seen in the 04-23 console logs.
+    if (realtimeChannelRef.current) {
+      supabase.removeChannel(realtimeChannelRef.current);
+      realtimeChannelRef.current = null;
+    }
+
+    // Unique suffix so repeat subscribeToRoom calls within the same session
+    // always get a fresh channel (Supabase's client caches by name — two
+    // subscribes on the same name return the same already-subscribed channel).
+    const uniq = Math.random().toString(36).slice(2, 10);
+    const channel = supabase.channel(`room-sync:${roomIdRef.current}:${uniq}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'files', filter: `room_id=eq.${roomIdRef.current}` }, (payload) => {
         if (handlers.onFileChange) handlers.onFileChange(payload.eventType, payload.new, payload.old);
       })
@@ -996,7 +1016,7 @@ export default function useSupabase() {
     joinRoom, getRoomId, setCreditAllocation, setParticipantCreditBonus,
     upsertParticipant, loadParticipants, findParticipantIdByName, getParticipantById, getCoworkerParticipantId,
     loadUserPreferences, saveUserPreferences, loadUserRole, saveUserRole,
-    sendDm, fetchDmThread, subscribeToDms, subscribeToAllRoomDms,
+    sendDm, fetchDmThread, subscribeToDms,
     loadFiles, loadFileContent, loadFilesContent, saveFile, deleteFile, saveFilesBatch,
     loadCoworkers, saveCoworker, deleteCoworker,
     loadTools, saveTool, deleteTool,

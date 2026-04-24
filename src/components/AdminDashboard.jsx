@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { STAGE_ORDER, STAGE_META, stageReached, nextStage } from './RevealAt';
 import { useConfirm } from './ConfirmDialog';
 
@@ -81,6 +81,9 @@ export default function AdminDashboard({ sb, user, onBack }) {
   const [detailTab, setDetailTab] = useState('stages');
   const [copied, setCopied] = useState(null);
   const [menuOpen, setMenuOpen] = useState(false);
+  // Tracks the most-recently requested workshop selection so stale parallel
+  // loads from earlier clicks can self-cancel — see handleSelect below.
+  const selectionTokenRef = useRef(null);
 
   const loadWorkshops = useCallback(async () => {
     setLoading(true);
@@ -203,11 +206,19 @@ export default function AdminDashboard({ sb, user, onBack }) {
     setSelected(workshop);
     setDetailTab('stages');
     setMenuOpen(false);
+    const requestedId = workshop.id;
+    selectionTokenRef.current = requestedId;
     const [p, c, a] = await Promise.all([
       sb.loadWorkshopParticipants(workshop.id),
       sb.loadWorkshopContent(workshop.id),
       sb.loadWorkshopActivity(workshop.id),
     ]);
+    // Guard against rapid-fire clicks: if the admin clicked a different
+    // workshop while these loads were in flight, the selection token has
+    // moved on and we must not overwrite the newer selection's data with
+    // this stale result. Matches the 04-23 "I clicked B but A's data
+    // flashed first" symptom.
+    if (selectionTokenRef.current !== requestedId) return;
     setParticipants(p);
     setContent(c);
     setActivity(a);

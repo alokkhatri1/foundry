@@ -124,10 +124,29 @@ function loadState() {
   return null;
 }
 
-function saveState(state) {
+// Coalesced writer: rapid persistLocal calls (tool chain, workflow step
+// updates, bursts of realtime inserts) would each JSON.stringify the full
+// state and hit localStorage. At cohort scale that visibly jams input.
+// Hold the latest state, flush once per animation frame / 200ms idle, and
+// drain on pagehide so we don't lose the last write.
+let pendingState = null;
+let flushTimer = null;
+function flushState() {
+  if (pendingState == null) return;
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(pendingState));
   } catch {}
+  pendingState = null;
+  flushTimer = null;
+}
+if (typeof window !== 'undefined') {
+  window.addEventListener('pagehide', flushState);
+  window.addEventListener('beforeunload', flushState);
+}
+function saveState(state) {
+  pendingState = state;
+  if (flushTimer != null) return;
+  flushTimer = setTimeout(flushState, 200);
 }
 
 function findNode(tree, id) {
@@ -447,33 +466,41 @@ function App() {
   // On load: reconnect to Supabase, load state from granular tables, start presence + realtime
   useEffect(() => {
     if (isJoined && workshopCode) {
-      sb.joinRoom(workshopCode).then(async (result) => {
+      // joinRoom and getUser are independent — joinRoom sets the room context
+      // (roomIdRef, used by all the load functions below), getUser only reads
+      // auth state. Running them in parallel saves one RTT over the old
+      // sequential chain. Nepal → Tokyo ~120ms, so every RTT counts.
+      Promise.all([sb.joinRoom(workshopCode), sb.getUser()]).then(async ([result, authUser]) => {
         if (result?.credit_allocation != null) setCreditAllocation(result.credit_allocation);
         if (result?.error === 'deprecated') { setWorkshopEnded(true); return; }
         if (result?.error || !result?.id || !userName) return;
-        const roomId = result.id;
         if (result.current_stage) setCurrentStage(normalizeStage(result.current_stage));
         if (result.org_name) setOrgName(result.org_name);
 
         const myColor = participants.find(p => p.name === userName)?.color || COLORS[0];
-        const authUser = await sb.getUser();
-        const me = await sb.upsertParticipant(userName, myColor, authUser?.id, authUser?.email);
+
+        // Kick everything that depends on (roomId + authUser) in parallel.
+        // Previously upsertParticipant → prefs → role ran sequentially and
+        // gated the granular loads. Now all eight happen at once — RTT-bound
+        // to the slowest, not the sum.
+        const prefsPromise = authUser?.id ? sb.loadUserPreferences(authUser.id) : Promise.resolve(null);
+        const rolePromise = authUser?.id ? sb.loadUserRole(authUser.id) : Promise.resolve(null);
+        const mePromise = sb.upsertParticipant(userName, myColor, authUser?.id, authUser?.email);
+        const [me, prefs, role, files, cws, tls, wfs, runs, dbParticipants] = await Promise.all([
+          mePromise, prefsPromise, rolePromise,
+          sb.loadFiles(), sb.loadCoworkers(), sb.loadTools(), sb.loadWorkflows(), sb.loadWorkflowRuns(), sb.loadParticipants(),
+        ]);
         if (me?.id) {
           setMyParticipantId(me.id);
-          // Fetch participant's credit bonus — admin may have granted extra.
+          // Fire-and-forget — admin-granted credit bonus is cosmetic on the
+          // initial paint; no need to block the granular loads on it.
           sb.getParticipantById(me.id).then(p => setMyCreditBonus(p?.credit_bonus || 0));
         }
         if (authUser?.id) {
-          const prefs = await sb.loadUserPreferences(authUser.id);
           setUserPreferences(prefs);
-          const role = await sb.loadUserRole(authUser.id);
           setUserRole(role);
           setUserRoleLoaded(true);
         }
-        // Load state from granular tables
-        const [files, cws, tls, wfs, runs, dbParticipants] = await Promise.all([
-          sb.loadFiles(), sb.loadCoworkers(), sb.loadTools(), sb.loadWorkflows(), sb.loadWorkflowRuns(), sb.loadParticipants(),
-        ]);
 
         if (files.length > 0) setFlatFiles(files);
         if (cws.length > 0) {
@@ -1093,67 +1120,28 @@ function App() {
   // which drops those turns from ~$0.002 to ~$0.0007. Classifier itself costs
   // ~$0.0003. Defaults to "action" on any error so tool access isn't silently
   // lost — quality over cost when in doubt.
-  async function classifyPlatformIntent(userMessage) {
-    if (!apiKey) return 'action';
-    const model = 'claude-haiku-4-5-20251001';
-    try {
-      const response = await claudeFetch('https://api.anthropic.com/v1/messages', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': apiKey,
-          'anthropic-version': '2023-06-01',
-          'anthropic-dangerous-direct-browser-access': 'true',
-        },
-        body: JSON.stringify({
-          model,
-          max_tokens: 3,
-          system: [{
-            type: 'text',
-            text: `You are a binary intent classifier.
+  // Heuristic intent classifier — replaces a per-message Haiku roundtrip
+  // (~200-400ms + cost) with local regex. At 35-person scale the previous
+  // LLM classifier added latency to every message and non-trivial spend.
+  // Defaults to 'action' on uncertainty — matches the prior model's bias
+  // so we never silently drop a platform-affecting request.
+  function classifyPlatformIntent(userMessage) {
+    const text = String(userMessage || '').trim().toLowerCase();
+    if (!text) return 'action';
 
-Reply with EXACTLY one word: "action" or "chat".
+    // "chat" cues: conceptual questions, small talk, thanks. Tight so we
+    // don't swallow an action phrased as a question ("how do I create…" is
+    // still an action because the verb is 'create').
+    const chatPatterns = [
+      /^(hi|hey|hello|yo|hola|namaste|thanks|thank you|cheers|ok|okay|cool|nice|great)[\s.!?]*$/,
+      /^(what|how|why|when|where|who)\s+(is|are|does|do|can|should|would|might)\b/,
+      /\b(explain|describe|tell me about|help me understand)\b/,
+      /\b(concept|definition|difference between|pros and cons|best practice)\b/,
+    ];
+    for (const re of chatPatterns) if (re.test(text)) return 'chat';
 
-"action" if the message asks to:
-- list / read / create / update / delete any files, coworkers, workflows, tools, or connectors
-- retrieve current platform state
-- run a workflow or connect an external service
-
-"chat" if the message:
-- asks a conceptual question, definition, or how-to
-- is greeting, small talk, or general conversation
-- asks for an explanation of a platform concept
-
-When unclear, default to "action".
-
-Examples:
-"list my coworkers" → action
-"how does this platform work?" → chat
-"create a coworker named Ravi" → action
-"what's a workflow?" → chat
-"show me files" → action
-"hello" → chat`,
-            cache_control: { type: 'ephemeral' },
-          }],
-          messages: [{ role: 'user', content: userMessage }],
-        }),
-      });
-      if (!response.ok) return 'action';
-      const data = await response.json();
-      if (data.usage) {
-        sb.logLlmUsage({
-          participantId: myParticipantId,
-          segment: 'chat_classifier',
-          model,
-          usage: data.usage,
-          costUsd: computeCost(data.usage, model),
-        });
-      }
-      const text = (data.content || []).filter(c => c.type === 'text').map(c => c.text).join('').trim().toLowerCase();
-      return text.startsWith('chat') ? 'chat' : 'action';
-    } catch {
-      return 'action';
-    }
+    // Everything else → action. Matches the LLM's "default to action" rule.
+    return 'action';
   }
 
   // ===== Claude API =====

@@ -404,6 +404,11 @@ function App() {
   const [unreadDmCounts, setUnreadDmCounts] = useState({});
   const activeDmRef = useRef(activeDm);
   useEffect(() => { activeDmRef.current = activeDm; }, [activeDm]);
+  // Single DM event channel: App.jsx owns the subscribeToDms call; this state
+  // fans the latest incoming DM out to ChatPanel (active-thread live updates)
+  // via prop, instead of ChatPanel opening a second redundant subscription.
+  // Saves one realtime channel per user — material near the free-tier 200 cap.
+  const [latestIncomingDm, setLatestIncomingDm] = useState(null);
 
   // Credit budget computation — lives here, after every state dependency
   // (myParticipantId, creditAllocation, myCreditBonus) is declared. Earlier
@@ -719,21 +724,41 @@ function App() {
     setActiveDm(null);
   }
 
-  // Subscribe to incoming DMs at app-level so notifications work outside the DM pane.
+  // Single room-wide DM subscription — handles three concerns:
+  //   1. Fan the event to ChatPanel (active-thread live updates) via
+  //      setLatestIncomingDm, so ChatPanel doesn't need its own subscription.
+  //   2. Bump the unread badge for messages to me that aren't currently open.
+  //   3. Resolve the sender's name from local `participants` state first so
+  //      we don't issue a getParticipantById DB call for every incoming DM.
   useEffect(() => {
     if (!myParticipantId) return;
     const unsub = sb.subscribeToDms(myParticipantId, async (dm) => {
+      // Fan out to ChatPanel regardless of involvement — ChatPanel filters
+      // again for the active thread. The subscription filter on the hook
+      // side already drops DMs not involving me, so this is bounded.
+      setLatestIncomingDm(dm);
+
+      // Unread badge updates only for messages TO me where the thread isn't open.
       if (dm.to_participant_id !== myParticipantId) return;
       if (activeDmRef.current?.id === dm.from_participant_id) return;
-      const sender = await sb.getParticipantById(dm.from_participant_id);
-      if (!sender?.name) return;
+
+      // Prefer the in-memory participants list. DB fallback only if the
+      // sender isn't cached locally (rare — mostly AI coworker mirrors or
+      // brand-new joiners whose presence hasn't synced yet).
+      const cached = (participants || []).find(p => p.id === dm.from_participant_id);
+      let senderName = cached?.name;
+      if (!senderName) {
+        const sender = await sb.getParticipantById(dm.from_participant_id);
+        senderName = sender?.name;
+      }
+      if (!senderName) return;
       setUnreadDmCounts(prev => ({
         ...prev,
-        [sender.name]: (prev[sender.name] || 0) + 1,
+        [senderName]: (prev[senderName] || 0) + 1,
       }));
     });
     return unsub;
-  }, [myParticipantId, sb]);
+  }, [myParticipantId, sb, participants]);
 
   // Reflect unread count in browser tab title.
   useEffect(() => {
@@ -2409,6 +2434,7 @@ Answer in ONE sentence. If the user asks "how", a second sentence is allowed —
               onCoworkerChange={handleCoworkerChange}
               currentStage={currentStage}
               activeDm={activeDm}
+              latestIncomingDm={latestIncomingDm}
               onOpenDm={handleOpenDm}
               onCloseDm={handleCloseDm}
               myParticipantId={myParticipantId}

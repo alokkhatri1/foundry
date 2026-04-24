@@ -840,7 +840,7 @@ function PendingReviewsBanner({ myPendingReviews, onRemoteApprove }) {
 }
 
 // ===== Main ChatPanel =====
-export default function ChatPanel({ messages, onSendMessage, onApprovalAction, onPickRecipient, onNudgeRecipient, onGoToFiles, onRetry, isLoading, participants, currentUserName, fileTree, onUpdateFileContent, onEnsureFileContent, coworkers, showEducationalCues, conversations, activeConvoId, onNewChat, onSelectConvo, onDeleteConvo, onCoworkerChange, currentStage, activeDm, onOpenDm, onCloseDm, myParticipantId, sb, unreadDmCounts, workflowRuns, myPendingReviews, onRemoteApprove }) {
+export default function ChatPanel({ messages, onSendMessage, onApprovalAction, onPickRecipient, onNudgeRecipient, onGoToFiles, onRetry, isLoading, participants, currentUserName, fileTree, onUpdateFileContent, onEnsureFileContent, coworkers, showEducationalCues, conversations, activeConvoId, onNewChat, onSelectConvo, onDeleteConvo, onCoworkerChange, currentStage, activeDm, latestIncomingDm, onOpenDm, onCloseDm, myParticipantId, sb, unreadDmCounts, workflowRuns, myPendingReviews, onRemoteApprove }) {
   const [input, setInput] = useState('');
   const [selectedFileIds, setSelectedFileIds] = useState([]);
   const [editingFileId, setEditingFileId] = useState(null);
@@ -907,20 +907,29 @@ export default function ChatPanel({ messages, onSendMessage, onApprovalAction, o
     }
   }, [activeDm]);
 
-  // Load and subscribe to DM messages when a DM is active.
+  // Load the DM thread when a DM opens. Live updates arrive via the
+  // `latestIncomingDm` prop (App.jsx owns the single subscription); a second
+  // useEffect below watches that prop and appends.
   useEffect(() => {
     if (!activeDm?.id || !myParticipantId) { setDmMessages([]); return; }
     let cancelled = false;
     sb.fetchDmThread(myParticipantId, activeDm.id).then(initial => {
       if (!cancelled) setDmMessages(initial);
     });
-    const unsub = sb.subscribeToDms(myParticipantId, (dm) => {
-      const belongs = (dm.from_participant_id === activeDm.id && dm.to_participant_id === myParticipantId)
-                    || (dm.from_participant_id === myParticipantId && dm.to_participant_id === activeDm.id);
-      if (belongs) setDmMessages(prev => prev.some(m => m.id === dm.id) ? prev : [...prev, dm]);
-    });
-    return () => { cancelled = true; unsub(); };
+    return () => { cancelled = true; };
   }, [sb, myParticipantId, activeDm?.id]);
+
+  // Realtime DM append: App.jsx fans the latest incoming DM event here via
+  // props. We dedupe by id because the sender also appends optimistically
+  // after sendDm resolves, and we want both sides' UI to converge without
+  // duplicate rows.
+  useEffect(() => {
+    if (!latestIncomingDm || !activeDm?.id || !myParticipantId) return;
+    const dm = latestIncomingDm;
+    const belongs = (dm.from_participant_id === activeDm.id && dm.to_participant_id === myParticipantId)
+                  || (dm.from_participant_id === myParticipantId && dm.to_participant_id === activeDm.id);
+    if (belongs) setDmMessages(prev => prev.some(m => m.id === dm.id) ? prev : [...prev, dm]);
+  }, [latestIncomingDm, activeDm?.id, myParticipantId]);
 
   async function handleSend() {
     if ((!input.trim() && attachedFiles.length === 0) || isLoading || parsingFiles) return;

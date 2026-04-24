@@ -434,15 +434,22 @@ export default function useSupabase() {
     return { data };
   }, []);
 
+  // Paginated, metadata-only thread fetch. Grabs the most-recent 100 messages
+  // (covers the full thread in every real-world case). AI coworker threads
+  // can accumulate rapidly — nudges, review requests, tool handoffs — so an
+  // unbounded fetch hurts most when the workshop has been running a while.
+  // Explicit columns match what the DM UI renders; skips anything extra.
   const fetchDmThread = useCallback(async (myParticipantId, otherParticipantId) => {
     if (!isSupabaseConfigured || !roomIdRef.current) return [];
     const { data, error } = await supabase.from('direct_messages')
-      .select('*')
+      .select('id, from_participant_id, to_participant_id, content, created_at')
       .eq('room_id', roomIdRef.current)
       .or(`and(from_participant_id.eq.${myParticipantId},to_participant_id.eq.${otherParticipantId}),and(from_participant_id.eq.${otherParticipantId},to_participant_id.eq.${myParticipantId})`)
-      .order('created_at', { ascending: true });
+      .order('created_at', { ascending: false })
+      .limit(100);
     if (error) { console.error('[sb] fetchDmThread:', error.message); return []; }
-    return data || [];
+    // DESC from server so the LIMIT hits the newest 100; reverse to display oldest-first.
+    return (data || []).slice().reverse();
   }, []);
 
   const subscribeToDms = useCallback((myParticipantId, onNewMessage) => {

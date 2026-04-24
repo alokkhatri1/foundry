@@ -486,11 +486,50 @@ export default function useSupabase() {
   }, []);
 
   // ===== Files (granular) =====
+  // Metadata-only list: deliberately omits `content`. File contents are
+  // tens of KB each (markdown bodies, AI outputs, uploaded docs) and
+  // pulling all of them up front is the single biggest contributor to
+  // reload latency — especially over high-latency links. Consumers that
+  // actually need the body (FileEditor, content preview) call
+  // loadFileContent(id) on demand; realtime UPDATE events also carry the
+  // full row, so any file being edited by someone else stays hydrated.
   const loadFiles = useCallback(async () => {
     if (!isSupabaseConfigured || !roomIdRef.current) return [];
-    const { data, error } = await supabase.from('files').select('*').eq('room_id', roomIdRef.current);
+    const { data, error } = await supabase
+      .from('files')
+      .select('id, parent_id, name, type, sort_order, room_id, created_by')
+      .eq('room_id', roomIdRef.current);
     if (error) { console.error('[sb] loadFiles:', error.message); return []; }
     return (data || []).map(mapFileRow);
+  }, []);
+
+  // Lazy content fetch: returns the `content` column for a single file.
+  // Caller is expected to merge the returned content into its local state
+  // (handleEnsureFileContent in App.jsx) so subsequent reads are synchronous.
+  const loadFileContent = useCallback(async (fileId) => {
+    if (!isSupabaseConfigured || !fileId) return null;
+    const { data, error } = await supabase
+      .from('files')
+      .select('id, content')
+      .eq('id', fileId)
+      .maybeSingle();
+    if (error) { console.error('[sb] loadFileContent:', error.message); return null; }
+    return data?.content ?? null;
+  }, []);
+
+  // Batch version — one roundtrip for N files. Used when a chat send or
+  // workflow run references multiple context/skill/instruction files whose
+  // bodies haven't been loaded yet. Returns a map {id: content}.
+  const loadFilesContent = useCallback(async (fileIds) => {
+    if (!isSupabaseConfigured || !fileIds || fileIds.length === 0) return {};
+    const { data, error } = await supabase
+      .from('files')
+      .select('id, content')
+      .in('id', fileIds);
+    if (error) { console.error('[sb] loadFilesContent:', error.message); return {}; }
+    const byId = {};
+    for (const row of (data || [])) byId[row.id] = row.content ?? '';
+    return byId;
   }, []);
 
   const saveFile = useCallback(async (file) => {
@@ -958,7 +997,7 @@ export default function useSupabase() {
     upsertParticipant, loadParticipants, findParticipantIdByName, getParticipantById, getCoworkerParticipantId,
     loadUserPreferences, saveUserPreferences, loadUserRole, saveUserRole,
     sendDm, fetchDmThread, subscribeToDms, subscribeToAllRoomDms,
-    loadFiles, saveFile, deleteFile, saveFilesBatch,
+    loadFiles, loadFileContent, loadFilesContent, saveFile, deleteFile, saveFilesBatch,
     loadCoworkers, saveCoworker, deleteCoworker,
     loadTools, saveTool, deleteTool,
     loadWorkflows, saveWorkflow, deleteWorkflow,

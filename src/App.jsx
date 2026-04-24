@@ -861,6 +861,48 @@ function App() {
     persistLocal({ fileTree: updateFileContent(fileTree, fileId, content) });
   }
 
+  // Lazy content loader: loadFiles now returns metadata only (no `content`).
+  // Callers that want to display or edit a file's body call this on open.
+  // Cheap: a single-row SELECT by id. A file that's already been hydrated
+  // (content !== undefined) is a no-op — common on realtime-updated files.
+  async function handleEnsureFileContent(fileId) {
+    if (!fileId) return;
+    const existing = flatFiles.find(f => f.id === fileId);
+    if (!existing) return;
+    if (existing.content !== undefined) return;
+    const content = await sb.loadFileContent(fileId);
+    setFlatFiles(prev => prev.map(f => f.id === fileId ? { ...f, content: content ?? '' } : f));
+  }
+
+  // Batch version for AI-consumption paths (chat send, workflow run). Any
+  // context / skill / instruction file referenced in a prompt MUST have its
+  // body loaded or the model sees empty context. One roundtrip covers N
+  // files; files already hydrated are filtered out.
+  //
+  // Returns the fresh flatFiles array so callers can build a hydrated
+  // fileTree *in this tick* without waiting for React to re-render — the
+  // setFlatFiles update below only takes effect on the next render, but
+  // handleSendMessage / runWorkflow need to read content synchronously
+  // right after the await.
+  async function handleEnsureFilesContent(fileIds) {
+    if (!fileIds || fileIds.length === 0) return flatFiles;
+    const missing = [];
+    const seen = new Set();
+    for (const id of fileIds) {
+      if (!id || seen.has(id)) continue;
+      seen.add(id);
+      const f = flatFiles.find(x => x.id === id);
+      if (f && f.content === undefined) missing.push(id);
+    }
+    if (missing.length === 0) return flatFiles;
+    const byId = await sb.loadFilesContent(missing);
+    const next = flatFiles.map(f =>
+      byId[f.id] !== undefined ? { ...f, content: byId[f.id] } : f
+    );
+    setFlatFiles(next);
+    return next;
+  }
+
   function handleUpdateWorkflows(newWorkflows) {
     // Always normalize to the DAG shape so nodes[]+edges[] ride alongside
     // steps[] in local state and in the DB. Diff against previous state so
@@ -1548,6 +1590,22 @@ Examples:
       return;
     }
 
+    // Hydrate all file content the workflow will actually touch: the Trigger's
+    // attached documents plus every step coworker's instruction/knowledge
+    // files. loadFiles returns metadata-only now, so without this the
+    // executor silently sends empty bodies to the model.
+    const allWorkflowFileIds = new Set();
+    for (const step of (workflow.steps || [])) {
+      for (const id of (step.fileIds || [])) allWorkflowFileIds.add(id);
+      const stepCw = step.coworker || (step.coworkerId ? coworkers?.find(c => c.id === step.coworkerId) : null);
+      if (stepCw) {
+        for (const id of (stepCw.instructionFileIds || [])) allWorkflowFileIds.add(id);
+        for (const id of (stepCw.knowledgeFileIds || [])) allWorkflowFileIds.add(id);
+      }
+    }
+    const hydratedWorkflowFlat = await handleEnsureFilesContent([...allWorkflowFileIds]);
+    const hydratedWorkflowTree = hydratedWorkflowFlat === flatFiles ? fileTree : buildTree(hydratedWorkflowFlat);
+
     // Case input is assembled from the Trigger step's two fields:
     // Instructions (free text) + Documents (file picks from the workspace).
     // autoInput remains a backdoor for programmatic callers (tests, replays).
@@ -1557,7 +1615,7 @@ Examples:
       const instructions = triggerStep?.caseInput?.trim() || '';
       const fileIds = triggerStep?.fileIds || [];
       const docs = fileIds
-        .map(id => flatFiles.find(f => f.id === id))
+        .map(id => hydratedWorkflowFlat.find(f => f.id === id))
         .filter(f => f && (f.content || '').trim())
         .map(f => `### ${f.name}\n${f.content.trim()}`);
       const parts = [];
@@ -1636,7 +1694,7 @@ Examples:
       workflow,
       coworkers,
       tools,
-      fileTree,
+      fileTree: hydratedWorkflowTree,
       caseInput,
       userName,
       callClaudeAPI,
@@ -1918,6 +1976,18 @@ Examples:
 
     // Resolve coworker (aggregate all skills) or context files
     const targetCoworker = coworkerId ? coworkers?.find(c => c.id === coworkerId) : null;
+
+    // Hydrate any file bodies we're about to splice into the system prompt.
+    // loadFiles returns metadata only now; reading f.content on a fresh
+    // session without this step would ship empty context to the model.
+    const idsToHydrate = [
+      ...(contextFileIds || []),
+      ...(skillFileIds || []),
+      ...(targetCoworker?.instructionFileIds || []),
+      ...(targetCoworker?.knowledgeFileIds || []),
+    ];
+    const hydratedFlat = await handleEnsureFilesContent(idsToHydrate);
+    const hydratedTree = hydratedFlat === flatFiles ? fileTree : buildTree(hydratedFlat);
     const loadingLabel = targetCoworker ? targetCoworker.name : 'Foundry';
 
     setIsLoading(true);
@@ -1927,8 +1997,8 @@ Examples:
     let systemPrompt = undefined;
     if (targetCoworker) {
       // Build system prompt from role description + instruction files + knowledge files
-      const instructions = (targetCoworker.instructionFileIds || []).map(id => findNode(fileTree, id)).filter(Boolean);
-      const knowledge = (targetCoworker.knowledgeFileIds || []).map(id => findNode(fileTree, id)).filter(Boolean);
+      const instructions = (targetCoworker.instructionFileIds || []).map(id => findNode(hydratedTree, id)).filter(Boolean);
+      const knowledge = (targetCoworker.knowledgeFileIds || []).map(id => findNode(hydratedTree, id)).filter(Boolean);
 
       // Tool guidance — Claude gets the schemas automatically, but without
       // a directive it often drafts artifacts or messages in chat instead
@@ -1966,7 +2036,7 @@ Examples:
       ].filter(Boolean).join('\n');
     } else if (contextFileIds && contextFileIds.length > 0) {
       const skillIdSet = new Set(skillFileIds || []);
-      const allFiles = contextFileIds.map(id => findNode(fileTree, id)).filter(Boolean);
+      const allFiles = contextFileIds.map(id => findNode(hydratedTree, id)).filter(Boolean);
       const skillFiles = allFiles.filter(f => skillIdSet.has(f.id));
       const contextFiles = allFiles.filter(f => !skillIdSet.has(f.id));
       const parts = [`You are an AI assistant at ${orgName}.`];
@@ -2051,7 +2121,7 @@ Examples:
         addMessage({ type: 'error', content: result.error });
       }
     } else {
-      const contextFiles = (contextFileIds || []).map(id => findNode(fileTree, id)).filter(Boolean);
+      const contextFiles = (contextFileIds || []).map(id => findNode(hydratedTree, id)).filter(Boolean);
       const knowledgeSection = contextFiles.length > 0
         ? `\n\nThe user has selected these context files — use them to answer questions:\n${contextFiles.map(f => `### ${f.name}\n${f.content}`).join('\n\n')}`
         : '';
@@ -2340,6 +2410,7 @@ Answer in ONE sentence. If the user asks "how", a second sentence is allowed —
               currentUserName={userName}
               fileTree={fileTree}
               onUpdateFileContent={handleUpdateFileContent}
+              onEnsureFileContent={handleEnsureFileContent}
               coworkers={coworkers || []}
               showEducationalCues={showEducationalCues}
               conversations={conversations}
@@ -2382,7 +2453,7 @@ Answer in ONE sentence. If the user asks "how", a second sentence is allowed —
                 <FileEditor file={selectedFile} onUpdateContent={handleUpdateFileContent} />
               </div>
             ) : (
-              <FileExplorer fileTree={fileTree} selectedFileId={selectedFileId} onSelectFile={setSelectedFileId} onUpdateTree={handleUpdateTree} onSelectDepartment={setSelectedDeptId} showEducationalCues={showEducationalCues} currentStage={currentStage} userName={userName} />
+              <FileExplorer fileTree={fileTree} selectedFileId={selectedFileId} onSelectFile={(id) => { if (id) handleEnsureFileContent(id); setSelectedFileId(id); }} onUpdateTree={handleUpdateTree} onSelectDepartment={setSelectedDeptId} showEducationalCues={showEducationalCues} currentStage={currentStage} userName={userName} />
             )}
           </div>
         )}

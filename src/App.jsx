@@ -412,6 +412,10 @@ function App() {
   }, [currentStage]);
 
   const approvalResolversRef = useRef(new Map());
+  // Optimistic set of runIds this user has just resolved as a remote reviewer.
+  // Prevents the "Reviews waiting for you" card from flashing back until the
+  // workflowRuns state catches up with the waiting_approval → running transition.
+  const [resolvedRemoteRunIds, setResolvedRemoteRunIds] = useState(() => new Set());
   // Pending recipient-picker resolvers, keyed by picker message id. When the
   // user clicks a human in the picker, the resolver fires with that name.
   const pickRecipientResolversRef = useRef(new Map());
@@ -630,6 +634,32 @@ function App() {
           );
           return next;
         });
+
+        // Cross-user round-trip: when a reviewer on another client writes
+        // their decision, the initiator's client picks it up here and fires
+        // the pending resolver so the workflow continues. Same-user clicks
+        // already fire and delete the resolver in handleApprovalAction before
+        // the DB write round-trips, so this branch no-ops in that case.
+        const resolver = approvalResolversRef.current.get(row.run_id);
+        if (resolver) {
+          approvalResolversRef.current.delete(row.run_id);
+          resolver({
+            action: row.action,
+            comment: row.comment || '',
+            resolvedBy: row.resolved_by || 'reviewer',
+          });
+          // Also flip any unresolved approval card in this run's conversation
+          // so the initiator sees the reviewer's decision instead of stale
+          // Approve/Reject buttons.
+          setConversations(prev => prev.map(c => ({
+            ...c,
+            messages: (c.messages || []).map(m =>
+              m.type === 'approval' && m.runId === row.run_id && !m.resolved
+                ? { ...m, resolved: true, resolvedAction: row.action, resolvedComment: row.comment || '', resolvedBy: row.resolved_by || 'reviewer' }
+                : m
+            ),
+          })));
+        }
       },
       onRoomChange: (row) => {
         if (row?.deprecated_at) setWorkshopEnded(true);
@@ -1613,6 +1643,16 @@ Examples:
           approvalResolversRef.current.set(rId, resolve);
         });
       },
+      onApprovalRequested: async ({ runId: rId, stepName, workflowName: wfName, assigneeId, prompt }) => {
+        // DM the assignee so they see the review request — the approval card
+        // itself only renders in the initiator's run conversation.
+        const sender = (participants || []).find(p => p.name === userName);
+        if (!sender || !assigneeId || sender.id === assigneeId) return;
+        const promptLine = prompt ? ` — "${prompt}"` : '';
+        const text = `Review requested: "${wfName}" · step "${stepName}"${promptLine}. A card is waiting in your Chat tab — approve or reject there.`;
+        await sb.sendDm(sender.id, assigneeId, text);
+        addLog({ type: 'workflow', message: `review DM sent to assignee for ${wfName} (${stepName})` });
+      },
       onSaveStepOutput: ({ name, content, destination }) => {
         // Per-step save: fires whenever a step with step.save.enabled
         // completes. Writes the content to the folder/subfolder chosen on
@@ -1764,6 +1804,32 @@ Examples:
     resolver({ action, comment, resolvedBy: userName });
     approvalResolversRef.current.delete(runId);
     sb.logApproval({ runId, action, comment, resolvedBy: userName });
+  }
+
+  // Cross-user approvals: the reviewer clicks Approve/Reject from the
+  // "Reviews waiting for you" list. They don't hold the Promise resolver
+  // (that lives on the initiator's tab), so this path just writes the
+  // decision to `approvals`. The initiator's `onApprovalChange` handler
+  // picks up the realtime insert and fires the resolver there.
+  async function handleRemoteApprove(run, stepResult, action, comment) {
+    if (!run || !stepResult) return;
+    // Optimistically hide the card so the reviewer doesn't see it flash back
+    // during the DB round-trip. Cleared after a timeout as a safety net in
+    // case the workflowRuns update never arrives.
+    setResolvedRemoteRunIds(prev => { const next = new Set(prev); next.add(run.id); return next; });
+    setTimeout(() => {
+      setResolvedRemoteRunIds(prev => { const next = new Set(prev); next.delete(run.id); return next; });
+    }, 10_000);
+    await sb.logApproval({
+      runId: run.id,
+      stepId: stepResult.stepId,
+      stepName: stepResult.stepName,
+      assigneeName: stepResult.assigneeName,
+      action,
+      comment: comment || '',
+      resolvedBy: userName,
+    });
+    addLog({ type: 'approval', message: `${userName}: ${action}${comment ? ' | "' + comment + '"' : ''}` });
   }
 
   function handlePickRecipient(pickId, recipientName) {
@@ -2091,6 +2157,21 @@ Answer in ONE sentence. If the user asks "how", a second sentence is allowed —
   const activeRuns = workflowRuns.filter(r => r.status === 'running' || r.status === 'waiting_approval');
   const hasActiveRuns = activeRuns.length > 0;
 
+  // Cross-user pending reviews: runs where the current user is the waiting
+  // assignee. Filter out any runs the local resolver already owns (same-user
+  // case) and any the user has already clicked but whose DB echo hasn't come
+  // back yet — tracked in resolvedRemoteRunIdsRef to prevent a card reappearing
+  // for a split second after Approve is clicked.
+  const myPendingReviews = (workflowRuns || [])
+    .filter(r => r.status === 'waiting_approval')
+    .map(r => {
+      const step = (r.stepResults || []).find(s => s.status === 'waiting' && s.assigneeName === userName);
+      return step ? { run: r, step } : null;
+    })
+    .filter(Boolean)
+    .filter(x => !approvalResolversRef.current.has(x.run.id))
+    .filter(x => !resolvedRemoteRunIds.has(x.run.id));
+
   if (workshopEnded) {
     return (
       <GraduationScreen
@@ -2266,6 +2347,8 @@ Answer in ONE sentence. If the user asks "how", a second sentence is allowed —
               sb={sb}
               unreadDmCounts={unreadDmCounts}
               workflowRuns={workflowRuns}
+              myPendingReviews={myPendingReviews}
+              onRemoteApprove={handleRemoteApprove}
             />
           </div>
         )}

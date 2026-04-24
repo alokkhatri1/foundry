@@ -46,6 +46,7 @@ export async function executeWorkflowRun({
   removeLoadingMessages, // () => void
   onLog,                // (entry) => void
   getApprovalDecision,  // (runId, stepId, config) => Promise<{action, comment}>
+  onApprovalRequested,  // ({runId, stepId, stepName, workflowName, assigneeId, prompt}) => void — fires once when an approval step starts waiting, so the host can DM the assignee
   onSaveStepOutput,     // ({stepName, content, name, destination}) => void — per-step save when step.save.enabled
   onCapture,            // ({fileId, coworkerId, content, runId}) => void — terminal append for capture steps
 }) {
@@ -250,6 +251,19 @@ export async function executeWorkflowRun({
         previousOutput: reviewerContext,
         resolved: false,
       });
+
+      // Notify the assignee out-of-band so they actually see the request — the
+      // approval card above only lands in the initiator's run conversation.
+      if (step.assigneeId && onApprovalRequested) {
+        onApprovalRequested({
+          runId,
+          stepId: step.id,
+          stepName: nodeLabel(step),
+          workflowName: workflow.name,
+          assigneeId: step.assigneeId,
+          prompt: step.prompt || '',
+        });
+      }
 
       const decision = await getApprovalDecision(runId, step.id, {
         prompt: step.prompt,

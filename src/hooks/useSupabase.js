@@ -118,6 +118,30 @@ export default function useSupabase() {
     // stage-gates the `skills` subfolder's visibility until stage 4.
   }, []);
 
+  // Batch reveal for the "Reveal all" admin action. Writes one stage_events
+  // row per intermediate transition (preserves the audit trail) but commits
+  // rooms.current_stage in a single write so participant clients get one
+  // realtime update instead of N. During the 2026-04-23 session, six
+  // sequential writes fanned out to 35 clients and overwhelmed their
+  // stage-advance logic — UI stopped responding.
+  const revealAllStages = useCallback(async (roomId, transitions, toStage, actorUserId) => {
+    if (!isSupabaseConfigured) return;
+    const events = (transitions || []).map(t => ({
+      room_id: roomId,
+      from_stage: t.from || null,
+      to_stage: t.to,
+      actor: actorUserId || null,
+    }));
+    if (events.length > 0) {
+      const { error: insertErr } = await supabase.from('stage_events').insert(events);
+      if (insertErr) console.error('[sb] revealAllStages stage_events:', insertErr.message);
+    }
+    const { error } = await supabase.from('rooms')
+      .update({ current_stage: toStage })
+      .eq('id', roomId);
+    if (error) console.error('[sb] revealAllStages:', error.message);
+  }, []);
+
   const loadWorkshopStats = useCallback(async (roomId) => {
     if (!isSupabaseConfigured) return null;
     const [files, coworkers, workflows, participants, messages] = await Promise.all([
@@ -271,16 +295,20 @@ export default function useSupabase() {
     if (authUserId) row.auth_user_id = authUserId;
     if (email) row.email = email;
 
-    const conflictKey = email ? 'room_id,email' : 'room_id,name';
-    const { data, error } = await supabase.from('participants').upsert(
-      row,
-      { onConflict: conflictKey }
-    ).select('id, name, color, email').single();
+    // Only upsert by (room_id, email) — that's the only unique constraint the
+    // schema has since migration 005. Without email, skip straight to the
+    // lookup+insert fallback below.
+    if (email) {
+      const { data, error } = await supabase.from('participants').upsert(
+        row,
+        { onConflict: 'room_id,email' }
+      ).select('id, name, color, email').single();
 
-    if (!error && data) return data;
+      if (!error && data) return data;
 
-    // Upsert failed — log and try to recover by fetching existing row.
-    console.error('[sb] upsertParticipant upsert failed:', error?.message || 'no data', 'conflictKey=' + conflictKey);
+      // Upsert failed — log and try to recover by fetching existing row.
+      console.error('[sb] upsertParticipant upsert failed:', error?.message || 'no data');
+    }
 
     // Recovery path: look up by email (preferred) or name within the room.
     let q = supabase.from('participants').select('id, name, color, email').eq('room_id', roomIdRef.current);
@@ -923,7 +951,7 @@ export default function useSupabase() {
     signOut, checkIsAdmin, onAuthStateChange,
     // Admin
     createWorkshop, loadAdminWorkshops, loadWorkshopParticipants,
-    deleteWorkshop, deprecateWorkshop, revealStage, loadWorkshopStats, loadWorkshopContent, loadWorkshopActivity,
+    deleteWorkshop, deprecateWorkshop, revealStage, revealAllStages, loadWorkshopStats, loadWorkshopContent, loadWorkshopActivity,
     seedWorkshopContent, subscribeToWorkshopPresence,
     // Room
     joinRoom, getRoomId, setCreditAllocation, setParticipantCreditBonus,

@@ -791,8 +791,56 @@ function InlineEditor({ file, onUpdateContent, onClose }) {
   );
 }
 
+// ===== Cross-user review surface =====
+// Rendered at the top of the chat body when the current user is the waiting
+// assignee on any workflow_run. Gives the reviewer a place to click Approve
+// or Reject — the initiator's tab owns the Promise resolver and picks up the
+// decision via the `approvals` realtime subscription.
+function PendingReviewCard({ run, step, onRemoteApprove }) {
+  const [comment, setComment] = useState('');
+  const [busy, setBusy] = useState(false);
+  async function act(action) {
+    if (busy) return;
+    setBusy(true);
+    try { await onRemoteApprove(run, step, action, comment); }
+    finally { setBusy(false); }
+  }
+  return (
+    <div style={{ marginBottom: 8, padding: 10, background: '#fff', border: '1px solid #e5d4a8', borderRadius: 6 }}>
+      <div style={{ fontSize: 13, color: '#5a5048', marginBottom: 4 }}>
+        Workflow <strong>{run.workflowName}</strong> · Step <strong>{step.stepName || 'Review'}</strong> · Requested by <strong>{run.startedBy || 'someone'}</strong>
+      </div>
+      <textarea
+        value={comment}
+        onChange={e => setComment(e.target.value)}
+        placeholder="Optional comment (required for Reject)"
+        rows={2}
+        style={{ width: '100%', marginTop: 6, padding: 6, fontSize: 13, border: '1px solid #ddd', borderRadius: 4, resize: 'vertical', fontFamily: 'inherit' }}
+      />
+      <div style={{ display: 'flex', gap: 8, marginTop: 6 }}>
+        <button onClick={() => act('Approve')} disabled={busy} style={{ background: '#3f8f4a', color: '#fff', border: 0, padding: '6px 14px', borderRadius: 4, cursor: busy ? 'wait' : 'pointer' }}>Approve</button>
+        <button onClick={() => act('Reject')} disabled={busy || !comment.trim()} style={{ background: '#b8453d', color: '#fff', border: 0, padding: '6px 14px', borderRadius: 4, cursor: (busy || !comment.trim()) ? 'not-allowed' : 'pointer', opacity: (busy || !comment.trim()) ? 0.6 : 1 }}>Reject</button>
+      </div>
+    </div>
+  );
+}
+
+function PendingReviewsBanner({ myPendingReviews, onRemoteApprove }) {
+  if (!myPendingReviews?.length) return null;
+  return (
+    <div style={{ padding: '12px 16px', background: '#fff8e6', borderBottom: '1px solid #f0e1b8' }}>
+      <div style={{ fontWeight: 600, marginBottom: 8, color: '#7a5a12', fontSize: 13 }}>
+        {myPendingReviews.length} review{myPendingReviews.length === 1 ? '' : 's'} waiting for you
+      </div>
+      {myPendingReviews.map(({ run, step }) => (
+        <PendingReviewCard key={`${run.id}-${step.stepId}`} run={run} step={step} onRemoteApprove={onRemoteApprove} />
+      ))}
+    </div>
+  );
+}
+
 // ===== Main ChatPanel =====
-export default function ChatPanel({ messages, onSendMessage, onApprovalAction, onPickRecipient, onNudgeRecipient, onGoToFiles, onRetry, isLoading, participants, currentUserName, fileTree, onUpdateFileContent, coworkers, showEducationalCues, conversations, activeConvoId, onNewChat, onSelectConvo, onDeleteConvo, onCoworkerChange, currentStage, activeDm, onOpenDm, onCloseDm, myParticipantId, sb, unreadDmCounts, workflowRuns }) {
+export default function ChatPanel({ messages, onSendMessage, onApprovalAction, onPickRecipient, onNudgeRecipient, onGoToFiles, onRetry, isLoading, participants, currentUserName, fileTree, onUpdateFileContent, coworkers, showEducationalCues, conversations, activeConvoId, onNewChat, onSelectConvo, onDeleteConvo, onCoworkerChange, currentStage, activeDm, onOpenDm, onCloseDm, myParticipantId, sb, unreadDmCounts, workflowRuns, myPendingReviews, onRemoteApprove }) {
   const [input, setInput] = useState('');
   const [selectedFileIds, setSelectedFileIds] = useState([]);
   const [editingFileId, setEditingFileId] = useState(null);
@@ -1166,6 +1214,7 @@ export default function ChatPanel({ messages, onSendMessage, onApprovalAction, o
           </>
         ) : isEmpty ? (
           <div className="cl-center-layout">
+            <PendingReviewsBanner myPendingReviews={myPendingReviews} onRemoteApprove={onRemoteApprove} />
             <div className="cl-welcome">
               <h2 className="cl-welcome-greeting">{greeting}</h2>
             </div>
@@ -1173,6 +1222,7 @@ export default function ChatPanel({ messages, onSendMessage, onApprovalAction, o
           </div>
         ) : (
           <>
+            <PendingReviewsBanner myPendingReviews={myPendingReviews} onRemoteApprove={onRemoteApprove} />
             <div className="cl-messages" ref={messagesRef}>
               <div className="cl-messages-inner">
                 {messages.filter(m => {

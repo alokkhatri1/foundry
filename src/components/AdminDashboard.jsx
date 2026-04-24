@@ -171,10 +171,17 @@ export default function AdminDashboard({ sb, user, onBack }) {
       confirmLabel: 'Reveal all',
     });
     if (!ok) return;
+    // Build per-transition audit rows but commit rooms.current_stage once.
+    // Sequential per-stage writes sent N realtime updates to every client
+    // (N = remaining stages); with ~35 clients the cumulative fanout locked
+    // up the participant UIs during the 2026-04-23 session.
+    const transitions = [];
+    let trailCursor = cursor;
     for (const s of remaining) {
-      await sb.revealStage(selected.id, s, cursor, user.id);
-      cursor = s;
+      transitions.push({ from: trailCursor, to: s });
+      trailCursor = s;
     }
+    await sb.revealAllStages(selected.id, transitions, lastStage, user.id);
     setSelected(prev => prev ? { ...prev, current_stage: lastStage } : prev);
     await loadWorkshops();
   }

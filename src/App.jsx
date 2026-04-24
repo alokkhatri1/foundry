@@ -27,6 +27,7 @@ import {
   BUILTIN_TOOLS,
 } from './data/starterContent';
 import { executeWorkflowRun } from './utils/runWorkflowAsync';
+import { submitDm, flushOutbox as flushDmOutbox, outboxSnapshot } from './utils/dmOutbox';
 import { executeTool, toolToClaudeSchema, toolFromClaudeName } from './utils/toolExecutor';
 import { PLATFORM_TOOL_SCHEMAS, TOOL_DISPLAY_NAMES, TOOL_ICONS, executePlatformAction } from './utils/platformActions';
 import useSupabase from './hooks/useSupabase';
@@ -409,6 +410,9 @@ function App() {
   // via prop, instead of ChatPanel opening a second redundant subscription.
   // Saves one realtime channel per user — material near the free-tier 200 cap.
   const [latestIncomingDm, setLatestIncomingDm] = useState(null);
+  // Outbox pending count — drives a small UI indicator so users see when
+  // messages are queued locally waiting for network recovery.
+  const [dmOutboxCount, setDmOutboxCount] = useState(() => outboxSnapshot().length);
 
   // Credit budget computation — lives here, after every state dependency
   // (myParticipantId, creditAllocation, myCreditBonus) is declared. Earlier
@@ -698,6 +702,45 @@ function App() {
         if (row?.current_stage) setCurrentStage(normalizeStage(row.current_stage));
         if (row?.credit_allocation != null) setCreditAllocation(row.credit_allocation);
       },
+      onReconnect: async () => {
+        // Realtime reattached after a disconnect — refetch what matters for
+        // workflow continuity. Any INSERT/UPDATE events that fired during the
+        // offline window are gone from the realtime stream; we catch up via
+        // snapshot. Deliberately skip big tables (files, messages) — user
+        // will naturally refetch those when interacting.
+        try {
+          const [runs, approvals] = await Promise.all([
+            sb.loadWorkflowRuns(),
+            sb.loadAllRoomApprovals(),
+          ]);
+          if (runs?.length) {
+            setWorkflowRuns(prev => {
+              const byId = new Map((prev || []).map(r => [r.id, r]));
+              for (const r of runs) byId.set(r.id, r);
+              return [...byId.values()].sort((a, b) => a.startedAt - b.startedAt);
+            });
+          }
+          if (approvals?.length) {
+            setApprovalsByRun(prev => {
+              const next = { ...(prev || {}) };
+              for (const a of approvals) {
+                const key = a.run_id;
+                const existing = next[key] || [];
+                if (!existing.find(x => x.id === a.id)) {
+                  next[key] = [...existing, a].sort((x, y) =>
+                    new Date(x.resolved_at).getTime() - new Date(y.resolved_at).getTime()
+                  );
+                }
+              }
+              return next;
+            });
+          }
+        } catch (err) {
+          console.warn('[app] reconnect refetch failed:', err?.message || err);
+        }
+        // Also flush any outbound DMs queued while offline.
+        flushDmOutbox(sb).then(({ remaining }) => setDmOutboxCount(remaining));
+      },
     });
   }
 
@@ -759,6 +802,32 @@ function App() {
     });
     return unsub;
   }, [myParticipantId, sb, participants]);
+
+  // On mount and periodically thereafter, drain any DMs that were queued
+  // locally (network dropped mid-session, tab closed with unsent messages,
+  // previous session left a partial send). The interval keeps trying
+  // slowly until the queue is empty — successful sends remove themselves.
+  useEffect(() => {
+    if (!myParticipantId) return;
+    let cancelled = false;
+    const tryFlush = async () => {
+      if (cancelled) return;
+      const { remaining } = await flushDmOutbox(sb);
+      if (!cancelled) setDmOutboxCount(remaining);
+    };
+    tryFlush();
+    const interval = setInterval(tryFlush, 15_000);
+    // Flush on tab regaining focus — most common recovery trigger.
+    const onFocus = () => tryFlush();
+    window.addEventListener('focus', onFocus);
+    window.addEventListener('online', onFocus);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+      window.removeEventListener('focus', onFocus);
+      window.removeEventListener('online', onFocus);
+    };
+  }, [myParticipantId, sb]);
 
   // Reflect unread count in browser tab title.
   useEffect(() => {
@@ -1409,7 +1478,7 @@ function App() {
                 return { success: false, output: `Could not find a participant named "${recipientName}".` };
               }
 
-              const sent = await sb.sendDm(coworkerParticipantId, humanId, message);
+              const sent = await submitDm(sb, coworkerParticipantId, humanId, message);
               if (!sent?.data) {
                 updateActiveMessages(prev => prev.map(m => m.id === pickId ? { ...m, status: 'error', errorOutput: sent?.error || 'unknown error' } : m));
                 return { success: false, output: `Failed to send the DM: ${sent?.error || 'unknown error'}.` };
@@ -1730,7 +1799,7 @@ function App() {
         if (!sender || !assigneeId || sender.id === assigneeId) return;
         const promptLine = prompt ? ` — "${prompt}"` : '';
         const text = `Review requested: "${wfName}" · step "${stepName}"${promptLine}. A card is waiting in your Chat tab — approve or reject there.`;
-        await sb.sendDm(sender.id, assigneeId, text);
+        await submitDm(sb, sender.id, assigneeId, text);
         addLog({ type: 'workflow', message: `review DM sent to assignee for ${wfName} (${stepName})` });
       },
       onSaveStepOutput: ({ name, content, destination }) => {
@@ -1935,7 +2004,7 @@ function App() {
     const prefix = (msg.nudgeCount || 0) === 0
       ? 'Just checking in — still need your input.'
       : `Nudge ${((msg.nudgeCount || 0) + 1)} — still waiting.`;
-    await sb.sendDm(msg.fromParticipantId, msg.toParticipantId, `${prefix} Original question: ${msg.question}`);
+    await submitDm(sb, msg.fromParticipantId, msg.toParticipantId, `${prefix} Original question: ${msg.question}`);
     updateActiveMessages(prev => prev.map(m =>
       m.id === pickId ? { ...m, nudgeCount: (m.nudgeCount || 0) + 1 } : m
     ));
@@ -1955,7 +2024,7 @@ function App() {
     let delivered = false;
     if (sender && assignee) {
       const text = `Nudge — please review "${run.workflowName}" when you get a moment.`;
-      const result = await sb.sendDm(sender.id, assignee.id, text);
+      const result = await submitDm(sb, sender.id, assignee.id, text);
       delivered = !result?.error;
     }
     addMessage({
@@ -2264,6 +2333,28 @@ Answer in ONE sentence. If the user asks "how", a second sentence is allowed —
     .filter(x => !approvalResolversRef.current.has(x.run.id))
     .filter(x => !resolvedRemoteRunIds.has(x.run.id));
 
+  // Orphaned runs: a run I started that is still 'waiting_approval' but my
+  // in-memory resolver for it is gone (tab refreshed mid-flight). The
+  // workflow executor is dead; nothing will ever act on approval events.
+  // Surface these so the user can cancel them cleanly instead of having
+  // "running" runs that never complete.
+  const myOrphanedRuns = (workflowRuns || []).filter(r =>
+    r.startedBy === userName
+    && r.status === 'waiting_approval'
+    && !approvalResolversRef.current.has(r.id)
+  );
+
+  async function handleCancelOrphanedRun(runId) {
+    // Mark the run cancelled both locally and in the DB. Don't await the
+    // DB write — the realtime UPDATE will sync everyone else; local state
+    // is what matters for the user right now.
+    setWorkflowRuns(prev => prev.map(r =>
+      r.id === runId ? { ...r, status: 'cancelled', completedAt: Date.now() } : r
+    ));
+    const run = workflowRuns.find(r => r.id === runId);
+    if (run) sb.saveWorkflowRun({ ...run, status: 'cancelled', completedAt: Date.now() });
+  }
+
   if (workshopEnded) {
     return (
       <GraduationScreen
@@ -2443,6 +2534,9 @@ Answer in ONE sentence. If the user asks "how", a second sentence is allowed —
               workflowRuns={workflowRuns}
               myPendingReviews={myPendingReviews}
               onRemoteApprove={handleRemoteApprove}
+              myOrphanedRuns={myOrphanedRuns}
+              onCancelOrphanedRun={handleCancelOrphanedRun}
+              dmOutboxCount={dmOutboxCount}
             />
           </div>
         )}

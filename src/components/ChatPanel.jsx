@@ -6,6 +6,7 @@ import EducationalCue from './EducationalCue';
 import RichText from './RichText';
 import { CoworkerGlyph } from './Icon';
 import useFileDraft from '../hooks/useFileDraft';
+import { submitDm } from '../utils/dmOutbox';
 
 function parseConfidence(text) {
   const match = text.match(/[Cc]onfidence\s*[Ss]core[:\s]*([01]?\.\d+|[01])/);
@@ -839,8 +840,40 @@ function PendingReviewsBanner({ myPendingReviews, onRemoteApprove }) {
   );
 }
 
+// Orphaned-run banner: a run this user started left mid-flight (page
+// refresh, tab crash, laptop sleep). The in-memory executor is gone and
+// nothing will advance the workflow. Let the user cancel cleanly so the
+// run state isn't "waiting_approval" forever.
+function OrphanedRunsBanner({ myOrphanedRuns, onCancelOrphanedRun }) {
+  if (!myOrphanedRuns?.length) return null;
+  return (
+    <div style={{ padding: '12px 16px', background: '#fce8e5', borderBottom: '1px solid #f0b8ad' }}>
+      <div style={{ fontWeight: 600, marginBottom: 8, color: '#8a2e22', fontSize: 13 }}>
+        {myOrphanedRuns.length} workflow run{myOrphanedRuns.length === 1 ? '' : 's'} interrupted — the executor was lost (refresh / tab closed). Cancel to clean up.
+      </div>
+      {myOrphanedRuns.map(run => (
+        <div key={run.id} style={{ marginBottom: 6, padding: 8, background: '#fff', border: '1px solid #f0b8ad', borderRadius: 6, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <span style={{ fontSize: 13 }}><strong>{run.workflowName}</strong></span>
+          <button onClick={() => onCancelOrphanedRun(run.id)} style={{ background: '#b8453d', color: '#fff', border: 0, padding: '4px 10px', borderRadius: 4, cursor: 'pointer', fontSize: 12 }}>Cancel</button>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// DM outbox indicator: shows when messages are queued locally waiting
+// for network recovery. Silent when empty so we don't clutter the UI.
+function OutboxIndicator({ count }) {
+  if (!count) return null;
+  return (
+    <div style={{ padding: '6px 16px', background: '#eef4ff', borderBottom: '1px solid #cfd8e8', fontSize: 12, color: '#4a6b96' }}>
+      {count} message{count === 1 ? '' : 's'} pending delivery — will retry automatically.
+    </div>
+  );
+}
+
 // ===== Main ChatPanel =====
-export default function ChatPanel({ messages, onSendMessage, onApprovalAction, onPickRecipient, onNudgeRecipient, onGoToFiles, onRetry, isLoading, participants, currentUserName, fileTree, onUpdateFileContent, onEnsureFileContent, coworkers, showEducationalCues, conversations, activeConvoId, onNewChat, onSelectConvo, onDeleteConvo, onCoworkerChange, currentStage, activeDm, latestIncomingDm, onOpenDm, onCloseDm, myParticipantId, sb, unreadDmCounts, workflowRuns, myPendingReviews, onRemoteApprove }) {
+export default function ChatPanel({ messages, onSendMessage, onApprovalAction, onPickRecipient, onNudgeRecipient, onGoToFiles, onRetry, isLoading, participants, currentUserName, fileTree, onUpdateFileContent, onEnsureFileContent, coworkers, showEducationalCues, conversations, activeConvoId, onNewChat, onSelectConvo, onDeleteConvo, onCoworkerChange, currentStage, activeDm, latestIncomingDm, onOpenDm, onCloseDm, myParticipantId, sb, unreadDmCounts, workflowRuns, myPendingReviews, onRemoteApprove, myOrphanedRuns, onCancelOrphanedRun, dmOutboxCount }) {
   const [input, setInput] = useState('');
   const [selectedFileIds, setSelectedFileIds] = useState([]);
   const [editingFileId, setEditingFileId] = useState(null);
@@ -936,9 +969,25 @@ export default function ChatPanel({ messages, onSendMessage, onApprovalAction, o
     const text = input.trim() || (attachedFiles.length > 0 ? `Analyze the attached file${attachedFiles.length > 1 ? 's' : ''}.` : '');
     if (activeDm) {
       if (!myParticipantId) return;
-      const result = await sb.sendDm(myParticipantId, activeDm.id, text);
+      // Use submitDm (outbox-backed) instead of sb.sendDm directly: on
+      // transient network failure the message gets queued to localStorage
+      // and retried on reconnect, rather than silently vanishing.
+      const result = await submitDm(sb, myParticipantId, activeDm.id, text);
       if (result?.data) {
         setDmMessages(prev => prev.some(m => m.id === result.data.id) ? prev : [...prev, result.data]);
+        setInput('');
+      } else if (result?.pending) {
+        // Queued optimistically. Show it locally with a pending marker so
+        // the user knows it will deliver once connectivity returns.
+        const optimistic = {
+          id: result.clientId,
+          from_participant_id: myParticipantId,
+          to_participant_id: activeDm.id,
+          content: text,
+          created_at: new Date().toISOString(),
+          _pending: true,
+        };
+        setDmMessages(prev => prev.some(m => m.id === optimistic.id) ? prev : [...prev, optimistic]);
         setInput('');
       }
       return;
@@ -1224,6 +1273,8 @@ export default function ChatPanel({ messages, onSendMessage, onApprovalAction, o
           </>
         ) : isEmpty ? (
           <div className="cl-center-layout">
+            <OutboxIndicator count={dmOutboxCount} />
+            <OrphanedRunsBanner myOrphanedRuns={myOrphanedRuns} onCancelOrphanedRun={onCancelOrphanedRun} />
             <PendingReviewsBanner myPendingReviews={myPendingReviews} onRemoteApprove={onRemoteApprove} />
             <div className="cl-welcome">
               <h2 className="cl-welcome-greeting">{greeting}</h2>
@@ -1232,6 +1283,8 @@ export default function ChatPanel({ messages, onSendMessage, onApprovalAction, o
           </div>
         ) : (
           <>
+            <OutboxIndicator count={dmOutboxCount} />
+            <OrphanedRunsBanner myOrphanedRuns={myOrphanedRuns} onCancelOrphanedRun={onCancelOrphanedRun} />
             <PendingReviewsBanner myPendingReviews={myPendingReviews} onRemoteApprove={onRemoteApprove} />
             <div className="cl-messages" ref={messagesRef}>
               <div className="cl-messages-inner">

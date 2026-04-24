@@ -1,6 +1,7 @@
 import { useRef, useCallback, useEffect } from 'react';
 import { supabase, isSupabaseConfigured } from '../supabase';
 import { mapFileRow, mapCoworkerRow, mapToolRow, mapWorkflowRow } from '../utils/treeUtils';
+import { withSupabaseRetry } from '../utils/supabaseRetry';
 
 export default function useSupabase() {
   const roomIdRef = useRef(null);
@@ -418,7 +419,12 @@ export default function useSupabase() {
     }
     if (!fromParticipantId) return { error: 'missing fromParticipantId (myParticipantId is null)' };
     if (!toParticipantId) return { error: 'missing toParticipantId' };
+    // Idempotency: caller can supply a pre-generated id (outbox retry path).
+    // Otherwise we generate one here so a naive retry never produces a
+    // duplicate row — the upsert below is a no-op on id collision.
+    const clientId = options.clientId || (typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`);
     const row = {
+      id: clientId,
       room_id: roomIdRef.current,
       from_participant_id: fromParticipantId,
       to_participant_id: toParticipantId,
@@ -426,12 +432,17 @@ export default function useSupabase() {
     };
     if (options.kind && options.kind !== 'chat') row.kind = options.kind;
     if (options.metadata) row.metadata = options.metadata;
-    const { data, error } = await supabase.from('direct_messages').insert(row).select().single();
+    // Upsert so retries of the same clientId are safe. Conflict on the
+    // primary key returns the existing row, not an error.
+    // withSupabaseRetry absorbs transient network / 5xx failures.
+    const { data, error } = await withSupabaseRetry(() =>
+      supabase.from('direct_messages').upsert(row, { onConflict: 'id' }).select().single()
+    );
     if (error) {
       console.error('[sb] sendDm:', error.message, error);
-      return { error: error.message, code: error.code, details: error.details, hint: error.hint };
+      return { error: error.message, code: error.code, details: error.details, hint: error.hint, clientId };
     }
-    return { data };
+    return { data, clientId };
   }, []);
 
   // Paginated, metadata-only thread fetch. Grabs the most-recent 100 messages
@@ -788,15 +799,28 @@ export default function useSupabase() {
     });
   }, []);
 
+  // Approvals are the keystone of cross-user workflow execution — if one
+  // fails to land, the initiator's run hangs forever. Idempotency key +
+  // retry are non-negotiable.
   const logApproval = useCallback(async (data) => {
-    if (!isSupabaseConfigured || !roomIdRef.current) return;
-    await supabase.from('approvals').insert({
+    if (!isSupabaseConfigured || !roomIdRef.current) return { error: 'not configured' };
+    const clientId = data.clientId || (typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`);
+    const row = {
+      id: clientId,
       room_id: roomIdRef.current, run_id: data.runId || null,
       step_id: data.stepId || null, step_name: data.stepName || null,
       prompt: data.prompt || null, assignee_name: data.assigneeName || null,
       resolved_by: data.resolvedBy || null, action: data.action,
       comment: data.comment || null, resolved_at: new Date().toISOString(),
-    });
+    };
+    const { error } = await withSupabaseRetry(() =>
+      supabase.from('approvals').upsert(row, { onConflict: 'id' })
+    );
+    if (error) {
+      console.error('[sb] logApproval:', error.message || error);
+      return { error, clientId };
+    }
+    return { clientId };
   }, []);
 
   // LLM usage — one row per Claude API response, precomputed cost. Non-blocking
@@ -921,6 +945,10 @@ export default function useSupabase() {
   }, []);
 
   // ===== Realtime: subscribe to all entity tables =====
+  // handlers.onReconnect (optional): fires whenever the channel re-enters the
+  // SUBSCRIBED state after previously leaving it (CHANNEL_ERROR, TIMED_OUT,
+  // CLOSED). Callers use this to refetch state that may have changed during
+  // the disconnect window — realtime doesn't replay missed events.
   const subscribeToRoom = useCallback((handlers) => {
     if (!isSupabaseConfigured || !roomIdRef.current) return () => {};
 
@@ -959,8 +987,21 @@ export default function useSupabase() {
       })
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'rooms', filter: `id=eq.${roomIdRef.current}` }, (payload) => {
         if (handlers.onRoomChange) handlers.onRoomChange(payload.new, payload.old);
-      })
-      .subscribe();
+      });
+
+    // Track whether this channel has ever been SUBSCRIBED. The first
+    // SUBSCRIBED is the initial attach; any subsequent SUBSCRIBED after
+    // a CHANNEL_ERROR / TIMED_OUT / CLOSED is a reconnect — signal the
+    // caller so they can refetch events we missed while offline.
+    let everSubscribed = false;
+    channel.subscribe((status) => {
+      if (status === 'SUBSCRIBED') {
+        if (everSubscribed && handlers.onReconnect) {
+          try { handlers.onReconnect(); } catch (err) { console.error('[sb] onReconnect threw:', err); }
+        }
+        everSubscribed = true;
+      }
+    });
 
     realtimeChannelRef.current = channel;
     return () => {

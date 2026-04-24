@@ -66,6 +66,50 @@ take down the current production version, but it also doesn't ship the fix.
 - If it's broken: the safe move is to push a forward fix, not revert.
   Revert only when the bug is blocking a live workshop.
 
+## Facilitator brief — credit top-ups during live sessions
+
+Default per-participant allocation is **3000 credits** (≈ $1.50 of LLM spend).
+That sizes for a 6-hour workshop with mixed use — chat, a few workflow runs,
+some coworker configuration. Heavy users who run many workflows or lean on
+Sonnet-backed coworkers will burn through this faster.
+
+**Monitor during the session:**
+
+- Admin Dashboard → pick the workshop → Participants tab shows each user's
+  credit balance. The list updates live (LLM usage realtime).
+- When a user drops below ~300 credits, consider a top-up before they hit 0
+  and get gated out of chat / workflow runs.
+
+**To grant more credits mid-session:**
+
+1. Admin Dashboard → select the live workshop → Participants tab.
+2. Click the participant whose balance is low.
+3. Bump their credit bonus (this is additive — keeps their original allocation
+   intact, layers a bonus on top).
+4. Change propagates via realtime; their UI shows the new balance within a
+   second or two.
+
+**If the whole room needs more:**
+
+- Change the workshop's default allocation (admin dashboard → workshop
+  settings). This re-allocates to every participant, not just new joiners.
+
+**Signals a user is running out:**
+
+- Yellow credit chip in their header turns red (at the 300-credit warn
+  threshold).
+- They see "You're out of credits (X allocated). Ask the facilitator…" when
+  they try to chat or run a workflow. Their message is still shown locally,
+  just not sent.
+
+**Rough cost cheat sheet (for sizing top-ups):**
+
+- One chat turn with Foundry: ~10-30 credits
+- One chat turn with a coworker: ~15-50 credits
+- One workflow run (3-5 steps): ~300-800 credits
+- Intent classification was removed in the 04-24 perf sweep — chat turns are
+  now cheaper than before.
+
 ## Notes
 
 - There is no `vercel.json` in the repo — Vercel auto-detects the Vite

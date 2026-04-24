@@ -943,14 +943,41 @@ export default function ChatPanel({ messages, onSendMessage, onApprovalAction, o
   // Load the DM thread when a DM opens. Live updates arrive via the
   // `latestIncomingDm` prop (App.jsx owns the single subscription); a second
   // useEffect below watches that prop and appends.
+  // `dmHasMoreEarlier` tracks whether the initial 100-message page
+  // completely covered the thread; if not, a "Load earlier" affordance
+  // appears at the top so long 6-hour-workshop coworker threads aren't
+  // silently truncated.
+  const [dmHasMoreEarlier, setDmHasMoreEarlier] = useState(false);
+  const [dmLoadingEarlier, setDmLoadingEarlier] = useState(false);
   useEffect(() => {
-    if (!activeDm?.id || !myParticipantId) { setDmMessages([]); return; }
+    if (!activeDm?.id || !myParticipantId) { setDmMessages([]); setDmHasMoreEarlier(false); return; }
     let cancelled = false;
     sb.fetchDmThread(myParticipantId, activeDm.id).then(initial => {
-      if (!cancelled) setDmMessages(initial);
+      if (cancelled) return;
+      setDmMessages(initial);
+      // If the server returned exactly 100, there's likely more behind it.
+      setDmHasMoreEarlier(initial.length >= 100);
     });
     return () => { cancelled = true; };
   }, [sb, myParticipantId, activeDm?.id]);
+
+  async function handleLoadEarlierDms() {
+    if (!activeDm?.id || !myParticipantId || dmLoadingEarlier || !dmHasMoreEarlier) return;
+    const oldest = dmMessages[0];
+    if (!oldest?.created_at) return;
+    setDmLoadingEarlier(true);
+    try {
+      const older = await sb.fetchDmThread(myParticipantId, activeDm.id, { beforeCreatedAt: oldest.created_at });
+      setDmMessages(prev => {
+        const seen = new Set(prev.map(m => m.id));
+        const merged = [...older.filter(m => !seen.has(m.id)), ...prev];
+        return merged;
+      });
+      setDmHasMoreEarlier(older.length >= 100);
+    } finally {
+      setDmLoadingEarlier(false);
+    }
+  }
 
   // Realtime DM append: App.jsx fans the latest incoming DM event here via
   // props. We dedupe by id because the sender also appends optimistically
@@ -1245,6 +1272,17 @@ export default function ChatPanel({ messages, onSendMessage, onApprovalAction, o
           <>
             <div className="dm-messages" ref={messagesRef}>
               <div className="dm-messages-inner">
+                {dmHasMoreEarlier && (
+                  <div style={{ textAlign: 'center', padding: '8px 0' }}>
+                    <button
+                      onClick={handleLoadEarlierDms}
+                      disabled={dmLoadingEarlier}
+                      style={{ background: 'transparent', border: '1px solid #ddd', borderRadius: 4, padding: '4px 12px', fontSize: 12, color: '#666', cursor: dmLoadingEarlier ? 'wait' : 'pointer' }}
+                    >
+                      {dmLoadingEarlier ? 'Loading…' : 'Load earlier messages'}
+                    </button>
+                  </div>
+                )}
                 {dmMessages.length === 0 ? (
                   <div className="dm-empty">No messages yet. Send the first one.</div>
                 ) : (

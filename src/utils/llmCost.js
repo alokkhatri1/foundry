@@ -88,9 +88,15 @@ export function labelForSegment(s) {
 // The bigger number is deliberate: a 4-digit balance that counts down feels
 // generous and gives finer-grained resolution per chat/run. Round UP when
 // converting spend to credits so fractional spend never under-counts.
+//
+// Default allocation bumped from 1000 → 3000 for the 6-hour 04-29 workshop
+// format. Heavy users exhausted 1000 mid-session on the 90-min 04-23 dry
+// run, so a 4× longer session needs headroom. 3000 ≈ $1.50 per participant;
+// ~$52 in allocated (not necessarily spent) budget across 35 users. Admin
+// can still override per-workshop via the dashboard.
 export const CREDIT_USD_VALUE = 0.0005;
-export const DEFAULT_CREDIT_ALLOCATION = 1000;
-export const CREDITS_WARN_THRESHOLD = 100;
+export const DEFAULT_CREDIT_ALLOCATION = 3000;
+export const CREDITS_WARN_THRESHOLD = 300;
 
 export function costToCredits(usd) {
   if (!usd || usd <= 0) return 0;

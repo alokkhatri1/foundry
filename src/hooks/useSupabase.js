@@ -450,14 +450,20 @@ export default function useSupabase() {
   // can accumulate rapidly — nudges, review requests, tool handoffs — so an
   // unbounded fetch hurts most when the workshop has been running a while.
   // Explicit columns match what the DM UI renders; skips anything extra.
-  const fetchDmThread = useCallback(async (myParticipantId, otherParticipantId) => {
+  //
+  // options.beforeCreatedAt (ISO string): load 100 older messages from
+  // before this timestamp. Used for the "Load earlier" affordance in long
+  // threads during 6h+ sessions. When omitted, returns the latest 100.
+  const fetchDmThread = useCallback(async (myParticipantId, otherParticipantId, options = {}) => {
     if (!isSupabaseConfigured || !roomIdRef.current) return [];
-    const { data, error } = await supabase.from('direct_messages')
+    let q = supabase.from('direct_messages')
       .select('id, from_participant_id, to_participant_id, content, created_at')
       .eq('room_id', roomIdRef.current)
       .or(`and(from_participant_id.eq.${myParticipantId},to_participant_id.eq.${otherParticipantId}),and(from_participant_id.eq.${otherParticipantId},to_participant_id.eq.${myParticipantId})`)
       .order('created_at', { ascending: false })
       .limit(100);
+    if (options.beforeCreatedAt) q = q.lt('created_at', options.beforeCreatedAt);
+    const { data, error } = await q;
     if (error) { console.error('[sb] fetchDmThread:', error.message); return []; }
     // DESC from server so the LIMIT hits the newest 100; reverse to display oldest-first.
     return (data || []).slice().reverse();

@@ -1,8 +1,9 @@
--- DRAFT — DO NOT APPLY BEFORE 2026-04-29 WORKSHOP.
+-- Scope direct_messages SELECT so realtime only broadcasts DMs to sender +
+-- receiver. Cuts per-client realtime processing ~17× in a 35-person room.
 --
--- This file lives in supabase/drafts/ deliberately so `supabase db push`
--- does not pick it up. Move it to supabase/migrations/ when you're ready,
--- rename it to the next unused number, and run in a low-stakes window.
+-- APPLY 24-48 HOURS BEFORE THE 2026-04-29 WORKSHOP via `supabase db push`
+-- or the migration UI. Follow the pre-apply checklist below. Do NOT apply
+-- at go-time — RLS changes are hard to diagnose under live load.
 --
 -- ---------------------------------------------------------------------
 -- Purpose

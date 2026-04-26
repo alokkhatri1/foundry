@@ -462,7 +462,7 @@ function FilePicker({ fileTree, selectedIds, onChange, folderName, onUpdateConte
 // Compact one-liner row — avatar + name + role + status + edit/delete. Used
 // when the coworker list gets long and scanning cards top-to-bottom becomes
 // painful. Click the row to chat, click Edit to open the editor.
-function CoworkerRow({ coworker, onStartChat, onEdit, onDelete, readOnly }) {
+function CoworkerRow({ coworker, onStartChat, onEdit, onDelete, onClone, readOnly }) {
   const instrCount = coworker.instructionFileIds?.length || 0;
   const isReady = instrCount > 0;
   return (
@@ -474,6 +474,9 @@ function CoworkerRow({ coworker, onStartChat, onEdit, onDelete, readOnly }) {
         <span className="cwb-card-dot" />
         {isReady ? 'Ready' : 'Needs setup'}
       </span>
+      {onClone && (
+        <button className="cwb-row-clone" onClick={e => { e.stopPropagation(); onClone(coworker); }} title="Clone — make my own copy">Clone</button>
+      )}
       {readOnly ? (
         <button className="cwb-row-edit" onClick={e => { e.stopPropagation(); onEdit(coworker.id); }} title="View (read-only)">View</button>
       ) : (
@@ -487,7 +490,7 @@ function CoworkerRow({ coworker, onStartChat, onEdit, onDelete, readOnly }) {
 }
 
 // ===== Coworker Card =====
-function CoworkerCard({ coworker, onStartChat, onEdit, onDelete, readOnly }) {
+function CoworkerCard({ coworker, onStartChat, onEdit, onDelete, onClone, readOnly }) {
   const instrCount = coworker.instructionFileIds?.length || 0;
   const isReady = instrCount > 0;
 
@@ -505,13 +508,24 @@ function CoworkerCard({ coworker, onStartChat, onEdit, onDelete, readOnly }) {
           <span className="cwb-card-dot" />
           {isReady ? 'Ready' : 'Needs setup'}
         </span>
-        <button
-          className="cwb-card-edit"
-          onClick={e => { e.stopPropagation(); onEdit(coworker.id); }}
-          title={readOnly ? 'View (read-only)' : 'Edit'}
-        >
-          {readOnly ? 'View' : 'Edit'}
-        </button>
+        <div className="cwb-card-actions">
+          {onClone && (
+            <button
+              className="cwb-card-clone"
+              onClick={e => { e.stopPropagation(); onClone(coworker); }}
+              title="Clone — make my own copy"
+            >
+              Clone
+            </button>
+          )}
+          <button
+            className="cwb-card-edit"
+            onClick={e => { e.stopPropagation(); onEdit(coworker.id); }}
+            title={readOnly ? 'View (read-only)' : 'Edit'}
+          >
+            {readOnly ? 'View' : 'Edit'}
+          </button>
+        </div>
       </div>
       {!readOnly && (
         <button className="cwb-card-delete" onClick={e => { e.stopPropagation(); onDelete(coworker.id); }} title="Delete">{'\u2715'}</button>
@@ -645,12 +659,13 @@ export default function CoworkerBuilder({ coworkers, onUpdateCoworkers, fileTree
         || (c.role || '').toLowerCase().includes(q)
       )
     : coworkers;
-  // Split into "mine" vs "built by others" so the user's own work doesn't
-  // get lost in the shared library as the workshop fills up. Anything
-  // without a createdBy (legacy) falls into "mine" for the current user
-  // rather than getting orphaned.
-  const myCoworkers = visibleCoworkers.filter(c => c.createdBy === userName);
-  const otherCoworkers = visibleCoworkers.filter(c => c.createdBy !== userName);
+  // Split into three buckets — Examples (System-seeded canonical
+  // coworkers), Built by you (mine), Built by others. Examples land at
+  // the top so participants see the "what good looks like" reference
+  // before scrolling into peer work.
+  const exampleCoworkers = visibleCoworkers.filter(c => c.createdBy === 'System');
+  const myCoworkers = visibleCoworkers.filter(c => c.createdBy && c.createdBy !== 'System' && c.createdBy === userName);
+  const otherCoworkers = visibleCoworkers.filter(c => c.createdBy && c.createdBy !== 'System' && c.createdBy !== userName);
 
   function handleCreate() {
     const newCw = {
@@ -682,6 +697,28 @@ export default function CoworkerBuilder({ coworkers, onUpdateCoworkers, fileTree
     if (!ok) return;
     onUpdateCoworkers(coworkers.filter(c => c.id !== cwId));
     if (selectedCwId === cwId) setSelectedCwId(null);
+  }
+
+  // Clone a System-seeded example coworker into the participant's own
+  // pool. Keeps the original file references — a cloned Ravi still reads
+  // the example skill/knowledge files, so it works out of the box. The
+  // participant can swap files later from the editor.
+  function handleClone(example) {
+    const clone = {
+      id: genCwId(),
+      name: example.name,
+      role: example.role,
+      avatar: example.avatar,
+      color: example.color,
+      instructionFileIds: [...(example.instructionFileIds || [])],
+      knowledgeFileIds: [...(example.knowledgeFileIds || [])],
+      toolIds: [...(example.toolIds || [])],
+      toolConfigs: { ...(example.toolConfigs || {}) },
+      createdBy: userName,
+      createdAt: Date.now(),
+    };
+    onUpdateCoworkers([...coworkers, clone]);
+    setSelectedCwId(clone.id);
   }
 
   if (selectedCw) {
@@ -754,6 +791,26 @@ export default function CoworkerBuilder({ coworkers, onUpdateCoworkers, fileTree
           </div>
         ) : (
           <>
+            {exampleCoworkers.length > 0 && (
+              <div className="cw-section">
+                <div className="cw-section-title">
+                  Examples <span className="cw-section-count">{exampleCoworkers.length}</span>
+                </div>
+                {viewMode === 'grid' ? (
+                  <div className="cw-list-grid">
+                    {exampleCoworkers.map(cw => (
+                      <CoworkerCard key={cw.id} coworker={cw} onStartChat={handleStartChat} onEdit={setSelectedCwId} onDelete={handleDelete} onClone={handleClone} readOnly />
+                    ))}
+                  </div>
+                ) : (
+                  <div className="cwb-list">
+                    {exampleCoworkers.map(cw => (
+                      <CoworkerRow key={cw.id} coworker={cw} onStartChat={handleStartChat} onEdit={setSelectedCwId} onDelete={handleDelete} onClone={handleClone} readOnly />
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
             {myCoworkers.length > 0 && (
               <div className="cw-section">
                 <div className="cw-section-title">

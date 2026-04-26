@@ -2,6 +2,66 @@ import { useRef, useCallback, useEffect, useMemo } from 'react';
 import { supabase, isSupabaseConfigured } from '../supabase';
 import { mapFileRow, mapCoworkerRow, mapToolRow, mapWorkflowRow } from '../utils/treeUtils';
 import { withSupabaseRetry } from '../utils/supabaseRetry';
+import {
+  createExampleFiles,
+  createExampleCoworkers,
+  createExampleWorkflow,
+  EXAMPLE_FOLDER_ID,
+  EXAMPLE_SKILLS_FOLDER_ID,
+} from '../data/exampleArtifacts';
+
+// ===== Per-stage example seeding =====
+// Each stage reveals a layer of the canonical "Credit Review" example —
+// Stage 3 lands the knowledge files, Stage 4 the skill files, Stage 5 the
+// coworkers (which now have valid file refs), Stage 6 the workflow that
+// chains those coworkers with two human review steps. Idempotent: every
+// row uses upsert(onConflict: 'id') so a re-reveal or revealAll that
+// passes through a stage twice is safe.
+async function seedStageExamples(roomId, toStage) {
+  if (!isSupabaseConfigured || !roomId || !toStage) return;
+  const stageStr = String(toStage);
+
+  if (stageStr === '3') {
+    // Examples/ root + knowledge subfolder + the two knowledge files.
+    // Skills subfolder is intentionally deferred to stage 4 so the
+    // structure reveals progressively.
+    const { folders, knowledge } = createExampleFiles(roomId);
+    const folderRows = folders.filter(f => f.id !== EXAMPLE_SKILLS_FOLDER_ID);
+    const { error } = await supabase.from('files').upsert(
+      [...folderRows, ...knowledge],
+      { onConflict: 'id' }
+    );
+    if (error) console.error('[sb] seedStageExamples(3):', error.message);
+    return;
+  }
+
+  if (stageStr === '4') {
+    // Skills subfolder + the two skill files. The Examples/ folder
+    // root is upserted again as a safety net for late-revealed stage
+    // 4 in a workshop where stage 3 was somehow skipped.
+    const { folders, skills } = createExampleFiles(roomId);
+    const skillsFolder = folders.find(f => f.id === EXAMPLE_SKILLS_FOLDER_ID);
+    const rootFolder = folders.find(f => f.id === EXAMPLE_FOLDER_ID);
+    const rows = [rootFolder, skillsFolder, ...skills].filter(Boolean);
+    const { error } = await supabase.from('files').upsert(rows, { onConflict: 'id' });
+    if (error) console.error('[sb] seedStageExamples(4):', error.message);
+    return;
+  }
+
+  if (stageStr === '5') {
+    const cws = createExampleCoworkers(roomId);
+    const { error } = await supabase.from('coworkers').upsert(cws, { onConflict: 'id' });
+    if (error) console.error('[sb] seedStageExamples(5):', error.message);
+    return;
+  }
+
+  if (stageStr === '6') {
+    const wf = createExampleWorkflow(roomId);
+    const { error } = await supabase.from('workflows').upsert(wf, { onConflict: 'id' });
+    if (error) console.error('[sb] seedStageExamples(6):', error.message);
+    return;
+  }
+}
 
 export default function useSupabase() {
   const roomIdRef = useRef(null);
@@ -109,14 +169,16 @@ export default function useSupabase() {
       to_stage: toStage,
       actor: actorUserId || null,
     });
+    // Seed example artifacts for this stage before flipping the room's
+    // current_stage. Order matters: realtime push from the rooms update
+    // is what wakes participants up — by then, the new files/coworkers/
+    // workflows are already present in the DB and arrive via their own
+    // realtime subs immediately.
+    await seedStageExamples(roomId, toStage);
     const { error } = await supabase.from('rooms')
       .update({ current_stage: toStage })
       .eq('id', roomId);
     if (error) console.error('[sb] revealStage:', error.message);
-    // Note: stage 3 and 4 no longer auto-create top-level Knowledge/Instructions
-    // folders. Knowledge + skills live as subfolders inside each user-created
-    // dept folder; the FileExplorer handles creation on new-folder click and
-    // stage-gates the `skills` subfolder's visibility until stage 4.
   }, []);
 
   // Facilitator-only correction. Reveal is normally monotonic; this lets an
@@ -154,6 +216,13 @@ export default function useSupabase() {
     if (events.length > 0) {
       const { error: insertErr } = await supabase.from('stage_events').insert(events);
       if (insertErr) console.error('[sb] revealAllStages stage_events:', insertErr.message);
+    }
+    // Seed examples for every stage we're passing through, in order, so
+    // the workspace ends up in the same shape as a stage-by-stage reveal.
+    // Sequential awaits — they're idempotent upserts so the cost is small
+    // but ordering keeps file → coworker → workflow ref dependencies clean.
+    for (const t of (transitions || [])) {
+      await seedStageExamples(roomId, t.to);
     }
     const { error } = await supabase.from('rooms')
       .update({ current_stage: toStage })
@@ -293,33 +362,15 @@ export default function useSupabase() {
 
   const seedWorkshopContent = useCallback(async (roomId) => {
     if (!isSupabaseConfigured) return;
-    const { createStarterFolders, createStarterCoworkers, createStarterTools, createStarterWorkflow } = await import('../data/starterContent');
-    const { flattenTree } = await import('../utils/treeUtils');
+    const { createStarterTools } = await import('../data/starterContent');
 
-    const tree = createStarterFolders('Workshop Organization');
-    const files = flattenTree(tree, roomId);
-    const coworkers = createStarterCoworkers();
+    // Workshops now open truly empty. The example artifacts (Examples/
+    // folder + Ravi/Aisha + Credit Review workflow) get seeded per-stage
+    // when the facilitator reveals stage 3, 4, 5, and 6 respectively —
+    // see seedStageExamples above. Tools are still seeded at room
+    // creation because the Create File / runtime built-ins must exist
+    // before any coworker can run.
     const tools = createStarterTools();
-    const workflow = createStarterWorkflow();
-
-    // Insert files
-    await supabase.from('files').upsert(
-      files.map(f => ({ ...f, room_id: roomId, updated_at: new Date().toISOString() })),
-      { onConflict: 'id' }
-    );
-    // Insert coworkers
-    for (const cw of coworkers) {
-      await supabase.from('coworkers').upsert({
-        id: cw.id, room_id: roomId, name: cw.name, role: cw.role,
-        avatar: cw.avatar, color: cw.color,
-        instruction_file_ids: cw.instructionFileIds || [],
-        knowledge_file_ids: cw.knowledgeFileIds || [],
-        tool_ids: cw.toolIds || [],
-        tool_configs: cw.toolConfigs || {},
-        created_by: 'System',
-      }, { onConflict: 'id' });
-    }
-    // Insert tools
     for (const t of tools) {
       await supabase.from('tools').upsert({
         id: t.id, room_id: roomId, name: t.name, type: t.type,
@@ -328,11 +379,6 @@ export default function useSupabase() {
         created_by: 'System',
       }, { onConflict: 'id' });
     }
-    // Insert workflow
-    await supabase.from('workflows').upsert({
-      id: workflow.id, room_id: roomId, name: workflow.name,
-      steps: workflow.steps, created_by: 'System',
-    }, { onConflict: 'id' });
   }, []);
 
   const subscribeToWorkshopPresence = useCallback((roomId, onPresenceChange) => {

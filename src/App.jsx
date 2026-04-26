@@ -15,12 +15,9 @@ import { computeCost, costToCredits, DEFAULT_CREDIT_ALLOCATION, CREDITS_WARN_THR
 import { buildStageGuidance } from './data/stageGuidance';
 import PreferencesEditor from './components/PreferencesEditor';
 import StageExamplePanel from './components/StageExamplePanel';
-import { lookupStageExample } from './data/stageExamples';
 import { useConfirm } from './components/ConfirmDialog';
 import {
   createStarterFolders,
-  createStarterWorkflow,
-  createStarterCoworkers,
   createStarterTools,
   createStarterRun,
   createStarterLogs,
@@ -2577,95 +2574,16 @@ Answer in ONE sentence. If the user asks "how", a second sentence is allowed —
         )}
 {activeTab === 'coworkers' && (
           <div className="tab-pane tab-pane-coworkers">
-            {stageReached(currentStage, '5') && (
-              <StageExamplePanel
-                stage="5"
-                workshopCode={workshopCode}
-                onApply={() => {
-                  // Build Ravi from the example data and add him to the
-                  // participant's coworker list. Folds the persona text into
-                  // role since the schema has no separate persona field; the
-                  // participant can refine it in the editor afterwards.
-                  const ex = lookupStageExample('5');
-                  const fields = Object.fromEntries((ex?.artifact?.fields || []).map(f => [f.name, f.value]));
-                  const ravi = {
-                    id: 'cw-ravi-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6),
-                    name: 'Ravi',
-                    role: [fields.Role, fields.Persona].filter(Boolean).join(' '),
-                    avatar: 'icon:user',
-                    color: '#5a9e6f',
-                    instructionFileIds: [],
-                    knowledgeFileIds: [],
-                    toolIds: [],
-                    toolConfigs: {},
-                    createdBy: userName,
-                    createdAt: Date.now(),
-                  };
-                  handleUpdateCoworkers([...(coworkers || []), ravi]);
-                }}
-              />
-            )}
             <CoworkerBuilder coworkers={coworkers || []} onUpdateCoworkers={handleUpdateCoworkers} fileTree={fileTree} tools={tools || []} userName={userName} callClaudeAPI={callClaudeAPI} showEducationalCues={showEducationalCues} currentStage={currentStage} onStartChat={cwId => { handleCoworkerChange(cwId); setActiveTab('chat'); }} participants={participants} onUpdateFileContent={handleUpdateFileContent} />
           </div>
         )}
         {activeTab === 'workflow' && (
           <div className="tab-pane tab-pane-workflow">
-            {stageReached(currentStage, '6') && (
-              <StageExamplePanel
-                stage="6"
-                workshopCode={workshopCode}
-                onApply={() => {
-                  // Add the seeded "Case Review" sample workflow if it
-                  // isn't already present (the room gets it on creation,
-                  // but a participant who deleted it can re-apply here).
-                  // De-duplicates by id rather than name.
-                  const sample = createStarterWorkflow();
-                  sample.createdBy = userName;
-                  if ((workflows || []).some(w => w.id === sample.id)) return;
-                  handleUpdateWorkflows([...(workflows || []), sample]);
-                }}
-              />
-            )}
             <WorkflowBuilder workflows={workflows} onUpdateWorkflows={handleUpdateWorkflows} fileTree={fileTree} onRun={runWorkflow} onCancelRun={handleCancelRun} onCancelAllRuns={handleCancelAllRuns} workflowRuns={workflowRuns} participants={participants} currentUserName={userName} coworkers={coworkers || []} tools={tools || []} showEducationalCues={showEducationalCues} callClaudeAPI={callClaudeAPI} onSaveCoworkerToLibrary={handleSaveCoworkerToLibrary} onUpdateFileContent={handleUpdateFileContent} apiKey={apiKey} onCopilotUsage={({ usage, model }) => sb.logLlmUsage({ participantId: myParticipantId, segment: 'workflow_copilot', model, usage, costUsd: computeCost(usage, model) })} />
           </div>
         )}
         {activeTab === 'files' && (
           <div className="tab-pane tab-pane-files">
-            {!selectedFile && currentStage === '3' && (
-              <StageExamplePanel stage="3" workshopCode={workshopCode} />
-            )}
-            {!selectedFile && stageReached(currentStage, '4') && (
-              <StageExamplePanel
-                stage="4"
-                workshopCode={workshopCode}
-                onApply={() => {
-                  // Drop the example skill file into the first 'skills'
-                  // folder we can find in the participant's workspace.
-                  // Falls back to the file root so the file isn't lost
-                  // even on a workspace that's been heavily reshaped.
-                  const ex = lookupStageExample('4');
-                  if (!ex?.artifact?.body) return;
-                  function findSkillsFolderId(node) {
-                    if (!node) return null;
-                    if (node.type === 'folder' && node.name === 'skills') return node.id;
-                    for (const c of node.children || []) {
-                      const found = findSkillsFolderId(c);
-                      if (found) return found;
-                    }
-                    return null;
-                  }
-                  const parentId = findSkillsFolderId(fileTree) || fileTree.id;
-                  const newFile = {
-                    id: 'file-credit-review-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6),
-                    name: 'credit_review.md',
-                    type: 'file',
-                    content: ex.artifact.body,
-                    createdBy: userName,
-                  };
-                  handleUpdateTree(addChildToTree(fileTree, parentId, newFile));
-                }}
-              />
-            )}
             {selectedFile ? (
               <div className="files-editor-fullview">
                 <div className="files-editor-topbar">

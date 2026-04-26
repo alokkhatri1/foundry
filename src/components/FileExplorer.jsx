@@ -274,6 +274,25 @@ export default function FileExplorer({ fileTree, selectedFileId, onSelectFile, o
     if (currentFolderId === nodeId) setCurrentFolderId(fileTree.id);
   }
 
+  // Clone a System-seeded example file into the participant's own pool.
+  // Drops it into whichever folder the participant is currently viewing
+  // so the new copy is right where they expect it. Stamps createdBy so
+  // it shows up under "Added by you" and can be freely edited from now.
+  function handleCloneFile(e, file) {
+    e.stopPropagation();
+    const clone = {
+      id: genId(),
+      name: file.name,
+      type: 'file',
+      content: file.content || '',
+      createdBy: userName,
+    };
+    const targetParentId = currentFolderId && currentFolderId !== fileTree.id
+      ? currentFolderId
+      : fileTree.id;
+    onUpdateTree(addChildToTree(fileTree, targetParentId, clone));
+  }
+
   // ===== Drag & Drop: move items into folders =====
   function handleDragStart(e, itemId) {
     setDragItemId(itemId);
@@ -513,61 +532,70 @@ export default function FileExplorer({ fileTree, selectedFileId, onSelectFile, o
           // only matters at the dept level for this UI.
           const folderItems = items.filter(i => i.type === 'folder');
           const fileItems = items.filter(i => i.type === 'file');
-          const renderFolderCard = (folder) => (
-            <div
-              key={folder.id}
-              className={`drive-card drive-card-folder${dropTargetId === folder.id ? ' drop-target' : ''}${dragItemId === folder.id ? ' dragging' : ''}`}
-              onClick={() => handleItemClick(folder)}
-              draggable
-              onDragStart={e => handleDragStart(e, folder.id)}
-              onDragOver={e => handleDragOverFolder(e, folder.id)}
-              onDragLeave={e => handleDragLeaveFolder(e)}
-              onDrop={e => handleDropOnFolder(e, folder.id)}
-              onDragEnd={handleDragEnd}
-            >
-              <div className="drive-card-icon">
-                <FolderIcon color={getFolderColor(folder.name)} />
-              </div>
-              <div className="drive-card-name">{folder.name}</div>
-              {getFolderDescription(folder.name) && (
-                <div className="drive-card-desc">{getFolderDescription(folder.name)}</div>
-              )}
-              {folder.children && (
-                <div className="drive-card-meta">
-                  {folder.children.filter(c => c.type === 'folder').length > 0 &&
-                    `${folder.children.filter(c => c.type === 'folder').length} folders`}
-                  {folder.children.filter(c => c.type === 'folder').length > 0 &&
-                    folder.children.filter(c => c.type === 'file').length > 0 && ', '}
-                  {folder.children.filter(c => c.type === 'file').length > 0 &&
-                    `${folder.children.filter(c => c.type === 'file').length} files`}
+          const renderFolderCard = (folder) => {
+            const isSystem = folder.createdBy === 'System';
+            return (
+              <div
+                key={folder.id}
+                className={`drive-card drive-card-folder${dropTargetId === folder.id ? ' drop-target' : ''}${dragItemId === folder.id ? ' dragging' : ''}${isSystem ? ' drive-card-example' : ''}`}
+                onClick={() => handleItemClick(folder)}
+                draggable={!isSystem}
+                onDragStart={e => !isSystem && handleDragStart(e, folder.id)}
+                onDragOver={e => !isSystem && handleDragOverFolder(e, folder.id)}
+                onDragLeave={e => handleDragLeaveFolder(e)}
+                onDrop={e => !isSystem && handleDropOnFolder(e, folder.id)}
+                onDragEnd={handleDragEnd}
+              >
+                <div className="drive-card-icon">
+                  <FolderIcon color={getFolderColor(folder.name)} />
                 </div>
-              )}
-              {folder.name !== 'knowledge' && folder.name !== 'skills' && folder.createdBy === userName && (
-                <button className="drive-card-delete" onClick={e => handleDelete(e, folder.id)} title="Delete">{'\u2715'}</button>
-              )}
-            </div>
-          );
-          const renderFileCard = (file) => (
-            <div
-              key={file.id}
-              className={`drive-card drive-card-file${selectedFileId === file.id ? ' selected' : ''}${dragItemId === file.id ? ' dragging' : ''}`}
-              onClick={() => handleItemClick(file)}
-              draggable
-              onDragStart={e => handleDragStart(e, file.id)}
-              onDragEnd={handleDragEnd}
-            >
-              <div className="drive-card-icon">
-                <FileIcon />
+                <div className="drive-card-name">{folder.name}</div>
+                {getFolderDescription(folder.name) && (
+                  <div className="drive-card-desc">{getFolderDescription(folder.name)}</div>
+                )}
+                {folder.children && (
+                  <div className="drive-card-meta">
+                    {folder.children.filter(c => c.type === 'folder').length > 0 &&
+                      `${folder.children.filter(c => c.type === 'folder').length} folders`}
+                    {folder.children.filter(c => c.type === 'folder').length > 0 &&
+                      folder.children.filter(c => c.type === 'file').length > 0 && ', '}
+                    {folder.children.filter(c => c.type === 'file').length > 0 &&
+                      `${folder.children.filter(c => c.type === 'file').length} files`}
+                  </div>
+                )}
+                {folder.name !== 'knowledge' && folder.name !== 'skills' && folder.createdBy === userName && (
+                  <button className="drive-card-delete" onClick={e => handleDelete(e, folder.id)} title="Delete">{'\u2715'}</button>
+                )}
               </div>
-              <div className="drive-card-name">{file.name}</div>
-              <div className="drive-card-meta">
-                {file.content ? `${file.content.split('\n').length} lines` : 'Empty'}
+            );
+          };
+          const renderFileCard = (file) => {
+            const isSystem = file.createdBy === 'System';
+            return (
+              <div
+                key={file.id}
+                className={`drive-card drive-card-file${selectedFileId === file.id ? ' selected' : ''}${dragItemId === file.id ? ' dragging' : ''}${isSystem ? ' drive-card-example' : ''}`}
+                onClick={() => handleItemClick(file)}
+                draggable={!isSystem}
+                onDragStart={e => !isSystem && handleDragStart(e, file.id)}
+                onDragEnd={handleDragEnd}
+              >
+                <div className="drive-card-icon">
+                  <FileIcon />
+                </div>
+                <div className="drive-card-name">{file.name}</div>
+                <div className="drive-card-meta">
+                  {file.content ? `${file.content.split('\n').length} lines` : 'Empty'}
+                </div>
+                {isSystem && (
+                  <button className="drive-card-clone" onClick={e => handleCloneFile(e, file)} title="Clone — make my own copy">Clone</button>
+                )}
+                {file.createdBy === userName && (
+                  <button className="drive-card-delete" onClick={e => handleDelete(e, file.id)} title="Delete">{'\u2715'}</button>
+                )}
               </div>
-              {file.createdBy === userName && (
-                <button className="drive-card-delete" onClick={e => handleDelete(e, file.id)} title="Delete">{'\u2715'}</button>
-              )}
-            </div>
-          );
+            );
+          };
 
           if (!isRoot) {
             return (
@@ -578,10 +606,19 @@ export default function FileExplorer({ fileTree, selectedFileId, onSelectFile, o
             );
           }
 
-          const mineFolders = folderItems.filter(f => f.createdBy === userName);
-          const othersFolders = folderItems.filter(f => f.createdBy !== userName);
+          const exampleFolders = folderItems.filter(f => f.createdBy === 'System');
+          const mineFolders = folderItems.filter(f => f.createdBy && f.createdBy !== 'System' && f.createdBy === userName);
+          const othersFolders = folderItems.filter(f => f.createdBy && f.createdBy !== 'System' && f.createdBy !== userName);
           return (
             <>
+              {exampleFolders.length > 0 && (
+                <>
+                  <div className="drive-section-title">
+                    Examples <span className="drive-section-count">{exampleFolders.length}</span>
+                  </div>
+                  {exampleFolders.map(renderFolderCard)}
+                </>
+              )}
               {mineFolders.length > 0 && (
                 <>
                   <div className="drive-section-title">

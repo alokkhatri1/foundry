@@ -1,13 +1,12 @@
-// Per-stage "see how this looks" content. Each entry is the canonical
-// example artifact a participant needs to visualise before they can build
-// their own — addresses the 04-23 visualization gap where participants
-// understood the primitive in the abstract but not what a finished one
-// looked like in this product.
+// Per-stage "see how this looks" content for surfaces that don't have a
+// natural file/coworker/workflow analog. As of 2026-04-26 this only
+// covers Stage 2 (Preferences) — pure text, no workspace artifact.
 //
-// Generic baseline only — every cohort sees the same examples regardless
-// of org. The shape leaves room for an admin-authored override per
-// workshop later (e.g. examples_override JSON on rooms.code), at which
-// point lookupStageExample() can prefer the override.
+// Stages 3, 4, 5, 6 used to have panels here but the visualisation gap
+// is now closed by the example artifacts that get seeded into the room
+// per-stage (see data/exampleArtifacts.js + seedStageExamples in
+// useSupabase.js). Don't reintroduce panels for those stages unless the
+// seeded artifacts go away.
 
 const STAGE_EXAMPLES = {
   '2': {
@@ -24,102 +23,6 @@ const STAGE_EXAMPLES = {
     },
     applyLabel: 'Use as starting point',
   },
-
-  '4': {
-    title: 'How a Skill file looks',
-    intro:
-      'A skill file is a reusable instruction. Save it once, attach it to any coworker or chat, and the AI follows that shape every time. The trick: write it like a checklist, not a paragraph.',
-    artifact: {
-      kind: 'markdown',
-      label: 'credit_review.md',
-      body:
-        '# Credit Review\n\n' +
-        'When given a loan application, return a structured assessment with the sections below. Use bullet points within each section.\n\n' +
-        '## Borrower\n' +
-        '- Name, registration, and years in operation\n' +
-        '- Sector and revenue band\n\n' +
-        '## Exposure\n' +
-        '- Requested amount and tenor\n' +
-        '- Total exposure including any existing facilities\n\n' +
-        '## Risks\n' +
-        '- Top three concrete risks (financial, operational, market)\n' +
-        '- For each: severity (low/med/high) and mitigant if any\n\n' +
-        '## Recommendation\n' +
-        '- Approve / Approve with conditions / Decline\n' +
-        '- One-sentence rationale citing the policy section that drove the call',
-    },
-    applyLabel: 'Add to my folder',
-  },
-
-  '5': {
-    title: 'How a finished Coworker looks',
-    intro:
-      'A coworker is three things in one: a persona (who they are), one or more skill files (how they work), and knowledge files (what they know). Once built, you DM them like a teammate.',
-    artifact: {
-      kind: 'card',
-      label: 'Ravi — Credit Risk Analyst',
-      fields: [
-        {
-          name: 'Role',
-          value:
-            "Credit Risk Analyst on the retail-lending desk. Reviews incoming loan applications and produces a structured first-cut assessment for the human credit committee.",
-        },
-        {
-          name: 'Skills',
-          value: 'credit_review.md',
-        },
-        {
-          name: 'Knowledge',
-          value: 'retail_lending_policy.pdf',
-        },
-        {
-          name: 'Persona',
-          value:
-            'Methodical, conservative, never speculates beyond evidence. Calls out missing data instead of guessing.',
-        },
-      ],
-    },
-    applyLabel: 'Create Ravi',
-  },
-
-  '3': {
-    title: 'How attaching a file to chat looks',
-    intro:
-      'Once a file is in your folder, you can attach it to a question. The AI grounds its answer in that file instead of guessing — and quotes it back so you can verify.',
-    artifact: {
-      kind: 'text',
-      label: 'Sample chat exchange',
-      body:
-        'You · attached: retail_lending_policy.pdf\n' +
-        '   Should we approve a $250,000 facility for a 3-year-old consulting firm?\n\n' +
-        'Analyst:\n' +
-        '  Per Section 3.2 of the attached policy, retail facilities above $200k\n' +
-        '  require either two years of audited financials or a personal guarantee\n' +
-        '  from the principal. The application has only one year of statements,\n' +
-        '  so the call hinges on whether a guarantee is on file.\n' +
-        '  Recommend: Approve with guarantee, decline without.',
-    },
-  },
-
-  '6': {
-    title: 'How a wired Workflow looks',
-    intro:
-      'A workflow chains coworker steps and human review steps end-to-end. Each AI step produces output; each human step pauses the run until that person approves or rejects with feedback.',
-    artifact: {
-      kind: 'card',
-      label: 'Loan approval — sample DAG',
-      fields: [
-        { name: 'Trigger', value: 'A new loan application is pasted in' },
-        { name: 'Step 1 — Coworker', value: 'Ravi drafts the credit memo from the application' },
-        { name: 'Step 2 — Review', value: 'Priya (human) reviews the memo · approves or rejects with comments' },
-        { name: 'Step 3 — Coworker', value: 'Legal AI checks the memo against policy exceptions' },
-        { name: 'Step 4 — Review', value: 'Anisha (human) signs off — final approver' },
-        { name: 'Save output', value: 'Final memo lands in Risk/knowledge for the next run to learn from' },
-      ],
-    },
-    applyLabel: 'Load this workflow',
-  },
-
 };
 
 export function lookupStageExample(stage) {

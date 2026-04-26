@@ -252,6 +252,23 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
 }
 .stage-example-apply:hover { filter: brightness(0.95); }
 .stage-example-apply:disabled { opacity: 0.6; cursor: progress; }
+
+/* Coworker card/row Clone affordance — used on system "Examples" coworkers */
+.cwb-card-actions { display: flex; gap: 6px; align-items: center; }
+.cwb-card-clone, .cwb-row-clone {
+  background: var(--accent-system, #4a7fb5); color: #fff; border: 1px solid var(--accent-system, #4a7fb5);
+  font-size: 11px; font-weight: 600; padding: 3px 10px; border-radius: var(--radius-sm); cursor: pointer;
+}
+.cwb-card-clone:hover, .cwb-row-clone:hover { filter: brightness(0.95); }
+
+/* File card Clone affordance + system-example styling */
+.drive-card-clone {
+  position: absolute; top: 6px; right: 6px;
+  background: var(--accent-system, #4a7fb5); color: #fff; border: 1px solid var(--accent-system, #4a7fb5);
+  font-size: 11px; font-weight: 600; padding: 3px 10px; border-radius: var(--radius-sm); cursor: pointer;
+}
+.drive-card-clone:hover { filter: brightness(0.95); }
+.drive-card-example { border-style: dashed; cursor: pointer; }
 .stage-example-reopen {
   background: transparent; border: 1px dashed var(--border-color); color: var(--text-muted);
   font-size: 11px; font-weight: 500; padding: 4px 10px; border-radius: 999px;

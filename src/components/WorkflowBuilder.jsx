@@ -1214,6 +1214,7 @@ export default function WorkflowBuilder({ workflows, onUpdateWorkflows, fileTree
       id: genWfId(),
       name: original.name + ' (copy)',
       steps: original.steps.map(s => ({ ...s, id: genStepId() })),
+      createdBy: currentUserName,
     };
     onUpdateWorkflows([...workflows, copy]);
   }
@@ -1291,13 +1292,13 @@ export default function WorkflowBuilder({ workflows, onUpdateWorkflows, fileTree
             </div>
           </div>
         ) : (() => {
-          // Require explicit ownership to land in "mine" — otherwise a
-          // workflow created before we started stamping createdBy would
-          // masquerade as every participant's own. Unstamped items go to
-          // the shared "others" bucket alongside anything created by someone
-          // whose name doesn't match.
-          const mine = workflows.filter(w => w.createdBy === currentUserName);
-          const others = workflows.filter(w => w.createdBy !== currentUserName);
+          // Three buckets — Examples (System-seeded canonical workflows),
+          // Built by you, Built by others. Examples land at the top so the
+          // canonical reference shows up first; the existing Copy button on
+          // every card is the Clone affordance for examples too.
+          const examples = workflows.filter(w => w.createdBy === 'System');
+          const mine = workflows.filter(w => w.createdBy && w.createdBy !== 'System' && w.createdBy === currentUserName);
+          const others = workflows.filter(w => w.createdBy && w.createdBy !== 'System' && w.createdBy !== currentUserName);
           const renderCard = (wf, readOnly) => (
             <WorkflowCard
               key={wf.id}
@@ -1313,6 +1314,12 @@ export default function WorkflowBuilder({ workflows, onUpdateWorkflows, fileTree
           );
           return (
             <>
+              {examples.length > 0 && (
+                <div className="wf-section">
+                  <div className="wf-section-title">Examples <span className="wf-section-count">{examples.length}</span></div>
+                  <div className="wf-list-grid">{examples.map(wf => renderCard(wf, true))}</div>
+                </div>
+              )}
               {mine.length > 0 && (
                 <div className="wf-section">
                   <div className="wf-section-title">Built by you <span className="wf-section-count">{mine.length}</span></div>

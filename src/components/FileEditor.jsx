@@ -9,6 +9,9 @@ export default function FileEditor({ file, onUpdateContent }) {
     file?.content,
     onUpdateContent,
   );
+  // System-seeded example files are room-shared; one participant editing
+  // would propagate to all 40. View-only — clone first if you want to edit.
+  const readOnly = file?.createdBy === 'System';
 
   useEffect(() => {
     if (!isDirty) return;
@@ -52,17 +55,19 @@ export default function FileEditor({ file, onUpdateContent }) {
   return (
     <div className="file-editor">
       <div className="file-editor-header">
-        <h3><span style={{ color: 'var(--text-muted)' }}>{'\u2666'}</span> {file.name}{isDirty && <span style={{ color: 'var(--text-muted)', fontWeight: 400, fontSize: 12, marginLeft: 8 }}>• unsaved</span>}</h3>
+        <h3><span style={{ color: 'var(--text-muted)' }}>{'\u2666'}</span> {file.name}{isDirty && <span style={{ color: 'var(--text-muted)', fontWeight: 400, fontSize: 12, marginLeft: 8 }}>• unsaved</span>}{readOnly && <span style={{ color: 'var(--text-muted)', fontWeight: 400, fontSize: 12, marginLeft: 8 }}>• example, view only</span>}</h3>
         <div className="file-editor-modes">
           <button
             className={`file-editor-mode${mode === 'view' ? ' active' : ''}`}
             onClick={() => switchMode('view')}
           >View</button>
-          <button
-            className={`file-editor-mode${mode === 'edit' ? ' active' : ''}`}
-            onClick={() => switchMode('edit')}
-          >Edit</button>
-          {mode === 'edit' && (
+          {!readOnly && (
+            <button
+              className={`file-editor-mode${mode === 'edit' ? ' active' : ''}`}
+              onClick={() => switchMode('edit')}
+            >Edit</button>
+          )}
+          {!readOnly && mode === 'edit' && (
             <button
               className="file-editor-save"
               onClick={handleSave}

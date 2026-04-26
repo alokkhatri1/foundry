@@ -288,7 +288,6 @@ export default function AdminDashboard({ sb, user, onBack, onEnterWorkshop }) {
           </div>
         </div>
         <div className="admin-topbar-right">
-          <button className="admin-btn-ghost" onClick={onBack}>Enter Workshop</button>
           <button className="admin-btn-ghost" onClick={() => sb.signOut()}>Sign Out</button>
         </div>
       </div>

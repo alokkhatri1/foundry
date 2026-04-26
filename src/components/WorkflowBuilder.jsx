@@ -1209,11 +1209,25 @@ export default function WorkflowBuilder({ workflows, onUpdateWorkflows, fileTree
   function handleDuplicateWorkflow(wfId) {
     const original = workflows.find(w => w.id === wfId);
     if (!original) return;
+    // When cloning a System example, pre-fill the cloner as the reviewer
+    // on every approval step so they can run it solo immediately. They
+    // can still pick anyone else from the room via the editor's assignee
+    // dropdown afterwards.
+    const isExample = original.createdBy === 'System';
+    const myParticipantId = isExample
+      ? (participants || []).find(p => p.name === currentUserName)?.id || ''
+      : null;
     const copy = {
       ...structuredClone(original),
       id: genWfId(),
       name: original.name + ' (copy)',
-      steps: original.steps.map(s => ({ ...s, id: genStepId() })),
+      steps: original.steps.map(s => ({
+        ...s,
+        id: genStepId(),
+        ...(isExample && s.type === 'approval' && myParticipantId
+          ? { assigneeId: myParticipantId }
+          : {}),
+      })),
       createdBy: currentUserName,
     };
     onUpdateWorkflows([...workflows, copy]);

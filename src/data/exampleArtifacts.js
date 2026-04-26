@@ -199,7 +199,7 @@ export function createExampleWorkflow(roomId) {
         name: 'Credit Manager review',
         prompt: 'Review the credit memo for risk framing, completeness, and policy citations. Approve to proceed to compliance, or reject back to Ravi with feedback.',
         actions: ['Approve', 'Reject'],
-        assigneeName: '',
+        assigneeId: '',
       },
       {
         id: 'step-aisha',
@@ -214,7 +214,7 @@ export function createExampleWorkflow(roomId) {
         name: 'Senior Approver sign-off',
         prompt: 'Review the compliance report and the underlying memo. As DRI, sign off if everything is in order or reject with feedback.',
         actions: ['Approve', 'Reject'],
-        assigneeName: '',
+        assigneeId: '',
       },
     ],
     nodes: null,

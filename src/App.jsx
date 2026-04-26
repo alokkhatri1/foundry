@@ -2291,7 +2291,15 @@ Answer in ONE sentence. Two sentences if explaining "how". Never restate the que
           // first exchange and knowledge section changes with attached
           // files — keeping them out of the cached prefix lets the stable
           // part stay hot across turns.
-          const platformStableBlock = `${userPrefsForPlatform}You are the Foundry platform assistant for ${orgName}. You help users build and manage their AI coworker platform through natural language.
+          //
+          // userPrefs is ALSO in the variable tail, deliberately: it varies
+          // per user, and including it in the cached prefix meant 35 users
+          // in a workshop each wrote their own cache and never shared. The
+          // 04-26 llm_usage audit showed `chat` segment at 3% hit rate
+          // (681K writes, 24K reads) because of this. Pulling userPrefs out
+          // makes the cached prefix byte-identical for every user in the
+          // workshop, so the first call writes and the other 34 read.
+          const platformStableBlock = `You are the Foundry platform assistant for ${orgName}. You help users build and manage their AI coworker platform through natural language.
 
 The platform has these elements:
 - **Files**: Knowledge documents (policies, rules, reference) and instruction files (AI coworker behavior). Organized in department folders.
@@ -2305,7 +2313,7 @@ When answering questions, check current state with list/read tools if needed.
 ## Reply style — strict
 Answer in ONE sentence. If the user asks "how", a second sentence is allowed — never more. After an action, reply with a bare confirmation and nothing else ("Created Ravi." / "Listed 3 coworkers."). Never restate the user's request. Never bullet-list a recap. Never say "Let me know if…" or "Feel free to…". If you can't fit the answer in two sentences, ask the user what specifically they want to know.`;
 
-          const platformVariableTail = `${stageGuidanceSection}${knowledgeSection}`;
+          const platformVariableTail = `${userPrefsForPlatform}${stageGuidanceSection}${knowledgeSection}`;
 
           const result = await callClaudeWithPlatformActions({
             systemBlocks: platformVariableTail.trim()

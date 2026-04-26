@@ -22,6 +22,7 @@ const STAGE_EXAMPLES = {
         'Be concise — bullet points, no preamble.\n' +
         'When assessing a loan, always cite the section of policy you relied on.',
     },
+    applyLabel: 'Use as starting point',
   },
 
   '4': {
@@ -47,6 +48,7 @@ const STAGE_EXAMPLES = {
         '- Approve / Approve with conditions / Decline\n' +
         '- One-sentence rationale citing the policy section that drove the call',
     },
+    applyLabel: 'Add to my folder',
   },
 
   '5': {
@@ -77,6 +79,7 @@ const STAGE_EXAMPLES = {
         },
       ],
     },
+    applyLabel: 'Create Ravi',
   },
 
   '3': {
@@ -114,42 +117,9 @@ const STAGE_EXAMPLES = {
         { name: 'Save output', value: 'Final memo lands in Risk/knowledge for the next run to learn from' },
       ],
     },
+    applyLabel: 'Load this workflow',
   },
 
-  '7': {
-    title: 'How a finished Run looks',
-    intro:
-      'Every workflow leaves a trail: who started it, every step, every approval, every comment. The Decision Log on a Review step shows exactly what was said and by whom.',
-    artifact: {
-      kind: 'text',
-      label: 'Sample run · "Loan approval" · started by Anisha',
-      body:
-        '10:42  Started by Anisha\n' +
-        '10:42  Ravi · drafted credit memo (1.4 KB)\n' +
-        '10:43  Review (Priya) · APPROVED\n' +
-        '       "Looks good. Rationale on tenor is clear. Proceed."\n' +
-        '10:44  Legal AI · flagged 2 policy exceptions\n' +
-        '10:46  Review (Anisha) · APPROVED\n' +
-        '       "Exceptions noted; both within delegated authority."\n' +
-        '10:46  Saved final memo → Risk/knowledge/loan_LM-2041.md',
-    },
-  },
-
-  '8': {
-    title: 'How to read your spend',
-    intro:
-      'Tokens are the unit of work your AI did on your behalf. High token use is the platform working as intended — it means a lot of work happened without you having to do it. Think of it as token-maxing, not cost-minimising.',
-    artifact: {
-      kind: 'card',
-      label: 'What the numbers mean',
-      fields: [
-        { name: 'Chat', value: 'Tokens you spent talking to AI directly — questions and answers' },
-        { name: 'Coworker chats', value: 'Tokens your coworkers used producing artifacts on your behalf' },
-        { name: 'Workflow runs', value: 'Tokens spent inside multi-step orchestrations — the highest-leverage line' },
-        { name: 'Headline', value: 'A workshop spend of $0.30 means roughly an hour of AI-assisted work for ~30¢. That ratio is the point.' },
-      ],
-    },
-  },
 };
 
 export function lookupStageExample(stage) {

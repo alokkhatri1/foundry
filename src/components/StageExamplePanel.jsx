@@ -22,9 +22,10 @@ function writeDismissed(workshopCode, stage, value) {
   } catch {}
 }
 
-export default function StageExamplePanel({ stage, workshopCode }) {
+export default function StageExamplePanel({ stage, workshopCode, onApply }) {
   const example = lookupStageExample(stage);
   const [dismissed, setDismissed] = useState(() => readDismissed(workshopCode, stage));
+  const [applying, setApplying] = useState(false);
 
   // Re-evaluate dismissal when the stage changes — moving from stage 4
   // back to a re-revealed stage 4 in the same browser shouldn't cause the
@@ -48,6 +49,22 @@ export default function StageExamplePanel({ stage, workshopCode }) {
     );
   }
 
+  // Applying the example is the whole point now — it drops the artifact
+  // into the participant's actual workspace as a starting point. Auto-
+  // dismisses the panel afterward; if they want to revisit, the "Show
+  // example" pill brings it back.
+  async function handleApply() {
+    if (!onApply || applying) return;
+    setApplying(true);
+    try {
+      await onApply();
+      writeDismissed(workshopCode, stage, true);
+      setDismissed(true);
+    } finally {
+      setApplying(false);
+    }
+  }
+
   return (
     <div className="stage-example-panel">
       <div className="stage-example-header">
@@ -62,8 +79,18 @@ export default function StageExamplePanel({ stage, workshopCode }) {
           className="stage-example-dismiss"
           onClick={() => { writeDismissed(workshopCode, stage, true); setDismissed(true); }}
         >
-          Got it
+          Dismiss
         </button>
+        {onApply && example.applyLabel && (
+          <button
+            type="button"
+            className="stage-example-apply"
+            onClick={handleApply}
+            disabled={applying}
+          >
+            {applying ? 'Applying…' : example.applyLabel}
+          </button>
+        )}
       </div>
     </div>
   );

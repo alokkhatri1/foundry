@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import StageExamplePanel from './StageExamplePanel';
+import { lookupStageExample } from '../data/stageExamples';
 
 export default function PreferencesEditor({ initialContent, onSave, onClose, workshopCode }) {
   const [content, setContent] = useState(initialContent || '');
@@ -20,7 +21,14 @@ export default function PreferencesEditor({ initialContent, onSave, onClose, wor
           Tell the AI about yourself — your role, how you want responses, what matters to you.
           These preferences are applied to every conversation you have, across all workshops.
         </p>
-        <StageExamplePanel stage="2" workshopCode={workshopCode} />
+        <StageExamplePanel
+          stage="2"
+          workshopCode={workshopCode}
+          onApply={() => {
+            const ex = lookupStageExample('2');
+            if (ex?.artifact?.body) setContent(ex.artifact.body);
+          }}
+        />
         <textarea
           value={content}
           onChange={e => setContent(e.target.value)}

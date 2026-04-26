@@ -238,13 +238,20 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
 .stage-example-card-row:last-child { border-bottom: 0; }
 .stage-example-card-name { font-size: 12px; font-weight: 600; color: var(--text-muted); }
 .stage-example-card-value { font-size: 13px; color: var(--text-dark); line-height: 1.45; }
-.stage-example-actions { display: flex; justify-content: flex-end; }
+.stage-example-actions { display: flex; justify-content: flex-end; gap: 8px; }
 .stage-example-dismiss {
-  background: transparent; border: 1px solid var(--border-color); color: var(--text-dark);
+  background: transparent; border: 1px solid var(--border-color); color: var(--text-muted);
   font-size: 12px; font-weight: 500; padding: 5px 12px; border-radius: var(--radius-sm);
   cursor: pointer;
 }
-.stage-example-dismiss:hover { background: var(--bg-soft, #f3f2ef); }
+.stage-example-dismiss:hover { background: var(--bg-soft, #f3f2ef); color: var(--text-dark); }
+.stage-example-apply {
+  background: var(--accent-system); border: 1px solid var(--accent-system); color: #fff;
+  font-size: 12px; font-weight: 600; padding: 5px 14px; border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+.stage-example-apply:hover { filter: brightness(0.95); }
+.stage-example-apply:disabled { opacity: 0.6; cursor: progress; }
 .stage-example-reopen {
   background: transparent; border: 1px dashed var(--border-color); color: var(--text-muted);
   font-size: 11px; font-weight: 500; padding: 4px 10px; border-radius: 999px;

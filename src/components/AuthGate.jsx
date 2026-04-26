@@ -171,9 +171,26 @@ export default function AuthGate({ children, onJoin, workshopCode }) {
     );
   }
 
-  // Authenticated admin — show dashboard
+  // Authenticated admin — show dashboard. Two ways to leave it:
+  //   1. onBack (the "Enter Workshop" button in the topbar) — closes the
+  //      panel and falls through to JoinScreen so the admin can type a code.
+  //   2. onEnterWorkshop(code) — direct hop into a specific workshop from
+  //      the admin list, bypassing the join screen entirely.
   if (isAdmin && showAdmin) {
-    return <AdminDashboard sb={sb} user={session.user} onBack={() => setShowAdmin(false)} />;
+    const adminName = session.user?.user_metadata?.full_name
+      || session.user?.email?.split('@')[0] || 'Admin';
+    return (
+      <AdminDashboard
+        sb={sb}
+        user={session.user}
+        onBack={() => setShowAdmin(false)}
+        onEnterWorkshop={async (code) => {
+          if (!code) return;
+          const result = await onJoin(adminName, code.toUpperCase(), session.user?.id, session.user?.email);
+          if (!result?.error) setShowAdmin(false);
+        }}
+      />
+    );
   }
 
   // Authenticated but no workshop code — show join screen

@@ -65,7 +65,7 @@ function WorkshopRow({ w, selected, onSelect, copied, onCopy, stats, dim }) {
   );
 }
 
-export default function AdminDashboard({ sb, user, onBack }) {
+export default function AdminDashboard({ sb, user, onBack, onEnterWorkshop }) {
   const confirm = useConfirm();
   const [workshops, setWorkshops] = useState([]);
   const [stats, setStats] = useState({});
@@ -383,6 +383,18 @@ export default function AdminDashboard({ sb, user, onBack }) {
                   </div>
                 </div>
                 <div className="admin-detail-actions">
+                  {/* Enter the selected workshop directly as a participant —
+                      bypasses the JoinScreen / typing the code. Works on
+                      live and deprecated workshops alike (deprecated rooms
+                      still render in read-only mode for audit purposes). */}
+                  {onEnterWorkshop && (
+                    <button
+                      className="admin-btn-primary"
+                      onClick={() => onEnterWorkshop(selected.code)}
+                    >
+                      Enter as participant
+                    </button>
+                  )}
                   <div className="admin-menu-wrap">
                     <button
                       className="admin-btn-ghost"

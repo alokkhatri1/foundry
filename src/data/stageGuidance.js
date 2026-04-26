@@ -39,7 +39,7 @@ const STAGE_GUIDES = {
     invitation: 'Invite them to look at what\'s already happened in the workshop — the runs, the approvals they gave, the tools that fired. The framing isn\'t just accountability; it\'s that this record is what makes the next workflow smarter. Their coworkers can read it. They can read it. The substrate just got richer.',
     externalReference: 'Same role as Datadog, OpenTelemetry, or Grafana in a software system — but for a team of humans and agents working together. The deeper analogy is Diana Hu\'s "queryable organization": every important action produces an artifact the AI at the centre of the company can learn from.',
   },
-  '7b': {
+  '8': {
     nowAvailable: 'Economics — a running total of their LLM spend + per-segment breakdown (chat, coworker work, workflow runs, copilot) for the workshop so far. Cost also appears per step on run detail views.',
     invitation: 'Invite them to open the Usage tab and see their accumulated spend for the workshop. The number has been ticking silently the whole time; this is the first moment it becomes visible. Point out which segment is largest and why.',
     externalReference: 'Like a cloud bill review, but for AI teammates. Output tokens cost 5\u00D7 input; caching knowledge files saves ~10\u00D7. Choices about prompt length, skill reuse, and model selection all show up here.',

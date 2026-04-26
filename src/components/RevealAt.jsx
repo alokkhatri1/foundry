@@ -1,4 +1,4 @@
-const STAGE_ORDER = ['1', '2', '3', '4', '5', '6', '7', '7b', '8'];
+const STAGE_ORDER = ['1', '2', '3', '4', '5', '6', '7', '8', '9'];
 
 // Rooms deprecated before the arc change can carry stage IDs that no longer
 // exist in STAGE_ORDER. Without normalization, indexOf returns -1 and every
@@ -8,7 +8,12 @@ const STAGE_ORDER = ['1', '2', '3', '4', '5', '6', '7', '7b', '8'];
 //     5b (Coworker Tools) was retired when tools were removed from the editor.
 //     5a then collapsed into a single Coworkers stage and got renumbered '5'.
 //     5c was an older collaboration substage folded earlier.
-const STAGE_ALIASES = { '5c': '5', '5b': '5', '5a': '5' };
+//   '7b' → '8'
+//     Economics renumbered to '8'; old Graduation '8' is now '9'. The
+//     paired SQL migration (020_renumber_stages_7b_8.sql) shifts existing
+//     rooms in the DB; this alias keeps any straggler that didn't get
+//     migrated routing correctly.
+const STAGE_ALIASES = { '5c': '5', '5b': '5', '5a': '5', '7b': '8' };
 function normalizeStage(s) {
   return STAGE_ALIASES[s] || s;
 }
@@ -35,8 +40,8 @@ export const STAGE_META = {
   '5':  { label: 'AI Coworkers',         description: 'Let\u2019s build your team, {name} \u2014 named AI teammates with skills, knowledge, and a voice.' },
   '6':  { label: 'Orchestration',        description: 'Now choreograph it, {name} \u2014 chain coworkers and humans into a workflow with human-in-loop checks.' },
   '7':  { label: 'Observability',        description: 'Last one, {name} \u2014 every run, approval, and tool call on the record. See what your team actually did.' },
-  '7b': { label: 'Economics',            description: 'Time to see the bill, {name} \u2014 every token your team spent is on the record now.' },
-  '8':  { label: 'Graduation',           description: 'Here\u2019s a read of what you built, {name} \u2014 your competency scorecard across everything we just did together.' },
+  '8':  { label: 'Economics',            description: 'Time to see the bill, {name} \u2014 every token your team spent is on the record now.' },
+  '9':  { label: 'Graduation',           description: 'Here\u2019s a read of what you built, {name} \u2014 your competency scorecard across everything we just did together.' },
 };
 
 export { STAGE_ORDER, normalizeStage };

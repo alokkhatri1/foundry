@@ -205,17 +205,17 @@ function SpendChip({ total, tokenTotal, onClick }) {
 
 // Single settings button on the far-right of the header. Opens a dropdown
 // that carries everything that used to crowd the header: user name,
-// Current Level, live spend total (when Stage 7b is revealed),
+// Current Level, live spend total (when Stage 8 / Economics is revealed),
 // Preferences (Stage 2+), and Exit Workshop. Frees the header to show
 // every stage tab without wrapping.
 function SettingsMenu({ userName, currentStage, sb, myParticipantId, creditsLeft, creditsTotal, onOpenUsage, onOpenPreferences, onExit }) {
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
   const { isAdmin, openAdmin } = useAuth();
-  const showSpend = stageReached(currentStage, '7b');
+  const showSpend = stageReached(currentStage, '8');
   // Workshop-wide total — matches the pedagogy of the Usage tab
   // ("look how cheap the whole room is"). We always run the hook (can't
-  // call hooks conditionally) but only render its result after 7b.
+  // call hooks conditionally) but only render its result after Stage 8.
   const spend = useWorkshopUsageTotal(sb);
   const showPreferences = stageReached(currentStage, '2');
   const initial = (userName || '?').trim().charAt(0).toUpperCase();
@@ -434,10 +434,10 @@ function App() {
     previousStageRef.current = currentStage;
     if (prev !== null && prev !== currentStage && currentStage !== '1') {
       setJustRevealed(currentStage);
-      // Stage 8 (Graduation) — the whole-room moment. Snap every participant
+      // Stage 9 (Graduation) — the whole-room moment. Snap every participant
       // to the graduation tab so they see their scorecard together. Later
       // navigation away is fine; this only fires on the transition.
-      if (currentStage === '8') setActiveTab('graduation');
+      if (currentStage === '9') setActiveTab('graduation');
     }
   }, [currentStage]);
 
@@ -2430,12 +2430,12 @@ Answer in ONE sentence. If the user asks "how", a second sentence is allowed —
               Observability{activeRuns.length > 0 && activeTab !== 'activity' && <span className="tab-count">{activeRuns.length}</span>}
             </button>
           </RevealAt>
-          <RevealAt stage="7b" currentStage={currentStage}>
+          <RevealAt stage="8" currentStage={currentStage}>
             <button className={`tab-nav-item${activeTab === 'usage' ? ' active' : ''}`} onClick={() => setActiveTab('usage')}>
               Economics
             </button>
           </RevealAt>
-          <RevealAt stage="8" currentStage={currentStage}>
+          <RevealAt stage="9" currentStage={currentStage}>
             <button className={`tab-nav-item${activeTab === 'graduation' ? ' active' : ''}`} onClick={() => setActiveTab('graduation')}>
               Graduation
             </button>
@@ -2443,7 +2443,7 @@ Answer in ONE sentence. If the user asks "how", a second sentence is allowed —
         </nav>
         <div className="app-header-right">
           <div className="header-account-pill">
-            <RevealAt stage="7b" currentStage={currentStage}>
+            <RevealAt stage="8" currentStage={currentStage}>
               <CreditsChip
                 creditsLeft={creditsLeft}
                 creditsTotal={creditsTotal}
@@ -2588,7 +2588,7 @@ Answer in ONE sentence. If the user asks "how", a second sentence is allowed —
             />
           </div>
         )}
-        {activeTab === 'usage' && stageReached(currentStage, '7b') && (
+        {activeTab === 'usage' && stageReached(currentStage, '8') && (
           <div className="tab-pane tab-pane-usage">
             <UsageView
               sb={sb}

@@ -1,4 +1,4 @@
-// Stage 7b (Economics) reveal surface — workshop-wide view.
+// Stage 8 (Economics) reveal surface — workshop-wide view.
 //
 // Every participant sees the same numbers: the room's collective LLM spend,
 // broken down by segment (chat, coworker work, workflow runs, copilot),

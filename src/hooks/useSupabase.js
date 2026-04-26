@@ -857,7 +857,7 @@ export default function useSupabase() {
   }, []);
 
   // Workshop-wide usage — every row tagged with this workshop, regardless
-  // of which participant spent it. Stage 7b's primary view uses this so
+  // of which participant spent it. Stage 8's primary view uses this so
   // the room sees the collective cost as pedagogy ("look how cheap a
   // full mixed-team workshop actually is").
   //

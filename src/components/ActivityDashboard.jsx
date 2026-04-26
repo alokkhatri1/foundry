@@ -99,7 +99,7 @@ function RunCard({ run, onClick, onNudge, showEducationalCues }) {
 // step's output, decision log, or (if it's the run owner's turn) the
 // approval form.
 function RunDetailView({ run, onBack, onApprovalAction, onCancelRun, onNudge, showEducationalCues, currentUserName, approvals, onLoadApprovals, workflows, currentStage, sb }) {
-  const showCost = stageReached(currentStage, '7b');
+  const showCost = stageReached(currentStage, '8');
   const [costByStepId, setCostByStepId] = useState({});
 
   useEffect(() => {

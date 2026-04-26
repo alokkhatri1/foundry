@@ -116,6 +116,41 @@ export default function UsageView({ sb, participants, myParticipantId, showEduca
       });
   }, [agg, participantById, myParticipantId]);
 
+  // Token-max scoreboard — Phase 6 of the platform plan. Re-leads the
+  // Economics tab with a leaderboard framing instead of cost-anxiety:
+  // high token use is the proof that your AI is doing real work on your
+  // behalf, not a budget to fear. Computed per-participant from the rows
+  // already loaded; no extra query.
+  const tokenMaxStats = useMemo(() => {
+    if (!myParticipantId || participantsInOrder.length === 0) return null;
+    const myIdx = participantsInOrder.findIndex(p => p.pid === myParticipantId);
+    if (myIdx < 0) return null;
+    const myRank = myIdx + 1;
+    const total = participantsInOrder.length;
+    // Percentile from the top — rank 1 of 10 = 10%, rank 5 of 10 = 50%.
+    const percentile = Math.max(1, Math.round((myRank / total) * 100));
+    // "On your behalf" = AI work that produced something while you were
+    // away or doing something else. Direct chat is excluded — that's
+    // you in the loop, not the AI acting for you.
+    const ON_YOUR_BEHALF = new Set(['workflow_run', 'coworker_chat', 'workflow_copilot', 'refine_description']);
+    let tasks = 0;
+    let myTokens = 0;
+    for (const r of rows) {
+      if (r.participant_id !== myParticipantId) continue;
+      if (ON_YOUR_BEHALF.has(r.segment)) tasks += 1;
+      myTokens += (r.input_tokens || 0) + (r.output_tokens || 0)
+        + (r.cache_creation_input_tokens || 0) + (r.cache_read_input_tokens || 0);
+    }
+    let label;
+    if (total === 1) label = 'Solo session — every token is yours';
+    else if (myRank === 1) label = 'Top of the room';
+    else if (percentile <= 10) label = `Top ${percentile}% of the room`;
+    else if (percentile <= 25) label = `Top ${percentile}%`;
+    else if (percentile <= 50) label = 'Above the room median';
+    else label = 'Plenty of room to push your AI further';
+    return { myRank, total, percentile, tasks, myTokens, label };
+  }, [myParticipantId, participantsInOrder, rows]);
+
   return (
     <div className="usage-view">
       <div className="usage-header">
@@ -152,6 +187,22 @@ export default function UsageView({ sb, participants, myParticipantId, showEduca
         </div>
       ) : (
         <>
+          {tokenMaxStats && (
+            <div className="usage-tokenmax">
+              <div className="usage-tokenmax-eyebrow">Token-maxing</div>
+              <div className="usage-tokenmax-headline">
+                <span className="usage-tokenmax-rank">#{tokenMaxStats.myRank}<span className="usage-tokenmax-rank-of">/{tokenMaxStats.total}</span></span>
+                <span className="usage-tokenmax-label">{tokenMaxStats.label}</span>
+              </div>
+              <div className="usage-tokenmax-detail">
+                Your AI ran <strong>{tokenMaxStats.tasks}</strong> task{tokenMaxStats.tasks === 1 ? '' : 's'} on your behalf this session — <strong>{formatTokens(tokenMaxStats.myTokens)}</strong> tokens of work.
+              </div>
+              <div className="usage-tokenmax-hint">
+                More tokens means more work your AI is doing for you. Don't optimise for a low bill — optimise for letting the AI do more.
+              </div>
+            </div>
+          )}
+
           <div className="usage-totals">
             <div>
               <div className="usage-total-label">Workshop total</div>

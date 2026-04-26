@@ -19,7 +19,20 @@ export default function AuthGate({ children, onJoin, workshopCode }) {
   const [adminStatus, setAdminStatus] = useState('unknown'); // 'unknown' | 'yes' | 'no' | 'error'
   const [adminError, setAdminError] = useState(null);
   const isAdmin = adminStatus === 'yes';
-  const [showAdmin, setShowAdmin] = useState(false);
+  // Persist across hard refreshes. Without this, admins on the dashboard
+  // get bounced back into whatever workshop their saved state pointed to,
+  // which felt like the platform was forgetting them. localStorage scopes
+  // to this browser/profile, so signing out clears it via signOut() below.
+  const [showAdmin, setShowAdminState] = useState(() => {
+    try { return localStorage.getItem('sandbox:show-admin') === '1'; } catch { return false; }
+  });
+  const setShowAdmin = (next) => {
+    setShowAdminState(next);
+    try {
+      if (next) localStorage.setItem('sandbox:show-admin', '1');
+      else localStorage.removeItem('sandbox:show-admin');
+    } catch {}
+  };
 
   // Manual retry for when the initial check failed (e.g. RLS blip). Called
   // from JoinScreen's "Retry admin check" link when adminStatus === 'error'.

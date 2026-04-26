@@ -195,7 +195,9 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
   background: var(--bg-white); border: 1px solid var(--border-color); border-radius: var(--radius-sm);
 }
 .admin-participant-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
-.admin-participant-name { font-size: 14px; font-weight: 600; color: var(--text-dark); flex: 1; }
+.admin-participant-ident { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
+.admin-participant-name { font-size: 14px; font-weight: 600; color: var(--text-dark); }
+.admin-participant-email { font-size: 12px; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .admin-participant-time { font-size: 12px; color: var(--text-muted); }
 .admin-participant-status { font-size: 12px; color: var(--text-muted); }
 

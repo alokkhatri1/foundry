@@ -531,7 +531,10 @@ export default function AdminDashboard({ sb, user, onBack, onEnterWorkshop }) {
                       {humanParticipants.map(p => (
                         <div key={p.id} className="admin-participant">
                           <span className="admin-participant-dot" style={{ background: onlineNames.has(p.name) ? 'var(--accent-system)' : 'var(--border-color)' }} />
-                          <span className="admin-participant-name">{p.name}</span>
+                          <div className="admin-participant-ident">
+                            <span className="admin-participant-name">{p.name}</span>
+                            {p.email && <span className="admin-participant-email">{p.email}</span>}
+                          </div>
                           <span className="admin-participant-status">{onlineNames.has(p.name) ? 'Online' : 'Offline'}</span>
                           <span className="admin-participant-time">Joined {new Date(p.joined_at).toLocaleDateString()}</span>
                         </div>

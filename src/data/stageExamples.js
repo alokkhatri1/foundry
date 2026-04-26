@@ -78,6 +78,78 @@ const STAGE_EXAMPLES = {
       ],
     },
   },
+
+  '3': {
+    title: 'How attaching a file to chat looks',
+    intro:
+      'Once a file is in your folder, you can attach it to a question. The AI grounds its answer in that file instead of guessing — and quotes it back so you can verify.',
+    artifact: {
+      kind: 'text',
+      label: 'Sample chat exchange',
+      body:
+        'You · attached: retail_lending_policy.pdf\n' +
+        '   Should we approve a $250,000 facility for a 3-year-old consulting firm?\n\n' +
+        'Analyst:\n' +
+        '  Per Section 3.2 of the attached policy, retail facilities above $200k\n' +
+        '  require either two years of audited financials or a personal guarantee\n' +
+        '  from the principal. The application has only one year of statements,\n' +
+        '  so the call hinges on whether a guarantee is on file.\n' +
+        '  Recommend: Approve with guarantee, decline without.',
+    },
+  },
+
+  '6': {
+    title: 'How a wired Workflow looks',
+    intro:
+      'A workflow chains coworker steps and human review steps end-to-end. Each AI step produces output; each human step pauses the run until that person approves or rejects with feedback.',
+    artifact: {
+      kind: 'card',
+      label: 'Loan approval — sample DAG',
+      fields: [
+        { name: 'Trigger', value: 'A new loan application is pasted in' },
+        { name: 'Step 1 — Coworker', value: 'Ravi drafts the credit memo from the application' },
+        { name: 'Step 2 — Review', value: 'Priya (human) reviews the memo · approves or rejects with comments' },
+        { name: 'Step 3 — Coworker', value: 'Legal AI checks the memo against policy exceptions' },
+        { name: 'Step 4 — Review', value: 'Anisha (human) signs off — final approver' },
+        { name: 'Save output', value: 'Final memo lands in Risk/knowledge for the next run to learn from' },
+      ],
+    },
+  },
+
+  '7': {
+    title: 'How a finished Run looks',
+    intro:
+      'Every workflow leaves a trail: who started it, every step, every approval, every comment. The Decision Log on a Review step shows exactly what was said and by whom.',
+    artifact: {
+      kind: 'text',
+      label: 'Sample run · "Loan approval" · started by Anisha',
+      body:
+        '10:42  Started by Anisha\n' +
+        '10:42  Ravi · drafted credit memo (1.4 KB)\n' +
+        '10:43  Review (Priya) · APPROVED\n' +
+        '       "Looks good. Rationale on tenor is clear. Proceed."\n' +
+        '10:44  Legal AI · flagged 2 policy exceptions\n' +
+        '10:46  Review (Anisha) · APPROVED\n' +
+        '       "Exceptions noted; both within delegated authority."\n' +
+        '10:46  Saved final memo → Risk/knowledge/loan_LM-2041.md',
+    },
+  },
+
+  '8': {
+    title: 'How to read your spend',
+    intro:
+      'Tokens are the unit of work your AI did on your behalf. High token use is the platform working as intended — it means a lot of work happened without you having to do it. Think of it as token-maxing, not cost-minimising.',
+    artifact: {
+      kind: 'card',
+      label: 'What the numbers mean',
+      fields: [
+        { name: 'Chat', value: 'Tokens you spent talking to AI directly — questions and answers' },
+        { name: 'Coworker chats', value: 'Tokens your coworkers used producing artifacts on your behalf' },
+        { name: 'Workflow runs', value: 'Tokens spent inside multi-step orchestrations — the highest-leverage line' },
+        { name: 'Headline', value: 'A workshop spend of $0.30 means roughly an hour of AI-assisted work for ~30¢. That ratio is the point.' },
+      ],
+    },
+  },
 };
 
 export function lookupStageExample(stage) {

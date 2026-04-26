@@ -2576,11 +2576,17 @@ Answer in ONE sentence. If the user asks "how", a second sentence is allowed —
         )}
         {activeTab === 'workflow' && (
           <div className="tab-pane tab-pane-workflow">
+            {stageReached(currentStage, '6') && (
+              <StageExamplePanel stage="6" workshopCode={workshopCode} />
+            )}
             <WorkflowBuilder workflows={workflows} onUpdateWorkflows={handleUpdateWorkflows} fileTree={fileTree} onRun={runWorkflow} onCancelRun={handleCancelRun} onCancelAllRuns={handleCancelAllRuns} workflowRuns={workflowRuns} participants={participants} currentUserName={userName} coworkers={coworkers || []} tools={tools || []} showEducationalCues={showEducationalCues} callClaudeAPI={callClaudeAPI} onSaveCoworkerToLibrary={handleSaveCoworkerToLibrary} onUpdateFileContent={handleUpdateFileContent} apiKey={apiKey} onCopilotUsage={({ usage, model }) => sb.logLlmUsage({ participantId: myParticipantId, segment: 'workflow_copilot', model, usage, costUsd: computeCost(usage, model) })} />
           </div>
         )}
         {activeTab === 'files' && (
           <div className="tab-pane tab-pane-files">
+            {!selectedFile && currentStage === '3' && (
+              <StageExamplePanel stage="3" workshopCode={workshopCode} />
+            )}
             {!selectedFile && stageReached(currentStage, '4') && (
               <StageExamplePanel stage="4" workshopCode={workshopCode} />
             )}
@@ -2599,6 +2605,9 @@ Answer in ONE sentence. If the user asks "how", a second sentence is allowed —
         )}
         {activeTab === 'activity' && (
           <div className="tab-pane tab-pane-activity">
+            {stageReached(currentStage, '7') && (
+              <StageExamplePanel stage="7" workshopCode={workshopCode} />
+            )}
             <ActivityDashboard
               workflowRuns={workflowRuns}
               onApprovalAction={handleApprovalAction}
@@ -2621,6 +2630,7 @@ Answer in ONE sentence. If the user asks "how", a second sentence is allowed —
         )}
         {activeTab === 'usage' && stageReached(currentStage, '8') && (
           <div className="tab-pane tab-pane-usage">
+            <StageExamplePanel stage="8" workshopCode={workshopCode} />
             <UsageView
               sb={sb}
               participants={participants}

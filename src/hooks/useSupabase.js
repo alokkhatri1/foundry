@@ -163,11 +163,15 @@ export default function useSupabase() {
 
   const loadWorkshopStats = useCallback(async (roomId) => {
     if (!isSupabaseConfigured) return null;
+    // The `participants` table mirrors AI coworkers as rows with kind='ai'
+    // for DM routing. Those are bookkeeping, not people — exclude them
+    // from the rail count so "12 participants" actually means 12 humans.
+    // Legacy rows pre-kind-column are null and treated as human.
     const [files, coworkers, workflows, participants, messages] = await Promise.all([
       supabase.from('files').select('id', { count: 'exact', head: true }).eq('room_id', roomId),
       supabase.from('coworkers').select('id', { count: 'exact', head: true }).eq('room_id', roomId),
       supabase.from('workflows').select('id', { count: 'exact', head: true }).eq('room_id', roomId),
-      supabase.from('participants').select('id', { count: 'exact', head: true }).eq('room_id', roomId),
+      supabase.from('participants').select('id', { count: 'exact', head: true }).eq('room_id', roomId).or('kind.eq.human,kind.is.null'),
       supabase.from('messages').select('id', { count: 'exact', head: true }).eq('room_id', roomId),
     ]);
     return {

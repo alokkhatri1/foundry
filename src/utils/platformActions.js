@@ -316,7 +316,7 @@ export function executePlatformAction(toolName, input, ctx) {
       const tools = ctx.tools || [];
       if (tools.length === 0) return 'No tools configured.';
       return `Tools (${tools.length}):\n\n` + tools.map(t => {
-        const label = t.isPrebuilt ? '[built-in]' : '[custom]';
+        const label = t.isBuiltin ? '[built-in]' : '[custom]';
         return `- **${t.name}** (${t.type}/${t.config?.templateId || '?'}) ${label} — ${t.description}`;
       }).join('\n');
     }
@@ -402,8 +402,8 @@ export function executePlatformAction(toolName, input, ctx) {
           updated.config.headers = { ...updated.config.headers, Authorization: `${provDef.tokenPrefix} ${settings.token}` };
         }
       }
-      // Identity settings (only for non-prebuilt tools)
-      if (!tool.isPrebuilt) {
+      // Identity settings (only for non-built-in tools)
+      if (!tool.isBuiltin) {
         if (settings.name) updated.name = settings.name;
         if (settings.description) updated.description = settings.description;
       }

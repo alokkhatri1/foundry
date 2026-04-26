@@ -238,7 +238,7 @@ export default function ToolBuilder({ tools, onUpdateTools, fileTree, callClaude
   const [showPicker, setShowPicker] = useState(false);
   const selectedTool = selectedToolId ? tools.find(t => t.id === selectedToolId) : null;
 
-  const externalTools = tools.filter(t => !t.isPrebuilt && t.type === 'connect');
+  const externalTools = tools.filter(t => !t.isBuiltin && t.type === 'connect');
 
   function handleAddProvider(providerId, token) {
     const provider = CONNECTOR_PROVIDERS.find(p => p.id === providerId);
@@ -291,7 +291,7 @@ export default function ToolBuilder({ tools, onUpdateTools, fileTree, callClaude
 
   async function handleDeleteTool(toolId) {
     const tool = tools.find(t => t.id === toolId);
-    if (tool?.isPrebuilt) return;
+    if (tool?.isBuiltin) return;
     const ok = await confirm({ message: 'Delete this connector?', danger: true });
     if (!ok) return;
     onUpdateTools(tools.filter(t => t.id !== toolId));

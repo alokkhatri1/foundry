@@ -57,7 +57,7 @@ export function computeScorecard({
   const myRuns = (workflowRuns || []).filter(r => r.startedBy === userName);
   const myFiles = (flatFiles || []).filter(f => !f.createdBy || f.createdBy === userName);
   const myRealFiles = myFiles.filter(f => f.type === 'file');
-  const myTools = (tools || []).filter(t => !t.isPrebuilt && (!t.createdBy || t.createdBy === userName));
+  const myTools = (tools || []).filter(t => !t.isBuiltin && (!t.createdBy || t.createdBy === userName));
 
   // Approvals I personally resolved (any action), split by whose run.
   const myApprovals = (approvals || []).filter(a => a.resolved_by === userName);

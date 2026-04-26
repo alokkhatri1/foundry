@@ -119,6 +119,24 @@ export default function useSupabase() {
     // stage-gates the `skills` subfolder's visibility until stage 4.
   }, []);
 
+  // Facilitator-only correction. Reveal is normally monotonic; this lets an
+  // admin who clicked Reveal too early roll the dial back one notch. The
+  // audit row records from_stage > to_stage, which downstream readers can
+  // use to distinguish a rewind from a normal forward reveal.
+  const unrevealStage = useCallback(async (roomId, toStage, fromStage, actorUserId) => {
+    if (!isSupabaseConfigured) return;
+    await supabase.from('stage_events').insert({
+      room_id: roomId,
+      from_stage: fromStage || null,
+      to_stage: toStage,
+      actor: actorUserId || null,
+    });
+    const { error } = await supabase.from('rooms')
+      .update({ current_stage: toStage })
+      .eq('id', roomId);
+    if (error) console.error('[sb] unrevealStage:', error.message);
+  }, []);
+
   // Batch reveal for the "Reveal all" admin action. Writes one stage_events
   // row per intermediate transition (preserves the audit trail) but commits
   // rooms.current_stage in a single write so participant clients get one
@@ -1077,7 +1095,7 @@ export default function useSupabase() {
     signOut, checkIsAdmin, onAuthStateChange,
     // Admin
     createWorkshop, loadAdminWorkshops, loadWorkshopParticipants,
-    deleteWorkshop, deprecateWorkshop, revealStage, revealAllStages, loadWorkshopStats, loadWorkshopContent, loadWorkshopActivity,
+    deleteWorkshop, deprecateWorkshop, revealStage, unrevealStage, revealAllStages, loadWorkshopStats, loadWorkshopContent, loadWorkshopActivity,
     seedWorkshopContent, subscribeToWorkshopPresence,
     // Room
     joinRoom, getRoomId, setCreditAllocation, setParticipantCreditBonus,

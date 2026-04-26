@@ -439,7 +439,20 @@ function App() {
       // navigation away is fine; this only fires on the transition.
       if (currentStage === '9') setActiveTab('graduation');
     }
-  }, [currentStage]);
+    // Facilitator un-reveal safety net: if the active tab requires a stage
+    // that's no longer reached (admin rolled the dial back), bounce to
+    // Chat. Without this the participant would sit on a tab whose UI
+    // depends on data the platform has now hidden, getting empty / broken
+    // states. Chat is always available so it's the safe fallback.
+    const TAB_STAGE_REQ = {
+      files: '3', coworkers: '5', workflow: '6', activity: '7',
+      usage: '8', graduation: '9',
+    };
+    const required = TAB_STAGE_REQ[activeTab];
+    if (required && !stageReached(currentStage, required)) {
+      setActiveTab('chat');
+    }
+  }, [currentStage, activeTab]);
 
   const approvalResolversRef = useRef(new Map());
   // Optimistic set of runIds this user has just resolved as a remote reviewer.

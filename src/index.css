@@ -571,6 +571,19 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
   flex-shrink: 0;
 }
 .admin-stage-reveal:hover { opacity: 0.9; }
+.admin-stage-unreveal {
+  background: transparent;
+  color: var(--text-muted);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-pill, 999px);
+  padding: 5px 14px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  flex-shrink: 0;
+  margin-left: 8px;
+}
+.admin-stage-unreveal:hover { color: var(--text-dark); border-color: var(--text-dark); }
 
 .admin-stage-header {
   display: flex;

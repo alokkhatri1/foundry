@@ -144,12 +144,34 @@ export default function AdminDashboard({ sb, user, onBack }) {
     const fromStage = selected.current_stage || '1';
     const ok = await confirm({
       title: `Reveal Stage ${toStage}`,
-      message: `Reveal Stage ${toStage} (${STAGE_META[toStage]?.label}) to all participants? This is one-way — reveal is monotonic.`,
+      message: `Reveal Stage ${toStage} (${STAGE_META[toStage]?.label}) to all participants?`,
       confirmLabel: 'Reveal',
     });
     if (!ok) return;
     await sb.revealStage(selected.id, toStage, fromStage, user.id);
     setSelected(prev => prev ? { ...prev, current_stage: toStage } : prev);
+    await loadWorkshops();
+  }
+
+  // Roll the room back one notch in the stage arc. Facilitator-only safety
+  // net for "I clicked Reveal too early." Realtime push to participants
+  // hides the un-revealed tabs immediately; their data is preserved
+  // server-side, just no longer reachable from the UI until re-revealed.
+  async function handleUnreveal() {
+    if (!selected) return;
+    const current = selected.current_stage || '1';
+    const idx = STAGE_ORDER.indexOf(current);
+    if (idx <= 0) return;
+    const target = STAGE_ORDER[idx - 1];
+    const ok = await confirm({
+      title: 'Hide latest stage',
+      message: `Roll back from Stage ${current} (${STAGE_META[current]?.label}) to Stage ${target} (${STAGE_META[target]?.label})? Participants will lose access to the Stage ${current} surface immediately. Their data is preserved.`,
+      confirmLabel: 'Hide',
+      danger: true,
+    });
+    if (!ok) return;
+    await sb.unrevealStage(selected.id, target, current, user.id);
+    setSelected(prev => prev ? { ...prev, current_stage: target } : prev);
     await loadWorkshops();
   }
 
@@ -469,6 +491,14 @@ export default function AdminDashboard({ sb, user, onBack }) {
                           {canReveal && !isDeprecated && (
                             <button className="admin-stage-reveal" onClick={() => handleReveal(s)}>
                               Reveal
+                            </button>
+                          )}
+                          {/* Hide button on the current stage — rolls back
+                              one notch. Stage 1 has no predecessor, so it
+                              never gets one. */}
+                          {isCurrent && !isDeprecated && STAGE_ORDER.indexOf(s) > 0 && (
+                            <button className="admin-stage-unreveal" onClick={handleUnreveal} title="Roll back one stage">
+                              Hide
                             </button>
                           )}
                         </div>

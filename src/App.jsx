@@ -14,6 +14,7 @@ import RevealAt, { STAGE_META, stageReached, normalizeStage } from './components
 import { computeCost, costToCredits, DEFAULT_CREDIT_ALLOCATION, CREDITS_WARN_THRESHOLD } from './utils/llmCost';
 import { buildStageGuidance } from './data/stageGuidance';
 import PreferencesEditor from './components/PreferencesEditor';
+import StageExamplePanel from './components/StageExamplePanel';
 import { useConfirm } from './components/ConfirmDialog';
 import {
   createStarterFolders,
@@ -2498,6 +2499,7 @@ Answer in ONE sentence. If the user asks "how", a second sentence is allowed —
       {showPreferences && (
         <PreferencesEditor
           initialContent={userPreferences}
+          workshopCode={workshopCode}
           onSave={async (content) => {
             const user = await sb.getUser();
             if (user?.id) await sb.saveUserPreferences(user.id, content);
@@ -2566,6 +2568,9 @@ Answer in ONE sentence. If the user asks "how", a second sentence is allowed —
         )}
 {activeTab === 'coworkers' && (
           <div className="tab-pane tab-pane-coworkers">
+            {stageReached(currentStage, '5') && (
+              <StageExamplePanel stage="5" workshopCode={workshopCode} />
+            )}
             <CoworkerBuilder coworkers={coworkers || []} onUpdateCoworkers={handleUpdateCoworkers} fileTree={fileTree} tools={tools || []} userName={userName} callClaudeAPI={callClaudeAPI} showEducationalCues={showEducationalCues} currentStage={currentStage} onStartChat={cwId => { handleCoworkerChange(cwId); setActiveTab('chat'); }} participants={participants} onUpdateFileContent={handleUpdateFileContent} />
           </div>
         )}
@@ -2576,6 +2581,9 @@ Answer in ONE sentence. If the user asks "how", a second sentence is allowed —
         )}
         {activeTab === 'files' && (
           <div className="tab-pane tab-pane-files">
+            {!selectedFile && stageReached(currentStage, '4') && (
+              <StageExamplePanel stage="4" workshopCode={workshopCode} />
+            )}
             {selectedFile ? (
               <div className="files-editor-fullview">
                 <div className="files-editor-topbar">

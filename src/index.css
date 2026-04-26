@@ -202,6 +202,55 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
   font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 999px;
   letter-spacing: 0.2px; flex-shrink: 0;
 }
+
+/* Per-stage "see how this looks" example panel — see StageExamplePanel.jsx */
+.stage-example-panel {
+  background: var(--bg-white); border: 1px solid var(--border-color);
+  border-left: 3px solid var(--accent-system); border-radius: var(--radius-sm);
+  padding: 16px 18px; margin: 0 0 16px; max-width: 720px;
+}
+.stage-example-header { margin-bottom: 8px; }
+.stage-example-eyebrow {
+  font-size: 11px; font-weight: 600; letter-spacing: 0.6px; text-transform: uppercase;
+  color: var(--accent-system); margin-bottom: 4px;
+}
+.stage-example-title { font-size: 15px; font-weight: 600; color: var(--text-dark); margin: 0; }
+.stage-example-intro { font-size: 13px; color: var(--text-muted); line-height: 1.5; margin: 6px 0 12px; }
+.stage-example-artifact {
+  background: var(--bg-soft, #f7f6f3); border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm); overflow: hidden; margin-bottom: 12px;
+}
+.stage-example-artifact-label {
+  font-size: 11px; font-weight: 600; color: var(--text-muted);
+  padding: 6px 12px; border-bottom: 1px solid var(--border-color);
+  background: var(--bg-white);
+}
+.stage-example-artifact-body {
+  margin: 0; padding: 12px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px; line-height: 1.55; color: var(--text-dark);
+  white-space: pre-wrap; word-break: break-word;
+}
+.stage-example-card { padding: 4px 0; }
+.stage-example-card-row {
+  display: grid; grid-template-columns: 110px 1fr; gap: 12px;
+  padding: 8px 12px; border-bottom: 1px solid var(--border-color);
+}
+.stage-example-card-row:last-child { border-bottom: 0; }
+.stage-example-card-name { font-size: 12px; font-weight: 600; color: var(--text-muted); }
+.stage-example-card-value { font-size: 13px; color: var(--text-dark); line-height: 1.45; }
+.stage-example-actions { display: flex; justify-content: flex-end; }
+.stage-example-dismiss {
+  background: transparent; border: 1px solid var(--border-color); color: var(--text-dark);
+  font-size: 12px; font-weight: 500; padding: 5px 12px; border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+.stage-example-dismiss:hover { background: var(--bg-soft, #f3f2ef); }
+.stage-example-reopen {
+  background: transparent; border: 1px dashed var(--border-color); color: var(--text-muted);
+  font-size: 11px; font-weight: 500; padding: 4px 10px; border-radius: 999px;
+  cursor: pointer; margin: 0 0 12px;
+}
+.stage-example-reopen:hover { color: var(--text-dark); border-style: solid; }
 .admin-participant-time { font-size: 12px; color: var(--text-muted); }
 .admin-participant-status { font-size: 12px; color: var(--text-muted); }
 

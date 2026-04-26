@@ -1,6 +1,7 @@
 import { useState } from 'react';
+import StageExamplePanel from './StageExamplePanel';
 
-export default function PreferencesEditor({ initialContent, onSave, onClose }) {
+export default function PreferencesEditor({ initialContent, onSave, onClose, workshopCode }) {
   const [content, setContent] = useState(initialContent || '');
   const [saving, setSaving] = useState(false);
 
@@ -19,6 +20,7 @@ export default function PreferencesEditor({ initialContent, onSave, onClose }) {
           Tell the AI about yourself — your role, how you want responses, what matters to you.
           These preferences are applied to every conversation you have, across all workshops.
         </p>
+        <StageExamplePanel stage="2" workshopCode={workshopCode} />
         <textarea
           value={content}
           onChange={e => setContent(e.target.value)}

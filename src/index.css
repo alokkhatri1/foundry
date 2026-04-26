@@ -6670,7 +6670,12 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
 
 /* ===== Graduation screen ===== */
 .grad-page {
-  min-height: 100vh;
+  /* Standalone graduation (workshopEnded === true) renders directly inside
+     #root, which is height:100% with overflow:hidden. min-height:100vh used
+     to make the page grow past the viewport with no internal scroll, so
+     overflow-y:auto never engaged and lower competencies were cut off. A
+     fixed viewport height makes overflow-y:auto kick in normally. */
+  height: 100vh;
   background: var(--bg-warm);
   padding: 48px 24px;
   overflow-y: auto;

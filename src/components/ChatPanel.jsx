@@ -601,9 +601,9 @@ function ContextSidebar({ fileTree, selectedFileIds, onToggleFile, onToggleFolde
         </div>
       </div>
 
-      {/* AI Coworkers — Stage 5a. Room-wide list; anyone can chat with any
+      {/* AI Coworkers — Stage 5. Room-wide list; anyone can chat with any
           coworker. The unified sidebar search narrows by name. */}
-      {stageReached(currentStage, '5a') && visibleCoworkers.length > 0 && (
+      {stageReached(currentStage, '5') && visibleCoworkers.length > 0 && (
         <div className="sl-section sl-agents-section">
           <div className="sl-section-header" onClick={() => toggleSection('agents')}>
             <span className="sl-section-name">AI Coworkers</span>
@@ -613,7 +613,7 @@ function ContextSidebar({ fileTree, selectedFileIds, onToggleFile, onToggleFolde
           <div className="sl-section-body sl-agents-body">
           {[...visibleCoworkers].sort(sortByUnread).map(cw => {
             const unread = (unreadDmCounts && unreadDmCounts[cw.name]) || 0;
-            const canDm = stageReached(currentStage, '5a') && sb?.getCoworkerParticipantId;
+            const canDm = stageReached(currentStage, '5') && sb?.getCoworkerParticipantId;
             const isMine = cw.createdBy && cw.createdBy === currentUserName;
             const handleOpenAiDm = async (e) => {
               if (e) e.stopPropagation();
@@ -1343,8 +1343,8 @@ export default function ChatPanel({ messages, onSendMessage, onApprovalAction, o
             <div className="cl-messages" ref={messagesRef}>
               <div className="cl-messages-inner">
                 {messages.filter(m => {
-                  // Hide platform-tool executions before Stage 5a (tools aren't revealed yet).
-                  if (m.type === 'tool_execution' && !stageReached(currentStage, '5a')) return false;
+                  // Hide platform-tool executions before Stage 5 (tools aren't revealed yet).
+                  if (m.type === 'tool_execution' && !stageReached(currentStage, '5')) return false;
                   // Hide orchestration / approval messages before Stage 7 (Orchestration).
                   if ((m.type === 'approval' || m.type === 'workflow_start' || m.type === 'workflow_end') && !stageReached(currentStage, '6')) return false;
                   // Drop the legacy "runtime isn't active" error bubbles left

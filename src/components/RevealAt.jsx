@@ -1,14 +1,14 @@
-const STAGE_ORDER = ['1', '2', '3', '4', '5a', '6', '7', '7b', '8'];
+const STAGE_ORDER = ['1', '2', '3', '4', '5', '6', '7', '7b', '8'];
 
 // Rooms deprecated before the arc change can carry stage IDs that no longer
 // exist in STAGE_ORDER. Without normalization, indexOf returns -1 and every
 // stageReached() check fails, hiding all gated UI. Map retired IDs to their
 // nearest still-valid predecessor.
-//   '5c' → '5b' (legacy collaboration stage, then folded into Tools)
-//   '5b' → '5a' (Coworker Tools collapsed into Coworkers when tools were
-//                retired from the editor — coworker is now skills + knowledge
-//                + persona, full stop; production lives on workflow steps)
-const STAGE_ALIASES = { '5c': '5a', '5b': '5a' };
+//   '5c' / '5b' / '5a' → '5'
+//     5b (Coworker Tools) was retired when tools were removed from the editor.
+//     5a then collapsed into a single Coworkers stage and got renumbered '5'.
+//     5c was an older collaboration substage folded earlier.
+const STAGE_ALIASES = { '5c': '5', '5b': '5', '5a': '5' };
 function normalizeStage(s) {
   return STAGE_ALIASES[s] || s;
 }
@@ -32,7 +32,7 @@ export const STAGE_META = {
   '2':  { label: 'Preferences',          description: 'Alright {name} — time to tell the AI who you are and how you like to work.' },
   '3':  { label: 'Files as context',     description: 'Okay {name}, now you can hand it files to read before it answers you.' },
   '4':  { label: 'Files as skills',      description: 'Going deeper, {name}. Write instructions that shape how the AI thinks.' },
-  '5a': { label: 'AI Coworkers',         description: 'Let\u2019s build your team, {name} \u2014 named AI teammates with skills, knowledge, and a voice.' },
+  '5':  { label: 'AI Coworkers',         description: 'Let\u2019s build your team, {name} \u2014 named AI teammates with skills, knowledge, and a voice.' },
   '6':  { label: 'Orchestration',        description: 'Now choreograph it, {name} \u2014 chain coworkers and humans into a workflow with human-in-loop checks.' },
   '7':  { label: 'Observability',        description: 'Last one, {name} \u2014 every run, approval, and tool call on the record. See what your team actually did.' },
   '7b': { label: 'Economics',            description: 'Time to see the bill, {name} \u2014 every token your team spent is on the record now.' },

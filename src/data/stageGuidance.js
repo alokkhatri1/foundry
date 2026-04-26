@@ -24,7 +24,7 @@ const STAGE_GUIDES = {
     invitation: 'Invite them to try writing an instruction file (e.g., "summarize responses in 3 bullet points") and toggle it as a skill.',
     externalReference: 'This is how Custom GPTs\' instructions work under the hood. Skill files shape HOW you respond, not WHAT you know.',
   },
-  '5a': {
+  '5': {
     nowAvailable: 'AI Coworkers — they can build named AI teammates with their own instructions (skills), knowledge files, and identity (Coworkers tab in the header). A coworker is skills + knowledge + persona, full stop; producing artifacts and acting on the world is what Stage 6 (Orchestration) adds on top.',
     invitation: 'Invite them to build their first coworker. A credit analyst, a legal reviewer, a creative partner — whatever fits their work. Encourage them to think of it as packaging a way of thinking, not as a do-it-all bot.',
     externalReference: 'Like Custom GPTs or Claude Projects — bundled specialists. Same primitive you already know, just with a shared organizational context the room can see.',

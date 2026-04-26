@@ -2218,7 +2218,7 @@ function App() {
       const isFirstExchange = priorAiMessages.length === 0;
       const stageGuidanceSection = isFirstExchange ? buildStageGuidance(currentStage) + '\n\n---\n\n' : '';
 
-      if (!stageReached(currentStage, '5a')) {
+      if (!stageReached(currentStage, '5')) {
         // Pre-Stage-5a: simple chat mode. No platform features described, no
         // platform-action tools attached. Just conversational AI.
         const chatPrompt = `${userPrefsForPlatform}${stageGuidanceSection}You are a helpful assistant. Have a conversation with the user. Be concise, warm, and helpful. Do not describe platform features, coworkers, files, workflows, or tools unless the user explicitly asks about them.${knowledgeSection}`;
@@ -2231,7 +2231,7 @@ function App() {
           addMessage({ type: 'error', content: result.error });
         }
       } else {
-        // Stage 5a+: intent classifier decides between a cheap no-tools
+        // Stage 5+: intent classifier decides between a cheap no-tools
         // chat and a full platform-tools chat. ~70% of messages are
         // conceptual questions that don't need tool access; routing those
         // away from the 12-schema platform-tools call cuts their cost
@@ -2415,7 +2415,7 @@ Answer in ONE sentence. If the user asks "how", a second sentence is allowed —
               Files
             </button>
           </RevealAt>
-          <RevealAt stage="5a" currentStage={currentStage}>
+          <RevealAt stage="5" currentStage={currentStage}>
             <button className={`tab-nav-item${activeTab === 'coworkers' ? ' active' : ''}`} onClick={() => setActiveTab('coworkers')}>
               Coworkers{coworkers && coworkers.length > 0 && <span className="tab-count">{coworkers.length}</span>}
             </button>

@@ -388,6 +388,10 @@ function App() {
   const [participants, setParticipants] = useState(initParticipants);
   const [isJoined, setIsJoined] = useState(!!(saved?.userName && saved?.workshopCode && (saved?.fileTree || saved?.workflows)));
   const [workshopEnded, setWorkshopEnded] = useState(false);
+  // When an admin enters a deprecated workshop via the admin dashboard, we
+  // suppress the workshopEnded → GraduationScreen routing so they get the
+  // full participant UI for browsing. Cleared on leave.
+  const [bypassDeprecation, setBypassDeprecation] = useState(false);
   const [currentStage, setCurrentStage] = useState('6');
   // Credit budget: allocation is per-room (admin-configurable), bonus is
   // per-participant (admin-grantable). Used-credits is derived live from
@@ -494,7 +498,7 @@ function App() {
       // (roomIdRef, used by all the load functions below), getUser only reads
       // auth state. Running them in parallel saves one RTT over the old
       // sequential chain. Nepal → Tokyo ~120ms, so every RTT counts.
-      Promise.all([sb.joinRoom(workshopCode), sb.getUser()]).then(async ([result, authUser]) => {
+      Promise.all([sb.joinRoom(workshopCode, { allowDeprecated: bypassDeprecation }), sb.getUser()]).then(async ([result, authUser]) => {
         if (result?.credit_allocation != null) setCreditAllocation(result.credit_allocation);
         if (result?.error === 'deprecated') { setWorkshopEnded(true); return; }
         if (result?.error || !result?.id || !userName) return;
@@ -713,7 +717,10 @@ function App() {
         }
       },
       onRoomChange: (row) => {
-        if (row?.deprecated_at) setWorkshopEnded(true);
+        // Admins entering a deprecated workshop via the dashboard set the
+        // bypass flag so they can browse the room normally; skip the
+        // workshop-ended routing for them.
+        if (row?.deprecated_at && !bypassDeprecation) setWorkshopEnded(true);
         if (row?.current_stage) setCurrentStage(normalizeStage(row.current_stage));
         if (row?.credit_allocation != null) setCreditAllocation(row.credit_allocation);
       },
@@ -858,17 +865,20 @@ function App() {
     document.title = total > 0 ? `(${total}) Foundry` : 'Foundry';
   }, [unreadDmCounts]);
 
-  async function handleJoin(name, code, authUserId, email) {
+  async function handleJoin(name, code, authUserId, email, options = {}) {
     try {
-      return await runHandleJoin(name, code, authUserId, email);
+      return await runHandleJoin(name, code, authUserId, email, options);
     } catch (err) {
       console.error('[join] handleJoin threw:', err);
       return { error: 'join_failed', message: err?.message || 'Unknown error joining workshop' };
     }
   }
 
-  async function runHandleJoin(name, code, authUserId, email) {
-    const result = await sb.joinRoom(code);
+  async function runHandleJoin(name, code, authUserId, email, options = {}) {
+    // `bypassDeprecation` lets admins entering from the dashboard browse
+    // delivered workshops without being trapped on the GraduationScreen.
+    setBypassDeprecation(!!options.bypassDeprecation);
+    const result = await sb.joinRoom(code, { allowDeprecated: !!options.bypassDeprecation });
     if (result?.error) return result;
     const roomId = result.id;
     if (result.current_stage) setCurrentStage(normalizeStage(result.current_stage));

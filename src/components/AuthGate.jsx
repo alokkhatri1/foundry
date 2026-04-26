@@ -186,7 +186,16 @@ export default function AuthGate({ children, onJoin, workshopCode }) {
         onBack={() => setShowAdmin(false)}
         onEnterWorkshop={async (code) => {
           if (!code) return;
-          const result = await onJoin(adminName, code.toUpperCase(), session.user?.id, session.user?.email);
+          // bypassDeprecation lets admins enter delivered workshops as a
+          // participant for browsing — the joinRoom guard and the
+          // workshopEnded → GraduationScreen routing both honour it.
+          const result = await onJoin(
+            adminName,
+            code.toUpperCase(),
+            session.user?.id,
+            session.user?.email,
+            { bypassDeprecation: true },
+          );
           if (!result?.error) setShowAdmin(false);
         }}
       />

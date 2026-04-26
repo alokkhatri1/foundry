@@ -264,7 +264,11 @@ export default function useSupabase() {
   }, []);
 
   // ===== Room: create or join =====
-  const joinRoom = useCallback(async (code) => {
+  // `allowDeprecated` lets admins entering from the admin dashboard browse
+  // delivered (deprecated) workshops as a participant — skips the guard that
+  // would otherwise route them to the GraduationScreen sign-off view.
+  // Regular JoinScreen entry still gets the deprecated rejection.
+  const joinRoom = useCallback(async (code, { allowDeprecated = false } = {}) => {
     if (!isSupabaseConfigured) return { error: 'not_configured' };
     const { data: room, error } = await supabase
       .from('rooms')
@@ -273,7 +277,7 @@ export default function useSupabase() {
       .maybeSingle();
     if (error) { console.error('[sb] joinRoom:', error.message); return { error: 'db_error' }; }
     if (!room) return { error: 'not_found' };
-    if (room.deprecated_at) return { error: 'deprecated' };
+    if (room.deprecated_at && !allowDeprecated) return { error: 'deprecated' };
     roomIdRef.current = room.id;
     console.log('[sb] joined room:', room.id);
     return {
@@ -281,6 +285,7 @@ export default function useSupabase() {
       org_name: room.org_name,
       current_stage: room.current_stage,
       credit_allocation: room.credit_allocation ?? 1000,
+      deprecated_at: room.deprecated_at || null,
     };
   }, []);
 

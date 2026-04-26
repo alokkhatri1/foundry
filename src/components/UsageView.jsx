@@ -75,23 +75,53 @@ export default function UsageView({ sb, participants, myParticipantId, showEduca
   }, [participants, creditAllocation, agg.totalCost]);
 
   // Leaderboard — every human participant in the room, sorted by tokens
-  // descending. Includes participants with zero usage so the cohort
-  // picture is honest. Token count is the metric, not cost — high tokens
-  // = your AI did a lot of work on your behalf (the token-maxing frame).
+  // descending. Built from BOTH the usage table (so rows with NULL or
+  // stale participant_id are visible instead of silently dropped — which
+  // was making the leaderboard total disagree with the cohort spend) AND
+  // the participants prop (so participants with zero usage still show up
+  // for an honest cohort picture). Token count is the metric, not cost.
   const leaderboard = useMemo(() => {
     const humans = (participants || []).filter(p => (p.kind || 'human') === 'human');
-    return humans.map(p => {
-      const v = agg.byParticipant[p.id] || { cost: 0, tokens: 0, calls: 0 };
-      return {
-        pid: p.id,
-        name: p.name,
-        color: p.color,
+    const humanById = new Map(humans.map(p => [p.id, p]));
+    const out = [];
+    const seen = new Set();
+
+    // Usage rows first — covers attributed humans, ex-participants, and
+    // 'unknown' (calls logged without participant_id). Null/missing pids
+    // get bucketed under a single Unattributed row instead of disappearing.
+    for (const [pid, v] of Object.entries(agg.byParticipant)) {
+      if (v.tokens === 0 && v.cost === 0 && v.calls === 0) continue;
+      const p = humanById.get(pid);
+      if (p) {
+        out.push({
+          pid, name: p.name, color: p.color,
+          isYou: p.id === myParticipantId,
+          tokens: v.tokens, cost: v.cost, calls: v.calls,
+        });
+        seen.add(pid);
+      } else if (pid === 'unknown' || pid === 'null') {
+        out.push({
+          pid: 'unknown', name: 'Unattributed', color: '#9b9b9b',
+          isYou: false, tokens: v.tokens, cost: v.cost, calls: v.calls,
+        });
+      } else {
+        out.push({
+          pid, name: 'Left the workshop', color: '#9b9b9b',
+          isYou: false, tokens: v.tokens, cost: v.cost, calls: v.calls,
+        });
+      }
+    }
+    // Then any humans we haven't already added — they have zero usage so
+    // far, but should still appear at the bottom of the leaderboard.
+    for (const p of humans) {
+      if (seen.has(p.id)) continue;
+      out.push({
+        pid: p.id, name: p.name, color: p.color,
         isYou: p.id === myParticipantId,
-        tokens: v.tokens,
-        cost: v.cost,
-        calls: v.calls,
-      };
-    }).sort((a, b) => b.tokens - a.tokens);
+        tokens: 0, cost: 0, calls: 0,
+      });
+    }
+    return out.sort((a, b) => b.tokens - a.tokens);
   }, [participants, agg.byParticipant, myParticipantId]);
 
   const maxTokens = leaderboard[0]?.tokens || 0;

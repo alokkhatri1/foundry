@@ -994,6 +994,13 @@ export default function useSupabase() {
   }) => {
     if (!isSupabaseConfigured || !roomIdRef.current) return;
     if (!usage) return;
+    // Loud about missing attribution — these rows turn into "Unattributed"
+    // in the leaderboard, which was making the per-participant tokens look
+    // wrong vs. the cohort spend total. Console warn so we can spot the
+    // call site that fired before myParticipantId was populated.
+    if (!participantId) {
+      console.warn('[sb] logLlmUsage with no participantId:', { segment, model, segmentRefId });
+    }
     try {
       await supabase.from('llm_usage').insert({
         workshop_id: roomIdRef.current,

@@ -1,6 +1,7 @@
 // Platform Action Tools — natural language control of platform entities via chat
 
 import { CONNECTOR_PROVIDERS } from '../data/connectorProviders';
+import { addChildToTree, updateNodeInTree } from './treeUtils';
 
 const VALID_ICONS = new Set([
   'user', 'users', 'search', 'chart', 'document', 'shield',
@@ -281,18 +282,20 @@ export function executePlatformAction(toolName, input, ctx) {
       const existing = findFileByName(ctx.fileTree, fileName);
       if (existing) return `File "${fileName}" already exists. Use update_file to modify it.`;
 
-      const newTree = JSON.parse(JSON.stringify(ctx.fileTree));
-      const folder = findFolderByType(newTree, input.folder_type, input.department);
+      // Find the target folder in the LIVE tree (read-only) so we can pass
+      // its id to addChildToTree. Path-clone is O(depth); avoids the full-
+      // tree JSON.stringify the previous implementation did per file write.
+      const folder = findFolderByType(ctx.fileTree, input.folder_type, input.department);
       if (!folder) return `Could not find a "${input.folder_type}" folder. Check the file structure.`;
 
-      if (!folder.children) folder.children = [];
-      folder.children.push({
+      const newFile = {
         id: 'f-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6),
         name: fileName,
         type: 'file',
         content: input.content,
         createdBy: ctx.userName,
-      });
+      };
+      const newTree = addChildToTree(ctx.fileTree, folder.id, newFile);
       ctx.onUpdateTree(newTree);
       ctx.fileTree = newTree;
       return `Created "${fileName}" in ${folder.name}/.`;
@@ -301,9 +304,9 @@ export function executePlatformAction(toolName, input, ctx) {
     case 'update_file': {
       const file = findFileByName(ctx.fileTree, input.file_name);
       if (!file) return `File "${input.file_name}" not found. Use list_files to see available files.`;
-      const newTree = JSON.parse(JSON.stringify(ctx.fileTree));
-      const node = findNodeById(newTree, file.id);
-      if (node) node.content = input.content;
+      const newTree = updateNodeInTree(ctx.fileTree, file.id, n =>
+        n.type === 'file' ? { ...n, content: input.content } : n
+      );
       ctx.onUpdateTree(newTree);
       ctx.fileTree = newTree;
       return `Updated "${file.name}".`;
@@ -383,7 +386,9 @@ export function executePlatformAction(toolName, input, ctx) {
       try { settings = JSON.parse(input.settings); }
       catch { return 'Invalid settings JSON.'; }
 
-      const updated = JSON.parse(JSON.stringify(tool));
+      // structuredClone is the native deep-clone — ~10× faster than the
+      // JSON.parse/stringify round-trip and handles non-JSON types correctly.
+      const updated = structuredClone(tool);
       // Config-level settings (allowed for all tools)
       if (settings.requiredItems && Array.isArray(settings.requiredItems)) {
         updated.config = { ...updated.config, requiredItems: settings.requiredItems };

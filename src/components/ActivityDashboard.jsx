@@ -490,6 +490,14 @@ export default function ActivityDashboard({ workflowRuns, onApprovalAction, onCa
     .sort((a, b) => (b.completedAt || b.startedAt || 0) - (a.completedAt || a.startedAt || 0));
   const pendingReviewCount = activeRuns.filter(r => r.status === 'waiting_approval').length;
   const [showRecent, setShowRecent] = useState(true);
+  // Cap how many completed runs hit the DOM at once. With 35 pax × multiple
+  // runs over 6h, the recent section can grow past 100 cards — each with
+  // expandable RunDagView state. "Show older" reveals the rest in chunks
+  // so we never render hundreds at once on a low-end laptop.
+  const RECENT_PAGE_SIZE = 30;
+  const [recentLimit, setRecentLimit] = useState(RECENT_PAGE_SIZE);
+  const visibleRecent = recentRuns.slice(0, recentLimit);
+  const hasMoreRecent = recentRuns.length > recentLimit;
 
   if (selectedRun) {
     return (
@@ -547,11 +555,23 @@ export default function ActivityDashboard({ workflowRuns, onApprovalAction, onCa
               {showRecent ? '\u25BE' : '\u25B8'} Recent ({recentRuns.length})
             </div>
             {showRecent && (
-              <div className="adash-grid">
-                {recentRuns.map(run => (
-                  <RunCard key={run.id} run={run} onClick={setSelectedRunId} onNudge={onNudge} showEducationalCues={showEducationalCues} />
-                ))}
-              </div>
+              <>
+                <div className="adash-grid">
+                  {visibleRecent.map(run => (
+                    <RunCard key={run.id} run={run} onClick={setSelectedRunId} onNudge={onNudge} showEducationalCues={showEducationalCues} />
+                  ))}
+                </div>
+                {hasMoreRecent && (
+                  <div style={{ textAlign: 'center', padding: '12px 0' }}>
+                    <button
+                      onClick={() => setRecentLimit(n => n + RECENT_PAGE_SIZE)}
+                      style={{ background: 'transparent', border: '1px solid #ddd', borderRadius: 4, padding: '6px 16px', fontSize: 13, color: '#666', cursor: 'pointer' }}
+                    >
+                      Show older runs ({recentRuns.length - recentLimit} more)
+                    </button>
+                  </div>
+                )}
+              </>
             )}
           </div>
         )}

@@ -1210,7 +1210,7 @@ export default function WorkflowBuilder({ workflows, onUpdateWorkflows, fileTree
     const original = workflows.find(w => w.id === wfId);
     if (!original) return;
     const copy = {
-      ...JSON.parse(JSON.stringify(original)),
+      ...structuredClone(original),
       id: genWfId(),
       name: original.name + ' (copy)',
       steps: original.steps.map(s => ({ ...s, id: genStepId() })),

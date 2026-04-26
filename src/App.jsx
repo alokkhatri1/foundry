@@ -31,7 +31,7 @@ import { submitDm, flushOutbox as flushDmOutbox, outboxSnapshot } from './utils/
 import { executeTool, toolToClaudeSchema, toolFromClaudeName } from './utils/toolExecutor';
 import { PLATFORM_TOOL_SCHEMAS, TOOL_DISPLAY_NAMES, TOOL_ICONS, executePlatformAction } from './utils/platformActions';
 import useSupabase from './hooks/useSupabase';
-import { buildTree, flattenTree, mapFileRow, mapCoworkerRow, mapToolRow, mapWorkflowRow, preserveToolConfigs, ensureDagShape } from './utils/treeUtils';
+import { buildTree, flattenTree, mapFileRow, mapCoworkerRow, mapToolRow, mapWorkflowRow, preserveToolConfigs, ensureDagShape, updateNodeInTree, addChildToTree } from './utils/treeUtils';
 import { claudeFetch } from './utils/claudeFetch';
 
 const STORAGE_KEY = 'sandbox:state';
@@ -163,12 +163,12 @@ function findNode(tree, id) {
 }
 
 function updateFileContent(tree, fileId, content) {
-  const cloned = JSON.parse(JSON.stringify(tree));
-  const node = findNode(cloned, fileId);
-  if (node && node.type === 'file') {
-    node.content = content;
-  }
-  return cloned;
+  // Path-clone via updateNodeInTree: only the spine from root to the
+  // edited file gets new objects. Sibling subtrees are shared, so React's
+  // reference-equality bailout skips re-rendering the rest of the tree.
+  return updateNodeInTree(tree, fileId, node =>
+    node.type === 'file' ? { ...node, content } : node
+  );
 }
 
 function getKnowledgeForDepartment(tree, deptId) {
@@ -1420,9 +1420,10 @@ function App() {
 
           // Shared helper: write a file into the coworker's configured
           // destination (or the sensible fallback) and persist the tree.
+          // Uses path-clone updates instead of full deep-clone so the
+          // tool-call burst during a workflow run doesn't re-serialize
+          // the whole tree on every file write.
           const writeCoworkerFile = (name, content) => {
-            const newTree = JSON.parse(JSON.stringify(fileTree));
-            newTree.children = newTree.children || [];
             const newFile = {
               id: 'f-' + Date.now() + '-' + Math.random().toString(36).slice(2, 7),
               name,
@@ -1431,24 +1432,20 @@ function App() {
               createdBy: userName,
             };
             const cfg = coworker?.toolConfigs?.['builtin-create-file'];
+            // Pick the target folder by id (configured) or fall back to the
+            // first top-level folder. We read from the live fileTree, not
+            // a clone, since findInTree is read-only.
+            const topChildren = fileTree.children || [];
             const configuredFolder = cfg?.folderId
-              ? newTree.children.find(c => c.id === cfg.folderId && c.type === 'folder')
+              ? topChildren.find(c => c.id === cfg.folderId && c.type === 'folder')
               : null;
-            const targetFolder = configuredFolder
-              || newTree.children.find(c => c.type === 'folder');
+            const targetFolder = configuredFolder || topChildren.find(c => c.type === 'folder');
             const subName = cfg?.subfolder === 'skills' ? 'skills' : 'knowledge';
-            if (targetFolder) {
-              targetFolder.children = targetFolder.children || [];
-              const sub = targetFolder.children.find(c => c.type === 'folder' && c.name === subName);
-              if (sub) {
-                sub.children = sub.children || [];
-                sub.children.push(newFile);
-              } else {
-                targetFolder.children.push(newFile);
-              }
-            } else {
-              newTree.children.push(newFile);
-            }
+            const sub = targetFolder
+              ? (targetFolder.children || []).find(c => c.type === 'folder' && c.name === subName)
+              : null;
+            const parentId = sub ? sub.id : (targetFolder ? targetFolder.id : fileTree.id);
+            const newTree = addChildToTree(fileTree, parentId, newFile);
             handleUpdateTree(newTree);
             return newFile;
           };
@@ -1820,8 +1817,6 @@ function App() {
         // completes. Writes the content to the folder/subfolder chosen on
         // that step. Falls back to the first top-level folder + 'knowledge'
         // if nothing was explicitly picked.
-        const newTree = JSON.parse(JSON.stringify(fileTree));
-        newTree.children = newTree.children || [];
         const newFile = {
           id: 'f-' + Date.now() + '-' + Math.random().toString(36).slice(2, 7),
           name,
@@ -1829,24 +1824,17 @@ function App() {
           content,
           createdBy: userName,
         };
+        const topChildren = fileTree.children || [];
         const configuredFolder = destination?.folderId
-          ? newTree.children.find(c => c.id === destination.folderId && c.type === 'folder')
+          ? topChildren.find(c => c.id === destination.folderId && c.type === 'folder')
           : null;
-        const targetFolder = configuredFolder || newTree.children.find(c => c.type === 'folder');
+        const targetFolder = configuredFolder || topChildren.find(c => c.type === 'folder');
         const subName = destination?.subfolder === 'skills' ? 'skills' : 'knowledge';
-        if (targetFolder) {
-          targetFolder.children = targetFolder.children || [];
-          const sub = targetFolder.children.find(c => c.type === 'folder' && c.name === subName);
-          if (sub) {
-            sub.children = sub.children || [];
-            sub.children.push(newFile);
-          } else {
-            targetFolder.children.push(newFile);
-          }
-        } else {
-          newTree.children.push(newFile);
-        }
-        handleUpdateTree(newTree);
+        const sub = targetFolder
+          ? (targetFolder.children || []).find(c => c.type === 'folder' && c.name === subName)
+          : null;
+        const parentId = sub ? sub.id : (targetFolder ? targetFolder.id : fileTree.id);
+        handleUpdateTree(addChildToTree(fileTree, parentId, newFile));
       },
       onCapture: async ({ fileId, mode, content, runId: capRunId, runName }) => {
         // Two modes. Knowledge (default): append the upstream output to a

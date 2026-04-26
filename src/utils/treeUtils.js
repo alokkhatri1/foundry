@@ -1,4 +1,83 @@
 // Convert between flat DB rows and nested tree structure
+//
+// ===== Immutable tree helpers =====
+//
+// Path-clone updates: only the spine from root to the touched node gets
+// new objects. Sibling subtrees are shared by reference. O(depth) instead
+// of O(nodes), which matters when fileTree has 100+ nodes and we're
+// updating on every keystroke / tool call / file rename. Replaces the
+// older JSON.parse(JSON.stringify(...)) pattern that re-serialized the
+// entire tree on every mutation.
+//
+// All helpers return the original tree reference unchanged if the target
+// id is not present, so React's reference equality fast-path skips
+// re-renders when nothing actually changed.
+
+export function findInTree(tree, id) {
+  if (!tree) return null;
+  if (tree.id === id) return tree;
+  if (tree.children) {
+    for (const c of tree.children) {
+      const hit = findInTree(c, id);
+      if (hit) return hit;
+    }
+  }
+  return null;
+}
+
+export function updateNodeInTree(tree, id, updater) {
+  if (!tree) return tree;
+  if (tree.id === id) {
+    const next = updater(tree);
+    return next === tree ? tree : next;
+  }
+  if (!tree.children) return tree;
+  let changed = false;
+  const nextChildren = tree.children.map(c => {
+    const sub = updateNodeInTree(c, id, updater);
+    if (sub !== c) changed = true;
+    return sub;
+  });
+  return changed ? { ...tree, children: nextChildren } : tree;
+}
+
+export function removeNodeFromTree(tree, id) {
+  if (!tree || !tree.children) return tree;
+  if (tree.children.some(c => c.id === id)) {
+    return { ...tree, children: tree.children.filter(c => c.id !== id) };
+  }
+  let changed = false;
+  const nextChildren = tree.children.map(c => {
+    const sub = removeNodeFromTree(c, id);
+    if (sub !== c) changed = true;
+    return sub;
+  });
+  return changed ? { ...tree, children: nextChildren } : tree;
+}
+
+export function addChildToTree(tree, parentId, newChild) {
+  if (!tree) return tree;
+  if (tree.id === parentId) {
+    return { ...tree, children: [...(tree.children || []), newChild] };
+  }
+  if (!tree.children) return tree;
+  let changed = false;
+  const nextChildren = tree.children.map(c => {
+    const sub = addChildToTree(c, parentId, newChild);
+    if (sub !== c) changed = true;
+    return sub;
+  });
+  return changed ? { ...tree, children: nextChildren } : tree;
+}
+
+export function moveNodeInTree(tree, nodeId, newParentId) {
+  const node = findInTree(tree, nodeId);
+  if (!node) return tree;
+  // Same parent? no-op. Prevents accidental reorders.
+  return addChildToTree(removeNodeFromTree(tree, nodeId), newParentId, node);
+}
+
+
 
 // Flat rows → nested tree (for rendering)
 //

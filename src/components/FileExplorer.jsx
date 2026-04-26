@@ -4,6 +4,7 @@ import { parseFile, getFileIcon, getFileCategory } from '../utils/fileParser';
 import EducationalCue from './EducationalCue';
 import { stageReached } from './RevealAt';
 import { useConfirm } from './ConfirmDialog';
+import { addChildToTree, removeNodeFromTree, moveNodeInTree } from '../utils/treeUtils';
 
 const SKILL_TEMPLATE = INSTRUCTION_TEMPLATE;
 
@@ -235,42 +236,30 @@ export default function FileExplorer({ fileTree, selectedFileId, onSelectFile, o
 
   function handleCreate() {
     if (!newName.trim()) return;
-    const updatedTree = JSON.parse(JSON.stringify(fileTree));
-    const parent = findNode(updatedTree, currentFolderId);
+    const parent = findNode(fileTree, currentFolderId);
     if (!parent || parent.type !== 'folder') return;
 
+    let newNode;
     if (modalMode === 'folder') {
-      // New top-level folders auto-get a `knowledge` subfolder always and a
-      // `skills` subfolder once stage 4 is reached. Inside a dept folder we
-      // keep the existing single-folder behavior.
       const isTopLevelCreate = parent.id === fileTree.id;
       const children = [];
       if (isTopLevelCreate) {
-        // Always write both subfolders. Skills is hidden by the stage-4 UI
-        // filter until the reveal, so the data is consistent no matter when
-        // the folder was created.
         children.push({ id: genId(), name: 'knowledge', type: 'folder', children: [], createdBy: userName });
         children.push({ id: genId(), name: 'skills', type: 'folder', children: [], createdBy: userName });
       }
-      parent.children.push({
-        id: genId(),
-        name: newName.trim(),
-        type: 'folder',
-        children,
-        createdBy: userName,
-      });
+      newNode = { id: genId(), name: newName.trim(), type: 'folder', children, createdBy: userName };
     } else {
       const fileName = newName.trim().endsWith('.md') ? newName.trim() : newName.trim() + '.md';
-      parent.children.push({
+      newNode = {
         id: genId(),
         name: fileName,
         type: 'file',
         content: templateContent || '',
         createdBy: userName,
-      });
+      };
     }
 
-    onUpdateTree(updatedTree);
+    onUpdateTree(addChildToTree(fileTree, currentFolderId, newNode));
     setShowModal(false);
     setNewName('');
     setTemplateContent('');
@@ -280,24 +269,7 @@ export default function FileExplorer({ fileTree, selectedFileId, onSelectFile, o
     e.stopPropagation();
     const ok = await confirm({ message: 'Delete this item?', danger: true });
     if (!ok) return;
-    const updatedTree = JSON.parse(JSON.stringify(fileTree));
-
-    function removeFromParent(node) {
-      if (node.children) {
-        const idx = node.children.findIndex(c => c.id === nodeId);
-        if (idx !== -1) {
-          node.children.splice(idx, 1);
-          return true;
-        }
-        for (const child of node.children) {
-          if (removeFromParent(child)) return true;
-        }
-      }
-      return false;
-    }
-
-    removeFromParent(updatedTree);
-    onUpdateTree(updatedTree);
+    onUpdateTree(removeNodeFromTree(fileTree, nodeId));
     if (selectedFileId === nodeId) onSelectFile(null);
     if (currentFolderId === nodeId) setCurrentFolderId(fileTree.id);
   }
@@ -342,27 +314,13 @@ export default function FileExplorer({ fileTree, selectedFileId, onSelectFile, o
       return;
     }
 
-    const updatedTree = JSON.parse(JSON.stringify(fileTree));
-
-    // Remove the item from its current parent
-    const item = findNode(updatedTree, dragItemId);
+    // Validate the source and target exist before mutating.
+    const item = findNode(fileTree, dragItemId);
     if (!item) { setDragItemId(null); return; }
-
-    const parent = findParent(updatedTree, dragItemId);
-    if (!parent) { setDragItemId(null); return; }
-
-    const idx = parent.children.findIndex(c => c.id === dragItemId);
-    if (idx === -1) { setDragItemId(null); return; }
-
-    const [removed] = parent.children.splice(idx, 1);
-
-    // Add it to the target folder
-    const targetFolder = findNode(updatedTree, folderId);
+    const targetFolder = findNode(fileTree, folderId);
     if (!targetFolder || targetFolder.type !== 'folder') { setDragItemId(null); return; }
 
-    targetFolder.children.push(removed);
-
-    onUpdateTree(updatedTree);
+    onUpdateTree(moveNodeInTree(fileTree, dragItemId, folderId));
     setDragItemId(null);
   }
 
@@ -390,22 +348,23 @@ export default function FileExplorer({ fileTree, selectedFileId, onSelectFile, o
     setUploading(true);
     setShowNewMenu(false);
 
-    const updatedTree = JSON.parse(JSON.stringify(fileTree));
-    const parent = findNode(updatedTree, currentFolderId);
+    const parent = findNode(fileTree, currentFolderId);
     if (!parent || parent.type !== 'folder') { setUploading(false); return; }
 
+    let nextTree = fileTree;
     for (const file of files) {
       const parsed = await parseFile(file);
-      parent.children.push({
+      const newFile = {
         id: genId(),
         name: parsed.fileName,
         type: 'file',
         content: parsed.type === 'text' ? parsed.content : `# ${file.name}\n\n[Image file — content not displayable as text]`,
         createdBy: userName,
-      });
+      };
+      nextTree = addChildToTree(nextTree, currentFolderId, newFile);
     }
 
-    onUpdateTree(updatedTree, currentFolderId);
+    onUpdateTree(nextTree, currentFolderId);
     setUploading(false);
     if (uploadInputRef.current) uploadInputRef.current.value = '';
   }

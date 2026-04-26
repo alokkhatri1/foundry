@@ -741,7 +741,9 @@ function App() {
           console.warn('[app] reconnect refetch failed:', err?.message || err);
         }
         // Also flush any outbound DMs queued while offline.
-        flushDmOutbox(sb).then(({ remaining }) => setDmOutboxCount(remaining));
+        flushDmOutbox(sb)
+          .then(({ remaining }) => setDmOutboxCount(remaining))
+          .catch(err => console.warn('[outbox] reconnect flush:', err?.message || err));
       },
     });
   }
@@ -814,8 +816,14 @@ function App() {
     let cancelled = false;
     const tryFlush = async () => {
       if (cancelled) return;
-      const { remaining } = await flushDmOutbox(sb);
-      if (!cancelled) setDmOutboxCount(remaining);
+      try {
+        const { remaining } = await flushDmOutbox(sb);
+        if (!cancelled) setDmOutboxCount(remaining);
+      } catch (err) {
+        // Don't let a transient flush failure throw an unhandled rejection
+        // and silently break the interval. We'll retry on the next tick.
+        console.warn('[outbox] flush threw:', err?.message || err);
+      }
     };
     tryFlush();
     const interval = setInterval(tryFlush, 15_000);
@@ -911,7 +919,7 @@ function App() {
         }
         return [...byName.values()];
       });
-    });
+    }).catch(err => console.error('[join] loadParticipants:', err?.message || err));
 
     setUserName(name);
     setWorkshopCode(code);
@@ -1207,7 +1215,10 @@ function App() {
   }
 
   function addLog(entry) {
-    setLogs(prev => [...prev, { timestamp: Date.now(), ...entry }]);
+    // Cap at 500 most-recent. A 6-hour workshop accumulates many entries
+    // (every workflow step, every approval, every nudge); without a cap the
+    // logs array grows unbounded and every render walks the whole list.
+    setLogs(prev => [...prev, { timestamp: Date.now(), ...entry }].slice(-500));
   }
 
   // ===== Intent classifier (platform chat) =====

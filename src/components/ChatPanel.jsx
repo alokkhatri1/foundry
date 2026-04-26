@@ -988,7 +988,15 @@ export default function ChatPanel({ messages, onSendMessage, onApprovalAction, o
     const dm = latestIncomingDm;
     const belongs = (dm.from_participant_id === activeDm.id && dm.to_participant_id === myParticipantId)
                   || (dm.from_participant_id === myParticipantId && dm.to_participant_id === activeDm.id);
-    if (belongs) setDmMessages(prev => prev.some(m => m.id === dm.id) ? prev : [...prev, dm]);
+    if (belongs) setDmMessages(prev => {
+      if (prev.some(m => m.id === dm.id)) return prev;
+      // Cap at 500 messages in memory. AI coworker threads can accumulate
+      // hundreds during a 6h workshop; "Load earlier" walks the older ones
+      // back in if the user scrolls. Without the cap, render time on each
+      // new message scales linearly with thread length.
+      const next = [...prev, dm];
+      return next.length > 500 ? next.slice(-500) : next;
+    });
   }, [latestIncomingDm, activeDm?.id, myParticipantId]);
 
   async function handleSend() {
@@ -1001,7 +1009,11 @@ export default function ChatPanel({ messages, onSendMessage, onApprovalAction, o
       // and retried on reconnect, rather than silently vanishing.
       const result = await submitDm(sb, myParticipantId, activeDm.id, text);
       if (result?.data) {
-        setDmMessages(prev => prev.some(m => m.id === result.data.id) ? prev : [...prev, result.data]);
+        setDmMessages(prev => {
+          if (prev.some(m => m.id === result.data.id)) return prev;
+          const next = [...prev, result.data];
+          return next.length > 500 ? next.slice(-500) : next;
+        });
         setInput('');
       } else if (result?.pending) {
         // Queued optimistically. Show it locally with a pending marker so
@@ -1014,7 +1026,11 @@ export default function ChatPanel({ messages, onSendMessage, onApprovalAction, o
           created_at: new Date().toISOString(),
           _pending: true,
         };
-        setDmMessages(prev => prev.some(m => m.id === optimistic.id) ? prev : [...prev, optimistic]);
+        setDmMessages(prev => {
+          if (prev.some(m => m.id === optimistic.id)) return prev;
+          const next = [...prev, optimistic];
+          return next.length > 500 ? next.slice(-500) : next;
+        });
         setInput('');
       }
       return;

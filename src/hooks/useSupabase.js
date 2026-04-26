@@ -208,6 +208,89 @@ export default function useSupabase() {
     return data || [];
   }, []);
 
+  // Single batched fetch of everything the graduation scorecard needs to
+  // compute an overall level for every participant in a workshop. Keeps the
+  // admin's per-workshop click cheap (one network round-trip) and reuses the
+  // same scorecard rubric the participants see at graduation.
+  //
+  // We deliberately don't reconstruct the per-DM conversation shape here —
+  // the scorecard's coworker-DM Influence signal will under-count, but
+  // overall = MIN(touched), so it rarely changes the headline level.
+  const loadAdminScorecardData = useCallback(async (roomId) => {
+    if (!isSupabaseConfigured) return null;
+    const [coworkers, workflows, runs, approvals, files, tools, userMessages, parts] = await Promise.all([
+      supabase.from('coworkers')
+        .select('id, name, role, avatar, color, instruction_file_ids, knowledge_file_ids, tool_ids, tool_configs, created_by, created_at')
+        .eq('room_id', roomId),
+      supabase.from('workflows')
+        .select('id, name, steps, nodes, edges, created_by, created_at')
+        .eq('room_id', roomId),
+      supabase.from('workflow_runs')
+        .select('id, workflow_id, workflow_name, status, current_step_index, started_by, step_results, started_at, completed_at')
+        .eq('room_id', roomId)
+        .limit(1000),
+      supabase.from('approvals')
+        .select('id, run_id, action, resolved_by, resolved_at')
+        .eq('room_id', roomId)
+        .limit(2000),
+      supabase.from('files')
+        .select('id, parent_id, name, type, content, sort_order, room_id, created_by')
+        .eq('room_id', roomId),
+      supabase.from('tools')
+        .select('id, name, type, description, icon, is_builtin, config, created_by, created_at')
+        .eq('room_id', roomId),
+      supabase.from('messages')
+        .select('participant_name')
+        .eq('room_id', roomId)
+        .eq('type', 'user')
+        .limit(5000),
+      supabase.from('participants')
+        .select('id, name, email, auth_user_id, kind')
+        .eq('room_id', roomId),
+    ]);
+
+    const participantRows = parts.data || [];
+    const authUserIds = participantRows.map(p => p.auth_user_id).filter(Boolean);
+    let prefsMap = {};
+    if (authUserIds.length > 0) {
+      const { data: prefsData } = await supabase
+        .from('user_preferences')
+        .select('auth_user_id, content')
+        .in('auth_user_id', authUserIds);
+      prefsMap = Object.fromEntries((prefsData || []).map(r => [r.auth_user_id, r.content || '']));
+    }
+
+    const messageCounts = {};
+    for (const m of (userMessages.data || [])) {
+      if (!m.participant_name) continue;
+      messageCounts[m.participant_name] = (messageCounts[m.participant_name] || 0) + 1;
+    }
+
+    const mapRunRow = (row) => ({
+      id: row.id,
+      workflowId: row.workflow_id,
+      workflowName: row.workflow_name,
+      status: row.status,
+      currentStepIndex: row.current_step_index,
+      startedBy: row.started_by,
+      stepResults: row.step_results || [],
+      startedAt: row.started_at ? new Date(row.started_at).getTime() : Date.now(),
+      completedAt: row.completed_at ? new Date(row.completed_at).getTime() : null,
+    });
+
+    return {
+      coworkers: (coworkers.data || []).map(mapCoworkerRow),
+      workflows: (workflows.data || []).map(mapWorkflowRow),
+      workflowRuns: (runs.data || []).map(mapRunRow),
+      approvals: approvals.data || [],
+      flatFiles: (files.data || []).map(mapFileRow),
+      tools: (tools.data || []).map(mapToolRow),
+      participants: participantRows,
+      messageCounts,
+      prefsMap,
+    };
+  }, []);
+
   const seedWorkshopContent = useCallback(async (roomId) => {
     if (!isSupabaseConfigured) return;
     const { createStarterFolders, createStarterCoworkers, createStarterTools, createStarterWorkflow } = await import('../data/starterContent');
@@ -1105,6 +1188,7 @@ export default function useSupabase() {
     // Admin
     createWorkshop, loadAdminWorkshops, loadWorkshopParticipants,
     deleteWorkshop, deprecateWorkshop, revealStage, unrevealStage, revealAllStages, loadWorkshopStats, loadWorkshopContent, loadWorkshopActivity,
+    loadAdminScorecardData,
     seedWorkshopContent, subscribeToWorkshopPresence,
     // Room
     joinRoom, getRoomId, setCreditAllocation, setParticipantCreditBonus,

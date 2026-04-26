@@ -1,6 +1,8 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { STAGE_ORDER, STAGE_META, stageReached, nextStage } from './RevealAt';
 import { useConfirm } from './ConfirmDialog';
+import { computeScorecard, LEVELS, LEVEL_COLORS } from '../utils/graduationScorecard';
+import { buildTree } from '../utils/treeUtils';
 
 // Per-participant credit allocation editor. Small inline row above the
 // stage list — big enough to notice, small enough not to steal focus from
@@ -78,6 +80,7 @@ export default function AdminDashboard({ sb, user, onBack, onEnterWorkshop }) {
   const [onlineUsers, setOnlineUsers] = useState([]);
   const [content, setContent] = useState({});
   const [activity, setActivity] = useState([]);
+  const [scorecardData, setScorecardData] = useState(null);
   const [detailTab, setDetailTab] = useState('stages');
   const [copied, setCopied] = useState(null);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -228,12 +231,14 @@ export default function AdminDashboard({ sb, user, onBack, onEnterWorkshop }) {
     setSelected(workshop);
     setDetailTab('stages');
     setMenuOpen(false);
+    setScorecardData(null);
     const requestedId = workshop.id;
     selectionTokenRef.current = requestedId;
-    const [p, c, a] = await Promise.all([
+    const [p, c, a, sc] = await Promise.all([
       sb.loadWorkshopParticipants(workshop.id),
       sb.loadWorkshopContent(workshop.id),
       sb.loadWorkshopActivity(workshop.id),
+      sb.loadAdminScorecardData(workshop.id),
     ]);
     // Guard against rapid-fire clicks: if the admin clicked a different
     // workshop while these loads were in flight, the selection token has
@@ -244,6 +249,7 @@ export default function AdminDashboard({ sb, user, onBack, onEnterWorkshop }) {
     setParticipants(p);
     setContent(c);
     setActivity(a);
+    setScorecardData(sc);
     const unsub = sb.subscribeToWorkshopPresence(workshop.id, setOnlineUsers);
     return unsub;
   }
@@ -275,6 +281,40 @@ export default function AdminDashboard({ sb, user, onBack, onEnterWorkshop }) {
   const past = workshops.filter(w => w.deprecated_at);
   const fileCount = participantFiles.length;
   const folderCount = selected ? (content.files?.filter(f => f.type === 'folder').length || 0) : 0;
+
+  // Compute the overall scorecard level for every human participant in the
+  // selected workshop. Reuses the same rubric the participants see at
+  // graduation; we just pivot the data per-participant on the admin side.
+  // Memoised on the loaded scorecardData so re-renders don't re-walk every
+  // workflow run.
+  const participantLevels = useMemo(() => {
+    if (!scorecardData) return {};
+    const fileTree = buildTree(scorecardData.flatFiles || []);
+    const out = {};
+    for (const p of (scorecardData.participants || [])) {
+      if ((p.kind || 'human') !== 'human') continue;
+      const msgCount = scorecardData.messageCounts?.[p.name] || 0;
+      const conversations = msgCount > 0
+        ? [{ kind: 'chat', messages: Array.from({ length: msgCount }, () => ({ type: 'user' })) }]
+        : [];
+      const userPreferences = p.auth_user_id ? (scorecardData.prefsMap?.[p.auth_user_id] || '') : '';
+      const card = computeScorecard({
+        userName: p.name,
+        conversations,
+        coworkers: scorecardData.coworkers,
+        workflows: scorecardData.workflows,
+        workflowRuns: scorecardData.workflowRuns,
+        flatFiles: scorecardData.flatFiles,
+        approvals: scorecardData.approvals,
+        participants: scorecardData.participants,
+        tools: scorecardData.tools,
+        fileTree,
+        userPreferences,
+      });
+      out[p.id] = card.overallLevel;
+    }
+    return out;
+  }, [scorecardData]);
 
   return (
     <div className="admin-shell">
@@ -528,17 +568,29 @@ export default function AdminDashboard({ sb, user, onBack, onEnterWorkshop }) {
                     <p className="admin-empty">No participants yet. Share the code to get started.</p>
                   ) : (
                     <div className="admin-participants">
-                      {humanParticipants.map(p => (
-                        <div key={p.id} className="admin-participant">
-                          <span className="admin-participant-dot" style={{ background: onlineNames.has(p.name) ? 'var(--accent-system)' : 'var(--border-color)' }} />
-                          <div className="admin-participant-ident">
-                            <span className="admin-participant-name">{p.name}</span>
-                            {p.email && <span className="admin-participant-email">{p.email}</span>}
+                      {humanParticipants.map(p => {
+                        const lvl = participantLevels[p.id];
+                        return (
+                          <div key={p.id} className="admin-participant">
+                            <span className="admin-participant-dot" style={{ background: onlineNames.has(p.name) ? 'var(--accent-system)' : 'var(--border-color)' }} />
+                            <div className="admin-participant-ident">
+                              <span className="admin-participant-name">{p.name}</span>
+                              {p.email && <span className="admin-participant-email">{p.email}</span>}
+                            </div>
+                            {scorecardData && typeof lvl === 'number' && (
+                              <span
+                                className="admin-participant-grade"
+                                style={{ background: LEVEL_COLORS[lvl], color: lvl === 0 ? 'var(--text-muted)' : '#fff' }}
+                                title="Graduation scorecard — overall level"
+                              >
+                                {LEVELS[lvl]}
+                              </span>
+                            )}
+                            <span className="admin-participant-status">{onlineNames.has(p.name) ? 'Online' : 'Offline'}</span>
+                            <span className="admin-participant-time">Joined {new Date(p.joined_at).toLocaleDateString()}</span>
                           </div>
-                          <span className="admin-participant-status">{onlineNames.has(p.name) ? 'Online' : 'Offline'}</span>
-                          <span className="admin-participant-time">Joined {new Date(p.joined_at).toLocaleDateString()}</span>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   )}
                 </div>

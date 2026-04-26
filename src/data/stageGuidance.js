@@ -40,9 +40,9 @@ const STAGE_GUIDES = {
     externalReference: 'Same primitive as Temporal, n8n, or Zapier — but with AI coworkers as first-class steps and humans pausing the flow for review.',
   },
   '7': {
-    nowAvailable: 'Observability — every orchestration run, approval, and tool call on the record. The audit trail for a mixed team.',
-    invitation: 'Invite them to look at what\'s already happened in the workshop — the runs, the approvals they gave, the tools that fired. This is how a mixed team stays accountable.',
-    externalReference: 'Same role as Datadog, OpenTelemetry, or Grafana in a software system — but for a team of humans and agents working together.',
+    nowAvailable: 'Observability — your team\'s queryable record. Every workflow run, approval, and tool call your mixed team produced is now legible to AI and to every participant in the room. This is what makes the closed loop possible: nothing important happens off-record.',
+    invitation: 'Invite them to look at what\'s already happened in the workshop — the runs, the approvals they gave, the tools that fired. The framing isn\'t just accountability; it\'s that this record is what makes the next workflow smarter. Their coworkers can read it. They can read it. The substrate just got richer.',
+    externalReference: 'Same role as Datadog, OpenTelemetry, or Grafana in a software system — but for a team of humans and agents working together. The deeper analogy is Diana Hu\'s "queryable organization": every important action produces an artifact the AI at the centre of the company can learn from.',
   },
   '7b': {
     nowAvailable: 'Economics — a running total of their LLM spend + per-segment breakdown (chat, coworker work, workflow runs, copilot) for the workshop so far. Cost also appears per step on run detail views.',

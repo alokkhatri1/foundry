@@ -521,7 +521,12 @@ export default function ActivityDashboard({ workflowRuns, onApprovalAction, onCa
   return (
     <div className="adash">
       <div className="adash-header">
-        <h2 className="adash-title">Observability</h2>
+        <div className="adash-header-left">
+          <h2 className="adash-title">Observability</h2>
+          <p className="adash-subtitle">
+            Everything your mixed team did, on the record. Queryable from here forward — by you, by your coworkers, by your next workflow.
+          </p>
+        </div>
         <div className="adash-summary">
           <EducationalCue cueId="activity-dashboard" show={showEducationalCues} />
           {activeRuns.length > 0 && <span className="adash-stat running">{activeRuns.length} active</span>}

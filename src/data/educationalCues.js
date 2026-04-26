@@ -55,6 +55,17 @@ export const EDUCATIONAL_CUES = {
       { name: 'LangSmith / PromptLayer', desc: 'Prompt versioning and observability' },
     ],
   },
+  'queryable-substrate-write': {
+    label: 'The substrate just got smarter',
+    title: 'Queryable Organization',
+    content: 'Every artifact your team produces — workflow outputs, decisions, files — is now legible to every coworker in the room. This is what AI-native organizations call a "queryable organization": every important action leaves a record the AI at the centre of the company can read. Pre-AI orgs lost most of their state in DMs, inboxes, and hallway conversations. AI-native orgs move that state into a shared substrate, so the next workflow run starts smarter than the last.',
+    tools: [
+      { name: 'Glean', desc: 'Enterprise-wide AI search across docs, chats, tickets' },
+      { name: 'Notion AI', desc: 'Knowledge base that\'s queryable by the AI built into it' },
+      { name: 'Granola / Otter / Fireflies', desc: 'AI notetakers that move meeting state on-record' },
+      { name: 'Linear + AI', desc: 'Project state queryable by agents and humans alike' },
+    ],
+  },
 
   // ===== TOOLS TAB =====
   'tools-overview': {

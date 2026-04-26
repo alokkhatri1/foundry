@@ -226,6 +226,13 @@ export async function executeWorkflowRun({
           destination: { folderId: step.save.folderId, subfolder: step.save.subfolder },
         });
         onLog({ type: 'workflow', message: `saved step output: ${fileName}` });
+        // Make the queryable-substrate moment explicit. Every artifact
+        // written by a workflow run is now legible to every coworker and
+        // every participant in the room — name that, don't bury it.
+        onMessage({
+          type: 'status',
+          content: `Saved ${fileName} to the team workspace — every coworker in the room can read it from here forward.`,
+        });
       }
 
       for (const e of (forwardOut.get(nodeId) || [])) queue.push(e.target);

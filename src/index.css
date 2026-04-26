@@ -4228,10 +4228,18 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
 /* ========== ACTIVITY DASHBOARD ========== */
 .adash { display: flex; flex-direction: column; flex: 1; overflow: hidden; background: var(--bg-white); }
 .adash-header {
-  display: flex; align-items: center; justify-content: space-between;
+  display: flex; align-items: flex-start; justify-content: space-between; gap: 16px;
   padding: 16px 24px; border-bottom: 1px solid var(--border-color); flex-shrink: 0;
 }
+.adash-header-left { display: flex; flex-direction: column; min-width: 0; flex: 1; }
 .adash-title { font-size: 18px; font-weight: 700; color: var(--text-dark); margin: 0; }
+.adash-subtitle {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin: 4px 0 0;
+  max-width: 640px;
+  line-height: 1.45;
+}
 .adash-summary { display: flex; gap: 12px; }
 .adash-stat {
   font-size: 12px; font-weight: 600; padding: 3px 10px; border-radius: var(--radius-pill);

@@ -1,4 +1,4 @@
-import { useRef, useCallback, useEffect } from 'react';
+import { useRef, useCallback, useEffect, useMemo } from 'react';
 import { supabase, isSupabaseConfigured } from '../supabase';
 import { mapFileRow, mapCoworkerRow, mapToolRow, mapWorkflowRow } from '../utils/treeUtils';
 import { withSupabaseRetry } from '../utils/supabaseRetry';
@@ -1057,7 +1057,20 @@ export default function useSupabase() {
     };
   }, []);
 
-  return {
+  // CRITICAL: this object reference must be stable across renders. Many
+  // consumers — useMyUsageTotal, the DM/outbox effects, AdminDashboard's
+  // loadWorkshops — depend on `sb` and put it in their useEffect/useCallback
+  // deps. Returning a fresh object literal each render caused those effects
+  // to re-fire on every parent render, which manifested as:
+  //   - credits "running away" (useMyUsageTotal re-loaded all rows and
+  //     re-added them to the total on every render — observed 2026-04-26)
+  //   - admin console refusing to settle (loadWorkshops looped)
+  //   - excess realtime channel churn from outbox / sub effects
+  // useMemo with []-deps is correct because every member is either a
+  // module-level constant or a useCallback'd function with []-deps —
+  // none of them change identity across renders.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  return useMemo(() => ({
     isConfigured: isSupabaseConfigured,
     // Auth
     getSession, getUser, signInWithGoogle, signInWithMagicLink,
@@ -1079,5 +1092,5 @@ export default function useSupabase() {
     logLlmUsage, loadMyUsage, subscribeToMyUsage,
     loadWorkshopUsage, subscribeToWorkshopUsage, loadRunUsage,
     subscribeToRoom, trackPresence, leavePresence,
-  };
+  }), []);
 }

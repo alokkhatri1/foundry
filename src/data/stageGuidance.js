@@ -25,18 +25,13 @@ const STAGE_GUIDES = {
     externalReference: 'This is how Custom GPTs\' instructions work under the hood. Skill files shape HOW you respond, not WHAT you know.',
   },
   '5a': {
-    nowAvailable: 'AI Coworkers — they can build named AI assistants with their own instruction files, knowledge files, and identity (Coworkers tab in the header).',
-    invitation: 'Invite them to build their first coworker. A credit analyst, a legal reviewer, a creative partner — whatever fits their work.',
-    externalReference: 'Like Custom GPTs or Claude Projects — bundled specialists. Same primitive you already know, just with a shared organizational context.',
-  },
-  '5b': {
-    nowAvailable: 'AI Coworkers can now use tools — external APIs, connectors, or platform actions. The coworker stops just responding and can do things.',
-    invitation: 'Invite them to add a tool to a coworker. This is the jump from assistant to agent.',
-    externalReference: 'The shift from "GPT" to "agent" — the AI gains hands. In Liberating Structures terms, the AI is now a peer doing work, not just reflecting.',
+    nowAvailable: 'AI Coworkers — they can build named AI teammates with their own instructions (skills), knowledge files, and identity (Coworkers tab in the header). A coworker is skills + knowledge + persona, full stop; producing artifacts and acting on the world is what Stage 6 (Orchestration) adds on top.',
+    invitation: 'Invite them to build their first coworker. A credit analyst, a legal reviewer, a creative partner — whatever fits their work. Encourage them to think of it as packaging a way of thinking, not as a do-it-all bot.',
+    externalReference: 'Like Custom GPTs or Claude Projects — bundled specialists. Same primitive you already know, just with a shared organizational context the room can see.',
   },
   '6': {
-    nowAvailable: 'Orchestration — chain AI coworkers and human approval steps into a multi-step workflow. Each coworker step processes upstream output with its knowledge + instructions; each human step reviews and either approves (flow continues) or rejects with feedback (flow halts and bounces back to the previous human step for revision).',
-    invitation: 'Invite them to chain the Stage 5c primitive they just felt — put a coworker, then a reviewer, then another coworker, then another reviewer. Run it. See a mixed team produce one outcome through several hands.',
+    nowAvailable: 'Orchestration — chain AI coworkers and human approval steps into a multi-step workflow. Each coworker step processes upstream output with its knowledge + instructions; each human step reviews and either approves (flow continues) or rejects with feedback (flow halts and bounces back to the previous human step for revision). This is also where coworkers stop just responding and start producing artifacts — each step can save its output to the team workspace.',
+    invitation: 'Invite them to chain the coworker primitive they just felt — put a coworker, then a reviewer, then another coworker, then another reviewer. Run it. See a mixed team produce one outcome through several hands, with artifacts landing in Files for everyone to read.',
     externalReference: 'Same primitive as Temporal, n8n, or Zapier — but with AI coworkers as first-class steps and humans pausing the flow for review.',
   },
   '7': {

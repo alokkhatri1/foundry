@@ -7,11 +7,6 @@ import RichText from './RichText';
 import useFileDraft from '../hooks/useFileDraft';
 import { useConfirm } from './ConfirmDialog';
 
-const TOOL_REVEAL_STAGE = {
-  'builtin-create-file': '5b',
-  'builtin-send-message': '5b',
-};
-
 let cwCounter = Date.now();
 function genCwId() { return 'cw-' + (cwCounter++); }
 

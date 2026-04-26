@@ -8,7 +8,7 @@
 // accountability.
 
 import { useEffect, useMemo, useState } from 'react';
-import { computeCost, formatTokens, costToCredits } from '../utils/llmCost';
+import { computeCost, formatUsd, formatTokens, costToCredits } from '../utils/llmCost';
 import EducationalCue from './EducationalCue';
 
 export default function UsageView({ sb, participants, myParticipantId, showEducationalCues, creditAllocation }) {
@@ -132,50 +132,55 @@ export default function UsageView({ sb, participants, myParticipantId, showEduca
         </div>
       ) : (
         <>
-          {/* Section 1 — workshop-wide credit pool. Total across the
-              cohort, used so far, remaining. The bar gives a quick read
-              of how much of the room's budget has been spent. */}
-          <div className="usage-pool">
-            <div className="usage-pool-title">Total available credits</div>
-            <div className="usage-pool-stats">
-              <div className="usage-pool-stat">
-                <div className="usage-pool-stat-label">Total</div>
-                <div className="usage-pool-stat-value">{workshopCredits.total.toLocaleString()}</div>
-              </div>
-              <div className="usage-pool-stat">
-                <div className="usage-pool-stat-label">Used</div>
-                <div className="usage-pool-stat-value">{workshopCredits.used.toLocaleString()}</div>
-              </div>
-              <div className="usage-pool-stat">
-                <div className="usage-pool-stat-label">Remaining</div>
-                <div className="usage-pool-stat-value">{workshopCredits.remaining.toLocaleString()}</div>
+          {/* Cohort spend header — the total dollar figure the room has
+              run through. Reuses the existing usage-totals visual so the
+              top of the tab feels like the previous version. */}
+          <div className="usage-totals">
+            <div>
+              <div className="usage-total-label">Cohort spend</div>
+              <div className="usage-total-cost">{formatUsd(agg.totalCost)}</div>
+            </div>
+            <div className="usage-total-meta">
+              {formatTokens(agg.totalTokens)} tokens across {rows.length} call{rows.length === 1 ? '' : 's'}
+              <br />
+              {workshopCredits.humans} participant{workshopCredits.humans === 1 ? '' : 's'} in the room
+            </div>
+          </div>
+
+          {/* Section 1 — workshop-wide credit pool. The gradient banner
+              shows credits remaining as the headline number, with a
+              progress bar and the breakdown underneath. */}
+          <div className="usage-credits-banner">
+            <div className="usage-credits-banner-left">
+              <div className="usage-credits-banner-label">Total available credits</div>
+              <div className="usage-credits-banner-value">
+                <span className="usage-credits-banner-star" aria-hidden>✦</span>
+                {workshopCredits.remaining.toLocaleString()}
               </div>
             </div>
-            <div className="usage-pool-bar">
-              <div
-                className="usage-pool-bar-fill"
-                style={{ width: workshopCredits.total > 0
-                  ? `${Math.min(100, (workshopCredits.used / workshopCredits.total) * 100).toFixed(1)}%`
-                  : '0%' }}
-              />
-            </div>
-            <div className="usage-pool-meta">
-              {workshopCredits.humans} participant{workshopCredits.humans === 1 ? '' : 's'}
-              {creditAllocation != null && <> × {creditAllocation.toLocaleString()} credits each</>}
+            <div className="usage-credits-banner-right">
+              The cohort started with <strong>{workshopCredits.total.toLocaleString()}</strong> credits
+              {creditAllocation != null && <> ({workshopCredits.humans} × {creditAllocation.toLocaleString()})</>}
+              {' '}— <strong>{workshopCredits.used.toLocaleString()}</strong> used so far.
+              <div className="usage-pool-bar" style={{ marginTop: 10 }}>
+                <div
+                  className="usage-pool-bar-fill"
+                  style={{ width: workshopCredits.total > 0
+                    ? `${Math.min(100, (workshopCredits.used / workshopCredits.total) * 100).toFixed(1)}%`
+                    : '0%' }}
+                />
+              </div>
             </div>
           </div>
 
           {/* Section 2 — leaderboard, every human in the room ranked by
-              tokens used. Leader at the top — the participant who put
-              their AI to the most work. Token count is the metric: more
-              tokens means more work the AI did on the participant's
-              behalf, not a bigger bill to apologise for. */}
-          <div className="usage-leaderboard">
-            <div className="usage-leaderboard-header">
-              <div className="usage-leaderboard-title">Leaderboard</div>
-              <div className="usage-leaderboard-sub">Ranked by tokens used — most token-maxing at the top.</div>
-            </div>
-            <div className="usage-leaderboard-list">
+              tokens used. Reuses the previous usage-participant-row grid
+              with a rank column slotted in front. Leader gets an amber
+              accent; the current user's row gets the existing is-you
+              treatment. */}
+          <div className="usage-bar-section">
+            <div className="usage-bar-label">Leaderboard — most tokens used</div>
+            <div className="usage-participant-list">
               {leaderboard.map((p, i) => {
                 const rank = i + 1;
                 const pct = maxTokens > 0 ? p.tokens / maxTokens : 0;
@@ -183,18 +188,18 @@ export default function UsageView({ sb, participants, myParticipantId, showEduca
                 return (
                   <div
                     key={p.pid}
-                    className={`usage-leader-row${p.isYou ? ' is-you' : ''}${isLeader ? ' is-leader' : ''}`}
+                    className={`usage-participant-row usage-leader-grid${p.isYou ? ' is-you' : ''}${isLeader ? ' is-leader' : ''}`}
                   >
                     <span className="usage-leader-rank">#{rank}</span>
-                    <span className="usage-leader-dot" style={{ background: p.color }} />
-                    <span className="usage-leader-name">
-                      {p.name}{p.isYou && <span className="usage-leader-you"> · you</span>}
+                    <span className="usage-participant-dot" style={{ background: p.color }} />
+                    <span className="usage-participant-name">
+                      {p.name}{p.isYou && <span className="usage-participant-you"> · you</span>}
                     </span>
-                    <div className="usage-leader-bar">
-                      <div className="usage-leader-bar-fill" style={{ width: `${pct * 100}%`, background: p.color }} />
+                    <div className="usage-participant-bar">
+                      <div className="usage-participant-bar-fill" style={{ width: `${pct * 100}%`, background: p.color }} />
                     </div>
-                    <span className="usage-leader-tokens">{formatTokens(p.tokens)}</span>
-                    <span className="usage-leader-meta">{p.calls} call{p.calls === 1 ? '' : 's'}</span>
+                    <span className="usage-participant-cost">{formatTokens(p.tokens)}</span>
+                    <span className="usage-participant-meta">{p.calls} call{p.calls === 1 ? '' : 's'}</span>
                   </div>
                 );
               })}

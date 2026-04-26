@@ -270,36 +270,48 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
 .drive-card-clone:hover { filter: brightness(0.95); }
 .drive-card-example { border-style: dashed; cursor: pointer; }
 
-/* Token-max scoreboard — re-leads the Usage tab with leaderboard
-   framing instead of cost. See UsageView.jsx tokenMaxStats memo. */
-.usage-tokenmax {
-  background: linear-gradient(135deg, rgba(74, 127, 181, 0.08) 0%, rgba(90, 158, 111, 0.08) 100%);
-  border: 1px solid var(--border-color); border-radius: var(--radius-md, 12px);
-  padding: 18px 22px; margin-bottom: 20px;
+/* Usage tab — total credit pool (Section 1) */
+.usage-pool {
+  background: var(--bg-white); border: 1px solid var(--border-color);
+  border-radius: var(--radius-md, 12px); padding: 20px 24px; margin-bottom: 24px;
 }
-.usage-tokenmax-eyebrow {
-  font-size: 11px; font-weight: 700; letter-spacing: 0.8px; text-transform: uppercase;
-  color: var(--accent-system, #4a7fb5); margin-bottom: 8px;
+.usage-pool-title { font-size: 14px; font-weight: 700; color: var(--text-dark); margin-bottom: 16px; letter-spacing: 0.2px; }
+.usage-pool-stats { display: flex; gap: 32px; margin-bottom: 14px; }
+.usage-pool-stat-label { font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.6px; margin-bottom: 4px; }
+.usage-pool-stat-value { font-size: 28px; font-weight: 700; color: var(--text-dark); font-variant-numeric: tabular-nums; }
+.usage-pool-bar { background: var(--bg-soft, #f3f2ef); border-radius: 999px; height: 8px; overflow: hidden; margin-bottom: 8px; }
+.usage-pool-bar-fill { background: var(--accent-system, #4a7fb5); height: 100%; transition: width 0.3s ease; }
+.usage-pool-meta { font-size: 12px; color: var(--text-muted); }
+
+/* Usage tab — leaderboard (Section 2) */
+.usage-leaderboard {
+  background: var(--bg-white); border: 1px solid var(--border-color);
+  border-radius: var(--radius-md, 12px); padding: 20px 24px;
 }
-.usage-tokenmax-headline {
-  display: flex; align-items: baseline; gap: 14px; margin-bottom: 6px; flex-wrap: wrap;
+.usage-leaderboard-header { margin-bottom: 14px; }
+.usage-leaderboard-title { font-size: 14px; font-weight: 700; color: var(--text-dark); margin-bottom: 4px; letter-spacing: 0.2px; }
+.usage-leaderboard-sub { font-size: 12px; color: var(--text-muted); }
+.usage-leaderboard-list { display: flex; flex-direction: column; gap: 6px; }
+.usage-leader-row {
+  display: grid; grid-template-columns: 36px 12px 1fr minmax(60px, 200px) auto auto;
+  gap: 12px; align-items: center; padding: 8px 12px;
+  background: var(--bg-soft, #f7f6f3); border-radius: var(--radius-sm); border: 1px solid transparent;
 }
-.usage-tokenmax-rank {
-  font-size: 32px; font-weight: 700; color: var(--text-dark);
-  font-variant-numeric: tabular-nums;
+.usage-leader-row.is-you { border-color: var(--accent-system, #4a7fb5); background: rgba(74, 127, 181, 0.06); }
+.usage-leader-row.is-leader {
+  background: linear-gradient(90deg, rgba(200, 149, 108, 0.18), rgba(200, 149, 108, 0.04));
+  border-color: rgba(200, 149, 108, 0.4);
 }
-.usage-tokenmax-rank-of {
-  font-size: 16px; font-weight: 500; color: var(--text-muted); margin-left: 2px;
-}
-.usage-tokenmax-label {
-  font-size: 16px; font-weight: 600; color: var(--text-dark);
-}
-.usage-tokenmax-detail {
-  font-size: 14px; color: var(--text-dark); line-height: 1.5; margin-bottom: 4px;
-}
-.usage-tokenmax-hint {
-  font-size: 12px; color: var(--text-muted); line-height: 1.5; font-style: italic;
-}
+.usage-leader-rank { font-size: 14px; font-weight: 700; color: var(--text-muted); text-align: center; font-variant-numeric: tabular-nums; }
+.usage-leader-row.is-leader .usage-leader-rank { color: #b87a44; }
+.usage-leader-dot { width: 10px; height: 10px; border-radius: 50%; }
+.usage-leader-name { font-size: 14px; font-weight: 600; color: var(--text-dark); }
+.usage-leader-you { color: var(--accent-system, #4a7fb5); font-weight: 500; }
+.usage-leader-bar { background: var(--bg-white); height: 6px; border-radius: 999px; overflow: hidden; }
+.usage-leader-bar-fill { height: 100%; transition: width 0.3s ease; }
+.usage-leader-tokens { font-size: 13px; font-weight: 600; color: var(--text-dark); font-variant-numeric: tabular-nums; }
+.usage-leader-meta { font-size: 11px; color: var(--text-muted); }
+.usage-leader-empty { padding: 16px; color: var(--text-muted); font-size: 13px; text-align: center; }
 .stage-example-reopen {
   background: transparent; border: 1px dashed var(--border-color); color: var(--text-muted);
   font-size: 11px; font-weight: 500; padding: 4px 10px; border-radius: 999px;

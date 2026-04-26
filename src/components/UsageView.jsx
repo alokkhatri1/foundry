@@ -8,27 +8,10 @@
 // accountability.
 
 import { useEffect, useMemo, useState } from 'react';
-import { computeCost, formatUsd, formatTokens, labelForSegment, costToCredits, creditsToUsd } from '../utils/llmCost';
+import { computeCost, formatTokens, costToCredits } from '../utils/llmCost';
 import EducationalCue from './EducationalCue';
 
-function timeAgo(ts) {
-  const diff = Math.floor((Date.now() - ts) / 1000);
-  if (diff < 60) return 'just now';
-  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
-  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
-  return `${Math.floor(diff / 86400)}d ago`;
-}
-
-const SEGMENT_COLORS = {
-  chat: '#4a7fb5',
-  coworker_chat: '#5a9e6f',
-  workflow_run: '#c8956c',
-  workflow_copilot: '#b87aa8',
-  refine_description: '#7a9a8e',
-  scorecard: '#9b9b9b',
-};
-
-export default function UsageView({ sb, participants, myParticipantId, showEducationalCues, creditAllocation, myCreditBonus }) {
+export default function UsageView({ sb, participants, myParticipantId, showEducationalCues, creditAllocation }) {
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -52,14 +35,6 @@ export default function UsageView({ sb, participants, myParticipantId, showEduca
     });
     return () => { cancelled = true; unsub?.(); };
   }, [sb]);
-
-  // Participant lookup: id → display name. Falls back to a stub so stale
-  // rows (participant deleted) still render.
-  const participantById = useMemo(() => {
-    const m = new Map();
-    for (const p of (participants || [])) m.set(p.id, p);
-    return m;
-  }, [participants]);
 
   // Aggregates: overall, per-segment, per-participant.
   const agg = useMemo(() => {
@@ -86,70 +61,40 @@ export default function UsageView({ sb, participants, myParticipantId, showEduca
     return { bySeg, byParticipant, totalCost, totalTokens };
   }, [rows]);
 
-  const segmentsInOrder = useMemo(() => {
-    return Object.entries(agg.bySeg)
-      .sort((a, b) => b[1].cost - a[1].cost)
-      .map(([segment, v]) => ({
-        segment,
-        cost: v.cost,
+  // Workshop credit pool — total available across the room, used so far,
+  // remaining. Allocation is per-participant; total = allocation × humans.
+  // Bonuses aren't aggregated into the pool view (they're per-person and
+  // not loaded into the participants prop) — workshop total reflects the
+  // baseline allocation, which is the budget the facilitator set.
+  const workshopCredits = useMemo(() => {
+    const humans = (participants || []).filter(p => (p.kind || 'human') === 'human');
+    const total = creditAllocation != null ? creditAllocation * humans.length : 0;
+    const used = costToCredits(agg.totalCost);
+    const remaining = Math.max(0, total - used);
+    return { total, used, remaining, humans: humans.length };
+  }, [participants, creditAllocation, agg.totalCost]);
+
+  // Leaderboard — every human participant in the room, sorted by tokens
+  // descending. Includes participants with zero usage so the cohort
+  // picture is honest. Token count is the metric, not cost — high tokens
+  // = your AI did a lot of work on your behalf (the token-maxing frame).
+  const leaderboard = useMemo(() => {
+    const humans = (participants || []).filter(p => (p.kind || 'human') === 'human');
+    return humans.map(p => {
+      const v = agg.byParticipant[p.id] || { cost: 0, tokens: 0, calls: 0 };
+      return {
+        pid: p.id,
+        name: p.name,
+        color: p.color,
+        isYou: p.id === myParticipantId,
         tokens: v.tokens,
+        cost: v.cost,
         calls: v.calls,
-        pct: agg.totalCost > 0 ? v.cost / agg.totalCost : 0,
-      }));
-  }, [agg]);
+      };
+    }).sort((a, b) => b.tokens - a.tokens);
+  }, [participants, agg.byParticipant, myParticipantId]);
 
-  const participantsInOrder = useMemo(() => {
-    return Object.entries(agg.byParticipant)
-      .sort((a, b) => b[1].cost - a[1].cost)
-      .map(([pid, v]) => {
-        const p = participantById.get(pid);
-        return {
-          pid,
-          name: p?.name || (pid === 'unknown' ? 'Unattributed' : 'Left the workshop'),
-          color: p?.color || '#9b9b9b',
-          isYou: pid === myParticipantId,
-          cost: v.cost,
-          tokens: v.tokens,
-          calls: v.calls,
-          pct: agg.totalCost > 0 ? v.cost / agg.totalCost : 0,
-        };
-      });
-  }, [agg, participantById, myParticipantId]);
-
-  // Token-max scoreboard — Phase 6 of the platform plan. Re-leads the
-  // Economics tab with a leaderboard framing instead of cost-anxiety:
-  // high token use is the proof that your AI is doing real work on your
-  // behalf, not a budget to fear. Computed per-participant from the rows
-  // already loaded; no extra query.
-  const tokenMaxStats = useMemo(() => {
-    if (!myParticipantId || participantsInOrder.length === 0) return null;
-    const myIdx = participantsInOrder.findIndex(p => p.pid === myParticipantId);
-    if (myIdx < 0) return null;
-    const myRank = myIdx + 1;
-    const total = participantsInOrder.length;
-    // Percentile from the top — rank 1 of 10 = 10%, rank 5 of 10 = 50%.
-    const percentile = Math.max(1, Math.round((myRank / total) * 100));
-    // "On your behalf" = AI work that produced something while you were
-    // away or doing something else. Direct chat is excluded — that's
-    // you in the loop, not the AI acting for you.
-    const ON_YOUR_BEHALF = new Set(['workflow_run', 'coworker_chat', 'workflow_copilot', 'refine_description']);
-    let tasks = 0;
-    let myTokens = 0;
-    for (const r of rows) {
-      if (r.participant_id !== myParticipantId) continue;
-      if (ON_YOUR_BEHALF.has(r.segment)) tasks += 1;
-      myTokens += (r.input_tokens || 0) + (r.output_tokens || 0)
-        + (r.cache_creation_input_tokens || 0) + (r.cache_read_input_tokens || 0);
-    }
-    let label;
-    if (total === 1) label = 'Solo session — every token is yours';
-    else if (myRank === 1) label = 'Top of the room';
-    else if (percentile <= 10) label = `Top ${percentile}% of the room`;
-    else if (percentile <= 25) label = `Top ${percentile}%`;
-    else if (percentile <= 50) label = 'Above the room median';
-    else label = 'Plenty of room to push your AI further';
-    return { myRank, total, percentile, tasks, myTokens, label };
-  }, [myParticipantId, participantsInOrder, rows]);
+  const maxTokens = leaderboard[0]?.tokens || 0;
 
   return (
     <div className="usage-view">
@@ -187,131 +132,76 @@ export default function UsageView({ sb, participants, myParticipantId, showEduca
         </div>
       ) : (
         <>
-          {tokenMaxStats && (
-            <div className="usage-tokenmax">
-              <div className="usage-tokenmax-eyebrow">Token-maxing</div>
-              <div className="usage-tokenmax-headline">
-                <span className="usage-tokenmax-rank">#{tokenMaxStats.myRank}<span className="usage-tokenmax-rank-of">/{tokenMaxStats.total}</span></span>
-                <span className="usage-tokenmax-label">{tokenMaxStats.label}</span>
+          {/* Section 1 — workshop-wide credit pool. Total across the
+              cohort, used so far, remaining. The bar gives a quick read
+              of how much of the room's budget has been spent. */}
+          <div className="usage-pool">
+            <div className="usage-pool-title">Total available credits</div>
+            <div className="usage-pool-stats">
+              <div className="usage-pool-stat">
+                <div className="usage-pool-stat-label">Total</div>
+                <div className="usage-pool-stat-value">{workshopCredits.total.toLocaleString()}</div>
               </div>
-              <div className="usage-tokenmax-detail">
-                Your AI ran <strong>{tokenMaxStats.tasks}</strong> task{tokenMaxStats.tasks === 1 ? '' : 's'} on your behalf this session — <strong>{formatTokens(tokenMaxStats.myTokens)}</strong> tokens of work.
+              <div className="usage-pool-stat">
+                <div className="usage-pool-stat-label">Used</div>
+                <div className="usage-pool-stat-value">{workshopCredits.used.toLocaleString()}</div>
               </div>
-              <div className="usage-tokenmax-hint">
-                More tokens means more work your AI is doing for you. Don't optimise for a low bill — optimise for letting the AI do more.
+              <div className="usage-pool-stat">
+                <div className="usage-pool-stat-label">Remaining</div>
+                <div className="usage-pool-stat-value">{workshopCredits.remaining.toLocaleString()}</div>
               </div>
             </div>
-          )}
-
-          <div className="usage-totals">
-            <div>
-              <div className="usage-total-label">Workshop total</div>
-              <div className="usage-total-cost">{formatUsd(agg.totalCost)}</div>
+            <div className="usage-pool-bar">
+              <div
+                className="usage-pool-bar-fill"
+                style={{ width: workshopCredits.total > 0
+                  ? `${Math.min(100, (workshopCredits.used / workshopCredits.total) * 100).toFixed(1)}%`
+                  : '0%' }}
+              />
             </div>
-            <div className="usage-total-meta">
-              {formatTokens(agg.totalTokens)} tokens across {rows.length} call{rows.length === 1 ? '' : 's'}
-              <br />
-              {participantsInOrder.length} participant{participantsInOrder.length === 1 ? '' : 's'} contributing
+            <div className="usage-pool-meta">
+              {workshopCredits.humans} participant{workshopCredits.humans === 1 ? '' : 's'}
+              {creditAllocation != null && <> × {creditAllocation.toLocaleString()} credits each</>}
             </div>
           </div>
 
-          {myParticipantId && creditAllocation != null && (() => {
-            const myRow = participantsInOrder.find(p => p.pid === myParticipantId);
-            const myCost = myRow?.cost || 0;
-            const myCreditsUsed = costToCredits(myCost);
-            const myCreditsTotal = creditAllocation + (myCreditBonus || 0);
-            const myCreditsLeft = Math.max(0, myCreditsTotal - myCreditsUsed);
-            return (
-              <div className="usage-credits-banner">
-                <div className="usage-credits-banner-left">
-                  <div className="usage-credits-banner-label">Your credits</div>
-                  <div className="usage-credits-banner-value">
-                    <span className="usage-credits-banner-star" aria-hidden>✦</span>
-                    {myCreditsLeft.toLocaleString()}
-                  </div>
-                </div>
-                <div className="usage-credits-banner-right">
-                  You started with {myCreditsTotal.toLocaleString()} credits ({formatUsd(creditsToUsd(myCreditsTotal))}). You've used {myCreditsUsed.toLocaleString()} of them — here's exactly where they went.
-                </div>
-              </div>
-            );
-          })()}
-
-          <div className="usage-bar-section">
-            <div className="usage-bar-label">By type of work</div>
-            <div className="usage-bar">
-              {segmentsInOrder.map(({ segment, pct }) => (
-                <div
-                  key={segment}
-                  className="usage-bar-chunk"
-                  style={{ width: `${pct * 100}%`, background: SEGMENT_COLORS[segment] || '#888' }}
-                  title={`${labelForSegment(segment)}: ${formatUsd(agg.bySeg[segment].cost)}`}
-                />
-              ))}
+          {/* Section 2 — leaderboard, every human in the room ranked by
+              tokens used. Leader at the top — the participant who put
+              their AI to the most work. Token count is the metric: more
+              tokens means more work the AI did on the participant's
+              behalf, not a bigger bill to apologise for. */}
+          <div className="usage-leaderboard">
+            <div className="usage-leaderboard-header">
+              <div className="usage-leaderboard-title">Leaderboard</div>
+              <div className="usage-leaderboard-sub">Ranked by tokens used — most token-maxing at the top.</div>
             </div>
-            <div className="usage-legend">
-              {segmentsInOrder.map(({ segment, cost, tokens, pct }) => (
-                <div key={segment} className="usage-legend-item">
-                  <span className="usage-legend-dot" style={{ background: SEGMENT_COLORS[segment] || '#888' }} />
-                  <span className="usage-legend-name">{labelForSegment(segment)}</span>
-                  <span className="usage-legend-cost">{formatUsd(cost)}</span>
-                  <span className="usage-legend-meta">
-                    {formatTokens(tokens)} tokens · {(pct * 100).toFixed(0)}%
-                  </span>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div className="usage-bar-section">
-            <div className="usage-bar-label">By participant</div>
-            <div className="usage-participant-list">
-              {participantsInOrder.map(({ pid, name, color, isYou, cost, tokens, calls, pct }) => (
-                <div key={pid} className={`usage-participant-row${isYou ? ' is-you' : ''}`}>
-                  <span className="usage-participant-dot" style={{ background: color }} />
-                  <span className="usage-participant-name">
-                    {name}{isYou && <span className="usage-participant-you"> · you</span>}
-                  </span>
-                  <div className="usage-participant-bar">
-                    <div className="usage-participant-bar-fill" style={{ width: `${pct * 100}%`, background: color }} />
-                  </div>
-                  <span className="usage-participant-cost">{formatUsd(cost)}</span>
-                  <span className="usage-participant-meta">
-                    {formatTokens(tokens)} tok · {calls} call{calls === 1 ? '' : 's'}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div className="usage-events">
-            <div className="usage-events-title">Every call across the room, newest first</div>
-            <div className="usage-events-list">
-              {[...rows].reverse().slice(0, 200).map(row => {
-                const tokens = (row.input_tokens || 0) + (row.output_tokens || 0)
-                  + (row.cache_creation_input_tokens || 0) + (row.cache_read_input_tokens || 0);
-                const p = participantById.get(row.participant_id);
+            <div className="usage-leaderboard-list">
+              {leaderboard.map((p, i) => {
+                const rank = i + 1;
+                const pct = maxTokens > 0 ? p.tokens / maxTokens : 0;
+                const isLeader = rank === 1 && p.tokens > 0;
                 return (
-                  <div key={row.id} className="usage-event-row">
-                    <span className="usage-event-dot" style={{ background: SEGMENT_COLORS[row.segment] || '#888' }} />
-                    <span className="usage-event-seg">{labelForSegment(row.segment)}</span>
-                    <span className="usage-event-who">{p?.name || '—'}</span>
-                    <span className="usage-event-cost">{formatUsd(Number(row.cost_usd || 0))}</span>
-                    <span className="usage-event-meta">
-                      {formatTokens(tokens)} tok · {timeAgo(new Date(row.created_at).getTime())}
+                  <div
+                    key={p.pid}
+                    className={`usage-leader-row${p.isYou ? ' is-you' : ''}${isLeader ? ' is-leader' : ''}`}
+                  >
+                    <span className="usage-leader-rank">#{rank}</span>
+                    <span className="usage-leader-dot" style={{ background: p.color }} />
+                    <span className="usage-leader-name">
+                      {p.name}{p.isYou && <span className="usage-leader-you"> · you</span>}
                     </span>
+                    <div className="usage-leader-bar">
+                      <div className="usage-leader-bar-fill" style={{ width: `${pct * 100}%`, background: p.color }} />
+                    </div>
+                    <span className="usage-leader-tokens">{formatTokens(p.tokens)}</span>
+                    <span className="usage-leader-meta">{p.calls} call{p.calls === 1 ? '' : 's'}</span>
                   </div>
                 );
               })}
+              {leaderboard.length === 0 && (
+                <div className="usage-leader-empty">No participants in the room yet.</div>
+              )}
             </div>
-          </div>
-
-          <div className="usage-footnote">
-            <strong>Look how cheap real work actually is.</strong> A full mixed-team workshop —
-            everyone chatting, building coworkers, running workflows, co-piloting the DAG — adds up
-            to the number at the top. Output tokens cost 5× input; cache reads are ~10× cheaper than
-            fresh input, which is why attaching a knowledge file once and reusing it pays for itself
-            fast. Nothing here stops you from starting your own AI processes tomorrow.
           </div>
         </>
       )}

@@ -607,72 +607,22 @@ function CoworkerEditor({ coworker, onUpdate, onBack, fileTree, callClaudeAPI, s
             />
           </div>
 
-          {/* Tools — Stage 5b */}
-          <RevealAt stage="5b" currentStage={currentStage}>
-            <div className="cwb-section">
-              <h3 className="cwb-section-title">Tools</h3>
-              <p className="cwb-section-desc">Capabilities this coworker can invoke during a conversation. Pick which tools they can use.</p>
-              <div className="cwb-tools-list">
-                {(tools || [])
-                  .filter(t => t.isBuiltin)
-                  .filter(t => stageReached(currentStage, TOOL_REVEAL_STAGE[t.id] || '5b'))
-                  .map(tool => {
-                  const checked = (coworker.toolIds || []).includes(tool.id);
-                  return (
-                    <div key={tool.id} className={`cwb-tool-wrap${checked ? ' checked' : ''}`}>
-                      <label className={`cwb-tool-row${checked ? ' checked' : ''}`}>
-                        <input
-                          type="checkbox"
-                          checked={checked}
-                          onChange={e => {
-                            const ids = new Set(coworker.toolIds || []);
-                            if (e.target.checked) ids.add(tool.id);
-                            else ids.delete(tool.id);
-                            onUpdate({ ...coworker, toolIds: Array.from(ids) });
-                          }}
-                        />
-                        <span className="cwb-tool-icon">{tool.icon}</span>
-                        <div className="cwb-tool-info">
-                          <span className="cwb-tool-name">{tool.name}</span>
-                          <span className="cwb-tool-desc">{tool.description}</span>
-                        </div>
-                      </label>
-                      {checked && tool.id === 'builtin-create-file' && (
-                        <CreateFileConfig
-                          fileTree={fileTree}
-                          currentStage={currentStage}
-                          config={coworker.toolConfigs?.['builtin-create-file']}
-                          onChange={next => onUpdate({
-                            ...coworker,
-                            toolConfigs: {
-                              ...(coworker.toolConfigs || {}),
-                              'builtin-create-file': next,
-                            },
-                          })}
-                        />
-                      )}
-                      {checked && tool.id === 'builtin-send-message' && (
-                        <SendMessageConfig
-                          participants={participants}
-                          config={coworker.toolConfigs?.['builtin-send-message']}
-                          onChange={next => onUpdate({
-                            ...coworker,
-                            toolConfigs: {
-                              ...(coworker.toolConfigs || {}),
-                              'builtin-send-message': next,
-                            },
-                          })}
-                        />
-                      )}
-                    </div>
-                  );
-                })}
-                {(tools || []).filter(t => t.isBuiltin && stageReached(currentStage, TOOL_REVEAL_STAGE[t.id] || '5b')).length === 0 && (
-                  <p style={{ fontSize: 13, color: 'var(--text-muted, #888)', padding: 8 }}>No tools available yet.</p>
-                )}
-              </div>
-            </div>
-          </RevealAt>
+
+          {/* Tools section retired from the coworker editor.
+              The new direction: a coworker is standalone — skills + knowledge
+              + persona, no per-coworker tools. Artifact production (file
+              writes, messages, etc.) happens at the workflow-step level via
+              the per-step "save" toggle on Coworker steps in Orchestration.
+              That keeps the coworker concept clean and ties production to
+              actual work, not ad-hoc chats. The closed loop on a coworker
+              comes from analysing its workflow runs and proposing skill
+              edits — not from giving it more tools.
+
+              Existing coworkers with toolIds in the DB keep them at the
+              data layer; the agentic loop still honours them at runtime so
+              nothing in-flight breaks. We just no longer expose the editor
+              UI for adding/removing tools. The whole Tools machinery can be
+              fully retired in a follow-up after the workshop. */}
 
         </div>
         </fieldset>

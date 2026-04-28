@@ -125,6 +125,16 @@ function ChatMessage({ msg, onApprovalAction, onPickRecipient, onNudgeRecipient,
 
   if (msg.type === 'approval') {
     const isActive = !msg.resolved;
+    // Buttons render only for the assigned reviewer. The run starter still
+    // sees the card (so they can monitor the upstream output and the
+    // pending decision) but can't accidentally act on a review that
+    // belongs to someone else. When no assignee is set, treat as
+    // "anyone can review" — show buttons. The Approve/Reject by the
+    // actual assignee fires handleRemoteApprove on their tab, which
+    // round-trips through the approvals table and the realtime echo
+    // resolves the executor on the run starter's tab.
+    const hasAssignee = !!msg.assigneeName;
+    const viewerIsAssignee = !hasAssignee || msg.assigneeName === currentUserName;
     const rawContext = msg.previousOutput || '';
     const CONTEXT_PREVIEW_CHARS = 600;
     const isLong = rawContext.length > CONTEXT_PREVIEW_CHARS;
@@ -154,7 +164,7 @@ function ChatMessage({ msg, onApprovalAction, onPickRecipient, onNudgeRecipient,
               )}
             </div>
           )}
-          {isActive && (
+          {isActive && viewerIsAssignee && (
             <>
               <textarea className="cl-approval-comment" placeholder="Feedback (required if rejecting)..." value={comment} onChange={e => setComment(e.target.value)} rows={2} />
               <EducationalCue cueId="chat-approval-actions" show={showEducationalCues} />
@@ -175,6 +185,11 @@ function ChatMessage({ msg, onApprovalAction, onPickRecipient, onNudgeRecipient,
                 </button>
               </div>
             </>
+          )}
+          {isActive && !viewerIsAssignee && (
+            <div className="cl-approval-waiting">
+              {'⏳'} Waiting for <strong>{msg.assigneeName}</strong> to review. They'll see the request in their Chat tab.
+            </div>
           )}
           {msg.resolved && (() => {
             const a = msg.resolvedAction;

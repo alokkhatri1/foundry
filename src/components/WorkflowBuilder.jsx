@@ -1217,17 +1217,45 @@ export default function WorkflowBuilder({ workflows, onUpdateWorkflows, fileTree
     const myParticipantId = isExample
       ? (participants || []).find(p => p.name === currentUserName)?.id || ''
       : null;
+    // Step ids get rewritten — `nodes` and `edges` reference those ids, so
+    // they have to be rewritten in lockstep or the orchestrator can't walk
+    // the DAG (forwardOut would be keyed by stale ids and the queue would
+    // drain on the trigger).
+    const idMap = new Map();
+    const newSteps = (original.steps || []).map(s => {
+      const newId = genStepId();
+      idMap.set(s.id, newId);
+      return {
+        ...s,
+        id: newId,
+        ...(isExample && s.type === 'approval' && myParticipantId
+          ? { assigneeId: myParticipantId }
+          : {}),
+      };
+    });
+    const remap = (id) => idMap.get(id) || id;
+    const newNodes = (original.nodes || []).map(n => ({
+      ...structuredClone(n),
+      id: remap(n.id),
+      data: n.data ? { ...structuredClone(n.data), id: remap(n.data.id) } : n.data,
+    }));
+    const newEdges = (original.edges || []).map(e => {
+      const src = remap(e.source);
+      const tgt = remap(e.target);
+      return {
+        ...structuredClone(e),
+        id: `edge-${src}-${tgt}${e.sourceHandle ? '-' + e.sourceHandle : ''}`,
+        source: src,
+        target: tgt,
+      };
+    });
     const copy = {
       ...structuredClone(original),
       id: genWfId(),
       name: original.name + ' (copy)',
-      steps: original.steps.map(s => ({
-        ...s,
-        id: genStepId(),
-        ...(isExample && s.type === 'approval' && myParticipantId
-          ? { assigneeId: myParticipantId }
-          : {}),
-      })),
+      steps: newSteps,
+      nodes: newNodes,
+      edges: newEdges,
       createdBy: currentUserName,
     };
     onUpdateWorkflows([...workflows, copy]);

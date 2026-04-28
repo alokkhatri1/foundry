@@ -177,48 +177,75 @@ export function createExampleCoworkers(roomId) {
 export const EXAMPLE_WORKFLOW_ID = 'example-wf-credit-review';
 
 // Two coworkers, two human reviews — alternating. The Review steps leave
-// `assigneeName` empty so the participant can either run it solo (assigning
-// themselves) or wire a peer when running the workshop with a partner.
+// `assigneeId` empty so the cloner gets pre-filled as reviewer at clone-time,
+// or can wire a peer when running the workshop with a partner.
+//
+// Ships with a fully-wired DAG (trigger + nodes + edges) — the orchestrator at
+// runWorkflowAsync.js requires a `trigger` step and walks `workflow.edges` to
+// drive forward execution. A workflow without these would hard-fail on Run.
+export const EXAMPLE_TRIGGER_STEP_ID = 'step-trigger';
+
 export function createExampleWorkflow(roomId) {
   const now = new Date().toISOString();
+  const steps = [
+    {
+      id: EXAMPLE_TRIGGER_STEP_ID,
+      type: 'trigger',
+      name: 'Trigger',
+      caseInput: '',
+    },
+    {
+      id: 'step-ravi',
+      type: 'agent',
+      name: 'Ravi drafts credit memo',
+      coworkerId: 'example-cw-ravi',
+      inputDescription: 'Draft a structured credit memo from the loan application',
+    },
+    {
+      id: 'step-credit-manager',
+      type: 'approval',
+      name: 'Credit Manager review',
+      prompt: 'Review the credit memo for risk framing, completeness, and policy citations. Approve to proceed to compliance, or reject back to Ravi with feedback.',
+      actions: ['Approve', 'Reject'],
+      assigneeId: '',
+    },
+    {
+      id: 'step-aisha',
+      type: 'agent',
+      name: 'Aisha checks compliance',
+      coworkerId: 'example-cw-aisha',
+      inputDescription: 'Validate the memo against the compliance exceptions register; flag any missing or insufficient exceptions',
+    },
+    {
+      id: 'step-senior-approver',
+      type: 'approval',
+      name: 'Senior Approver sign-off',
+      prompt: 'Review the compliance report and the underlying memo. As DRI, sign off if everything is in order or reject with feedback.',
+      actions: ['Approve', 'Reject'],
+      assigneeId: '',
+    },
+  ];
+  const nodes = steps.map((s, i) => ({
+    id: s.id,
+    type: s.type,
+    position: { x: 80, y: i * 240 },
+    data: { ...s },
+  }));
+  const edges = [];
+  for (let i = 0; i < steps.length - 1; i++) {
+    edges.push({
+      id: `edge-${steps[i].id}-${steps[i + 1].id}`,
+      source: steps[i].id,
+      target: steps[i + 1].id,
+    });
+  }
   return {
     id: EXAMPLE_WORKFLOW_ID,
     room_id: roomId,
     name: 'Credit Review Process',
-    steps: [
-      {
-        id: 'step-ravi',
-        type: 'agent',
-        name: 'Ravi drafts credit memo',
-        coworkerId: 'example-cw-ravi',
-        inputDescription: 'Draft a structured credit memo from the loan application',
-      },
-      {
-        id: 'step-credit-manager',
-        type: 'approval',
-        name: 'Credit Manager review',
-        prompt: 'Review the credit memo for risk framing, completeness, and policy citations. Approve to proceed to compliance, or reject back to Ravi with feedback.',
-        actions: ['Approve', 'Reject'],
-        assigneeId: '',
-      },
-      {
-        id: 'step-aisha',
-        type: 'agent',
-        name: 'Aisha checks compliance',
-        coworkerId: 'example-cw-aisha',
-        inputDescription: 'Validate the memo against the compliance exceptions register; flag any missing or insufficient exceptions',
-      },
-      {
-        id: 'step-senior-approver',
-        type: 'approval',
-        name: 'Senior Approver sign-off',
-        prompt: 'Review the compliance report and the underlying memo. As DRI, sign off if everything is in order or reject with feedback.',
-        actions: ['Approve', 'Reject'],
-        assigneeId: '',
-      },
-    ],
-    nodes: null,
-    edges: null,
+    steps,
+    nodes,
+    edges,
     created_by: 'System',
     updated_at: now,
   };

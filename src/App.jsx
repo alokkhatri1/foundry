@@ -671,6 +671,10 @@ function App() {
             // local copy has more-recent completedAt, keep it.
             const local = list[idx];
             if (local.completedAt && mapped.completedAt && local.completedAt > mapped.completedAt) return list;
+            // Or if local has terminated and the DB echo says still-running
+            // (legacy rows from before the rejected-sync fix), keep local.
+            const TERMINAL = new Set(['completed', 'rejected', 'error', 'cancelled']);
+            if (TERMINAL.has(local.status) && !TERMINAL.has(mapped.status)) return list;
             return list.map(r => r.id === mapped.id ? mapped : r);
           });
         }
@@ -736,8 +740,18 @@ function App() {
           ]);
           if (runs?.length) {
             setWorkflowRuns(prev => {
+              const TERMINAL = new Set(['completed', 'rejected', 'error', 'cancelled']);
               const byId = new Map((prev || []).map(r => [r.id, r]));
-              for (const r of runs) byId.set(r.id, r);
+              for (const r of runs) {
+                const local = byId.get(r.id);
+                // Don't let a stale DB 'running' clobber a local terminal
+                // state — that's how rejected runs flip back to "running"
+                // after a reconnect when their terminal status hasn't synced
+                // upstream yet (e.g. legacy rows from before the rejected
+                // sync fix). Local terminal wins; otherwise DB is fresher.
+                if (local && TERMINAL.has(local.status) && !TERMINAL.has(r.status)) continue;
+                byId.set(r.id, r);
+              }
               return [...byId.values()].sort((a, b) => a.startedAt - b.startedAt);
             });
           }

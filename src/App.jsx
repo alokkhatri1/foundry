@@ -1770,11 +1770,13 @@ function App() {
       return;
     }
 
-    // Capture-terminal validation. The Capture step is the workflow's
+    // Capture-terminal heads-up. The Capture step is the workflow's
     // compounding affordance — without an edge into it, the run produces
-    // nothing that future participants can read. Walk forward from the
-    // trigger; every leaf must be a Capture step. Skip rejected edges
-    // (those are revision loops, not forward flow).
+    // nothing that future participants can read. Workshop posture is to
+    // warn, not block: the executor already soft-lands missing Capture,
+    // and a hard block at run start prevents participants from iterating
+    // on partial workflows. Walk forward from the trigger and surface
+    // unwired leaves as a status note.
     {
       const steps = workflow.steps || [];
       const stepById = new Map(steps.map(s => [s.id, s]));
@@ -1805,10 +1807,9 @@ function App() {
       }
       if (danglingLeaves.length > 0) {
         addMessage({
-          type: 'error',
-          content: `Workflow has steps with no path into Capture: ${danglingLeaves.join(', ')}. Wire each one through to the Capture node so the run's output compounds, then run again.`,
+          type: 'status',
+          content: `Heads up — these steps don't reach Capture: ${danglingLeaves.join(', ')}. The run will still execute; wire them into Capture if you want their output to compound into a knowledge file.`,
         });
-        return;
       }
     }
 

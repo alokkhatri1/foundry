@@ -1043,15 +1043,33 @@ function WorkflowEditor({ workflow, onUpdateWorkflow, readOnly, fileTree, cowork
         )}
       </div>
 
-      {(activeRun && activeRun.status === 'completed') && (
-        <div className="wf-run-banner success wf-run-banner-canvas">
-          <div className="wf-run-banner-title">{'\u2713'} Run complete</div>
-          <div className="wf-run-banner-body">
-            Started by {activeRun.startedBy} at {new Date(activeRun.startedAt).toLocaleTimeString()}.
-            Any step with save enabled wrote its output to its chosen folder.
+      {(activeRun && activeRun.status === 'completed') && (() => {
+        // A run can reach 'completed' two ways: clean approve-path, or via a
+        // wired rejection branch that ran to its end. The banner needs to
+        // tell those apart \u2014 the latter shouldn't read as a clean success.
+        const hadReject = (activeRun.stepResults || []).some(s =>
+          s?.type === 'approval' && typeof s.output === 'string' && s.output.startsWith('Reject')
+        );
+        if (hadReject) {
+          return (
+            <div className="wf-run-banner rejected wf-run-banner-canvas">
+              <div className="wf-run-banner-title">Run rerouted after rejection</div>
+              <div className="wf-run-banner-body">
+                A reviewer rejected; the workflow followed its wired rejection path to completion. Step outputs are below.
+              </div>
+            </div>
+          );
+        }
+        return (
+          <div className="wf-run-banner success wf-run-banner-canvas">
+            <div className="wf-run-banner-title">{'\u2713'} Run complete</div>
+            <div className="wf-run-banner-body">
+              Started by {activeRun.startedBy} at {new Date(activeRun.startedAt).toLocaleTimeString()}.
+              Any step with save enabled wrote its output to its chosen folder.
+            </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
       {(activeRun && activeRun.status === 'rejected') && (
         <div className="wf-run-banner rejected wf-run-banner-canvas">
           <div className="wf-run-banner-title">Run rejected</div>

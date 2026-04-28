@@ -32,10 +32,27 @@ const STATUS_CONFIG = {
   running: { label: 'Running', color: '#4a7fb5', bg: '#e8f0f8' },
   waiting_approval: { label: 'Waiting for Review', color: '#c8956c', bg: '#fdf0e6' },
   completed: { label: 'Completed', color: '#5a9e6f', bg: '#e8f4ec' },
+  // Run reached a terminal state after at least one Reject decision routed
+  // through a wired rejected-edge branch. Distinct from 'completed' (clean
+  // approval path) so a rejection is never invisible in the dashboard.
+  rerouted: { label: 'Rerouted (Rejected)', color: '#c8956c', bg: '#fdf0e6' },
   rejected: { label: 'Rejected', color: '#c45c5c', bg: '#fdf0f0' },
   error: { label: 'Error', color: '#c45c5c', bg: '#fdf0f0' },
   cancelled: { label: 'Cancelled', color: '#8c7b68', bg: '#efeae2' },
+  interrupted: { label: 'Interrupted', color: '#8c7b68', bg: '#efeae2' },
 };
+
+// A run's stored status is what the executor wrote, but if the run completed
+// after a wired rejection routing, surface that as a distinct UI state.
+// Derived purely from stepResults so no schema/executor change is needed.
+function effectiveRunStatus(run) {
+  const status = run?.status;
+  if (status !== 'completed') return status;
+  const hadReject = (run.stepResults || []).some(s =>
+    s?.type === 'approval' && typeof s.output === 'string' && s.output.startsWith('Reject')
+  );
+  return hadReject ? 'rerouted' : 'completed';
+}
 
 const STEP_STATUS_ICON = {
   completed: '\u2713',
@@ -47,7 +64,7 @@ const STEP_STATUS_ICON = {
 
 // ===== Run Card =====
 function RunCard({ run, onClick, onNudge, showEducationalCues }) {
-  const cfg = STATUS_CONFIG[run.status] || STATUS_CONFIG.running;
+  const cfg = STATUS_CONFIG[effectiveRunStatus(run)] || STATUS_CONFIG.running;
   const stepResults = run.stepResults || [];
   const completedSteps = stepResults.filter(s => s.status === 'completed').length;
   const totalSteps = stepResults.length;
@@ -114,7 +131,7 @@ function RunDetailView({ run, onBack, onApprovalAction, onCancelRun, onNudge, sh
       setCostByStepId(map);
     });
   }, [run.id, showCost, sb]);
-  const cfg = STATUS_CONFIG[run.status] || STATUS_CONFIG.running;
+  const cfg = STATUS_CONFIG[effectiveRunStatus(run)] || STATUS_CONFIG.running;
   const isOwner = run.startedBy === currentUserName;
 
   // The workflow the run was derived from. Needed for the DAG shape

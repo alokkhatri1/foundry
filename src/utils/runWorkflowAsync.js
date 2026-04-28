@@ -89,9 +89,15 @@ export async function executeWorkflowRun({
     for (const e of (forwardOut.get(id) || [])) walk(e.target);
   })(triggerStep.id);
 
+  // Precompute the set of nodes that are the target of any rejected edge —
+  // cheaper than flattening rejectedOut.values() once per step.
+  const rejectedTargets = new Set();
+  for (const edges of rejectedOut.values()) {
+    for (const e of edges) rejectedTargets.add(e.target);
+  }
   for (let i = 0; i < steps.length; i++) {
     if (!forwardReachable.has(steps[i].id) && !rejectedOut.has(steps[i].id)
-        && !Array.from(rejectedOut.values()).flat().some(e => e.target === steps[i].id)) {
+        && !rejectedTargets.has(steps[i].id)) {
       // Truly stranded: no forward edge touches it and no rejected edge
       // points at it either. Mark skipped so it doesn't sit on 'pending'.
       onStepUpdate(runId, i, { status: 'skipped' });
@@ -188,11 +194,16 @@ export async function executeWorkflowRun({
         knowledgeContents.length > 0 ? '\n\n## Knowledge Documents\n' : '',
         ...knowledgeContents.map(k => `### ${k.name}\n${k.content}\n`),
       ].filter(Boolean).join('\n');
+      // Clean envelope: case input + upstream + revision feedback. The output
+      // shape (sections, format, score line) is the coworker's responsibility
+      // — bake it into the coworker's instruction file. The executor used to
+      // tack on a hardcoded "Confidence Score / Status / Summary / ..." rider
+      // that bled through every coworker regardless of fit; that's gone now.
       const userMessage = [
         '## Case Input\n', caseInput,
         predBlocks.length > 0 ? '\n\n## Upstream Outputs\n' + predBlocks.join('\n\n') : '',
         revisionNotes.length > 0 ? '\n\n## Revision Feedback\n' + revisionNotes.join('\n\n') : '',
-        '\n\nAnalyze this case according to your instructions. Provide your assessment in clear prose with the following sections clearly labeled: Confidence Score (0.0-1.0), Status, Summary, Issues (if any), Recommended Action, and Key Facts.',
+        '\n\nRespond according to your instructions.',
       ].join('\n');
 
       onMessage({ type: 'loading', label: coworkerLabel });
@@ -416,9 +427,13 @@ export async function executeWorkflowRun({
       onMessage({ type: 'status', content: `Captured: ${summary}` });
       onLog({ type: 'workflow', message: `capture (${step.mode || 'knowledge'}) → file ${step.targetFileId}` });
     } else {
-      // Unknown step type — skip.
-      executed.set(nodeId, { output: '' });
-      executionLog.push(nodeId);
+      // Unknown step type — fail loudly so a workflow with a typo'd step.type
+      // doesn't silently complete with empty outputs threaded forward.
+      onStepUpdate(runId, stepIndex, { status: 'error', output: `Unknown step type: ${step.type}`, completedAt: Date.now() });
+      onRunUpdate(runId, { status: 'error', completedAt: Date.now() });
+      onMessage({ type: 'error', content: `Step "${step.name || step.id}" has unknown type "${step.type}" — workflow halted.` });
+      onLog({ type: 'error', message: `${step.name || step.id} | unknown type "${step.type}"` });
+      return;
     }
   }
 

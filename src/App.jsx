@@ -31,7 +31,8 @@ import { executeTool, toolToClaudeSchema, toolFromClaudeName } from './utils/too
 import { PLATFORM_TOOL_SCHEMAS, TOOL_DISPLAY_NAMES, TOOL_ICONS, executePlatformAction } from './utils/platformActions';
 import useSupabase from './hooks/useSupabase';
 import { buildTree, flattenTree, mapFileRow, mapCoworkerRow, mapToolRow, mapWorkflowRow, preserveToolConfigs, ensureDagShape, updateNodeInTree, addChildToTree } from './utils/treeUtils';
-import { claudeFetch } from './utils/claudeFetch';
+import { callClaudeProxy } from './utils/claudeFetch';
+import { supabase as supabaseClient } from './supabase';
 
 const STORAGE_KEY = 'sandbox:state';
 
@@ -327,7 +328,9 @@ function App() {
   const [userName, setUserName] = useState(saved?.userName || '');
   const [workshopCode, setWorkshopCode] = useState(saved?.workshopCode || '');
   const [orgName, setOrgName] = useState(saved?.orgName || 'My Organization');
-  const [apiKey] = useState(saved?.apiKey || import.meta.env.VITE_ANTHROPIC_API_KEY || '');
+  // The Anthropic API key used to live here, sourced from VITE_ANTHROPIC_API_KEY.
+  // It now lives in the claude-proxy Edge Function's secrets and never enters
+  // the browser. callClaudeProxy reads the supabase session token instead.
   const [flatFiles, setFlatFiles] = useState(() => {
     // Initialize from localStorage tree if available
     if (saved?.fileTree) return flattenTree(saved.fileTree, null).map(mapFileRow);
@@ -458,6 +461,17 @@ function App() {
   }, [currentStage, activeTab]);
 
   const approvalResolversRef = useRef(new Map());
+  // runId → true while an in-memory executor is alive for that run. Used by
+  // orphan detection to tell "running, executor still here" apart from
+  // "running, executor died on a refresh". Populated when runWorkflow fires
+  // and cleared in its .finally().
+  const liveExecutorsRef = useRef(new Set());
+  // Per-run throttle of intermediate Supabase syncs. Keys: runId → timestamp
+  // of last save. Used by updateRun/updateRunStep so participants in the
+  // room see step transitions stream into the workflow_runs row instead of
+  // only seeing the final terminal status.
+  const lastRunSyncRef = useRef(new Map());
+  const RUN_SYNC_THROTTLE_MS = 1000;
   // Optimistic set of runIds this user has just resolved as a remote reviewer.
   // Prevents the "Reviews waiting for you" card from flashing back until the
   // workflowRuns state catches up with the waiting_approval → running transition.
@@ -468,6 +482,40 @@ function App() {
   const activeTabRef = useRef(activeTab);
 
   useEffect(() => { activeTabRef.current = activeTab; }, [activeTab]);
+
+  // Mirror workflowRuns + sb.saveWorkflowRun into refs so the beforeunload
+  // handler can read the latest values without re-registering on every change.
+  const workflowRunsRef = useRef(workflowRuns);
+  useEffect(() => { workflowRunsRef.current = workflowRuns; }, [workflowRuns]);
+  const saveWorkflowRunRef = useRef(sb.saveWorkflowRun);
+  useEffect(() => { saveWorkflowRunRef.current = sb.saveWorkflowRun; }, [sb.saveWorkflowRun]);
+
+  // Mark in-flight runs 'interrupted' on tab close. Without this, runs whose
+  // executor is killed mid-flight stay 'running' in Supabase forever and
+  // appear orphaned in the room's Observability for everyone except the
+  // owner. localStorage already gets flushed by the existing pagehide
+  // handler — this is the Supabase-side belt to that suspenders.
+  useEffect(() => {
+    function markInterrupted() {
+      const live = liveExecutorsRef.current;
+      if (live.size === 0) return;
+      const runs = workflowRunsRef.current || [];
+      for (const r of runs) {
+        if (!live.has(r.id)) continue;
+        if (r.status !== 'running' && r.status !== 'waiting_approval') continue;
+        // Best-effort fire-and-forget. Browser may not flush this fetch
+        // depending on close timing — the orphan-detection banner is the
+        // safety net for cases where the write doesn't land.
+        saveWorkflowRunRef.current({ ...r, status: 'interrupted', completedAt: Date.now() });
+      }
+    }
+    window.addEventListener('beforeunload', markInterrupted);
+    window.addEventListener('pagehide', markInterrupted);
+    return () => {
+      window.removeEventListener('beforeunload', markInterrupted);
+      window.removeEventListener('pagehide', markInterrupted);
+    };
+  }, []);
 
   // One-time cleanup of stale "New Chat" conversations left behind by the
   // old workflow-run → addMessage bug (which spawned a fresh chat per
@@ -569,7 +617,6 @@ function App() {
       userName: updates.userName ?? userName,
       workshopCode: updates.workshopCode ?? workshopCode,
       orgName: updates.orgName ?? orgName,
-      apiKey: updates.apiKey ?? apiKey,
       fileTree: updates.fileTree ?? fileTree,
       workflows: updates.workflows ?? workflows,
       coworkers: updates.coworkers ?? coworkers,
@@ -1072,16 +1119,29 @@ function App() {
 
   function handleUpdateWorkflows(newWorkflows) {
     // Always normalize to the DAG shape so nodes[]+edges[] ride alongside
-    // steps[] in local state and in the DB. Diff against previous state so
-    // removed workflows get hard-deleted from Supabase — otherwise a deleted
-    // workflow reappears on the next reload/realtime sync because its row
-    // still exists in the DB.
+    // steps[] in local state and in the DB. Diff against previous state so:
+    //   - removed workflows get hard-deleted from Supabase (otherwise a
+    //     deleted workflow reappears on the next reload/realtime sync
+    //     because its row still exists)
+    //   - only *changed* workflows get re-upserted (a single rename used to
+    //     trigger a write of every workflow in the room — the copilot, which
+    //     fires onWorkflowUpdate per tool call, was the worst case)
     const normalized = (newWorkflows || []).map(ensureDagShape);
-    const prevIds = new Set((workflows || []).map(w => w.id));
+    const prevById = new Map((workflows || []).map(w => [w.id, w]));
     const nextIds = new Set(normalized.map(w => w.id));
-    const removedIds = [...prevIds].filter(id => !nextIds.has(id));
+    const removedIds = [...prevById.keys()].filter(id => !nextIds.has(id));
     setWorkflows(normalized);
-    for (const wf of normalized) sb.saveWorkflow(wf);
+    for (const wf of normalized) {
+      const prev = prevById.get(wf.id);
+      // Cheap structural compare: stringify both. Workflows are small JSON
+      // (steps + nodes + edges), so this is fast enough to run inline. A
+      // shallow ref-equal check would miss in-place edits the existing
+      // codepath does; a deep equal pulls in lodash. JSON.stringify is the
+      // pragmatic middle.
+      if (!prev || JSON.stringify(prev) !== JSON.stringify(wf)) {
+        sb.saveWorkflow(wf);
+      }
+    }
     for (const id of removedIds) sb.deleteWorkflow(id);
     persistLocal({ workflows: newWorkflows });
   }
@@ -1292,9 +1352,6 @@ function App() {
   // with a different context (refine_description, scorecard, etc.) should
   // pass options.segment explicitly.
   async function callClaudeAPI(systemPrompt, userMessage, options = {}) {
-    if (!apiKey) {
-      return { success: false, error: 'No API key configured. Add your Anthropic API key in .env file.' };
-    }
     // Default model is Haiku 4.5. Sonnet's RPM tier limits were the
     // bottleneck during cohort-scale load — every participant's coworker
     // chat and workflow-run step landed on the same bucket. Haiku 4.5 has
@@ -1304,28 +1361,19 @@ function App() {
     // reasoning can pass `options.model` explicitly.
     const model = options.model || 'claude-haiku-4-5-20251001';
     try {
-      const response = await claudeFetch('https://api.anthropic.com/v1/messages', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': apiKey,
-          'anthropic-version': '2023-06-01',
-          'anthropic-dangerous-direct-browser-access': 'true',
-        },
-        body: JSON.stringify({
-          model,
-          // 600 tokens covers the vast majority of coworker chat + workflow
-          // step outputs (most finish under 500). Tighter cap directly
-          // reduces TPM pressure during cohort-scale load, where the single
-          // shared Anthropic org is the bottleneck. Structured assessments
-          // truncate gracefully at this ceiling.
-          max_tokens: 600,
-          // Cache the system prompt so repeated turns with the same coworker /
-          // skills / knowledge hit the 10x-cheaper cache_read rate. Claude
-          // ignores cache_control below its 1024-token minimum gracefully.
-          ...(systemPrompt ? { system: [{ type: 'text', text: systemPrompt, cache_control: { type: 'ephemeral' } }] } : {}),
-          messages: [{ role: 'user', content: userMessage }],
-        }),
+      const response = await callClaudeProxy(supabaseClient, {
+        model,
+        // 600 tokens covers the vast majority of coworker chat + workflow
+        // step outputs (most finish under 500). Tighter cap directly
+        // reduces TPM pressure during cohort-scale load, where the single
+        // shared Anthropic org is the bottleneck. Structured assessments
+        // truncate gracefully at this ceiling.
+        max_tokens: 600,
+        // Cache the system prompt so repeated turns with the same coworker /
+        // skills / knowledge hit the 10x-cheaper cache_read rate. Claude
+        // ignores cache_control below its 1024-token minimum gracefully.
+        ...(systemPrompt ? { system: [{ type: 'text', text: systemPrompt, cache_control: { type: 'ephemeral' } }] } : {}),
+        messages: [{ role: 'user', content: userMessage }],
       });
       if (!response.ok) {
         const errorText = await response.text().catch(() => '');
@@ -1354,8 +1402,6 @@ function App() {
 
   // ===== Claude with Tools (agentic loop) =====
   async function callClaudeWithTools({ systemPrompt, userMessage, agentTools, onToolExecution, onProgressText, coworker, usageSegment, usageRefId }) {
-    if (!apiKey) return { success: false, content: [{ type: 'text', text: 'No API key configured.' }] };
-
     const claudeTools = agentTools.map(t => toolToClaudeSchema(t));
     // Mark the last tool with cache_control so the entire tools array is
     // cached — identical per coworker across turns. Saves re-sending the
@@ -1378,28 +1424,19 @@ function App() {
     while (turns < 10) {
       turns++;
       try {
-        const response = await claudeFetch('https://api.anthropic.com/v1/messages', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-api-key': apiKey,
-            'anthropic-version': '2023-06-01',
-            'anthropic-dangerous-direct-browser-access': 'true',
-          },
-          body: JSON.stringify({
-            model,
-            // Tool-calling turns rarely need more than ~1000 tokens — the
-            // assistant's narration around tool calls is usually short.
-            // 1200 leaves headroom for the occasional longer synthesis
-            // turn without blowing up TPM across a cohort.
-            max_tokens: 1200,
-            // System prompt (role + skills + knowledge + tool guidance) is
-            // identical across turns of a coworker chat — cache it. Tools
-            // are also marked cacheable via the last-tool trick above.
-            ...(systemPrompt ? { system: [{ type: 'text', text: systemPrompt, cache_control: { type: 'ephemeral' } }] } : {}),
-            messages,
-            tools: claudeToolsCached,
-          }),
+        const response = await callClaudeProxy(supabaseClient, {
+          model,
+          // Tool-calling turns rarely need more than ~1000 tokens — the
+          // assistant's narration around tool calls is usually short.
+          // 1200 leaves headroom for the occasional longer synthesis
+          // turn without blowing up TPM across a cohort.
+          max_tokens: 1200,
+          // System prompt (role + skills + knowledge + tool guidance) is
+          // identical across turns of a coworker chat — cache it. Tools
+          // are also marked cacheable via the last-tool trick above.
+          ...(systemPrompt ? { system: [{ type: 'text', text: systemPrompt, cache_control: { type: 'ephemeral' } }] } : {}),
+          messages,
+          tools: claudeToolsCached,
         });
 
         if (!response.ok) {
@@ -1557,8 +1594,6 @@ function App() {
 
   // ===== Claude with Platform Actions (agentic loop for platform management) =====
   async function callClaudeWithPlatformActions({ systemPrompt, systemBlocks, userMessage, onToolExecution }) {
-    if (!apiKey) return { success: false, content: [{ type: 'text', text: 'No API key configured.' }] };
-
     // Mutable context so consecutive tool calls in one turn see each other's changes
     const platformCtx = {
       fileTree,
@@ -1581,34 +1616,25 @@ function App() {
     while (turns < 10) {
       turns++;
       try {
-        const response = await claudeFetch('https://api.anthropic.com/v1/messages', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-api-key': apiKey,
-            'anthropic-version': '2023-06-01',
-            'anthropic-dangerous-direct-browser-access': 'true',
-          },
-          body: JSON.stringify({
-            model: 'claude-haiku-4-5-20251001',
-            // Platform-chat replies are routing + single-line confirmations.
-            // Output is the dominant remaining cost once caching kicks in;
-            // capping tight pushes Haiku toward ~100-token replies.
-            max_tokens: 256,
-            // System prompt: prefer the multi-block array from callers that
-            // want stable-vs-variable caching (the platform-chat path); fall
-            // back to wrapping a plain string in a single cached block for
-            // legacy callers.
-            ...(systemBlocks
-              ? { system: systemBlocks }
-              : systemPrompt
-                ? { system: [{ type: 'text', text: systemPrompt, cache_control: { type: 'ephemeral' } }] }
-                : {}),
-            messages: msgs,
-            tools: PLATFORM_TOOL_SCHEMAS.length > 0
-              ? PLATFORM_TOOL_SCHEMAS.map((t, i) => i === PLATFORM_TOOL_SCHEMAS.length - 1 ? { ...t, cache_control: { type: 'ephemeral' } } : t)
-              : PLATFORM_TOOL_SCHEMAS,
-          }),
+        const response = await callClaudeProxy(supabaseClient, {
+          model: 'claude-haiku-4-5-20251001',
+          // Platform-chat replies are routing + single-line confirmations.
+          // Output is the dominant remaining cost once caching kicks in;
+          // capping tight pushes Haiku toward ~100-token replies.
+          max_tokens: 256,
+          // System prompt: prefer the multi-block array from callers that
+          // want stable-vs-variable caching (the platform-chat path); fall
+          // back to wrapping a plain string in a single cached block for
+          // legacy callers.
+          ...(systemBlocks
+            ? { system: systemBlocks }
+            : systemPrompt
+              ? { system: [{ type: 'text', text: systemPrompt, cache_control: { type: 'ephemeral' } }] }
+              : {}),
+          messages: msgs,
+          tools: PLATFORM_TOOL_SCHEMAS.length > 0
+            ? PLATFORM_TOOL_SCHEMAS.map((t, i) => i === PLATFORM_TOOL_SCHEMAS.length - 1 ? { ...t, cache_control: { type: 'ephemeral' } } : t)
+            : PLATFORM_TOOL_SCHEMAS,
         });
 
         if (!response.ok) {
@@ -1677,19 +1703,35 @@ function App() {
 
   // ===== Workflow Execution =====
   // ===== Workflow Run Helpers =====
+  // Terminal statuses always sync; intermediate ones throttle so a chatty
+  // run doesn't write a row per step transition.
+  const TERMINAL_RUN_STATUSES = new Set(['completed', 'error', 'cancelled', 'rejected', 'interrupted']);
+
+  function syncRunToSupabase(run, isTerminal) {
+    if (!run) return;
+    if (isTerminal) {
+      lastRunSyncRef.current.delete(run.id);
+      sb.saveWorkflowRun(run);
+      return;
+    }
+    const now = Date.now();
+    const last = lastRunSyncRef.current.get(run.id) || 0;
+    if (now - last < RUN_SYNC_THROTTLE_MS) return;
+    lastRunSyncRef.current.set(run.id, now);
+    sb.saveWorkflowRun(run);
+  }
+
   function updateRun(runId, updates) {
     setWorkflowRuns(prev => {
       const updated = prev.map(r => r.id === runId ? { ...r, ...updates } : r);
       persistLocal({ workflowRuns: updated });
-      // Sync terminal statuses to Supabase so refreshing doesn't resurrect them
-      // and so other participants in the room actually see the final state.
-      // 'rejected' must be in here — without it, rejected runs stay 'running'
-      // in Supabase forever and disappear from Observability for everyone but
-      // the owner.
       const run = updated.find(r => r.id === runId);
-      if (run && (updates.status === 'completed' || updates.status === 'error' || updates.status === 'cancelled' || updates.status === 'rejected')) {
-        sb.saveWorkflowRun(run);
-      }
+      // Sync to Supabase: terminal statuses fire immediately so the room sees
+      // the final state and the row stops looking "running" forever; non-
+      // terminal updates throttle so participants get progress without a
+      // write per step transition.
+      const isTerminal = TERMINAL_RUN_STATUSES.has(updates.status);
+      syncRunToSupabase(run, isTerminal);
       return updated;
     });
   }
@@ -1703,6 +1745,12 @@ function App() {
         return { ...r, stepResults };
       });
       persistLocal({ workflowRuns: updated });
+      // Step-level updates are always intermediate (a step's status moving
+      // to 'completed' doesn't end the run — only the run-level status
+      // does). Throttle the sync so participants still see progress stream
+      // in but we don't write per keystroke-equivalent transition.
+      const run = updated.find(r => r.id === runId);
+      syncRunToSupabase(run, false);
       return updated;
     });
   }
@@ -1720,6 +1768,48 @@ function App() {
         content: `You're out of credits (${creditsTotal} allocated). Ask the facilitator to grant more before running a workflow.`,
       });
       return;
+    }
+
+    // Capture-terminal validation. The Capture step is the workflow's
+    // compounding affordance — without an edge into it, the run produces
+    // nothing that future participants can read. Walk forward from the
+    // trigger; every leaf must be a Capture step. Skip rejected edges
+    // (those are revision loops, not forward flow).
+    {
+      const steps = workflow.steps || [];
+      const stepById = new Map(steps.map(s => [s.id, s]));
+      const forwardOut = new Map();
+      for (const e of (workflow.edges || [])) {
+        if (e.sourceHandle === 'rejected') continue;
+        if (!forwardOut.has(e.source)) forwardOut.set(e.source, []);
+        forwardOut.get(e.source).push(e);
+      }
+      const trigger = steps.find(s => s.type === 'trigger');
+      const danglingLeaves = [];
+      if (trigger) {
+        const visited = new Set();
+        const walk = (id) => {
+          if (visited.has(id)) return;
+          visited.add(id);
+          const out = forwardOut.get(id) || [];
+          if (out.length === 0) {
+            const step = stepById.get(id);
+            if (step && step.type !== 'capture') {
+              danglingLeaves.push(step.name || step.type || id);
+            }
+            return;
+          }
+          for (const e of out) walk(e.target);
+        };
+        walk(trigger.id);
+      }
+      if (danglingLeaves.length > 0) {
+        addMessage({
+          type: 'error',
+          content: `Workflow has steps with no path into Capture: ${danglingLeaves.join(', ')}. Wire each one through to the Capture node so the run's output compounds, then run again.`,
+        });
+        return;
+      }
     }
 
     // Hydrate all file content the workflow will actually touch: the Trigger's
@@ -1760,7 +1850,7 @@ function App() {
       return;
     }
 
-    const runId = 'run-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6);
+    const runId = 'run-' + crypto.randomUUID();
 
     // Initialize run with all steps as pending
     const newRun = {
@@ -1792,6 +1882,7 @@ function App() {
 
     setWorkflowRuns(prev => [...prev, newRun]);
     sb.saveWorkflowRun(newRun);
+    liveExecutorsRef.current.add(runId);
 
     // Pre-create one dedicated chat per run so every status line / agent
     // reply / approval note lands in a single conversation rather than
@@ -1820,7 +1911,9 @@ function App() {
     // conversation the user isn't looking at and the run feels broken.
     setActiveConvoId(runConvoId);
 
-    // Fire and forget — runs concurrently
+    // Fire and forget — runs concurrently. Wrapped so resolver leaks and
+    // crashes both clear the resolver entry instead of leaving a dead handle
+    // in the Map for the lifetime of the session.
     executeWorkflowRun({
       runId,
       workflow,
@@ -1855,20 +1948,33 @@ function App() {
       onSaveStepOutput: ({ name, content, destination }) => {
         // Per-step save: fires whenever a step with step.save.enabled
         // completes. Writes the content to the folder/subfolder chosen on
-        // that step. Falls back to the first top-level folder + 'knowledge'
-        // if nothing was explicitly picked.
+        // that step. Two fallback rules:
+        //   - destination.folderId set but missing → surface error (don't
+        //     silently land the file somewhere unrelated).
+        //   - destination.folderId not set → land in the first top-level
+        //     folder, which is the documented default for legacy steps.
         const newFile = {
-          id: 'f-' + Date.now() + '-' + Math.random().toString(36).slice(2, 7),
+          id: 'f-' + crypto.randomUUID(),
           name,
           type: 'file',
           content,
           createdBy: userName,
         };
         const topChildren = fileTree.children || [];
-        const configuredFolder = destination?.folderId
-          ? topChildren.find(c => c.id === destination.folderId && c.type === 'folder')
-          : null;
-        const targetFolder = configuredFolder || topChildren.find(c => c.type === 'folder');
+        let targetFolder = null;
+        if (destination?.folderId) {
+          targetFolder = topChildren.find(c => c.id === destination.folderId && c.type === 'folder');
+          if (!targetFolder) {
+            addMessage({
+              type: 'error',
+              content: `Could not save "${name}": configured destination folder no longer exists. Re-pick the folder on this step and run again.`,
+            });
+            addLog({ type: 'error', message: `save failed: missing folder ${destination.folderId}` });
+            return;
+          }
+        } else {
+          targetFolder = topChildren.find(c => c.type === 'folder');
+        }
         const subName = destination?.subfolder === 'skills' ? 'skills' : 'knowledge';
         const sub = targetFolder
           ? (targetFolder.children || []).find(c => c.type === 'folder' && c.name === subName)
@@ -1921,6 +2027,13 @@ function App() {
     }).catch(err => {
       updateRun(runId, { status: 'error', completedAt: Date.now() });
       addMessage({ type: 'error', content: `Workflow error: ${err.message}` });
+    }).finally(() => {
+      // Drop any approval resolver still tied to this run — handles both the
+      // happy path (resolver already fired and deleted itself in cancel) and
+      // the crash path (executor threw before resolving).
+      approvalResolversRef.current.delete(runId);
+      liveExecutorsRef.current.delete(runId);
+      lastRunSyncRef.current.delete(runId);
     });
   }
 
@@ -2382,15 +2495,17 @@ Answer in ONE sentence. If the user asks "how", a second sentence is allowed —
     .filter(x => !approvalResolversRef.current.has(x.run.id))
     .filter(x => !resolvedRemoteRunIds.has(x.run.id));
 
-  // Orphaned runs: a run I started that is still 'waiting_approval' but my
-  // in-memory resolver for it is gone (tab refreshed mid-flight). The
-  // workflow executor is dead; nothing will ever act on approval events.
-  // Surface these so the user can cancel them cleanly instead of having
-  // "running" runs that never complete.
+  // Orphaned runs: a run I started that thinks it's still in-flight
+  // ('running' or 'waiting_approval'), but the in-memory executor that owns
+  // it is gone (tab refreshed mid-flight). Nothing will ever push it to a
+  // terminal state. Surface these so the user can cancel them cleanly.
+  // Catching 'running' (not just 'waiting_approval') matters because runs
+  // that crashed between two coworker steps never reached an approval and
+  // the old detector missed them.
   const myOrphanedRuns = (workflowRuns || []).filter(r =>
     r.startedBy === userName
-    && r.status === 'waiting_approval'
-    && !approvalResolversRef.current.has(r.id)
+    && (r.status === 'running' || r.status === 'waiting_approval')
+    && !liveExecutorsRef.current.has(r.id)
   );
 
   async function handleCancelOrphanedRun(runId) {
@@ -2597,7 +2712,7 @@ Answer in ONE sentence. If the user asks "how", a second sentence is allowed —
         )}
         {activeTab === 'workflow' && (
           <div className="tab-pane tab-pane-workflow">
-            <WorkflowBuilder workflows={workflows} onUpdateWorkflows={handleUpdateWorkflows} fileTree={fileTree} onRun={runWorkflow} onCancelRun={handleCancelRun} onCancelAllRuns={handleCancelAllRuns} workflowRuns={workflowRuns} participants={participants} currentUserName={userName} coworkers={coworkers || []} tools={tools || []} showEducationalCues={showEducationalCues} callClaudeAPI={callClaudeAPI} onSaveCoworkerToLibrary={handleSaveCoworkerToLibrary} onUpdateFileContent={handleUpdateFileContent} apiKey={apiKey} onCopilotUsage={({ usage, model }) => sb.logLlmUsage({ participantId: myParticipantId, segment: 'workflow_copilot', model, usage, costUsd: computeCost(usage, model) })} />
+            <WorkflowBuilder workflows={workflows} onUpdateWorkflows={handleUpdateWorkflows} fileTree={fileTree} onRun={runWorkflow} onCancelRun={handleCancelRun} onCancelAllRuns={handleCancelAllRuns} workflowRuns={workflowRuns} participants={participants} currentUserName={userName} coworkers={coworkers || []} tools={tools || []} showEducationalCues={showEducationalCues} callClaudeAPI={callClaudeAPI} onSaveCoworkerToLibrary={handleSaveCoworkerToLibrary} onUpdateFileContent={handleUpdateFileContent} onCopilotUsage={({ usage, model }) => sb.logLlmUsage({ participantId: myParticipantId, segment: 'workflow_copilot', model, usage, costUsd: computeCost(usage, model) })} />
           </div>
         )}
         {activeTab === 'files' && (

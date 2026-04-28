@@ -5,6 +5,14 @@ wired to the `main` branch of the GitHub repo
 [`alokkhatri1/foundry`](https://github.com/alokkhatri1/foundry). Every push to
 `main` triggers an automatic build + deploy. There is no staging environment yet.
 
+Two production surfaces ship from the same `main`:
+
+- **Frontend (React app)** — deployed by Vercel automatically on every push.
+- **Supabase Edge Functions** (anything under `supabase/functions/`) — deployed
+  by `.github/workflows/deploy-edge-functions.yml` on push, scoped by path
+  filter so frontend-only pushes don't trigger it. Function secrets (e.g.
+  `ANTHROPIC_API_KEY`) live in the Supabase Dashboard, not in this repo.
+
 ## Domain setup
 
 - Custom domain `foundry.alokkhatri.com` is configured as the Vercel production
@@ -110,12 +118,45 @@ Sonnet-backed coworkers will burn through this faster.
 - Intent classification was removed in the 04-24 perf sweep — chat turns are
   now cheaper than before.
 
+## Edge Functions
+
+Functions under `supabase/functions/<name>/` deploy via GitHub Actions on
+push to `main`. The current functions:
+
+- `claude-proxy` — forwards browser calls to `api.anthropic.com` so the
+  Anthropic key never lives on the client. Set `ANTHROPIC_API_KEY` once via
+  Supabase Dashboard → Project Settings → Edge Functions → Manage Secrets.
+
+### One-time GitHub Actions setup
+
+1. Create a Supabase personal access token at
+   `https://supabase.com/dashboard/account/tokens` (name it e.g.
+   "github-actions-foundry"). Copy it once.
+2. In the GitHub repo: Settings → Secrets and variables → Actions → New
+   repository secret. Name: `SUPABASE_ACCESS_TOKEN`. Value: the token.
+3. The project ref (`ryzmzjiilqgtbiqmpbfv`) is hardcoded in the workflow —
+   update it there if the project ever moves.
+
+After setup, every push to `main` that touches `supabase/functions/**` runs
+the deploy workflow. Watch it in the GitHub Actions tab. You can also
+trigger manually via the "Run workflow" button on the workflow page.
+
+### Setting / updating function secrets
+
+Function secrets (the actual values the function reads at runtime, like
+`ANTHROPIC_API_KEY`) are not in this repo and not in GitHub Actions. They
+live on the Supabase project itself: Dashboard → Project Settings → Edge
+Functions → Manage Secrets. Set once; the function picks them up on next
+invocation.
+
 ## Notes
 
 - There is no `vercel.json` in the repo — Vercel auto-detects the Vite
   project. If framework detection ever breaks, add one with
   `buildCommand: "npm run build"` and `outputDirectory: "dist"`.
-- Environment variables (Supabase URL, anon key, Anthropic key) live in
-  the Vercel project settings, not in this repo. `.env` is gitignored.
+- Environment variables (Supabase URL, anon key) live in the Vercel project
+  settings, not in this repo. `.env` is gitignored. The Anthropic key
+  used to live on the client too, but as of the H3 audit it's been moved
+  off the client into the `claude-proxy` Edge Function's secrets.
 - The GitHub remote is aliased `personal`, not `origin`:
   `git remote -v` will show `personal  https://github.com/alokkhatri1/foundry.git`.

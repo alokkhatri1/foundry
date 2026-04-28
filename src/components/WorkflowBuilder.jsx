@@ -6,6 +6,7 @@ import { CoworkerGlyph } from './Icon';
 import RichText from './RichText';
 import { AvatarDisplay, AvatarPicker, DescriptionSection, FilePicker } from './CoworkerBuilder';
 import { runCopilotTurn } from '../utils/workflowCopilot';
+import { supabase } from '../supabase';
 import { useConfirm } from './ConfirmDialog';
 
 // Resolve a step's coworker data. New-style steps embed the full coworker
@@ -32,11 +33,9 @@ function emptyCoworker() {
   };
 }
 
-let stepCounter = Date.now();
-function genStepId() { return 'step-' + (stepCounter++); }
+function genStepId() { return 'step-' + crypto.randomUUID(); }
 
-let wfCounter = Date.now();
-function genWfId() { return 'wf-' + (wfCounter++); }
+function genWfId() { return 'wf-' + crypto.randomUUID(); }
 
 function getAllFolders(tree, path = []) {
   const folders = [];
@@ -583,7 +582,7 @@ function StepCard({ step, index, coworkers, tools, participants, onUpdate, onDel
 // visual — nodes are draggable and their positions persist, edges are
 // drawn read-only from the linear auto-migration. Wiring, typed handles,
 // and DAG runtime arrive in later phases.
-function WorkflowCanvas({ workflow, onUpdateWorkflow, readOnly, fileTree, coworkers, tools, participants, activeRun, currentStepId, expandedStep, setExpandedStep, updateStep, deleteStep, validationErrors, showEducationalCues, callClaudeAPI, onSaveCoworkerToLibrary, onUpdateFileContent, apiKey, onCopilotUsage, copilotState, onCopilotPatch, copilotHistoriesRef, copilotWfId }) {
+function WorkflowCanvas({ workflow, onUpdateWorkflow, readOnly, fileTree, coworkers, tools, participants, activeRun, currentStepId, expandedStep, setExpandedStep, updateStep, deleteStep, validationErrors, showEducationalCues, callClaudeAPI, onSaveCoworkerToLibrary, onUpdateFileContent, onCopilotUsage, copilotState, onCopilotPatch, copilotHistoriesRef, copilotWfId }) {
   const [nodes, setNodes] = useState([]);
   const [edges, setEdges] = useState([]);
   // Copilot state lives in the parent (WorkflowBuilder) so the transcript
@@ -739,7 +738,7 @@ function WorkflowCanvas({ workflow, onUpdateWorkflow, readOnly, fileTree, cowork
     // 'approved' (Phase 4 split), everything else stays 'out'.
     const defaultHandle = sourceStep?.type === 'approval' ? 'approved' : 'out';
     const newEdge = {
-      id: `edge-${params.source}-${params.target}-${Date.now()}`,
+      id: `edge-${crypto.randomUUID()}`,
       source: params.source,
       target: params.target,
       sourceHandle: params.sourceHandle || defaultHandle,
@@ -768,7 +767,7 @@ function WorkflowCanvas({ workflow, onUpdateWorkflow, readOnly, fileTree, cowork
       : [];
     try {
       const { updatedHistory, updatedWorkflow } = await runCopilotTurn({
-        apiKey,
+        supabase,
         userMessage: text,
         conversationHistory: priorHistory,
         workflow,
@@ -797,7 +796,7 @@ function WorkflowCanvas({ workflow, onUpdateWorkflow, readOnly, fileTree, cowork
     } finally {
       setCopilotBusy(false);
     }
-  }, [copilotInput, copilotBusy, apiKey, workflow, coworkers, participants, onUpdateWorkflow, setCopilotInput, setCopilotMessages, setCopilotBusy, copilotHistoriesRef, copilotWfId, onCopilotUsage]);
+  }, [copilotInput, copilotBusy, workflow, coworkers, participants, onUpdateWorkflow, setCopilotInput, setCopilotMessages, setCopilotBusy, copilotHistoriesRef, copilotWfId, onCopilotUsage]);
 
   return (
     <div className={`wf-canvas-layout${copilotOpen ? ' copilot-open' : ''}`}>
@@ -895,7 +894,7 @@ function WorkflowCanvas({ workflow, onUpdateWorkflow, readOnly, fileTree, cowork
 }
 
 // ===== Workflow Editor =====
-function WorkflowEditor({ workflow, onUpdateWorkflow, readOnly, fileTree, coworkers, tools, participants, onRun, onCancelRun, isRunning, currentStepId, activeRun, onBack, showEducationalCues, callClaudeAPI, onSaveCoworkerToLibrary, onUpdateFileContent, apiKey, onCopilotUsage, copilotState, onCopilotPatch, copilotHistoriesRef, copilotWfId }) {
+function WorkflowEditor({ workflow, onUpdateWorkflow, readOnly, fileTree, coworkers, tools, participants, onRun, onCancelRun, isRunning, currentStepId, activeRun, onBack, showEducationalCues, callClaudeAPI, onSaveCoworkerToLibrary, onUpdateFileContent, onCopilotUsage, copilotState, onCopilotPatch, copilotHistoriesRef, copilotWfId }) {
   const confirm = useConfirm();
   const [expandedStep, setExpandedStep] = useState(null);
   const [showAddMenu, setShowAddMenu] = useState(false);
@@ -1088,7 +1087,6 @@ function WorkflowEditor({ workflow, onUpdateWorkflow, readOnly, fileTree, cowork
         callClaudeAPI={callClaudeAPI}
         onSaveCoworkerToLibrary={onSaveCoworkerToLibrary}
         onUpdateFileContent={onUpdateFileContent}
-        apiKey={apiKey}
         onCopilotUsage={onCopilotUsage}
         copilotState={copilotState}
         onCopilotPatch={onCopilotPatch}
@@ -1143,7 +1141,7 @@ function WorkflowCard({ workflow, coworkers, participants, onSelect, onDelete, o
 }
 
 // ===== Main Export =====
-export default function WorkflowBuilder({ workflows, onUpdateWorkflows, fileTree, coworkers, tools, onRun, onCancelRun, onCancelAllRuns, workflowRuns = [], participants, currentUserName, showEducationalCues, callClaudeAPI, onSaveCoworkerToLibrary, onUpdateFileContent, apiKey, onCopilotUsage }) {
+export default function WorkflowBuilder({ workflows, onUpdateWorkflows, fileTree, coworkers, tools, onRun, onCancelRun, onCancelAllRuns, workflowRuns = [], participants, currentUserName, showEducationalCues, callClaudeAPI, onSaveCoworkerToLibrary, onUpdateFileContent, onCopilotUsage }) {
   const confirm = useConfirm();
   const [selectedWorkflowId, setSelectedWorkflowId] = useState(null);
   // Copilot transcript state lives up here so it survives closing the panel,
@@ -1303,7 +1301,6 @@ export default function WorkflowBuilder({ workflows, onUpdateWorkflows, fileTree
           callClaudeAPI={callClaudeAPI}
           onSaveCoworkerToLibrary={onSaveCoworkerToLibrary}
           onUpdateFileContent={onUpdateFileContent}
-          apiKey={apiKey}
           onCopilotUsage={onCopilotUsage}
           copilotState={copilotState}
           onCopilotPatch={patchCopilot}

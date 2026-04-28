@@ -5,7 +5,7 @@
 // The canvas re-renders live because the mutations flow through the existing
 // onUpdateWorkflow path (same as drag-and-drop edits).
 
-import { claudeFetch } from './claudeFetch';
+import { callClaudeProxy } from './claudeFetch';
 
 // ===== Tool schemas =====
 // These go to Claude as the callable surface. The underlying implementations
@@ -100,7 +100,7 @@ function nextPosition(workflow) {
 }
 
 function genCopilotNodeId() {
-  return 'step-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6);
+  return 'step-' + crypto.randomUUID();
 }
 
 function applyCopilotTool(name, input, workflow, ctx) {
@@ -182,7 +182,7 @@ function applyCopilotTool(name, input, workflow, ctx) {
       );
       if (alreadyWired) return { error: `Edge ${fromNodeId} → ${toNodeId} (${sourceHandle}) already exists.` };
       const newEdge = {
-        id: `edge-${fromNodeId}-${toNodeId}-${Date.now()}`,
+        id: `edge-${crypto.randomUUID()}`,
         source: fromNodeId,
         target: toNodeId,
         sourceHandle,
@@ -375,7 +375,7 @@ ${summarizeWorkflow(workflow)}
 // panel can show progress. Each successful mutation fires onWorkflowUpdate.
 
 export async function runCopilotTurn({
-  apiKey,
+  supabase,
   userMessage,
   conversationHistory,
   workflow,
@@ -387,8 +387,8 @@ export async function runCopilotTurn({
   onError,
   onUsage,
 }) {
-  if (!apiKey) {
-    onError?.('No API key configured. Add VITE_ANTHROPIC_API_KEY to .env.');
+  if (!supabase) {
+    onError?.('Copilot needs the supabase client to authenticate proxy calls.');
     return { updatedHistory: conversationHistory, updatedWorkflow: workflow };
   }
 
@@ -414,31 +414,22 @@ export async function runCopilotTurn({
 
     let data;
     try {
-      const response = await claudeFetch('https://api.anthropic.com/v1/messages', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': apiKey,
-          'anthropic-version': '2023-06-01',
-          'anthropic-dangerous-direct-browser-access': 'true',
-        },
-        body: JSON.stringify({
-          model: 'claude-sonnet-4-20250514',
-          max_tokens: 2000,
-          // Prefix (stable — instructions, coworker/human/file lists) gets
-          // cache_control so turns 2+ read from prompt cache. Suffix
-          // (dynamic — current workflow state, mutates every tool call)
-          // flows uncached. Tools array is invariant, caches on its last
-          // tool's marker.
-          system: [
-            { type: 'text', text: stablePrefix, cache_control: { type: 'ephemeral' } },
-            { type: 'text', text: dynamicSuffix },
-          ],
-          messages,
-          tools: COPILOT_TOOL_SCHEMAS.length > 0
-            ? COPILOT_TOOL_SCHEMAS.map((t, i) => i === COPILOT_TOOL_SCHEMAS.length - 1 ? { ...t, cache_control: { type: 'ephemeral' } } : t)
-            : COPILOT_TOOL_SCHEMAS,
-        }),
+      const response = await callClaudeProxy(supabase, {
+        model: 'claude-sonnet-4-6',
+        max_tokens: 2000,
+        // Prefix (stable — instructions, coworker/human/file lists) gets
+        // cache_control so turns 2+ read from prompt cache. Suffix
+        // (dynamic — current workflow state, mutates every tool call)
+        // flows uncached. Tools array is invariant, caches on its last
+        // tool's marker.
+        system: [
+          { type: 'text', text: stablePrefix, cache_control: { type: 'ephemeral' } },
+          { type: 'text', text: dynamicSuffix },
+        ],
+        messages,
+        tools: COPILOT_TOOL_SCHEMAS.length > 0
+          ? COPILOT_TOOL_SCHEMAS.map((t, i) => i === COPILOT_TOOL_SCHEMAS.length - 1 ? { ...t, cache_control: { type: 'ephemeral' } } : t)
+          : COPILOT_TOOL_SCHEMAS,
       });
       if (!response.ok) {
         const errorText = await response.text().catch(() => '');
@@ -447,7 +438,7 @@ export async function runCopilotTurn({
       }
       data = await response.json();
       if (data.usage && onUsage) {
-        onUsage({ usage: data.usage, model: 'claude-sonnet-4-20250514' });
+        onUsage({ usage: data.usage, model: 'claude-sonnet-4-6' });
       }
     } catch (err) {
       onError?.(`Network error: ${err.message}`);
@@ -484,6 +475,13 @@ export async function runCopilotTurn({
     }
 
     messages.push({ role: 'user', content: toolResults });
+  }
+
+  // If the loop exited because we hit MAX_TURNS rather than because Claude
+  // stopped calling tools, surface that explicitly so the user knows the
+  // build was cut off mid-flight and may need a follow-up turn.
+  if (turns >= MAX_TURNS) {
+    onNarration?.(`(Hit the ${MAX_TURNS}-turn limit — the canvas reflects what I built so far. Tell me if anything's missing and I'll keep going.)`);
   }
 
   return { updatedHistory: messages, updatedWorkflow: currentWorkflow };

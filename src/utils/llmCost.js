@@ -12,6 +12,12 @@ const RATES = {
     cacheWrite: 3.75,
     cacheRead: 0.30,
   },
+  'claude-sonnet-4-6': {
+    input: 3.00,
+    output: 15.00,
+    cacheWrite: 3.75,
+    cacheRead: 0.30,
+  },
   'claude-haiku-4-5-20251001': {
     input: 1.00,
     output: 5.00,

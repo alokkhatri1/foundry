@@ -264,6 +264,13 @@ export async function executeWorkflowRun({
       onMessage({
         type: 'approval',
         runId,
+        // stepId/stepName/assigneeName ride along so the click handler can
+        // write them into the approvals row. Without these, the decisions
+        // panel can't tie the approval to the step that was reviewed and
+        // renders the step as "No decision recorded" even after a Reject.
+        stepId: step.id,
+        stepName: nodeLabel(step),
+        assigneeName: step.assigneeName || null,
         prompt: step.prompt || 'Review the upstream output and approve or reject with feedback',
         actions: ['Approve', 'Reject'],
         previousOutput: reviewerContext,

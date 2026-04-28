@@ -2074,7 +2074,7 @@ function App() {
     addMessage({ type: 'status', content: `Cancelled ${active.length} active run${active.length === 1 ? '' : 's'}.` });
   }
 
-  function handleApprovalAction(runId, msgId, action, comment) {
+  function handleApprovalAction(runId, msgId, action, comment, stepInfo = {}) {
     // The in-memory resolver only exists in the browser tab that started
     // the run. If the page has been refreshed since then, the runtime is
     // gone and there's nothing to resolve. Retire the card inline with a
@@ -2107,7 +2107,18 @@ function App() {
     }
     resolver({ action, comment, resolvedBy: userName });
     approvalResolversRef.current.delete(runId);
-    sb.logApproval({ runId, action, comment, resolvedBy: userName });
+    // Pass stepId/stepName/assigneeName so the decisions panel can tie the
+    // approval row back to the step. Without these, the row's step_id is
+    // null and the panel renders "No decision recorded" even after a Reject.
+    sb.logApproval({
+      runId,
+      stepId: stepInfo.stepId,
+      stepName: stepInfo.stepName,
+      assigneeName: stepInfo.assigneeName,
+      action,
+      comment,
+      resolvedBy: userName,
+    });
   }
 
   // Cross-user approvals: the reviewer clicks Approve/Reject from the

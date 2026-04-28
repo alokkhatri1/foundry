@@ -161,7 +161,7 @@ function ChatMessage({ msg, onApprovalAction, onPickRecipient, onNudgeRecipient,
               <div className="cl-approval-actions">
                 <button
                   className="cl-send-btn-approve"
-                  onClick={() => onApprovalAction(msg.runId, msg.id, 'Approve', comment)}
+                  onClick={() => onApprovalAction(msg.runId, msg.id, 'Approve', comment, { stepId: msg.stepId, stepName: msg.stepName, assigneeName: msg.assigneeName })}
                 >
                   Approve
                 </button>
@@ -169,7 +169,7 @@ function ChatMessage({ msg, onApprovalAction, onPickRecipient, onNudgeRecipient,
                   className="cl-send-btn-cancel"
                   disabled={!comment.trim()}
                   title={comment.trim() ? '' : 'Add feedback before rejecting'}
-                  onClick={() => onApprovalAction(msg.runId, msg.id, 'Reject', comment)}
+                  onClick={() => onApprovalAction(msg.runId, msg.id, 'Reject', comment, { stepId: msg.stepId, stepName: msg.stepName, assigneeName: msg.assigneeName })}
                 >
                   Reject with feedback
                 </button>

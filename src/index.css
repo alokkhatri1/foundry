@@ -4756,7 +4756,11 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
 /* Workflow cards */
 .wf-card {
   background: var(--bg-white); border: 1px solid var(--border-color);
-  border-radius: var(--radius); padding: 20px; cursor: pointer;
+  border-radius: var(--radius);
+  /* Right pad reserves room for the absolute-positioned .wf-card-actions
+     so long titles never run under the Copy/✕ buttons on hover. */
+  padding: 20px 88px 20px 20px;
+  cursor: pointer;
   transition: border-color 0.15s, box-shadow 0.15s, transform 0.15s;
   position: relative;
 }

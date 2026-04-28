@@ -341,14 +341,21 @@ export async function executeWorkflowRun({
         onLog({ type: 'workflow', message: `rejected → wired path(s): ${bounceTargets.join(',')}` });
       } else {
         // No wired rejected edge — fall back to the most recently executed
-        // Review before this one (Phase 5 bounce-back behavior).
+        // prior Review with a DIFFERENT assignee. Bouncing back to the same
+        // person who just rejected (or whose earlier approval is being
+        // re-evaluated) just re-asks them the same question; the value of
+        // a bounce is a different pair of eyes on the upstream output. If
+        // no different-assignee prior review exists, terminate as rejected.
         let prevReviewId = null;
         for (let i = executionLog.length - 1; i >= 0; i--) {
           const pid = executionLog[i];
-          if (pid !== nodeId && stepById.get(pid)?.type === 'approval' && executed.has(pid)) {
-            prevReviewId = pid;
-            break;
-          }
+          if (pid === nodeId) continue;
+          const prevStep = stepById.get(pid);
+          if (prevStep?.type !== 'approval') continue;
+          if (!executed.has(pid)) continue;
+          if (prevStep.assigneeId && step.assigneeId && prevStep.assigneeId === step.assigneeId) continue;
+          prevReviewId = pid;
+          break;
         }
         if (!prevReviewId) {
           onRunUpdate(runId, { status: 'rejected', completedAt: Date.now() });

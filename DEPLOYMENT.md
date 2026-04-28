@@ -5,13 +5,17 @@ wired to the `main` branch of the GitHub repo
 [`alokkhatri1/foundry`](https://github.com/alokkhatri1/foundry). Every push to
 `main` triggers an automatic build + deploy. There is no staging environment yet.
 
-Two production surfaces ship from the same `main`:
+Vercel ships everything in this repo on every push to `main`:
 
-- **Frontend (React app)** — deployed by Vercel automatically on every push.
-- **Supabase Edge Functions** (anything under `supabase/functions/`) — deployed
-  by `.github/workflows/deploy-edge-functions.yml` on push, scoped by path
-  filter so frontend-only pushes don't trigger it. Function secrets (e.g.
-  `ANTHROPIC_API_KEY`) live in the Supabase Dashboard, not in this repo.
+- **Frontend (React app)** — built from `src/` by Vite.
+- **Server-side API routes** under `api/*.js` — deployed as Vercel
+  serverless functions automatically. The frontend calls them at
+  `/api/<name>` (same origin, no CORS).
+
+There is intentionally only one deploy mechanism. If you ever add server
+code that needs to live elsewhere (e.g., Supabase Edge Functions for
+DB-proximate work), wire a separate deploy then — but until then, default
+to `api/*.js`.
 
 ## Domain setup
 
@@ -118,45 +122,45 @@ Sonnet-backed coworkers will burn through this faster.
 - Intent classification was removed in the 04-24 perf sweep — chat turns are
   now cheaper than before.
 
-## Edge Functions
+## API routes
 
-Functions under `supabase/functions/<name>/` deploy via GitHub Actions on
-push to `main`. The current functions:
+Files under `api/<name>.js` become Vercel serverless functions automatically
+on push. The frontend reaches them at `/api/<name>`.
 
-- `claude-proxy` — forwards browser calls to `api.anthropic.com` so the
-  Anthropic key never lives on the client. Set `ANTHROPIC_API_KEY` once via
-  Supabase Dashboard → Project Settings → Edge Functions → Manage Secrets.
+Current routes:
 
-### One-time GitHub Actions setup
+- `api/claude-proxy.js` — forwards browser calls to `api.anthropic.com` so
+  the Anthropic key never lives on the client. Verifies the caller's
+  Supabase session JWT before forwarding.
 
-1. Create a Supabase personal access token at
-   `https://supabase.com/dashboard/account/tokens` (name it e.g.
-   "github-actions-foundry"). Copy it once.
-2. In the GitHub repo: Settings → Secrets and variables → Actions → New
-   repository secret. Name: `SUPABASE_ACCESS_TOKEN`. Value: the token.
-3. The project ref (`ryzmzjiilqgtbiqmpbfv`) is hardcoded in the workflow —
-   update it there if the project ever moves.
+### Required Vercel env vars
 
-After setup, every push to `main` that touches `supabase/functions/**` runs
-the deploy workflow. Watch it in the GitHub Actions tab. You can also
-trigger manually via the "Run workflow" button on the workflow page.
+Set these in **Vercel → Project Settings → Environment Variables** for the
+**Production** environment:
 
-### Setting / updating function secrets
+- `ANTHROPIC_API_KEY` — the actual Anthropic key. Server-only — must NOT
+  have a `VITE_` prefix or Vite will inline it into the client bundle.
+- `VITE_SUPABASE_URL` — already set; reused by the proxy for JWT verify.
+- `VITE_SUPABASE_ANON_KEY` — already set; ditto.
 
-Function secrets (the actual values the function reads at runtime, like
-`ANTHROPIC_API_KEY`) are not in this repo and not in GitHub Actions. They
-live on the Supabase project itself: Dashboard → Project Settings → Edge
-Functions → Manage Secrets. Set once; the function picks them up on next
-invocation.
+After changing env vars, redeploy from the Vercel dashboard (or push a
+trivial commit) so the new value reaches the function.
+
+### Local dev
+
+`npm run dev` runs Vite on port 5173 but does **not** serve `api/*.js` —
+calls to `/api/claude-proxy` will 404 in dev. To exercise the proxy
+locally, use `vercel dev` instead, which boots both the Vite dev server
+and the API routes together. For UI-only work, the dev server is fine.
 
 ## Notes
 
 - There is no `vercel.json` in the repo — Vercel auto-detects the Vite
   project. If framework detection ever breaks, add one with
   `buildCommand: "npm run build"` and `outputDirectory: "dist"`.
-- Environment variables (Supabase URL, anon key) live in the Vercel project
-  settings, not in this repo. `.env` is gitignored. The Anthropic key
-  used to live on the client too, but as of the H3 audit it's been moved
-  off the client into the `claude-proxy` Edge Function's secrets.
+- Environment variables (Supabase URL, anon key, Anthropic key) live in the
+  Vercel project settings, not in this repo. `.env` is gitignored. The
+  Anthropic key used to live on the client too, but as of the H3 audit it
+  moved off the client into the `claude-proxy` Vercel function's env.
 - The GitHub remote is aliased `personal`, not `origin`:
   `git remote -v` will show `personal  https://github.com/alokkhatri1/foundry.git`.

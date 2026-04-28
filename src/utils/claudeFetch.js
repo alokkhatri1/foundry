@@ -1,9 +1,9 @@
 // Wrapper around `fetch` for every call to the Anthropic API. Calls now
-// go through the Supabase Edge Function `claude-proxy` instead of hitting
-// api.anthropic.com directly — the API key lives in proxy env, not on the
-// client. See `callClaudeProxy` at the bottom of this file for the helper
-// callers should use; raw `claudeFetch` stays exported for any non-Anthropic
-// fetches that want the same retry/concurrency/pacing protections.
+// go through the Vercel API route `/api/claude-proxy` instead of hitting
+// api.anthropic.com directly — the API key lives in Vercel server env,
+// not on the client. See `callClaudeProxy` at the bottom of this file for
+// the helper callers should use; raw `claudeFetch` stays exported for any
+// non-Anthropic fetches that want the same retry/concurrency/pacing.
 //
 //
 // Browsers have no sensible default timeout, so a slow Anthropic response (or
@@ -110,24 +110,16 @@ function retryAfterMs(response, attempt) {
 // the org-level rate limit is exhausted and a higher tier is needed.
 const MAX_ATTEMPTS_DEFAULT = 6;
 
-// Build the proxy URL once — the value is fixed at module load. If the
-// supabase URL isn't configured, callers will get a clear error from
-// callClaudeProxy below rather than firing requests at a broken URL.
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || '';
-const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
-const PROXY_URL = SUPABASE_URL ? `${SUPABASE_URL.replace(/\/$/, '')}/functions/v1/claude-proxy` : '';
+// Same-origin Vercel API route — the frontend and the function are served
+// from the same Vercel domain in production, so a relative path is enough
+// and there's nothing to configure per environment.
+const PROXY_URL = '/api/claude-proxy';
 
 // Send a request through the Anthropic proxy. `body` is the parsed JSON
 // payload that would have gone to /v1/messages directly (model, messages,
-// system, tools, max_tokens, etc.). Pulls the access token from the live
-// supabase session — the Edge Function rejects unauthenticated calls.
+// system, tools, max_tokens, etc.). Attaches the user's Supabase session
+// token as a Bearer header — the proxy verifies it before forwarding.
 export async function callClaudeProxy(supabase, body, opts = {}) {
-  if (!PROXY_URL) {
-    return new Response(
-      JSON.stringify({ error: 'VITE_SUPABASE_URL not configured — claude-proxy unreachable.' }),
-      { status: 500, headers: { 'Content-Type': 'application/json' } },
-    );
-  }
   if (!supabase) {
     return new Response(
       JSON.stringify({ error: 'callClaudeProxy needs the supabase client to read the session token.' }),
@@ -147,10 +139,6 @@ export async function callClaudeProxy(supabase, body, opts = {}) {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        // Both headers are needed for Supabase Functions: `apikey` lets the
-        // request through the API gateway; `Authorization` carries the user
-        // session that the function's verify_jwt step validates.
-        'apikey': SUPABASE_ANON_KEY,
         'Authorization': `Bearer ${session.access_token}`,
       },
       body: JSON.stringify(body),

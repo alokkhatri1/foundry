@@ -115,6 +115,24 @@ const MAX_ATTEMPTS_DEFAULT = 6;
 // and there's nothing to configure per environment.
 const PROXY_URL = '/api/claude-proxy';
 
+// Pull a fresh access token. supabase-js auto-refreshes on a timer when
+// `autoRefreshToken: true`, but the timer can lag behind a real call —
+// especially on long workshop sessions. Proactively refresh when the
+// current token is within a 60-second buffer of expiry, and as a last
+// line of defense, refresh-and-retry if the proxy ever returns 401.
+async function getFreshAccessToken(supabase) {
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session?.access_token) return null;
+  const now = Math.floor(Date.now() / 1000);
+  const expiresAt = session.expires_at || 0;
+  if (expiresAt - now < 60) {
+    const { data, error } = await supabase.auth.refreshSession();
+    if (error || !data?.session?.access_token) return session.access_token;
+    return data.session.access_token;
+  }
+  return session.access_token;
+}
+
 // Send a request through the Anthropic proxy. `body` is the parsed JSON
 // payload that would have gone to /v1/messages directly (model, messages,
 // system, tools, max_tokens, etc.). Attaches the user's Supabase session
@@ -126,25 +144,39 @@ export async function callClaudeProxy(supabase, body, opts = {}) {
       { status: 500, headers: { 'Content-Type': 'application/json' } },
     );
   }
-  const { data: { session } } = await supabase.auth.getSession();
-  if (!session?.access_token) {
+  let token = await getFreshAccessToken(supabase);
+  if (!token) {
     return new Response(
       JSON.stringify({ error: 'Not signed in — sign in before calling Claude.' }),
       { status: 401, headers: { 'Content-Type': 'application/json' } },
     );
   }
-  return claudeFetch(
+
+  const send = (t) => claudeFetch(
     PROXY_URL,
     {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${session.access_token}`,
+        'Authorization': `Bearer ${t}`,
       },
       body: JSON.stringify(body),
     },
     opts,
   );
+
+  let response = await send(token);
+  // 401 here means the token validated by the proxy is no longer valid —
+  // either it expired in the seconds between our pre-check and the proxy's
+  // verify, or supabase-js handed us a stale cached one. Force a refresh
+  // and try once more before giving up.
+  if (response.status === 401) {
+    const { data, error } = await supabase.auth.refreshSession();
+    if (!error && data?.session?.access_token) {
+      response = await send(data.session.access_token);
+    }
+  }
+  return response;
 }
 
 export async function claudeFetch(url, options = {}, { timeoutMs = 90_000, maxAttempts = MAX_ATTEMPTS_DEFAULT } = {}) {

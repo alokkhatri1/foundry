@@ -1938,13 +1938,59 @@ function App() {
       },
       onApprovalRequested: async ({ runId: rId, stepName, workflowName: wfName, assigneeId, prompt }) => {
         // DM the assignee so they see the review request — the approval card
-        // itself only renders in the initiator's run conversation.
+        // itself only renders in the initiator's run conversation. Surface
+        // each branch as a status line in the run chat so the run starter
+        // can SEE what happened (vs. silently no-op'ing or lying in logs).
         const sender = (participants || []).find(p => p.name === userName);
-        if (!sender || !assigneeId || sender.id === assigneeId) return;
+        const assignee = (participants || []).find(p => p.id === assigneeId);
+        if (!sender) {
+          addMessage({
+            type: 'status',
+            content: `Could not notify reviewer — your participant row wasn't found. Try refreshing.`,
+          }, runConvoId);
+          addLog({ type: 'error', message: `review DM skipped: sender not in participants for "${userName}"` });
+          return;
+        }
+        if (!assigneeId) {
+          addMessage({
+            type: 'status',
+            content: `Step "${stepName}" has no reviewer assigned — anyone can approve or reject from the run chat.`,
+          }, runConvoId);
+          return;
+        }
+        if (sender.id === assigneeId) {
+          addMessage({
+            type: 'status',
+            content: `You're the reviewer for "${stepName}" — approval card is right here, no DM needed.`,
+          }, runConvoId);
+          return;
+        }
+        if (!assignee) {
+          addMessage({
+            type: 'status',
+            content: `Could not notify reviewer — the assigned participant (id ${assigneeId}) is no longer in this room. Re-assign the reviewer in the workflow builder.`,
+          }, runConvoId);
+          addLog({ type: 'error', message: `review DM skipped: assignee ${assigneeId} not in participants` });
+          return;
+        }
         const promptLine = prompt ? ` — "${prompt}"` : '';
         const text = `Review requested: "${wfName}" · step "${stepName}"${promptLine}. A card is waiting in your Chat tab — approve or reject there.`;
-        await submitDm(sb, sender.id, assigneeId, text);
-        addLog({ type: 'workflow', message: `review DM sent to assignee for ${wfName} (${stepName})` });
+        const result = await submitDm(sb, sender.id, assigneeId, text);
+        if (result?.error && !result?.pending) {
+          addMessage({
+            type: 'error',
+            content: `Failed to notify ${assignee.name}: ${result.error?.message || result.error}. They won't see the request unless they refresh and look at the run.`,
+          }, runConvoId);
+          addLog({ type: 'error', message: `review DM failed: ${result.error?.message || result.error}` });
+          return;
+        }
+        addMessage({
+          type: 'status',
+          content: result?.pending
+            ? `Notification to ${assignee.name} queued (network slow); will deliver when their browser comes back.`
+            : `${assignee.name}${assignee.online ? '' : ' (offline)'} has been notified — they'll see the review request in their Chat tab.`,
+        }, runConvoId);
+        addLog({ type: 'workflow', message: `review DM sent to ${assignee.name} for ${wfName} (${stepName})${assignee.online ? '' : ' [offline]'}` });
       },
       onSaveStepOutput: ({ name, content, destination }) => {
         // Per-step save: fires whenever a step with step.save.enabled

@@ -1873,6 +1873,13 @@ function App() {
           type: step.type,
           coworkerName: cw?.name || null,
           coworkerAvatar: cw?.avatar || null,
+          // Both id and name. The "Reviews waiting for you" banner now
+          // matches on assigneeId vs. myParticipantId (rock-solid) and
+          // falls back to assigneeName for legacy run records that pre-
+          // date this field. Name-only matching was breaking when the
+          // assignee's userName state diverged even slightly from their
+          // participant.name (case, trailing space, post-rejoin renames).
+          assigneeId: step.assigneeId || null,
           assigneeName: person?.name || null,
           status: 'pending',
           output: null,
@@ -2546,7 +2553,14 @@ Answer in ONE sentence. If the user asks "how", a second sentence is allowed —
   const myPendingReviews = (workflowRuns || [])
     .filter(r => r.status === 'waiting_approval')
     .map(r => {
-      const step = (r.stepResults || []).find(s => s.status === 'waiting' && s.assigneeName === userName);
+      // ID match first (rock-solid against name drift); fall back to name
+      // match for runs created before assigneeId was stored on the
+      // stepResult.
+      const step = (r.stepResults || []).find(s => {
+        if (s.status !== 'waiting') return false;
+        if (s.assigneeId && myParticipantId) return s.assigneeId === myParticipantId;
+        return s.assigneeName === userName;
+      });
       return step ? { run: r, step } : null;
     })
     .filter(Boolean)

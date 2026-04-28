@@ -1668,8 +1668,12 @@ function App() {
       const updated = prev.map(r => r.id === runId ? { ...r, ...updates } : r);
       persistLocal({ workflowRuns: updated });
       // Sync terminal statuses to Supabase so refreshing doesn't resurrect them
+      // and so other participants in the room actually see the final state.
+      // 'rejected' must be in here — without it, rejected runs stay 'running'
+      // in Supabase forever and disappear from Observability for everyone but
+      // the owner.
       const run = updated.find(r => r.id === runId);
-      if (run && (updates.status === 'completed' || updates.status === 'error' || updates.status === 'cancelled')) {
+      if (run && (updates.status === 'completed' || updates.status === 'error' || updates.status === 'cancelled' || updates.status === 'rejected')) {
         sb.saveWorkflowRun(run);
       }
       return updated;

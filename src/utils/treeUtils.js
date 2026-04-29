@@ -168,16 +168,24 @@ export function flattenTree(tree, roomId) {
   const rows = [];
 
   function walk(node, pid, order) {
-    rows.push({
+    const row = {
       id: node.id,
       room_id: roomId,
       parent_id: pid,
       name: node.name,
       type: node.type,
-      content: node.content || null,
       sort_order: order,
       created_by: node.createdBy ?? node.created_by ?? null,
-    });
+    };
+    // Only carry `content` when the local node actually has a body. We
+    // lazy-load file bodies on click, so most rows in the in-memory tree
+    // have content === undefined. Coercing to null and including it in
+    // the row was bulk-clobbering DB content on every tree-wide save —
+    // a single file upload (which re-upserts the whole tree) wiped the
+    // body of every file the current user hadn't clicked yet. Omitting
+    // the field lets the upsert preserve whatever is already in the DB.
+    if (typeof node.content === 'string') row.content = node.content;
+    rows.push(row);
     if (node.children) {
       node.children.forEach((child, i) => walk(child, node.id, i));
     }

@@ -695,17 +695,22 @@ export default function useSupabase() {
 
   const saveFile = useCallback(async (file) => {
     if (!isSupabaseConfigured || !roomIdRef.current) return;
-    const { error } = await supabase.from('files').upsert({
+    const row = {
       id: file.id,
       room_id: roomIdRef.current,
       parent_id: file.parentId ?? file.parent_id ?? null,
       name: file.name,
       type: file.type,
-      content: file.content || null,
       sort_order: file.sortOrder ?? file.sort_order ?? 0,
       created_by: file.createdBy ?? file.created_by ?? null,
       updated_at: new Date().toISOString(),
-    }, { onConflict: 'id' });
+    };
+    // Mirror saveFilesBatch's content-preservation rule. Single-file saves
+    // come from explicit edits so content is usually a real string, but
+    // staying consistent prevents the same clobber bug from creeping back
+    // through a future call site that hands us an unloaded row.
+    if (typeof file.content === 'string') row.content = file.content;
+    const { error } = await supabase.from('files').upsert(row, { onConflict: 'id' });
     if (error) console.error('[sb] saveFile:', error.message);
   }, []);
 
@@ -721,9 +726,14 @@ export default function useSupabase() {
       const row = {
         id: f.id, room_id: f.room_id || roomIdRef.current,
         parent_id: f.parent_id || null, name: f.name, type: f.type,
-        content: f.content || null, sort_order: f.sort_order ?? 0,
+        sort_order: f.sort_order ?? 0,
         updated_at: new Date().toISOString(),
       };
+      // Same content-preservation rule as flattenTree: only include the
+      // `content` column when the caller actually has a loaded body to
+      // write. Sending null for an unloaded row would clobber the DB body
+      // on every tree-wide upsert.
+      if (typeof f.content === 'string') row.content = f.content;
       // Only set created_by when we actually have a value — omitting the key
       // lets Supabase preserve any existing stamp on re-upsert (e.g. a user's
       // file getting re-written by a tree migration pass that doesn't know

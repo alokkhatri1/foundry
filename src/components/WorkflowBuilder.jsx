@@ -212,7 +212,7 @@ function DeletableEdge({ id, sourceX, sourceY, targetX, targetY, sourcePosition,
 const wfEdgeTypes = { deletable: DeletableEdge };
 
 // ===== Step Card =====
-function StepCard({ step, index, coworkers, tools, participants, onUpdate, onDelete, expanded, onToggleExpand, validationErrors, allSteps, currentStepId, stepResult, isDragging, dragOverPos, onDragStart, onDragOver, onDragEnd, onDrop, showEducationalCues, onCanvas, fileTree, callClaudeAPI, onUpdateFileContent, readOnly }) {
+function StepCard({ step, index, coworkers, tools, participants, onUpdate, onDelete, expanded, onToggleExpand, validationErrors, allSteps, currentStepId, stepResult, isDragging, dragOverPos, onDragStart, onDragOver, onDragEnd, onDrop, showEducationalCues, onCanvas, fileTree, callClaudeAPI, onUpdateFileContent, readOnly, selfParticipantId, selfParticipantName }) {
   const isRunning = currentStepId === step.id;
   const assignedCw = step.type === 'agent' ? resolveStepCoworker(step, coworkers) : null;
   const assignedPerson = step.assigneeId ? participants?.find(p => p.id === step.assigneeId) : null;
@@ -501,11 +501,25 @@ function StepCard({ step, index, coworkers, tools, participants, onUpdate, onDel
                       assigneeName: picked?.name || null,
                     });
                   }}>
-                    <option value="">Anyone can review</option>
-                    {(participants || []).map(p => (
-                      <option key={p.id} value={p.id}>{p.name}</option>
-                    ))}
+                    {/* Workshop self-only mode: the dropdown only offers
+                        the current participant as a reviewer. Cross-user
+                        review delivery has unresolved bugs we couldn't
+                        ship through in time for the 04-29 workshop, so
+                        for the session we constrain reviews to the run
+                        starter — the path that's been verified end-to-
+                        end. Re-enable other participants by reverting
+                        this filter when the cross-user path is fixed. */}
+                    {selfParticipantId && selfParticipantName ? (
+                      <option value={selfParticipantId}>{selfParticipantName} (you)</option>
+                    ) : (
+                      <option value="">Anyone can review</option>
+                    )}
                   </select>
+                  {selfParticipantId && (
+                    <div className="step-config-help" style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>
+                      Workshop mode: reviewers are limited to you. The card lands in your run chat with Approve / Reject buttons.
+                    </div>
+                  )}
                 </div>
                 {assignedPerson && (
                   <div className="step-agent-info">
@@ -594,7 +608,7 @@ function StepCard({ step, index, coworkers, tools, participants, onUpdate, onDel
 // visual — nodes are draggable and their positions persist, edges are
 // drawn read-only from the linear auto-migration. Wiring, typed handles,
 // and DAG runtime arrive in later phases.
-function WorkflowCanvas({ workflow, onUpdateWorkflow, readOnly, fileTree, coworkers, tools, participants, activeRun, currentStepId, expandedStep, setExpandedStep, updateStep, deleteStep, validationErrors, showEducationalCues, callClaudeAPI, onSaveCoworkerToLibrary, onUpdateFileContent, onCopilotUsage, copilotState, onCopilotPatch, copilotHistoriesRef, copilotWfId }) {
+function WorkflowCanvas({ workflow, onUpdateWorkflow, readOnly, fileTree, coworkers, tools, participants, activeRun, currentStepId, expandedStep, setExpandedStep, updateStep, deleteStep, validationErrors, showEducationalCues, callClaudeAPI, onSaveCoworkerToLibrary, onUpdateFileContent, onCopilotUsage, copilotState, onCopilotPatch, copilotHistoriesRef, copilotWfId, selfParticipantId, selfParticipantName }) {
   const [nodes, setNodes] = useState([]);
   const [edges, setEdges] = useState([]);
   // Copilot state lives in the parent (WorkflowBuilder) so the transcript
@@ -655,6 +669,8 @@ function WorkflowCanvas({ workflow, onUpdateWorkflow, readOnly, fileTree, cowork
             onSaveCoworkerToLibrary,
             onUpdateFileContent,
             readOnly,
+            selfParticipantId,
+            selfParticipantName,
           },
         },
       };
@@ -906,7 +922,7 @@ function WorkflowCanvas({ workflow, onUpdateWorkflow, readOnly, fileTree, cowork
 }
 
 // ===== Workflow Editor =====
-function WorkflowEditor({ workflow, onUpdateWorkflow, readOnly, fileTree, coworkers, tools, participants, onRun, onCancelRun, isRunning, currentStepId, activeRun, onBack, showEducationalCues, callClaudeAPI, onSaveCoworkerToLibrary, onUpdateFileContent, onCopilotUsage, copilotState, onCopilotPatch, copilotHistoriesRef, copilotWfId }) {
+function WorkflowEditor({ workflow, onUpdateWorkflow, readOnly, fileTree, coworkers, tools, participants, onRun, onCancelRun, isRunning, currentStepId, activeRun, onBack, showEducationalCues, callClaudeAPI, onSaveCoworkerToLibrary, onUpdateFileContent, onCopilotUsage, copilotState, onCopilotPatch, copilotHistoriesRef, copilotWfId, selfParticipantId, selfParticipantName }) {
   const confirm = useConfirm();
   const [expandedStep, setExpandedStep] = useState(null);
   const [showAddMenu, setShowAddMenu] = useState(false);
@@ -965,7 +981,15 @@ function WorkflowEditor({ workflow, onUpdateWorkflow, readOnly, fileTree, cowork
       id: genStepId(), type,
       name: defaultName,
       ...(type === 'agent' && { coworker: emptyCoworker() }),
-      ...(type === 'approval' && { assigneeId: '', prompt: '' }),
+      // Self-only workshop mode: pre-fill new approval steps with the
+      // current user as the reviewer. The dropdown is locked to self
+      // anyway; pre-filling means the step is runnable immediately
+      // without requiring the user to open the panel and pick.
+      ...(type === 'approval' && {
+        assigneeId: selfParticipantId || '',
+        assigneeName: selfParticipantName || null,
+        prompt: '',
+      }),
       ...(type === 'capture' && { mode: 'knowledge', targetFileId: '' }),
     };
     onUpdateWorkflow({ ...workflow, steps: [...workflow.steps, newStep] });
@@ -1106,6 +1130,8 @@ function WorkflowEditor({ workflow, onUpdateWorkflow, readOnly, fileTree, cowork
         coworkers={coworkers}
         tools={tools}
         participants={participants}
+        selfParticipantId={selfParticipantId}
+        selfParticipantName={selfParticipantName}
         activeRun={activeRun}
         currentStepId={currentStepId}
         expandedStep={expandedStep}
@@ -1182,6 +1208,13 @@ export default function WorkflowBuilder({ workflows, onUpdateWorkflows, fileTree
   const copilotHistoriesRef = useRef({});
 
   const selectedWorkflow = selectedWorkflowId ? workflows.find(w => w.id === selectedWorkflowId) : null;
+
+  // Self-only workshop mode helper. Resolves the current participant from
+  // currentUserName so the assignee dropdown can lock to self and new
+  // approval steps can pre-fill correctly. See StepCard for the full why.
+  const selfParticipant = (participants || []).find(p => p.name === currentUserName);
+  const selfParticipantId = selfParticipant?.id || null;
+  const selfParticipantName = selfParticipant?.name || null;
 
   const COPILOT_DEFAULTS = { messages: [], input: '', busy: false, open: null };
   const copilotState = selectedWorkflowId
@@ -1314,6 +1347,8 @@ export default function WorkflowBuilder({ workflows, onUpdateWorkflows, fileTree
           coworkers={coworkers}
           tools={tools}
           participants={participants}
+          selfParticipantId={selfParticipantId}
+          selfParticipantName={selfParticipantName}
           onRun={onRun}
           onCancelRun={onCancelRun}
           isRunning={workflowRuns.some(r => r.workflowId === selectedWorkflow.id && (r.status === 'running' || r.status === 'waiting_approval'))}

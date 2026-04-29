@@ -2923,8 +2923,6 @@ Answer in ONE sentence. If the user asks "how", a second sentence is allowed —
               participants={participants}
               myParticipantId={myParticipantId}
               showEducationalCues={showEducationalCues}
-              creditAllocation={creditAllocation}
-              myCreditBonus={myCreditBonus}
             />
           </div>
         )}

@@ -8,10 +8,10 @@
 // accountability.
 
 import { useEffect, useMemo, useState } from 'react';
-import { computeCost, formatUsd, formatTokens, costToCredits } from '../utils/llmCost';
+import { computeCost, formatUsd, formatTokens } from '../utils/llmCost';
 import EducationalCue from './EducationalCue';
 
-export default function UsageView({ sb, participants, myParticipantId, showEducationalCues, creditAllocation }) {
+export default function UsageView({ sb, participants, myParticipantId, showEducationalCues }) {
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -61,18 +61,13 @@ export default function UsageView({ sb, participants, myParticipantId, showEduca
     return { bySeg, byParticipant, totalCost, totalTokens };
   }, [rows]);
 
-  // Workshop credit pool — total available across the room, used so far,
-  // remaining. Allocation is per-participant; total = allocation × humans.
-  // Bonuses aren't aggregated into the pool view (they're per-person and
-  // not loaded into the participants prop) — workshop total reflects the
-  // baseline allocation, which is the budget the facilitator set.
-  const workshopCredits = useMemo(() => {
-    const humans = (participants || []).filter(p => (p.kind || 'human') === 'human');
-    const total = creditAllocation != null ? creditAllocation * humans.length : 0;
-    const used = costToCredits(agg.totalCost);
-    const remaining = Math.max(0, total - used);
-    return { total, used, remaining, humans: humans.length };
-  }, [participants, creditAllocation, agg.totalCost]);
+  // Number of humans in the room — used to label the cohort header.
+  // The credit-pool banner that previously consumed this was removed
+  // (the "total available credits" framing wasn't pedagogically useful);
+  // only the participant count remains.
+  const humanCount = useMemo(() => (
+    (participants || []).filter(p => (p.kind || 'human') === 'human').length
+  ), [participants]);
 
   // Leaderboard — every human participant in the room, sorted by tokens
   // descending. Built from BOTH the usage table (so rows with NULL or
@@ -173,37 +168,11 @@ export default function UsageView({ sb, participants, myParticipantId, showEduca
             <div className="usage-total-meta">
               {formatTokens(agg.totalTokens)} tokens across {rows.length} call{rows.length === 1 ? '' : 's'}
               <br />
-              {workshopCredits.humans} participant{workshopCredits.humans === 1 ? '' : 's'} in the room
+              {humanCount} participant{humanCount === 1 ? '' : 's'} in the room
             </div>
           </div>
 
-          {/* Section 1 — workshop-wide credit pool. The gradient banner
-              shows credits remaining as the headline number, with a
-              progress bar and the breakdown underneath. */}
-          <div className="usage-credits-banner">
-            <div className="usage-credits-banner-left">
-              <div className="usage-credits-banner-label">Total available credits</div>
-              <div className="usage-credits-banner-value">
-                <span className="usage-credits-banner-star" aria-hidden>✦</span>
-                {workshopCredits.remaining.toLocaleString()}
-              </div>
-            </div>
-            <div className="usage-credits-banner-right">
-              The cohort started with <strong>{workshopCredits.total.toLocaleString()}</strong> credits
-              {creditAllocation != null && <> ({workshopCredits.humans} × {creditAllocation.toLocaleString()})</>}
-              {' '}— <strong>{workshopCredits.used.toLocaleString()}</strong> used so far.
-              <div className="usage-pool-bar" style={{ marginTop: 10 }}>
-                <div
-                  className="usage-pool-bar-fill"
-                  style={{ width: workshopCredits.total > 0
-                    ? `${Math.min(100, (workshopCredits.used / workshopCredits.total) * 100).toFixed(1)}%`
-                    : '0%' }}
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* Section 2 — leaderboard, every human in the room ranked by
+          {/* Leaderboard — every human in the room ranked by
               tokens used. Reuses the previous usage-participant-row grid
               with a rank column slotted in front. Leader gets an amber
               accent; the current user's row gets the existing is-you

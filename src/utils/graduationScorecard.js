@@ -1,5 +1,5 @@
 // Graduation scorecard — maps each participant's activity onto a rubric of
-// competency levels per pedagogical dimension.
+// competency levels, one dimension per top-level tab.
 //
 // Levels, lowest → highest:
 //   0. Not Started   — no evidence of touching the primitive
@@ -8,9 +8,14 @@
 //   3. Mastery       — used it well, multiple times, refined
 //   4. Influence     — their artifact was used or acted on by another participant
 //
-// "Influence" requires cross-participant data (someone else DM'd my coworker,
-// used my skill file, resolved my review request, etc). We compute what we
-// can with the Supabase data at hand; some influence signals are intentionally
+// The 6 dimensions mirror the app's tabs: Chat, Files, Coworkers, Orchestration,
+// Collaboration (cross-tab), Observability. Tools and Capture are no longer
+// standalone — they roll into Coworkers and Orchestration respectively, which
+// is where participants actually configure them in the new layout.
+//
+// "Influence" requires cross-participant data (someone else used my file,
+// DM'd my coworker, ran my workflow, resolved my review request). We compute
+// what we can with the Supabase data at hand; signals are intentionally
 // conservative — false negatives are fine, false positives are not.
 
 export const LEVELS = ['Not Started', 'Awareness', 'Application', 'Mastery', 'Influence'];
@@ -51,6 +56,9 @@ export function computeScorecard({
   fileTree = null,
   userPreferences = '',
 }) {
+  // Pull the participant's slice of every entity. "mine" = createdBy === userName,
+  // with a permissive fallback for files that were created before createdBy was
+  // stamped (treat as own — they don't otherwise count toward any peer's score).
   const myMessages = (conversations || []).reduce((sum, c) => sum + (c.messages || []).filter(m => m.type === 'user').length, 0);
   const myCoworkers = (coworkers || []).filter(c => c.createdBy === userName);
   const myWorkflows = (workflows || []).filter(w => w.createdBy === userName);
@@ -59,7 +67,7 @@ export function computeScorecard({
   const myRealFiles = myFiles.filter(f => f.type === 'file');
   const myTools = (tools || []).filter(t => !t.isBuiltin && (!t.createdBy || t.createdBy === userName));
 
-  // Approvals I personally resolved (any action), split by whose run.
+  // Approvals split by whose run, for the Collaboration + Observability dims.
   const myApprovals = (approvals || []).filter(a => a.resolved_by === userName);
   const reviewsForOthers = myApprovals.filter(a => {
     const run = (workflowRuns || []).find(r => r.id === a.run_id);
@@ -68,8 +76,6 @@ export function computeScorecard({
   const distinctPeopleIReviewedFor = new Set(reviewsForOthers
     .map(a => (workflowRuns || []).find(r => r.id === a.run_id)?.startedBy)
     .filter(Boolean));
-
-  // Approvals on MY runs resolved by someone else (others influenced my flows).
   const approvalsOnMyRuns = (approvals || []).filter(a => {
     const run = (workflowRuns || []).find(r => r.id === a.run_id);
     return run && run.startedBy === userName;
@@ -79,14 +85,14 @@ export function computeScorecard({
   // when no fileTree is passed (test harness) so callers don't have to
   // always thread it.
   const skillsFilesAll = fileTree ? filesInFolderNamed(fileTree, 'skills') : myRealFiles.filter(f => /skill|instruction/i.test(f.name || ''));
-  const skillFiles = skillsFilesAll.filter(f => !f.createdBy || f.createdBy === userName);
+  const knowledgeFilesAll = fileTree ? filesInFolderNamed(fileTree, 'knowledge') : [];
+  const mySkillFiles = skillsFilesAll.filter(f => !f.createdBy || f.createdBy === userName);
+  const myKnowledgeFiles = knowledgeFilesAll.filter(f => !f.createdBy || f.createdBy === userName);
+  const myFolderOrganizedFiles = mySkillFiles.length + myKnowledgeFiles.length;
   const skillUsedInMyCoworkers = myCoworkers.some(c =>
-    (c.instructionFileIds || []).some(id => skillFiles.some(f => f.id === id))
+    (c.instructionFileIds || []).some(id => mySkillFiles.some(f => f.id === id))
   );
   const othersCoworkers = (coworkers || []).filter(c => c.createdBy && c.createdBy !== userName);
-  const mySkillsUsedByOthers = skillFiles.filter(f =>
-    othersCoworkers.some(c => (c.instructionFileIds || []).includes(f.id))
-  ).length;
   const myFilesUsedByOthers = myFiles.filter(f =>
     othersCoworkers.some(c =>
       (c.instructionFileIds || []).includes(f.id)
@@ -101,118 +107,141 @@ export function computeScorecard({
     c.kind === 'dm' && myCoworkerNames.has(c.title)
     && (c.messages || []).some(m => m.authorName && m.authorName !== userName)
   ).length;
+  const myToolsUsedByOthers = myTools.filter(t =>
+    othersCoworkers.some(c => (c.toolIds || []).includes(t.id))
+  ).length;
+
+  // Capture-step signals fold into Orchestration now.
+  const myCaptureSteps = myWorkflows.flatMap(w =>
+    (w.steps || []).filter(s => s.type === 'capture')
+  );
+  const myConfiguredCaptures = myCaptureSteps.filter(s => s.targetFileId);
+  const myCaptureRunsCompleted = myRuns.filter(r =>
+    (r.stepResults || []).some(s => s.type === 'capture' && s.status === 'completed' && s.output && !/^not configured/i.test(String(s.output)))
+  ).length;
 
   // Dimensions -------------------------------------------------------------
 
   const dimensions = [];
 
-  // 1. Personalization (Preferences) — reads the actual user_preferences
-  //    content (threaded in from Supabase), not a file named "preferences".
+  // 1. Chat & Personalization (Chat tab) — measures whether the participant
+  //    actually conversed and taught the AI their voice via preferences.
+  //    Caps at Mastery: there's no clean "influence" signal for prefs alone.
   const prefs = (userPreferences || '').trim();
   dimensions.push({
-    key: 'personalization',
-    label: 'Personalization',
-    hint: 'Teaching the AI your voice and role.',
+    key: 'chat',
+    label: 'Chat & Personalization',
+    hint: 'Talking with the AI and teaching it your voice and role.',
     level: (() => {
       if (myMessages === 0 && prefs.length === 0) return 0;
       if (prefs.length === 0) return 1;
       if (prefs.length < 80) return 2;
       return 3;
     })(),
-    evidence: prefs.length > 0
-      ? `Preferences: ${prefs.length} chars${prefs.length >= 80 ? ' (detailed)' : ''}.`
-      : myMessages > 0 ? 'Chatted, but no preferences written yet.' : 'No activity.',
+    evidence: (() => {
+      const parts = [];
+      if (myMessages > 0) parts.push(`${myMessages} message${myMessages === 1 ? '' : 's'} sent`);
+      if (prefs.length > 0) parts.push(`preferences ${prefs.length} chars${prefs.length >= 80 ? ' (detailed)' : ''}`);
+      return parts.length ? parts.join(' · ') + '.' : 'No activity.';
+    })(),
   });
 
-  // 2. Grounding (Files as context)
+  // 2. Files & Grounding (Files tab) — uploads + skills/knowledge folder
+  //    organization + reuse by peers. Folds in the old "Skill authoring"
+  //    dimension; level 4 fires for any file (not just skill files) reused.
   dimensions.push({
-    key: 'grounding',
-    label: 'Grounding',
-    hint: 'Giving the AI documents to work from.',
+    key: 'files',
+    label: 'Files & Grounding',
+    hint: 'Giving the AI documents to work from, organized into skills and knowledge.',
     level: (() => {
       const n = myRealFiles.length;
       if (n === 0) return 0;
       if (myFilesUsedByOthers.length > 0) return 4;
-      if (n >= 5) return 3;
-      if (n >= 2) return 2;
+      if (n >= 5 && skillUsedInMyCoworkers) return 3;
+      if (n >= 2 || myFolderOrganizedFiles >= 1) return 2;
       return 1;
     })(),
-    evidence: myRealFiles.length === 0
-      ? 'No files uploaded.'
-      : `${myRealFiles.length} file${myRealFiles.length === 1 ? '' : 's'} in your folders${myFilesUsedByOthers.length > 0 ? ` · ${myFilesUsedByOthers.length} used by others` : ''}.`,
-  });
-
-  // 3. Skill authoring — now folder-based (/skills/) instead of name regex.
-  dimensions.push({
-    key: 'skills',
-    label: 'Skill authoring',
-    hint: 'Writing reusable instructions that shape coworker behavior.',
-    level: (() => {
-      if (skillFiles.length === 0) return 0;
-      if (mySkillsUsedByOthers > 0) return 4;
-      if (skillUsedInMyCoworkers && skillFiles.length >= 2) return 3;
-      if (skillUsedInMyCoworkers) return 2;
-      return 1;
+    evidence: (() => {
+      if (myRealFiles.length === 0) return 'No files uploaded.';
+      const parts = [`${myRealFiles.length} file${myRealFiles.length === 1 ? '' : 's'}`];
+      if (mySkillFiles.length) parts.push(`${mySkillFiles.length} skill`);
+      if (myKnowledgeFiles.length) parts.push(`${myKnowledgeFiles.length} knowledge`);
+      if (myFilesUsedByOthers.length) parts.push(`${myFilesUsedByOthers.length} reused by peers`);
+      return parts.join(' · ') + '.';
     })(),
-    evidence: skillFiles.length === 0
-      ? 'No skill files authored.'
-      : `${skillFiles.length} skill file${skillFiles.length === 1 ? '' : 's'}${skillUsedInMyCoworkers ? ' · used in your coworker' : ''}${mySkillsUsedByOthers ? ` · reused by ${mySkillsUsedByOthers} of others' coworkers` : ''}.`,
   });
 
-  // 4. Coworker creation — compound Mastery gate (role + instruction files +
-  //    tool) instead of a flat 40-char role threshold.
+  // 3. Coworkers (Coworkers tab) — folds in the old "Tools & connectors"
+  //    dimension. A "rich" coworker now means role + instructions + knowledge
+  //    + tool wired in. Influence fires if a peer DM'd a coworker I built or
+  //    reused a tool I built.
+  const myCoworkersWithTools = myCoworkers.filter(c => (c.toolIds || []).length > 0);
   const richCoworker = myCoworkers.find(c =>
     (c.role || '').trim().length > 40
     && (c.instructionFileIds || []).length > 0
+    && (c.knowledgeFileIds || []).length > 0
     && (c.toolIds || []).length > 0
   );
   dimensions.push({
     key: 'coworkers',
-    label: 'Coworker creation',
-    hint: 'Building named AI teammates with instructions + knowledge.',
+    label: 'Coworkers',
+    hint: 'Building named AI teammates with role, instructions, knowledge, and tools.',
     level: (() => {
       if (myCoworkers.length === 0) return 0;
-      if (coworkersDmdByOthers > 0) return 4;
+      if (coworkersDmdByOthers > 0 || myToolsUsedByOthers > 0) return 4;
       if (myCoworkers.length >= 2 && richCoworker) return 3;
-      if (myCoworkers.some(c => (c.role || '').trim().length > 0 || (c.instructionFileIds || []).length > 0)) return 2;
+      if (myCoworkers.some(c => (c.role || '').trim().length > 0 && (c.instructionFileIds || []).length > 0)) return 2;
       return 1;
     })(),
-    evidence: myCoworkers.length === 0
-      ? 'No coworkers built.'
-      : `${myCoworkers.length} coworker${myCoworkers.length === 1 ? '' : 's'}: ${myCoworkers.map(c => c.name).slice(0, 3).join(', ')}${myCoworkers.length > 3 ? '\u2026' : ''}${coworkersDmdByOthers > 0 ? ' · DM\'d by peers' : ''}.`,
+    evidence: (() => {
+      if (myCoworkers.length === 0) return 'No coworkers built.';
+      const parts = [`${myCoworkers.length} coworker${myCoworkers.length === 1 ? '' : 's'}`];
+      if (myCoworkersWithTools.length) parts.push(`${myCoworkersWithTools.length} armed with tools`);
+      if (myTools.length) parts.push(`${myTools.length} tool${myTools.length === 1 ? '' : 's'} built`);
+      if (coworkersDmdByOthers) parts.push(`DM'd by peers`);
+      if (myToolsUsedByOthers) parts.push(`tools reused`);
+      return parts.join(' · ') + '.';
+    })(),
   });
 
-  // 5. Tools / Connectors — new dimension. Counts participant-authored tools
-  //    (non-prebuilt) plus coworkers that actually wire a tool in.
-  const myCoworkersWithTools = myCoworkers.filter(c => (c.toolIds || []).length > 0);
-  const myToolsUsedByOthers = myTools.filter(t =>
-    othersCoworkers.some(c => (c.toolIds || []).includes(t.id))
+  // 4. Orchestration (Orchestration tab) — folds in the old "Capture learning"
+  //    dimension. Mastery requires a workflow that includes a configured
+  //    capture step AND completed at least one successful capture run.
+  //    Influence fires when a peer runs your workflow.
+  const myWorkflowsRunByOthers = myWorkflows.filter(w =>
+    (workflowRuns || []).some(r => r.workflowId === w.id && r.startedBy !== userName)
   ).length;
+  const myRunsWithHumanReview = myRuns.filter(r =>
+    (r.stepResults || []).some(s => s.type === 'approval' && s.status === 'completed')
+  );
   dimensions.push({
-    key: 'tools',
-    label: 'Tools & connectors',
-    hint: 'Extending coworkers with external actions.',
+    key: 'orchestration',
+    label: 'Orchestration',
+    hint: 'Chaining AI and human steps into a repeatable flow that captures what it learns.',
     level: (() => {
-      if (myTools.length === 0 && myCoworkersWithTools.length === 0) return 0;
-      if (myToolsUsedByOthers > 0) return 4;
-      if (myTools.length >= 1 && myCoworkersWithTools.length >= 1) return 3;
-      if (myCoworkersWithTools.length >= 1) return 2;
+      if (myRuns.length === 0 && myWorkflows.length === 0) return 0;
+      if (myWorkflowsRunByOthers > 0) return 4;
+      if (myCaptureRunsCompleted >= 1 && myRunsWithHumanReview.length >= 1) return 3;
+      if (myRuns.length >= 1) return 2;
       return 1;
     })(),
     evidence: (() => {
       const parts = [];
-      if (myTools.length) parts.push(`${myTools.length} tool${myTools.length === 1 ? '' : 's'} built`);
-      if (myCoworkersWithTools.length) parts.push(`${myCoworkersWithTools.length} coworker${myCoworkersWithTools.length === 1 ? '' : 's'} armed`);
-      if (myToolsUsedByOthers) parts.push(`${myToolsUsedByOthers} used by others`);
-      return parts.length ? parts.join(' · ') + '.' : 'No tools built yet.';
+      if (myWorkflows.length) parts.push(`${myWorkflows.length} workflow${myWorkflows.length === 1 ? '' : 's'} designed`);
+      if (myRuns.length) parts.push(`${myRuns.length} run${myRuns.length === 1 ? '' : 's'}`);
+      if (myConfiguredCaptures.length) parts.push(`${myConfiguredCaptures.length} capture step${myConfiguredCaptures.length === 1 ? '' : 's'}`);
+      if (myWorkflowsRunByOthers) parts.push(`reused by ${myWorkflowsRunByOthers} teammate${myWorkflowsRunByOthers === 1 ? '' : 's'}`);
+      return parts.length ? parts.join(' · ') + '.' : 'No orchestration activity yet.';
     })(),
   });
 
-  // 6. Mixed-team collaboration (reviews — sending and resolving)
+  // 5. Collaboration — cross-room review exchange. Both sides count: opening
+  //    a review on a peer (resolveByMe targeting their run) and having one
+  //    of yours resolved (approvalsOnMyRuns).
   dimensions.push({
     key: 'collaboration',
-    label: 'Mixed-team collaboration',
-    hint: 'Both roles of the draft-and-review exchange.',
+    label: 'Collaboration',
+    hint: 'Mixed-team draft-and-review across humans and coworkers.',
     level: (() => {
       const resolvedByMe = myApprovals.length;
       const onMyRuns = approvalsOnMyRuns.length;
@@ -231,71 +260,9 @@ export function computeScorecard({
     })(),
   });
 
-  // 7. Orchestration
-  const myRunsWithHumanReview = myRuns.filter(r =>
-    (r.stepResults || []).some(s => s.type === 'approval' && s.status === 'completed')
-  );
-  const myWorkflowsRunByOthers = myWorkflows.filter(w =>
-    (workflowRuns || []).some(r => r.workflowId === w.id && r.startedBy !== userName)
-  ).length;
-  dimensions.push({
-    key: 'orchestration',
-    label: 'Orchestration',
-    hint: 'Chaining AI and human steps into a repeatable flow.',
-    level: (() => {
-      if (myRuns.length === 0 && myWorkflows.length === 0) return 0;
-      if (myWorkflowsRunByOthers > 0) return 4;
-      if (myRunsWithHumanReview.length > 0) return 3;
-      if (myRuns.length > 0) return 2;
-      return 1;
-    })(),
-    evidence: (() => {
-      const parts = [];
-      if (myWorkflows.length) parts.push(`${myWorkflows.length} workflow${myWorkflows.length === 1 ? '' : 's'} designed`);
-      if (myRuns.length) parts.push(`${myRuns.length} run${myRuns.length === 1 ? '' : 's'}`);
-      if (myRunsWithHumanReview.length) parts.push('including human review');
-      if (myWorkflowsRunByOthers) parts.push(`reused by ${myWorkflowsRunByOthers} teammate${myWorkflowsRunByOthers === 1 ? '' : 's'}`);
-      return parts.length ? parts.join(' · ') + '.' : 'No orchestration activity yet.';
-    })(),
-  });
-
-  // 8. Capture Learning — new dimension. Did they configure a Capture step,
-  //    did it run successfully, did knowledge/skills actually compound?
-  const myCaptureSteps = myWorkflows.flatMap(w =>
-    (w.steps || []).filter(s => s.type === 'capture')
-  );
-  const myConfiguredCaptures = myCaptureSteps.filter(s => s.targetFileId);
-  const myCaptureRunsCompleted = myRuns.filter(r =>
-    (r.stepResults || []).some(s => s.type === 'capture' && s.status === 'completed' && s.output && !/^not configured/i.test(String(s.output)))
-  ).length;
-  const myCaptureFiles = new Set(myConfiguredCaptures.map(s => s.targetFileId));
-  const myCapturedFilesUsedByOthers = [...myCaptureFiles].filter(fid =>
-    othersCoworkers.some(c =>
-      (c.instructionFileIds || []).includes(fid) || (c.knowledgeFileIds || []).includes(fid)
-    )
-  ).length;
-  dimensions.push({
-    key: 'capture',
-    label: 'Capture learning',
-    hint: 'Turning a run into compounding knowledge or refined skills.',
-    level: (() => {
-      if (myCaptureSteps.length === 0) return 0;
-      if (myCapturedFilesUsedByOthers > 0) return 4;
-      if (myCaptureRunsCompleted >= 2) return 3;
-      if (myCaptureRunsCompleted >= 1) return 2;
-      return 1;
-    })(),
-    evidence: (() => {
-      const parts = [];
-      if (myConfiguredCaptures.length) parts.push(`${myConfiguredCaptures.length} capture step${myConfiguredCaptures.length === 1 ? '' : 's'} configured`);
-      if (myCaptureRunsCompleted) parts.push(`${myCaptureRunsCompleted} successful run${myCaptureRunsCompleted === 1 ? '' : 's'}`);
-      if (myCapturedFilesUsedByOthers) parts.push(`file${myCapturedFilesUsedByOthers === 1 ? '' : 's'} reused by peers`);
-      return parts.length ? parts.join(' · ') + '.' : 'No capture steps configured.';
-    })(),
-  });
-
-  // 9. Observability — now weighted toward actual review signals (decisions
-  //    + activity on your runs) rather than re-counting unrelated activity.
+  // 6. Observability (Observability tab) — visible runs + decisions logged
+  //    + activity on your own runs. Distinct-runs-touched is the influence
+  //    signal: someone whose decisions span the room, not just their own.
   const runsInRoom = (workflowRuns || []).length;
   dimensions.push({
     key: 'observability',
@@ -303,8 +270,6 @@ export function computeScorecard({
     hint: 'Watching the mixed team work and acting on what you see.',
     level: (() => {
       if (runsInRoom === 0) return 0;
-      // Distinct runs I had decision-log involvement on — as reviewer or as
-      // owner whose run produced decisions.
       const distinctRunsTouched = new Set([
         ...myApprovals.map(a => a.run_id),
         ...approvalsOnMyRuns.map(a => a.run_id),

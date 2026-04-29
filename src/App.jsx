@@ -1703,13 +1703,19 @@ function App() {
 
   // ===== Workflow Execution =====
   // ===== Workflow Run Helpers =====
-  // Terminal statuses always sync; intermediate ones throttle so a chatty
-  // run doesn't write a row per step transition.
-  const TERMINAL_RUN_STATUSES = new Set(['completed', 'error', 'cancelled', 'rejected', 'interrupted']);
+  // Statuses that bypass the throttle and sync immediately. Terminal
+  // statuses must sync so the room sees the run finish; 'waiting_approval'
+  // must sync so the assigned reviewer's browser sees the run reach the
+  // pause point and renders the inline approval card / pending-reviews
+  // banner. Without 'waiting_approval' here, the throttle silently drops
+  // the status transition because step.status='waiting' and
+  // run.status='waiting_approval' both fire in the same React batch and
+  // only the first sync gets through.
+  const FORCE_SYNC_STATUSES = new Set(['completed', 'error', 'cancelled', 'rejected', 'interrupted', 'waiting_approval']);
 
-  function syncRunToSupabase(run, isTerminal) {
+  function syncRunToSupabase(run, forceSync) {
     if (!run) return;
-    if (isTerminal) {
+    if (forceSync) {
       lastRunSyncRef.current.delete(run.id);
       sb.saveWorkflowRun(run);
       return;
@@ -1726,12 +1732,12 @@ function App() {
       const updated = prev.map(r => r.id === runId ? { ...r, ...updates } : r);
       persistLocal({ workflowRuns: updated });
       const run = updated.find(r => r.id === runId);
-      // Sync to Supabase: terminal statuses fire immediately so the room sees
-      // the final state and the row stops looking "running" forever; non-
-      // terminal updates throttle so participants get progress without a
+      // Sync to Supabase: force-sync statuses (terminal + waiting_approval)
+      // fire immediately so the room sees the state change without delay;
+      // other updates throttle so participants get progress without a
       // write per step transition.
-      const isTerminal = TERMINAL_RUN_STATUSES.has(updates.status);
-      syncRunToSupabase(run, isTerminal);
+      const forceSync = FORCE_SYNC_STATUSES.has(updates.status);
+      syncRunToSupabase(run, forceSync);
       return updated;
     });
   }

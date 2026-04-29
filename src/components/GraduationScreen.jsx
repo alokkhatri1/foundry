@@ -87,10 +87,18 @@ export default function GraduationScreen({
     }
   }
 
-  const totalMessages = (conversations || []).reduce((sum, c) => sum + (c.messages?.length || 0), 0);
-  const filesCount = (flatFiles || []).filter(f => f.type === 'file').length;
-  const coworkersCount = (coworkers || []).length;
-  const runsCount = (workflowRuns || []).length;
+  // Tally is user-scoped, matching the per-dimension rubric below.
+  // Counting room-wide totals here was misleading: the screen reads as
+  // "your" graduation but the numbers were the cohort's, so an admin
+  // viewing a deprecated workshop would see "132 files" with every
+  // competency below saying "no activity" — same data, two framings.
+  const totalMessages = (conversations || []).reduce(
+    (sum, c) => sum + (c.messages || []).filter(m => m.type === 'user').length,
+    0,
+  );
+  const filesCount = (flatFiles || []).filter(f => f.type === 'file' && f.createdBy === userName).length;
+  const coworkersCount = (coworkers || []).filter(c => c.createdBy === userName).length;
+  const runsCount = (workflowRuns || []).filter(r => r.startedBy === userName).length;
 
   const overall = scorecard?.overallLevel ?? 0;
   const overallLabel = LEVELS[overall];

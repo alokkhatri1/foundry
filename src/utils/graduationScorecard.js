@@ -235,32 +235,12 @@ export function computeScorecard({
     })(),
   });
 
-  // 5. Collaboration — cross-room review exchange. Both sides count: opening
-  //    a review on a peer (resolveByMe targeting their run) and having one
-  //    of yours resolved (approvalsOnMyRuns).
-  dimensions.push({
-    key: 'collaboration',
-    label: 'Collaboration',
-    hint: 'Mixed-team draft-and-review across humans and coworkers.',
-    level: (() => {
-      const resolvedByMe = myApprovals.length;
-      const onMyRuns = approvalsOnMyRuns.length;
-      if (resolvedByMe === 0 && onMyRuns === 0) return 0;
-      if (distinctPeopleIReviewedFor.size >= 2) return 4;
-      if (resolvedByMe > 0 && onMyRuns > 0) return 3;
-      if (resolvedByMe > 0 || onMyRuns > 0) return 2;
-      return 1;
-    })(),
-    evidence: (() => {
-      const parts = [];
-      if (myApprovals.length) parts.push(`${myApprovals.length} review${myApprovals.length === 1 ? '' : 's'} resolved`);
-      if (approvalsOnMyRuns.length) parts.push(`${approvalsOnMyRuns.length} on your runs`);
-      if (distinctPeopleIReviewedFor.size) parts.push(`for ${distinctPeopleIReviewedFor.size} ${distinctPeopleIReviewedFor.size === 1 ? 'person' : 'people'}`);
-      return parts.length ? parts.join(' · ') + '.' : 'No review activity yet.';
-    })(),
-  });
+  // (Collaboration dimension was here before — dropped because it counted
+  // the same review-activity signals that Observability already scores.
+  // The mixed-team draft-and-review story now lives entirely under
+  // Observability, which is also the tab participants see those signals on.)
 
-  // 6. Observability (Observability tab) — visible runs + decisions logged
+  // 5. Observability (Observability tab) — visible runs + decisions logged
   //    + activity on your own runs. Distinct-runs-touched is the influence
   //    signal: someone whose decisions span the room, not just their own.
   const runsInRoom = (workflowRuns || []).length;

@@ -1919,12 +1919,28 @@ function App() {
     // conversation the user isn't looking at and the run feels broken.
     setActiveConvoId(runConvoId);
 
+    // Enrich workflow steps with assigneeName looked up from participants.
+    // The workflow stores assigneeId only; the executor needs the name on
+    // each step so the approval card it emits carries the assignee's name.
+    // Without this, the chat-side check that hides the Approve/Reject
+    // buttons on non-assignees can't tell who to gate against and falls
+    // back to "anyone can review" — leaving buttons visible on the run
+    // starter's view even when the review belongs to someone else.
+    const enrichedWorkflow = {
+      ...workflow,
+      steps: (workflow.steps || []).map(s => {
+        if (s.type !== 'approval' || !s.assigneeId) return s;
+        const person = (participants || []).find(p => p.id === s.assigneeId);
+        return person ? { ...s, assigneeName: person.name } : s;
+      }),
+    };
+
     // Fire and forget — runs concurrently. Wrapped so resolver leaks and
     // crashes both clear the resolver entry instead of leaving a dead handle
     // in the Map for the lifetime of the session.
     executeWorkflowRun({
       runId,
-      workflow,
+      workflow: enrichedWorkflow,
       coworkers,
       tools,
       fileTree: hydratedWorkflowTree,

@@ -90,6 +90,13 @@ export default function JoinScreen({ user, isAdmin, adminStatus, adminError, onR
             <button className="landing-admin-link" onClick={onSignOut} style={{ marginLeft: 'auto' }}>Sign Out</button>
           </div>
         </div>
+
+        <div className="landing-attribution">
+          Foundry by{' '}
+          <a href="https://alokkhatri.com" target="_blank" rel="noopener noreferrer">
+            Alok Khatri
+          </a>
+        </div>
       </div>
     </div>
   );

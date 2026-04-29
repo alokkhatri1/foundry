@@ -211,9 +211,9 @@ export default function GraduationScreen({
             )}
 
             <div className="grad-attribution">
-              Built by{' '}
+              Foundry by{' '}
               <a href="https://alokkhatri.com" target="_blank" rel="noopener noreferrer">
-                alokkhatri.com
+                Alok Khatri
               </a>
             </div>
           </>

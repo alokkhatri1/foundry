@@ -180,6 +180,13 @@ export default function AuthGate({ children, onJoin, workshopCode }) {
             </div>
           </div>
         </div>
+
+        <div className="landing-attribution">
+          Foundry by{' '}
+          <a href="https://alokkhatri.com" target="_blank" rel="noopener noreferrer">
+            Alok Khatri
+          </a>
+        </div>
       </div>
     );
   }

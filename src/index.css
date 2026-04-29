@@ -7354,20 +7354,43 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
   color: var(--text-muted);
   letter-spacing: 0.2px;
 }
-.landing-byline {
-  margin-top: 8px;
-  font-size: 13px;
+/* Typographic wordmark used on the landing screens in place of the F+Foundry
+   logo block. "Foundry" is the brand mark; "by Alok Khatri" reads as a small
+   author credit, with the name itself linking to alokkhatri.com. */
+.landing-wordmark {
+  display: inline-block;
+  line-height: 1.1;
+  margin-bottom: 24px;
+}
+.landing-wordmark-name {
+  font-size: 44px;
+  font-weight: 700;
+  letter-spacing: -1px;
+  color: var(--text-dark);
+  font-family: 'Cormorant Garamond', 'Georgia', serif;
+}
+.landing-wordmark-by {
+  font-size: 16px;
+  font-weight: 400;
   color: var(--text-muted);
   letter-spacing: 0.2px;
+  font-style: italic;
+  font-family: 'Cormorant Garamond', 'Georgia', serif;
 }
-.grad-attribution a,
-.landing-byline a {
+.landing-wordmark-by a {
+  color: var(--accent-gold, #c8956c);
+  text-decoration: none;
+  font-weight: 600;
+  font-style: normal;
+}
+.landing-wordmark-by a:hover { text-decoration: underline; }
+
+.grad-attribution a {
   color: var(--accent-gold, #c8956c);
   text-decoration: none;
   font-weight: 600;
 }
-.grad-attribution a:hover,
-.landing-byline a:hover { text-decoration: underline; }
+.grad-attribution a:hover { text-decoration: underline; }
 
 /* ========== FEEDBACK FORM (pre-graduation) ========== */
 .feedback-form {

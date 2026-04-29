@@ -140,9 +140,12 @@ export default function AuthGate({ children, onJoin, workshopCode }) {
     return (
       <div className="landing">
         <div className="landing-content" style={{ justifyContent: 'center' }}>
-          <div className="landing-brand" style={{ margin: '0 auto' }}>
-            <div className="landing-logo">F</div>
-            <span className="landing-logo-text">Foundry</span>
+          <div className="landing-wordmark" style={{ margin: '0 auto', textAlign: 'center' }}>
+            <span className="landing-wordmark-name">Foundry</span>
+            <span className="landing-wordmark-by">
+              {' '}by{' '}
+              <a href="https://alokkhatri.com" target="_blank" rel="noopener noreferrer">Alok Khatri</a>
+            </span>
           </div>
         </div>
       </div>
@@ -155,15 +158,12 @@ export default function AuthGate({ children, onJoin, workshopCode }) {
       <div className="landing">
         <div className="landing-content">
           <div className="landing-left">
-            <div className="landing-brand">
-              <div className="landing-logo">F</div>
-              <span className="landing-logo-text">Foundry</span>
-            </div>
-            <div className="landing-byline">
-              Foundry by{' '}
-              <a href="https://alokkhatri.com" target="_blank" rel="noopener noreferrer">
-                Alok Khatri
-              </a>
+            <div className="landing-wordmark">
+              <span className="landing-wordmark-name">Foundry</span>
+              <span className="landing-wordmark-by">
+                {' '}by{' '}
+                <a href="https://alokkhatri.com" target="_blank" rel="noopener noreferrer">Alok Khatri</a>
+              </span>
             </div>
             <h1 className="landing-title">
               The platform where you become <span className="landing-highlight">AI Native</span>.

@@ -708,17 +708,19 @@ export default function AdminDashboard({ sb, user, onBack, onEnterWorkshop }) {
 // (most recent first) including any free-text answers. Anonymous-feeling but
 // still attributable so the trainer can reach out on specific responses.
 const SCORE_FIELDS = [
-  { key: 'satisfaction',       label: 'Satisfaction' },
-  { key: 'relevance',          label: 'Relevance' },
-  { key: 'clarity',            label: 'Clarity' },
-  { key: 'trainer_knowledge',  label: 'Trainer knowledge' },
-  { key: 'trainer_delivery',   label: 'Trainer delivery' },
-  { key: 'trainer_engagement', label: 'Trainer engagement' },
-  { key: 'materials_quality',  label: 'Materials' },
-  { key: 'theory_practice',    label: 'Theory/practice' },
-  { key: 'improved_skills',    label: 'Improved skills' },
-  { key: 'can_apply',          label: 'Can apply' },
-  { key: 'platform_rating',    label: 'Platform' },
+  { key: 'satisfaction',         label: 'Satisfaction' },
+  { key: 'relevance',            label: 'Relevance' },
+  { key: 'clarity',              label: 'Clarity' },
+  { key: 'trainer_knowledge',    label: 'Trainer knowledge' },
+  { key: 'trainer_delivery',     label: 'Trainer delivery' },
+  { key: 'trainer_engagement',   label: 'Trainer engagement' },
+  { key: 'materials_quality',    label: 'Slides & content' },
+  { key: 'theory_practice',      label: 'Explain / practice mix' },
+  { key: 'improved_skills',      label: 'Improved skills' },
+  { key: 'can_apply',            label: 'Can apply' },
+  { key: 'platform_rating',      label: 'Platform ease' },
+  { key: 'platform_reliability', label: 'Platform reliability' },
+  { key: 'platform_support',     label: 'Platform support' },
 ];
 
 function FeedbackResponses({ rows }) {

@@ -16,16 +16,21 @@ const SCALE_QUESTIONS_A = [
 ];
 
 const SCALE_QUESTIONS_B_C = [
-  { key: 'materials_quality',  label: 'Quality and usefulness of training materials (slides, handouts, etc.)' },
-  { key: 'theory_practice',    label: 'Balance between theory and practical application' },
+  { key: 'materials_quality',  label: 'Quality and usefulness of the slides and reference content' },
+  { key: 'theory_practice',    label: 'Balance between guided explanation and hands-on practice on the platform' },
   { key: 'improved_skills',    label: 'The training improved my knowledge / skills' },
   { key: 'can_apply',          label: 'I can apply what I learned in my work' },
 ];
 
-const PLATFORM_QUESTION = {
-  key: 'platform_rating',
-  label: 'How would you rate the Foundry platform itself (separate from the trainer and content)?',
-};
+// Section F (Platform) was originally a single question. Since the training
+// itself is delivered through the platform, one rating wasn't enough signal —
+// expanded to three so the trainer can see ease, reliability, and pedagogical
+// fit independently.
+const PLATFORM_QUESTIONS = [
+  { key: 'platform_rating',       label: 'Ease of using the Foundry platform (intuitive, easy to navigate)' },
+  { key: 'platform_reliability',  label: 'Reliability during the workshop (no lag, errors, or sync issues)' },
+  { key: 'platform_support',      label: 'How well the platform supported what you were trying to learn' },
+];
 
 const SCALE_LABELS = ['Strongly disagree', 'Disagree', 'Neutral', 'Agree', 'Strongly agree'];
 
@@ -85,7 +90,7 @@ export default function FeedbackForm({ onSubmit, submitting, errorMessage }) {
   const requiredScaleKeys = [
     ...SCALE_QUESTIONS_A.map(q => q.key),
     ...SCALE_QUESTIONS_B_C.map(q => q.key),
-    PLATFORM_QUESTION.key,
+    ...PLATFORM_QUESTIONS.map(q => q.key),
   ];
   const missingScale = requiredScaleKeys.filter(k => !answers[k]);
   const missingYesNo = ['duration_appropriate', 'would_recommend'].filter(k => answers[k] === undefined);
@@ -112,6 +117,8 @@ export default function FeedbackForm({ onSubmit, submitting, errorMessage }) {
       improvement_notes:    (answers.improvement_notes || '').trim() || null,
       would_recommend:      answers.would_recommend,
       platform_rating:      answers.platform_rating,
+      platform_reliability: answers.platform_reliability,
+      platform_support:     answers.platform_support,
     });
   }
 
@@ -216,10 +223,12 @@ export default function FeedbackForm({ onSubmit, submitting, errorMessage }) {
 
       <section className="fb-section">
         <h3 className="fb-section-title">F. Platform</h3>
-        <div className={`fb-row${fieldError(PLATFORM_QUESTION.key) ? ' has-error' : ''}`}>
-          <label className="fb-label"><span className="fb-num">16.</span> {PLATFORM_QUESTION.label}</label>
-          <ScaleRow value={answers.platform_rating} onChange={v => update('platform_rating', v)} disabled={submitting} />
-        </div>
+        {PLATFORM_QUESTIONS.map((q, i) => (
+          <div key={q.key} className={`fb-row${fieldError(q.key) ? ' has-error' : ''}`}>
+            <label className="fb-label"><span className="fb-num">{16 + i}.</span> {q.label}</label>
+            <ScaleRow value={answers[q.key]} onChange={v => update(q.key, v)} disabled={submitting} />
+          </div>
+        ))}
       </section>
 
       {errorMessage && <div className="fb-error">{errorMessage}</div>}

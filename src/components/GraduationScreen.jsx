@@ -209,6 +209,13 @@ export default function GraduationScreen({
                 </button>
               </div>
             )}
+
+            <div className="grad-attribution">
+              Built by{' '}
+              <a href="https://alokkhatri.com" target="_blank" rel="noopener noreferrer">
+                alokkhatri.com
+              </a>
+            </div>
           </>
         )}
       </div>

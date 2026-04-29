@@ -1950,6 +1950,22 @@ function App() {
         // can SEE what happened (vs. silently no-op'ing or lying in logs).
         const sender = (participants || []).find(p => p.name === userName);
         const assignee = (participants || []).find(p => p.id === assigneeId);
+        // direct_messages.{from,to}_participant_id are uuid-typed. Local
+        // synthetic ids (p-…) generated as a fallback when a participant
+        // existed before sync hit the DB will fail the insert with code
+        // 22P02 (invalid_text_representation). Resolve to a real UUID by
+        // name. Sender first, then assignee.
+        const isUuid = (s) => typeof s === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s);
+        let realSenderId = sender?.id || null;
+        if (realSenderId && !isUuid(realSenderId) && sender?.name) {
+          const looked = await sb.findParticipantIdByName(sender.name);
+          if (looked) realSenderId = looked;
+        }
+        let realAssigneeId = assigneeId || null;
+        if (realAssigneeId && !isUuid(realAssigneeId) && assignee?.name) {
+          const looked = await sb.findParticipantIdByName(assignee.name);
+          if (looked) realAssigneeId = looked;
+        }
         if (!sender) {
           addMessage({
             type: 'status',
@@ -1982,7 +1998,15 @@ function App() {
         }
         const promptLine = prompt ? ` — "${prompt}"` : '';
         const text = `Review requested: "${wfName}" · step "${stepName}"${promptLine}. A card is waiting in your Chat tab — approve or reject there.`;
-        const result = await submitDm(sb, sender.id, assigneeId, text);
+        if (!isUuid(realSenderId) || !isUuid(realAssigneeId)) {
+          addMessage({
+            type: 'error',
+            content: `Couldn't notify ${assignee.name}: their participant row isn't fully synced yet (id: ${realAssigneeId}). Have them refresh their browser, or pick them again in the workflow builder.`,
+          }, runConvoId);
+          addLog({ type: 'error', message: `review DM aborted: non-uuid participant id (assignee=${realAssigneeId}, sender=${realSenderId})` });
+          return;
+        }
+        const result = await submitDm(sb, realSenderId, realAssigneeId, text);
         // Surface the actual sendDm error verbatim so we can diagnose
         // instead of guessing. "queued (network slow)" used to be the
         // catch-all status for any non-fatal write failure, which hid

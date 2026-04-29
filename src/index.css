@@ -2020,6 +2020,15 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
 }
 .wf-section .wf-list-grid { flex: none; padding: 0 24px 8px; }
 
+/* Scroll container that wraps all wf-sections under .wf-list. Without this
+   the sections stack as flex:none siblings under .wf-list (overflow:hidden),
+   and anything past the viewport gets clipped with no scrollbar. */
+.wf-list-scroll {
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
+}
+
 /* Read-only banner on the workflow editor header — gold accent so it
    reads as the app's own callout, parallels the coworker banner. */
 .wf-readonly-banner {
@@ -4897,6 +4906,15 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
 /* Inside a cw-section, don't let cw-list-grid fight for flex height —
    it's now wrapped by the section, so normalise back to block-flow. */
 .cw-section .cw-list-grid { flex: none; padding: 0 24px 8px; }
+
+/* Scroll container for stacked cw-sections under .cw-list (mirrors
+   .wf-list-scroll). Without this the sections pile up under
+   .cw-list (overflow:hidden) with no scrollbar. */
+.cw-list-scroll {
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
+}
 /* Override: my split-list variant of cw-section-title conflicted with an
    older same-named rule further down that targets the editor pane. Pin
    positioning/padding here so the two rules don't fight. */

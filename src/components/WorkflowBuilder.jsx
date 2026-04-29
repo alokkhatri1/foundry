@@ -1417,7 +1417,7 @@ export default function WorkflowBuilder({ workflows, onUpdateWorkflows, fileTree
             />
           );
           return (
-            <>
+            <div className="wf-list-scroll">
               {examples.length > 0 && (
                 <div className="wf-section">
                   <div className="wf-section-title">Examples <span className="wf-section-count">{examples.length}</span></div>
@@ -1436,7 +1436,7 @@ export default function WorkflowBuilder({ workflows, onUpdateWorkflows, fileTree
                   <div className="wf-list-grid">{others.map(wf => renderCard(wf, true))}</div>
                 </div>
               )}
-            </>
+            </div>
           );
         })()}
       </div>

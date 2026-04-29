@@ -790,7 +790,7 @@ export default function CoworkerBuilder({ coworkers, onUpdateCoworkers, fileTree
             No coworkers match &ldquo;{searchQ}&rdquo;.
           </div>
         ) : (
-          <>
+          <div className="cw-list-scroll">
             {exampleCoworkers.length > 0 && (
               <div className="cw-section">
                 <div className="cw-section-title">
@@ -851,7 +851,7 @@ export default function CoworkerBuilder({ coworkers, onUpdateCoworkers, fileTree
                 )}
               </div>
             )}
-          </>
+          </div>
         )}
       </div>
     </div>

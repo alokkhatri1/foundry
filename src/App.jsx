@@ -1077,13 +1077,19 @@ function App() {
 
   // Lazy content loader: loadFiles now returns metadata only (no `content`).
   // Callers that want to display or edit a file's body call this on open.
-  // Cheap: a single-row SELECT by id. A file that's already been hydrated
-  // (content !== undefined) is a no-op — common on realtime-updated files.
+  // Cheap: a single-row SELECT by id.
+  //
+  // Skip only when we already have a real string body cached. `undefined` is
+  // "never loaded"; `null` slips in when a realtime postgres_changes payload
+  // for a large file is truncated above Supabase's row-size cap (a parsed
+  // PDF body easily blows past it) — without this guard, the user clicks
+  // the file, the bail-out fires, and they see "This file is empty" forever
+  // because the truncated null was cached as if it were the real value.
   async function handleEnsureFileContent(fileId) {
     if (!fileId) return;
     const existing = flatFiles.find(f => f.id === fileId);
     if (!existing) return;
-    if (existing.content !== undefined) return;
+    if (typeof existing.content === 'string') return;
     const content = await sb.loadFileContent(fileId);
     setFlatFiles(prev => prev.map(f => f.id === fileId ? { ...f, content: content ?? '' } : f));
   }
@@ -1106,7 +1112,10 @@ function App() {
       if (!id || seen.has(id)) continue;
       seen.add(id);
       const f = flatFiles.find(x => x.id === id);
-      if (f && f.content === undefined) missing.push(id);
+      // Same realtime-truncation defence as handleEnsureFileContent — treat
+      // null cache as "not loaded" so chat/workflow context isn't built from
+      // an empty body that came from a dropped realtime payload.
+      if (f && typeof f.content !== 'string') missing.push(id);
     }
     if (missing.length === 0) return flatFiles;
     const byId = await sb.loadFilesContent(missing);

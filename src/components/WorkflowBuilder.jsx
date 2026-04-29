@@ -488,7 +488,19 @@ function StepCard({ step, index, coworkers, tools, participants, onUpdate, onDel
                 <EducationalCue cueId="workflow-approval-step" show={showEducationalCues} />
                 <div className="step-config-row">
                   <label>Assign Reviewer</label>
-                  <select value={step.assigneeId || ''} onChange={e => onUpdate({ ...step, assigneeId: e.target.value })}>
+                  <select value={step.assigneeId || ''} onChange={e => {
+                    // Persist the picked participant's name on the step too,
+                    // so a later runtime can resolve the assignee even if
+                    // their participant id has drifted (e.g. a synthetic
+                    // 'p-…' id from a pre-sync local session being replaced
+                    // by the real Supabase UUID after refresh).
+                    const picked = (participants || []).find(p => p.id === e.target.value);
+                    onUpdate({
+                      ...step,
+                      assigneeId: e.target.value,
+                      assigneeName: picked?.name || null,
+                    });
+                  }}>
                     <option value="">Anyone can review</option>
                     {(participants || []).map(p => (
                       <option key={p.id} value={p.id}>{p.name}</option>

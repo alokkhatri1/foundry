@@ -1872,7 +1872,15 @@ function App() {
       caseInput,
       stepResults: workflow.steps.map(step => {
         const cw = step.coworker || (step.coworkerId ? coworkers?.find(c => c.id === step.coworkerId) : null);
-        const person = step.assigneeId ? participants?.find(p => p.id === step.assigneeId) : null;
+        // Resolve the assignee participant. Prefer id match (fast path),
+        // fall back to name match if the stored id has drifted (e.g. a
+        // synthetic 'p-…' from a pre-sync session). Without the fallback,
+        // existing workflows built before the WorkflowBuilder started
+        // storing assigneeName lose their assignee on every run.
+        let person = step.assigneeId ? participants?.find(p => p.id === step.assigneeId) : null;
+        if (!person && step.assigneeName) {
+          person = participants?.find(p => p.name === step.assigneeName) || null;
+        }
         return {
           stepId: step.id,
           stepName: step.type === 'agent' ? (cw?.name || step.name) : step.name,
@@ -1885,8 +1893,10 @@ function App() {
           // date this field. Name-only matching was breaking when the
           // assignee's userName state diverged even slightly from their
           // participant.name (case, trailing space, post-rejoin renames).
-          assigneeId: step.assigneeId || null,
-          assigneeName: person?.name || null,
+          // Use the resolved participant's id where possible so synthetic
+          // 'p-…' fallbacks don't propagate into the run record.
+          assigneeId: person?.id || step.assigneeId || null,
+          assigneeName: person?.name || step.assigneeName || null,
           status: 'pending',
           output: null,
           completedAt: null,
@@ -1971,7 +1981,17 @@ function App() {
         // each branch as a status line in the run chat so the run starter
         // can SEE what happened (vs. silently no-op'ing or lying in logs).
         const sender = (participants || []).find(p => p.name === userName);
-        const assignee = (participants || []).find(p => p.id === assigneeId);
+        // Try id first, then fall back to looking up by name from the
+        // workflow step's stored assigneeName (passed via the step's
+        // stepResults entry — the run record knows the name too).
+        let assignee = (participants || []).find(p => p.id === assigneeId);
+        if (!assignee) {
+          const runRow = (workflowRuns || []).find(r => r.id === rId);
+          const stepRow = runRow?.stepResults?.find(s => s.stepId === stepId);
+          if (stepRow?.assigneeName) {
+            assignee = (participants || []).find(p => p.name === stepRow.assigneeName);
+          }
+        }
         // direct_messages.{from,to}_participant_id are uuid-typed. Local
         // synthetic ids (p-…) generated as a fallback when a participant
         // existed before sync hit the DB will fail the insert with code

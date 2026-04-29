@@ -159,6 +159,12 @@ export default function AuthGate({ children, onJoin, workshopCode }) {
               <div className="landing-logo">F</div>
               <span className="landing-logo-text">Foundry</span>
             </div>
+            <div className="landing-byline">
+              Foundry by{' '}
+              <a href="https://alokkhatri.com" target="_blank" rel="noopener noreferrer">
+                Alok Khatri
+              </a>
+            </div>
             <h1 className="landing-title">
               The platform where you become <span className="landing-highlight">AI Native</span>.
             </h1>
@@ -181,12 +187,6 @@ export default function AuthGate({ children, onJoin, workshopCode }) {
           </div>
         </div>
 
-        <div className="landing-attribution">
-          Foundry by{' '}
-          <a href="https://alokkhatri.com" target="_blank" rel="noopener noreferrer">
-            Alok Khatri
-          </a>
-        </div>
       </div>
     );
   }

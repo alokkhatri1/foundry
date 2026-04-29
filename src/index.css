@@ -7345,30 +7345,29 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
 .usage-footnote strong { color: var(--text-dark); }
 
 /* Attribution shown on the graduation page and the landing screens. */
-.grad-attribution,
-.landing-attribution {
+.grad-attribution {
+  margin-top: 28px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border-color);
   text-align: center;
   font-size: 12px;
   color: var(--text-muted);
   letter-spacing: 0.2px;
 }
-.grad-attribution {
-  margin-top: 28px;
-  padding-top: 16px;
-  border-top: 1px solid var(--border-color);
-}
-.landing-attribution {
-  margin-top: 32px;
-  padding: 16px 24px;
+.landing-byline {
+  margin-top: 8px;
+  font-size: 13px;
+  color: var(--text-muted);
+  letter-spacing: 0.2px;
 }
 .grad-attribution a,
-.landing-attribution a {
+.landing-byline a {
   color: var(--accent-gold, #c8956c);
   text-decoration: none;
   font-weight: 600;
 }
 .grad-attribution a:hover,
-.landing-attribution a:hover { text-decoration: underline; }
+.landing-byline a:hover { text-decoration: underline; }
 
 /* ========== FEEDBACK FORM (pre-graduation) ========== */
 .feedback-form {

@@ -41,9 +41,15 @@ export default function JoinScreen({ user, isAdmin, adminStatus, adminError, onR
     <div className="landing">
       <div className="landing-content" style={{ flexDirection: 'column', alignItems: 'center', gap: 32 }}>
         <div style={{ textAlign: 'center' }}>
-          <div className="landing-brand" style={{ justifyContent: 'center', marginBottom: 16 }}>
+          <div className="landing-brand" style={{ justifyContent: 'center', marginBottom: 8 }}>
             <div className="landing-logo">F</div>
             <span className="landing-logo-text">Foundry</span>
+          </div>
+          <div className="landing-byline" style={{ marginBottom: 24 }}>
+            Foundry by{' '}
+            <a href="https://alokkhatri.com" target="_blank" rel="noopener noreferrer">
+              Alok Khatri
+            </a>
           </div>
           <h1 className="landing-title" style={{ fontSize: 36, textAlign: 'center' }}>
             Welcome, <span className="landing-highlight">{userName}</span>
@@ -91,12 +97,6 @@ export default function JoinScreen({ user, isAdmin, adminStatus, adminError, onR
           </div>
         </div>
 
-        <div className="landing-attribution">
-          Foundry by{' '}
-          <a href="https://alokkhatri.com" target="_blank" rel="noopener noreferrer">
-            Alok Khatri
-          </a>
-        </div>
       </div>
     </div>
   );

@@ -613,7 +613,7 @@ export default function useSupabase() {
   const fetchDmThread = useCallback(async (myParticipantId, otherParticipantId, options = {}) => {
     if (!isSupabaseConfigured || !roomIdRef.current) return [];
     let q = supabase.from('direct_messages')
-      .select('id, from_participant_id, to_participant_id, content, created_at')
+      .select('id, from_participant_id, to_participant_id, content, kind, metadata, created_at')
       .eq('room_id', roomIdRef.current)
       .or(`and(from_participant_id.eq.${myParticipantId},to_participant_id.eq.${otherParticipantId}),and(from_participant_id.eq.${otherParticipantId},to_participant_id.eq.${myParticipantId})`)
       .order('created_at', { ascending: false })

@@ -1943,7 +1943,7 @@ function App() {
           approvalResolversRef.current.set(rId, resolve);
         });
       },
-      onApprovalRequested: async ({ runId: rId, stepName, workflowName: wfName, assigneeId, prompt }) => {
+      onApprovalRequested: async ({ runId: rId, stepId, stepName, workflowName: wfName, assigneeId, prompt, previousOutput }) => {
         // DM the assignee so they see the review request — the approval card
         // itself only renders in the initiator's run conversation. Surface
         // each branch as a status line in the run chat so the run starter
@@ -1997,7 +1997,7 @@ function App() {
           return;
         }
         const promptLine = prompt ? ` — "${prompt}"` : '';
-        const text = `Review requested: "${wfName}" · step "${stepName}"${promptLine}. A card is waiting in your Chat tab — approve or reject there.`;
+        const text = `Review requested: "${wfName}" · step "${stepName}"${promptLine}`;
         if (!isUuid(realSenderId) || !isUuid(realAssigneeId)) {
           addMessage({
             type: 'error',
@@ -2006,7 +2006,21 @@ function App() {
           addLog({ type: 'error', message: `review DM aborted: non-uuid participant id (assignee=${realAssigneeId}, sender=${realSenderId})` });
           return;
         }
-        const result = await submitDm(sb, realSenderId, realAssigneeId, text);
+        // Send as kind='review_request' with metadata so the assignee's DM
+        // thread can render the message as an inline approval card with
+        // Approve/Reject buttons (instead of a plain text notification
+        // pointing them to a separate banner).
+        const result = await submitDm(sb, realSenderId, realAssigneeId, text, {
+          kind: 'review_request',
+          metadata: {
+            runId: rId,
+            stepId,
+            stepName,
+            workflowName: wfName,
+            prompt: prompt || '',
+            previousOutput: previousOutput || '',
+          },
+        });
         // Surface the actual sendDm error verbatim so we can diagnose
         // instead of guessing. "queued (network slow)" used to be the
         // catch-all status for any non-fatal write failure, which hid

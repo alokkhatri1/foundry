@@ -279,6 +279,9 @@ export async function executeWorkflowRun({
 
       // Notify the assignee out-of-band so they actually see the request — the
       // approval card above only lands in the initiator's run conversation.
+      // The DM carries the full upstream output as metadata so the inline
+      // approval card on the assignee's chat thread has everything it
+      // needs to render Approve/Reject without a separate banner trip.
       if (step.assigneeId && onApprovalRequested) {
         onApprovalRequested({
           runId,
@@ -287,6 +290,7 @@ export async function executeWorkflowRun({
           workflowName: workflow.name,
           assigneeId: step.assigneeId,
           prompt: step.prompt || '',
+          previousOutput: reviewerContext,
         });
       }
 

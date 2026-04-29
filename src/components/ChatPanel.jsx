@@ -807,6 +807,49 @@ function InlineEditor({ file, onUpdateContent, onClose }) {
   );
 }
 
+// Inline approval actions for review_request DMs in the assignee's chat
+// thread. Same wiring as PendingReviewCard below — fires onRemoteApprove,
+// which writes to the approvals table and lets the initiator's tab
+// resolve the executor via the realtime echo.
+function ReviewRequestActions({ run, stepResult, onRemoteApprove }) {
+  const [comment, setComment] = useState('');
+  const [busy, setBusy] = useState(false);
+  async function act(action) {
+    if (busy) return;
+    setBusy(true);
+    try { await onRemoteApprove(run, stepResult, action, comment); }
+    finally { setBusy(false); }
+  }
+  return (
+    <>
+      <textarea
+        className="cl-approval-comment"
+        value={comment}
+        onChange={e => setComment(e.target.value)}
+        placeholder="Feedback (required if rejecting)…"
+        rows={2}
+      />
+      <div className="cl-approval-actions">
+        <button
+          className="cl-send-btn-approve"
+          onClick={() => act('Approve')}
+          disabled={busy}
+        >
+          Approve
+        </button>
+        <button
+          className="cl-send-btn-cancel"
+          onClick={() => act('Reject')}
+          disabled={busy || !comment.trim()}
+          title={comment.trim() ? '' : 'Add feedback before rejecting'}
+        >
+          Reject with feedback
+        </button>
+      </div>
+    </>
+  );
+}
+
 // ===== Cross-user review surface =====
 // Rendered at the top of the chat body when the current user is the waiting
 // assignee on any workflow_run. Gives the reviewer a place to click Approve
@@ -1321,6 +1364,63 @@ export default function ChatPanel({ messages, onSendMessage, onApprovalAction, o
                     const isMine = m.from_participant_id === myParticipantId;
                     const senderName = isMine ? (currentUserName || 'Me') : activeDm.name;
                     const senderColor = isMine ? '#4a7fb5' : (activeDm.color || '#888');
+
+                    // Inline approval card for review_request DMs addressed
+                    // to me. Resolves the run + step from workflowRuns and
+                    // wires Approve/Reject to onRemoteApprove (same path as
+                    // the "Reviews waiting for you" banner). Once acted on,
+                    // the run's status moves past 'waiting_approval' and
+                    // the matching review disappears.
+                    if (m.kind === 'review_request' && !isMine && m.metadata) {
+                      const runId = m.metadata.runId;
+                      const run = (workflowRuns || []).find(r => r.id === runId);
+                      const stepResult = run?.stepResults?.find(s => s.stepId === m.metadata.stepId);
+                      const stillPending = run?.status === 'waiting_approval' && stepResult?.status === 'waiting';
+                      return (
+                        <div key={m.id} className={`cl-dm-flat`}>
+                          <div className="cl-dm-flat-header">
+                            <span className="cl-dm-flat-avatar" style={{ background: senderColor }}>
+                              {senderName?.charAt(0)?.toUpperCase()}
+                            </span>
+                            <span className="cl-dm-flat-name">{senderName?.toUpperCase()}</span>
+                          </div>
+                          <div className="cl-bubble cl-bubble-approval" style={{ marginTop: 4 }}>
+                            <div className="cl-bubble-label approval">Review request</div>
+                            <div className="cl-approval-prompt">
+                              <strong>{m.metadata.workflowName || 'Workflow'}</strong> · step "{m.metadata.stepName}"
+                            </div>
+                            {m.metadata.prompt && (
+                              <div className="cl-approval-prompt" style={{ marginTop: 6 }}>{m.metadata.prompt}</div>
+                            )}
+                            {m.metadata.previousOutput && (
+                              <div className="cl-approval-context-wrap">
+                                <div className="cl-approval-context-label">Upstream output</div>
+                                <div className="cl-approval-context md-doc">
+                                  <RichText content={String(m.metadata.previousOutput)} />
+                                </div>
+                              </div>
+                            )}
+                            {stillPending ? (
+                              <ReviewRequestActions
+                                run={run}
+                                stepResult={stepResult}
+                                onRemoteApprove={onRemoteApprove}
+                              />
+                            ) : (
+                              <div className="cl-approval-resolved">
+                                <span className="cl-approval-resolved-action">
+                                  {run?.status === 'rejected' ? '✕ Already resolved (rejected)'
+                                    : run?.status === 'completed' ? '✓ Already resolved'
+                                    : run?.status === 'cancelled' ? '⊘ Run cancelled'
+                                    : '— No longer pending'}
+                                </span>
+                              </div>
+                            )}
+                          </div>
+                          <div className="cl-dm-flat-time">{new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
+                        </div>
+                      );
+                    }
 
                     return (
                       <div key={m.id} className={`cl-dm-flat${isMine ? ' mine' : ''}`}>

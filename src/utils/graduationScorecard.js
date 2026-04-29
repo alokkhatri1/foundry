@@ -284,11 +284,20 @@ export function computeScorecard({
       : `${runsInRoom} run${runsInRoom === 1 ? '' : 's'} visible, ${myApprovals.length} decision${myApprovals.length === 1 ? '' : 's'} by you${approvalsOnMyRuns.length ? `, ${approvalsOnMyRuns.length} on your runs` : ''}.`,
   });
 
-  // Overall band — lowest level across dimensions the user has started
-  // (Level 0 dimensions don't drag the overall down — they just mean they
-  // haven't touched that primitive yet). If they touched nothing, Not Started.
+  // Overall band — rounded average of the dimensions the participant has
+  // actually touched (level > 0). Earlier rule used Math.min, which read as
+  // "weakest link wins" and was punishing for participants with a mostly-
+  // Mastery scorecard plus one Awareness dim — overall came out as Awareness
+  // even though the work obviously cleared Application or above. Average
+  // sits between min (too strict) and max (too lenient); rounding to the
+  // nearest band keeps the output on the same 0-4 ladder. Untouched
+  // dimensions are still excluded so a participant who skipped one pillar
+  // entirely isn't punished for it — that's a deliberate choice consistent
+  // with the per-dimension scoring above.
   const touchedLevels = dimensions.map(d => d.level).filter(l => l > 0);
-  const overallLevel = touchedLevels.length === 0 ? 0 : Math.min(...touchedLevels);
+  const overallLevel = touchedLevels.length === 0
+    ? 0
+    : Math.round(touchedLevels.reduce((s, l) => s + l, 0) / touchedLevels.length);
 
   return { dimensions, overallLevel };
 }

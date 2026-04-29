@@ -585,7 +585,13 @@ export default function FileExplorer({ fileTree, selectedFileId, onSelectFile, o
                 </div>
                 <div className="drive-card-name">{file.name}</div>
                 <div className="drive-card-meta">
-                  {file.content ? `${file.content.split('\n').length} lines` : 'Empty'}
+                  {/* Only label as Empty when we've actually loaded the body and
+                      it really is empty. While content is still undefined/null
+                      (unhydrated metadata-only row), say nothing — "Empty" was
+                      misleading every card that hadn't been clicked yet. */}
+                  {typeof file.content === 'string'
+                    ? (file.content ? `${file.content.split('\n').length} lines` : 'Empty')
+                    : ''}
                 </div>
                 {isSystem && (
                   <button className="drive-card-clone" onClick={e => handleCloneFile(e, file)} title="Clone — make my own copy">Clone</button>

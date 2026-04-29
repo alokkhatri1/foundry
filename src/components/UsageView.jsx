@@ -69,42 +69,32 @@ export default function UsageView({ sb, participants, myParticipantId, showEduca
     (participants || []).filter(p => (p.kind || 'human') === 'human').length
   ), [participants]);
 
-  // Leaderboard — every human participant in the room, sorted by tokens
-  // descending. Built from BOTH the usage table (so rows with NULL or
-  // stale participant_id are visible instead of silently dropped — which
-  // was making the leaderboard total disagree with the cohort spend) AND
-  // the participants prop (so participants with zero usage still show up
-  // for an honest cohort picture). Token count is the metric, not cost.
+  // Leaderboard — every human participant currently in the room, sorted
+  // by tokens descending. Token count is the metric, not cost.
+  //
+  // Rogue rows ("Unattributed" for null pids and "Left the workshop" for
+  // pids that don't match any current participant) are deliberately
+  // hidden. They were noise from a) llm_usage rows logged without a
+  // participant_id, and b) pre-sync synthetic ids whose owners' real
+  // UUIDs don't match. For a workshop view, "people in the room right
+  // now" is the cleaner story — orphan attribution lives in the cohort
+  // total at the top of the tab if you want the full picture.
   const leaderboard = useMemo(() => {
     const humans = (participants || []).filter(p => (p.kind || 'human') === 'human');
     const humanById = new Map(humans.map(p => [p.id, p]));
     const out = [];
     const seen = new Set();
 
-    // Usage rows first — covers attributed humans, ex-participants, and
-    // 'unknown' (calls logged without participant_id). Null/missing pids
-    // get bucketed under a single Unattributed row instead of disappearing.
     for (const [pid, v] of Object.entries(agg.byParticipant)) {
       if (v.tokens === 0 && v.cost === 0 && v.calls === 0) continue;
       const p = humanById.get(pid);
-      if (p) {
-        out.push({
-          pid, name: p.name, color: p.color,
-          isYou: p.id === myParticipantId,
-          tokens: v.tokens, cost: v.cost, calls: v.calls,
-        });
-        seen.add(pid);
-      } else if (pid === 'unknown' || pid === 'null') {
-        out.push({
-          pid: 'unknown', name: 'Unattributed', color: '#9b9b9b',
-          isYou: false, tokens: v.tokens, cost: v.cost, calls: v.calls,
-        });
-      } else {
-        out.push({
-          pid, name: 'Left the workshop', color: '#9b9b9b',
-          isYou: false, tokens: v.tokens, cost: v.cost, calls: v.calls,
-        });
-      }
+      if (!p) continue; // rogue pid — hide rather than mislabel
+      out.push({
+        pid, name: p.name, color: p.color,
+        isYou: p.id === myParticipantId,
+        tokens: v.tokens, cost: v.cost, calls: v.calls,
+      });
+      seen.add(pid);
     }
     // Then any humans we haven't already added — they have zero usage so
     // far, but should still appear at the bottom of the leaderboard.

@@ -1113,6 +1113,49 @@ export default function useSupabase() {
     return () => supabase.removeChannel(channel);
   }, []);
 
+  // ===== Workshop feedback =====
+  // Mandatory survey gating the graduation rubric. One row per
+  // (workshop_id, participant_id) thanks to the unique constraint; the upsert
+  // below enforces the same on the client so a double-submit can't insert two
+  // rows. Admin uses loadAllFeedback to read the cohort's responses.
+  const loadMyFeedback = useCallback(async (participantId) => {
+    if (!isSupabaseConfigured || !roomIdRef.current || !participantId) return null;
+    const { data, error } = await supabase
+      .from('workshop_feedback')
+      .select('*')
+      .eq('workshop_id', roomIdRef.current)
+      .eq('participant_id', participantId)
+      .maybeSingle();
+    if (error) { console.error('[sb] loadMyFeedback:', error.message); return null; }
+    return data;
+  }, []);
+
+  const saveFeedback = useCallback(async (payload) => {
+    if (!isSupabaseConfigured || !roomIdRef.current) return { ok: false, error: 'Not connected' };
+    if (!payload?.participant_id) return { ok: false, error: 'Missing participant_id' };
+    const row = { ...payload, workshop_id: roomIdRef.current };
+    const { data, error } = await supabase
+      .from('workshop_feedback')
+      .upsert(row, { onConflict: 'workshop_id,participant_id' })
+      .select()
+      .single();
+    if (error) { console.error('[sb] saveFeedback:', error.message); return { ok: false, error: error.message }; }
+    return { ok: true, data };
+  }, []);
+
+  const loadAllFeedback = useCallback(async (workshopId) => {
+    if (!isSupabaseConfigured) return [];
+    const id = workshopId || roomIdRef.current;
+    if (!id) return [];
+    const { data, error } = await supabase
+      .from('workshop_feedback')
+      .select('*')
+      .eq('workshop_id', id)
+      .order('created_at', { ascending: false });
+    if (error) { console.error('[sb] loadAllFeedback:', error.message); return []; }
+    return data || [];
+  }, []);
+
   // ===== Realtime: subscribe to all entity tables =====
   // handlers.onReconnect (optional): fires whenever the channel re-enters the
   // SUBSCRIBED state after previously leaving it (CHANNEL_ERROR, TIMED_OUT,
@@ -1256,5 +1299,6 @@ export default function useSupabase() {
     logLlmUsage, loadMyUsage, subscribeToMyUsage,
     loadWorkshopUsage, subscribeToWorkshopUsage, loadRunUsage,
     subscribeToRoom, trackPresence, leavePresence,
+    loadMyFeedback, saveFeedback, loadAllFeedback,
   }), []);
 }

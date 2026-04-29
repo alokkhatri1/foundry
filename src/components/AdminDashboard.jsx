@@ -80,6 +80,7 @@ export default function AdminDashboard({ sb, user, onBack, onEnterWorkshop }) {
   const [onlineUsers, setOnlineUsers] = useState([]);
   const [content, setContent] = useState({});
   const [activity, setActivity] = useState([]);
+  const [feedback, setFeedback] = useState([]);
   const [scorecardData, setScorecardData] = useState(null);
   const [detailTab, setDetailTab] = useState('stages');
   const [copied, setCopied] = useState(null);
@@ -234,11 +235,12 @@ export default function AdminDashboard({ sb, user, onBack, onEnterWorkshop }) {
     setScorecardData(null);
     const requestedId = workshop.id;
     selectionTokenRef.current = requestedId;
-    const [p, c, a, sc] = await Promise.all([
+    const [p, c, a, sc, fb] = await Promise.all([
       sb.loadWorkshopParticipants(workshop.id),
       sb.loadWorkshopContent(workshop.id),
       sb.loadWorkshopActivity(workshop.id),
       sb.loadAdminScorecardData(workshop.id),
+      sb.loadAllFeedback(workshop.id),
     ]);
     // Guard against rapid-fire clicks: if the admin clicked a different
     // workshop while these loads were in flight, the selection token has
@@ -250,6 +252,7 @@ export default function AdminDashboard({ sb, user, onBack, onEnterWorkshop }) {
     setContent(c);
     setActivity(a);
     setScorecardData(sc);
+    setFeedback(fb || []);
     const unsub = sb.subscribeToWorkshopPresence(workshop.id, setOnlineUsers);
     return unsub;
   }
@@ -484,7 +487,7 @@ export default function AdminDashboard({ sb, user, onBack, onEnterWorkshop }) {
 
               {/* Sub-tabs */}
               <div className="admin-tabs">
-                {['stages', 'participants', 'content', 'activity'].map(tab => (
+                {['stages', 'participants', 'content', 'activity', 'feedback'].map(tab => (
                   <button
                     key={tab}
                     className={`admin-tab${detailTab === tab ? ' active' : ''}`}
@@ -660,6 +663,12 @@ export default function AdminDashboard({ sb, user, onBack, onEnterWorkshop }) {
                   )}
                 </div>
               )}
+
+              {detailTab === 'feedback' && (
+                <div className="admin-tab-content">
+                  <FeedbackResponses rows={feedback} />
+                </div>
+              )}
             </div>
           )}
         </main>
@@ -691,5 +700,114 @@ export default function AdminDashboard({ sb, user, onBack, onEnterWorkshop }) {
         </div>
       )}
     </div>
+  );
+}
+
+// Renders cohort feedback in two parts: a summary strip with response count
+// and average score per scaled question, then a list of individual rows
+// (most recent first) including any free-text answers. Anonymous-feeling but
+// still attributable so the trainer can reach out on specific responses.
+const SCORE_FIELDS = [
+  { key: 'satisfaction',       label: 'Satisfaction' },
+  { key: 'relevance',          label: 'Relevance' },
+  { key: 'clarity',            label: 'Clarity' },
+  { key: 'trainer_knowledge',  label: 'Trainer knowledge' },
+  { key: 'trainer_delivery',   label: 'Trainer delivery' },
+  { key: 'trainer_engagement', label: 'Trainer engagement' },
+  { key: 'materials_quality',  label: 'Materials' },
+  { key: 'theory_practice',    label: 'Theory/practice' },
+  { key: 'improved_skills',    label: 'Improved skills' },
+  { key: 'can_apply',          label: 'Can apply' },
+  { key: 'platform_rating',    label: 'Platform' },
+];
+
+function FeedbackResponses({ rows }) {
+  if (!rows || rows.length === 0) {
+    return <p className="admin-feedback-empty">No feedback submitted yet.</p>;
+  }
+
+  // Cohort averages — mean of each scale field across submitted rows.
+  const summary = SCORE_FIELDS.map(f => {
+    const vals = rows.map(r => Number(r[f.key])).filter(v => !isNaN(v));
+    const avg = vals.length ? vals.reduce((s, v) => s + v, 0) / vals.length : 0;
+    return { ...f, avg };
+  });
+  const yesShare = (key) => {
+    const vals = rows.map(r => r[key]).filter(v => v === true || v === false);
+    if (vals.length === 0) return null;
+    return Math.round((vals.filter(v => v === true).length / vals.length) * 100);
+  };
+  const durationYes = yesShare('duration_appropriate');
+  const recommendYes = yesShare('would_recommend');
+
+  return (
+    <>
+      <div className="admin-feedback-summary">
+        <div className="admin-feedback-stat">
+          <div className="admin-feedback-stat-label">Responses</div>
+          <div className="admin-feedback-stat-value">{rows.length}</div>
+        </div>
+        {summary.map(s => (
+          <div key={s.key} className="admin-feedback-stat">
+            <div className="admin-feedback-stat-label">{s.label}</div>
+            <div className="admin-feedback-stat-value">{s.avg.toFixed(1)}</div>
+          </div>
+        ))}
+        {durationYes !== null && (
+          <div className="admin-feedback-stat">
+            <div className="admin-feedback-stat-label">Duration ok</div>
+            <div className="admin-feedback-stat-value">{durationYes}%</div>
+          </div>
+        )}
+        {recommendYes !== null && (
+          <div className="admin-feedback-stat">
+            <div className="admin-feedback-stat-label">Would recommend</div>
+            <div className="admin-feedback-stat-value">{recommendYes}%</div>
+          </div>
+        )}
+      </div>
+
+      <div className="admin-feedback-list">
+        {rows.map(r => (
+          <div key={r.id} className="admin-feedback-row">
+            <div className="admin-feedback-who">
+              <span className="admin-feedback-name">{r.participant_name || 'Anonymous'}</span>
+              <span className="admin-feedback-when">{r.created_at ? new Date(r.created_at).toLocaleString() : ''}</span>
+            </div>
+            <div className="admin-feedback-scores">
+              {SCORE_FIELDS.map(f => (
+                <div key={f.key} className="admin-feedback-score-cell">
+                  {f.label}: <strong>{r[f.key] ?? '—'}</strong>
+                </div>
+              ))}
+              <div className="admin-feedback-score-cell">
+                Duration ok: <strong>{r.duration_appropriate === true ? 'Yes' : r.duration_appropriate === false ? 'No' : '—'}</strong>
+              </div>
+              <div className="admin-feedback-score-cell">
+                Recommend: <strong>{r.would_recommend === true ? 'Yes' : r.would_recommend === false ? 'No' : '—'}</strong>
+              </div>
+            </div>
+            {r.most_valuable && (
+              <>
+                <div className="admin-feedback-text-label">Most valuable</div>
+                <div className="admin-feedback-text">{r.most_valuable}</div>
+              </>
+            )}
+            {r.future_topics && (
+              <>
+                <div className="admin-feedback-text-label">Future topics</div>
+                <div className="admin-feedback-text">{r.future_topics}</div>
+              </>
+            )}
+            {r.improvement_notes && (
+              <>
+                <div className="admin-feedback-text-label">Suggestions</div>
+                <div className="admin-feedback-text">{r.improvement_notes}</div>
+              </>
+            )}
+          </div>
+        ))}
+      </div>
+    </>
   );
 }

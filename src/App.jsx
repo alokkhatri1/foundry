@@ -2706,6 +2706,8 @@ Answer in ONE sentence. If the user asks "how", a second sentence is allowed —
         fileTree={fileTree}
         userPreferences={userPreferences}
         loadAllRoomApprovals={sb.loadAllRoomApprovals}
+        sb={sb}
+        myParticipantId={myParticipantId}
         onSignOut={() => {
           try { localStorage.removeItem('sandbox:state'); } catch {}
           setIsJoined(false);
@@ -2950,6 +2952,8 @@ Answer in ONE sentence. If the user asks "how", a second sentence is allowed —
               fileTree={fileTree}
               userPreferences={userPreferences}
               loadAllRoomApprovals={sb.loadAllRoomApprovals}
+              sb={sb}
+              myParticipantId={myParticipantId}
             />
           </div>
         )}

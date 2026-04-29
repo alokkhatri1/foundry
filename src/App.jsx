@@ -1983,19 +1983,31 @@ function App() {
         const promptLine = prompt ? ` — "${prompt}"` : '';
         const text = `Review requested: "${wfName}" · step "${stepName}"${promptLine}. A card is waiting in your Chat tab — approve or reject there.`;
         const result = await submitDm(sb, sender.id, assigneeId, text);
-        if (result?.error && !result?.pending) {
+        // Surface the actual sendDm error verbatim so we can diagnose
+        // instead of guessing. "queued (network slow)" used to be the
+        // catch-all status for any non-fatal write failure, which hid
+        // real problems (RLS quirks, FK mismatches, auth lapses).
+        const rawErr = result?.error;
+        const errMsg = typeof rawErr === 'string' ? rawErr : (rawErr?.message || (rawErr ? JSON.stringify(rawErr) : ''));
+        if (rawErr && !result?.pending) {
           addMessage({
             type: 'error',
-            content: `Failed to notify ${assignee.name}: ${result.error?.message || result.error}. They won't see the request unless they refresh and look at the run.`,
+            content: `Failed to notify ${assignee.name}: ${errMsg || 'unknown error'}. They won't see the request unless they refresh and look at the run.`,
           }, runConvoId);
-          addLog({ type: 'error', message: `review DM failed: ${result.error?.message || result.error}` });
+          addLog({ type: 'error', message: `review DM failed: ${errMsg}` });
+          return;
+        }
+        if (result?.pending) {
+          addMessage({
+            type: 'error',
+            content: `Could not deliver notification to ${assignee.name} — Supabase write failed (${errMsg || 'no error message'}). DM is queued in your local outbox; will retry on next reload or realtime reconnect. Check DevTools console for the [sb] sendDm log.`,
+          }, runConvoId);
+          addLog({ type: 'error', message: `review DM queued (transient): ${errMsg}` });
           return;
         }
         addMessage({
           type: 'status',
-          content: result?.pending
-            ? `Notification to ${assignee.name} queued (network slow); will deliver when their browser comes back.`
-            : `${assignee.name}${assignee.online ? '' : ' (offline)'} has been notified — they'll see the review request in their Chat tab.`,
+          content: `${assignee.name}${assignee.online ? '' : ' (offline)'} has been notified — they'll see the review request in their Chat tab.`,
         }, runConvoId);
         addLog({ type: 'workflow', message: `review DM sent to ${assignee.name} for ${wfName} (${stepName})${assignee.online ? '' : ' [offline]'}` });
       },

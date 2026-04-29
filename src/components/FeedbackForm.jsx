@@ -31,19 +31,25 @@ const SCALE_LABELS = ['Strongly disagree', 'Disagree', 'Neutral', 'Agree', 'Stro
 
 function ScaleRow({ value, onChange, disabled }) {
   return (
-    <div className="fb-scale">
-      {[1, 2, 3, 4, 5].map(n => (
-        <button
-          type="button"
-          key={n}
-          className={`fb-scale-btn${value === n ? ' active' : ''}`}
-          onClick={() => onChange(n)}
-          disabled={disabled}
-          title={SCALE_LABELS[n - 1]}
-        >
-          {n}
-        </button>
-      ))}
+    <div className="fb-scale-wrap">
+      <div className="fb-scale">
+        {[1, 2, 3, 4, 5].map(n => (
+          <button
+            type="button"
+            key={n}
+            className={`fb-scale-btn${value === n ? ' active' : ''}`}
+            onClick={() => onChange(n)}
+            disabled={disabled}
+            title={SCALE_LABELS[n - 1]}
+          >
+            {n}
+          </button>
+        ))}
+      </div>
+      <div className="fb-scale-legend">
+        <span>1 — {SCALE_LABELS[0]}</span>
+        <span>5 — {SCALE_LABELS[4]}</span>
+      </div>
     </div>
   );
 }

@@ -7386,6 +7386,12 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
 .fb-row.has-error .fb-label { color: #c45c5c; }
 .fb-row.has-error { border-top-color: #c45c5c; }
 
+.fb-scale-wrap { display: flex; flex-direction: column; gap: 4px; }
+.fb-scale-legend {
+  display: flex; justify-content: space-between;
+  font-size: 11px; color: var(--text-muted);
+  letter-spacing: 0.2px;
+}
 .fb-scale { display: flex; gap: 6px; }
 .fb-scale-btn {
   flex: 1; min-width: 36px; padding: 8px 0;

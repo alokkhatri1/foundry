@@ -1366,16 +1366,47 @@ export default function ChatPanel({ messages, onSendMessage, onApprovalAction, o
                     const senderColor = isMine ? '#4a7fb5' : (activeDm.color || '#888');
 
                     // Inline approval card for review_request DMs addressed
-                    // to me. Resolves the run + step from workflowRuns and
-                    // wires Approve/Reject to onRemoteApprove (same path as
-                    // the "Reviews waiting for you" banner). Once acted on,
-                    // the run's status moves past 'waiting_approval' and
-                    // the matching review disappears.
-                    if (m.kind === 'review_request' && !isMine && m.metadata) {
+                    // to me. Three guards:
+                    //   - metadata present (skip malformed rows)
+                    //   - !isMine (I didn't send this myself)
+                    //   - to_participant_id matches my id (the DM is *to* me)
+                    // The third guard is belt-and-suspenders against id
+                    // drift: if my local myParticipantId is a synthetic
+                    // 'p-…' fallback while the DB row has the real uuid,
+                    // !isMine alone could fail open. Requiring the explicit
+                    // to-me match closes that.
+                    const addressedToMe = m.kind === 'review_request'
+                      && !isMine
+                      && m.metadata
+                      && m.to_participant_id === myParticipantId;
+                    if (addressedToMe) {
                       const runId = m.metadata.runId;
                       const run = (workflowRuns || []).find(r => r.id === runId);
                       const stepResult = run?.stepResults?.find(s => s.stepId === m.metadata.stepId);
                       const stillPending = run?.status === 'waiting_approval' && stepResult?.status === 'waiting';
+                      // Resolved review_request DMs collapse to a single
+                      // line so a thread with many past runs isn't a wall
+                      // of stale "No longer pending" cards.
+                      if (!stillPending) {
+                        const verb = run?.status === 'rejected' ? 'rejected'
+                          : run?.status === 'completed' ? 'resolved'
+                          : run?.status === 'cancelled' ? 'cancelled'
+                          : 'no longer pending';
+                        return (
+                          <div key={m.id} className="cl-dm-flat" style={{ opacity: 0.55 }}>
+                            <div className="cl-dm-flat-header">
+                              <span className="cl-dm-flat-avatar" style={{ background: senderColor }}>
+                                {senderName?.charAt(0)?.toUpperCase()}
+                              </span>
+                              <span className="cl-dm-flat-name">{senderName?.toUpperCase()}</span>
+                            </div>
+                            <div className="cl-dm-flat-body" style={{ fontStyle: 'italic', fontSize: 12 }}>
+                              Review request for {m.metadata.workflowName || 'workflow'} · step "{m.metadata.stepName}" — {verb}
+                            </div>
+                            <div className="cl-dm-flat-time">{new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
+                          </div>
+                        );
+                      }
                       return (
                         <div key={m.id} className={`cl-dm-flat`}>
                           <div className="cl-dm-flat-header">
@@ -1400,22 +1431,30 @@ export default function ChatPanel({ messages, onSendMessage, onApprovalAction, o
                                 </div>
                               </div>
                             )}
-                            {stillPending ? (
-                              <ReviewRequestActions
-                                run={run}
-                                stepResult={stepResult}
-                                onRemoteApprove={onRemoteApprove}
-                              />
-                            ) : (
-                              <div className="cl-approval-resolved">
-                                <span className="cl-approval-resolved-action">
-                                  {run?.status === 'rejected' ? '✕ Already resolved (rejected)'
-                                    : run?.status === 'completed' ? '✓ Already resolved'
-                                    : run?.status === 'cancelled' ? '⊘ Run cancelled'
-                                    : '— No longer pending'}
-                                </span>
-                              </div>
-                            )}
+                            <ReviewRequestActions
+                              run={run}
+                              stepResult={stepResult}
+                              onRemoteApprove={onRemoteApprove}
+                            />
+                          </div>
+                          <div className="cl-dm-flat-time">{new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
+                        </div>
+                      );
+                    }
+                    // Sender's view of a review_request DM — collapse to a
+                    // single one-liner so the same content doesn't fill
+                    // the thread on both sides.
+                    if (m.kind === 'review_request' && isMine) {
+                      return (
+                        <div key={m.id} className="cl-dm-flat mine" style={{ opacity: 0.6 }}>
+                          <div className="cl-dm-flat-header">
+                            <span className="cl-dm-flat-avatar" style={{ background: senderColor }}>
+                              {senderName?.charAt(0)?.toUpperCase()}
+                            </span>
+                            <span className="cl-dm-flat-name">{senderName?.toUpperCase()}</span>
+                          </div>
+                          <div className="cl-dm-flat-body" style={{ fontStyle: 'italic', fontSize: 12 }}>
+                            Sent review request · {m.metadata?.stepName || 'step'} ({m.metadata?.workflowName || 'workflow'})
                           </div>
                           <div className="cl-dm-flat-time">{new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
                         </div>

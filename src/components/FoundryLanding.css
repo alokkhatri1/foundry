@@ -23,7 +23,13 @@
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   line-height: 1.5;
-  min-height: 100vh;
+
+  /* Document-level scrolling is disabled globally by the SPA reset
+     (html, body, #root { overflow: hidden }). The marketing landing
+     scrolls inside its own wrapper instead. */
+  height: 100%;
+  overflow-y: auto;
+  overflow-x: hidden;
   scroll-behavior: smooth;
 }
 

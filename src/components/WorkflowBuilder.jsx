@@ -372,9 +372,75 @@ function StepCard({ step, index, coworkers, tools, participants, onUpdate, onDel
               // to the library (button below) pushes a decoupled copy to
               // the shared pool.
               const cw = step.coworker || assignedCw || emptyCoworker();
+
+              // Picker that copies a coworker built elsewhere (Coworkers tab,
+              // System examples, peers in the room) into this step. Stays a
+              // deep-copy contract: the workflow node owns its own config
+              // afterward, so library edits don't ripple in mid-run.
+              const namedCoworkers = (coworkers || []).filter(c => c.name);
+              const myBuiltCoworkers = namedCoworkers.filter(c => c.createdBy === selfParticipantName);
+              const exampleCoworkers = namedCoworkers.filter(c => c.createdBy === 'System');
+              const peerCoworkers = namedCoworkers.filter(c =>
+                c.createdBy && c.createdBy !== 'System' && c.createdBy !== selfParticipantName);
+
+              function loadFromBuilt(cwId) {
+                if (!cwId) return;
+                const src = namedCoworkers.find(c => c.id === cwId);
+                if (!src) return;
+                updateCoworker({
+                  name: src.name,
+                  role: src.role || '',
+                  avatar: src.avatar,
+                  color: src.color,
+                  instructionFileIds: [...(src.instructionFileIds || [])],
+                  knowledgeFileIds: [...(src.knowledgeFileIds || [])],
+                  toolIds: [...(src.toolIds || [])],
+                  toolConfigs: { ...(src.toolConfigs || {}) },
+                });
+              }
+
               return (
                 <>
                   <EducationalCue cueId="step-type-agent" show={showEducationalCues} />
+
+                  {namedCoworkers.length > 0 && (
+                    <div className="step-config-row step-load-coworker-row">
+                      <label className="step-load-coworker-label">Load a built coworker</label>
+                      <select
+                        className="step-load-coworker-select"
+                        value=""
+                        onChange={e => loadFromBuilt(e.target.value)}
+                        disabled={readOnly}
+                      >
+                        <option value="">Pick one to copy in&hellip;</option>
+                        {myBuiltCoworkers.length > 0 && (
+                          <optgroup label="Built by you">
+                            {myBuiltCoworkers.map(c => (
+                              <option key={c.id} value={c.id}>{c.name}</option>
+                            ))}
+                          </optgroup>
+                        )}
+                        {peerCoworkers.length > 0 && (
+                          <optgroup label="Built by others">
+                            {peerCoworkers.map(c => (
+                              <option key={c.id} value={c.id}>{c.name}{c.createdBy ? ` — ${c.createdBy}` : ''}</option>
+                            ))}
+                          </optgroup>
+                        )}
+                        {exampleCoworkers.length > 0 && (
+                          <optgroup label="Examples">
+                            {exampleCoworkers.map(c => (
+                              <option key={c.id} value={c.id}>{c.name}</option>
+                            ))}
+                          </optgroup>
+                        )}
+                      </select>
+                      <p className="step-load-coworker-help">
+                        Copies the coworker&rsquo;s name, role, skills, and knowledge into this step. Edit afterward as needed.
+                      </p>
+                    </div>
+                  )}
+
                   <div className="cwb-section cwb-section-identity">
                     <div className="cwb-identity">
                       <div

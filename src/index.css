@@ -2211,6 +2211,31 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
 .step-config-row input:focus,
 .step-config-row textarea:focus { border-color: var(--accent-gold); background: var(--bg-white); }
 .step-config-row textarea { resize: vertical; min-height: 60px; font-family: inherit; }
+
+/* Coworker-loader on agent steps. Subtle gold accent so the picker reads
+   as a "shortcut" affordance, not part of the inline editor below it. */
+.step-load-coworker-row {
+  padding: 12px;
+  background: rgba(200, 149, 108, 0.08);
+  border: 1px solid rgba(200, 149, 108, 0.35);
+  border-radius: var(--radius-sm);
+  margin-top: 12px;
+}
+.step-load-coworker-row .step-load-coworker-label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: var(--accent-gold, #c8956c);
+  margin-bottom: 6px;
+  display: block;
+}
+.step-load-coworker-help {
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--text-muted);
+  line-height: 1.4;
+}
 .step-config-hint {
   margin-top: 10px;
   padding: 8px 12px;

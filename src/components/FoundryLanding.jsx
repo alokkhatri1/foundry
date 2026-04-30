@@ -49,10 +49,10 @@ export default function FoundryLanding({ onSignIn }) {
         <div className="wrap">
           <div className="fl-eyebrow">For professionals</div>
           <h1 className="fl-h1">
-            You can&rsquo;t train your way to{' '}
+            You can&rsquo;t train your way to become{' '}
             <span className="fl-highlight">AI native.</span>
             <br />
-            You have to rehearse it somewhere.
+            You rehearse it.
           </h1>
           <p className="fl-hero-sub">
             A workshop sandbox where professionals live through the shift from org chart to agent chart, with AI as a peer in the room.

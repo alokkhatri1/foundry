@@ -81,9 +81,9 @@ export default function FoundryLanding({ onSignIn }) {
         <section className="fl-section-dark">
           <div className="fl-section-eyebrow">The thesis</div>
           <p className="fl-thesis-quote">
-            AI isn&rsquo;t a tool your team uses. It&rsquo;s the <em>operating system</em> your company runs on. Hierarchy was the routing protocol of the old company. The intelligence layer is the routing protocol of the new one &mdash; and humans sit at the edges, guiding it rather than relaying through it.
+            AI isn&rsquo;t a tool your team uses. It&rsquo;s the <em>operating system</em> your company runs on. Hierarchy was the routing protocol of the old company. The intelligence layer is the routing protocol of the new one. Humans sit at the edges, guiding it rather than relaying through it.
           </p>
-          <div className="fl-thesis-attr">&mdash; The Delegation Dilemma</div>
+          <div className="fl-thesis-attr">The Delegation Dilemma</div>
         </section>
       </div>
 
@@ -92,7 +92,7 @@ export default function FoundryLanding({ onSignIn }) {
           <div className="fl-section-eyebrow">The arc</div>
           <h2 className="fl-h2">Six hours. Four movements. One new shape of work.</h2>
           <p className="fl-lede">
-            You walk in using AI like a chatbox. You leave having orchestrated a mixed team of humans and AI through a real workflow, with every decision on the record. Most of what shifts is invisible &mdash; and that&rsquo;s the point.
+            You walk in using AI like a chatbox. You leave having orchestrated a mixed team of humans and AI through a real workflow, with every decision on the record. Most of what shifts is invisible, and that&rsquo;s the point.
           </p>
 
           <div className="fl-arc-grid">
@@ -121,7 +121,7 @@ export default function FoundryLanding({ onSignIn }) {
               <span className="fl-arc-num">04 &middot; Own it</span>
               <div className="fl-arc-title">See the loop close.</div>
               <p className="fl-arc-body">
-                Every run leaves a trail. Every trail makes the next coworker smarter. You leave with a competency scorecard built from what you actually did &mdash; not a participation tile.
+                Every run leaves a trail. Every trail makes the next coworker smarter. You leave with a competency scorecard built from what you actually did, not a participation tile.
               </p>
             </div>
           </div>
@@ -148,7 +148,7 @@ export default function FoundryLanding({ onSignIn }) {
               </div>
               <h3>The whole organization is queryable.</h3>
               <p>
-                Nothing important happens off-record. Files are shared. Decisions land on the trail. The intelligence layer can read the company&rsquo;s state at any moment &mdash; because every action left an artifact behind.
+                Nothing important happens off-record. Files are shared. Decisions land on the trail. The intelligence layer can read the company&rsquo;s state at any moment, because every action left an artifact behind.
               </p>
             </div>
             <div className="fl-pillar">
@@ -174,7 +174,7 @@ export default function FoundryLanding({ onSignIn }) {
               </div>
               <h3>AI and humans are peers.</h3>
               <p>
-                Same sidebar. Same DM. Same role in a workflow. Liberating Structures provide the grammar for working as peers when no one is the manager &mdash; and AI takes a seat at the table.
+                Same sidebar. Same DM. Same role in a workflow. Liberating Structures provide the grammar for working as peers when no one is the manager. AI takes a seat at the table.
               </p>
             </div>
           </div>

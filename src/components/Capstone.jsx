@@ -84,12 +84,17 @@ function flattenForPicker(tree) {
   return out;
 }
 
+function stripExt(name) {
+  return (name || '').replace(/\.md$/i, '');
+}
+
 function FilePicker({ value, onChange, fileTree }) {
   const [open, setOpen] = useState(false);
   const options = useMemo(() => flattenForPicker(fileTree), [fileTree]);
   const selectedNames = (value || [])
     .map(id => options.find(o => o.id === id)?.name)
-    .filter(Boolean);
+    .filter(Boolean)
+    .map(stripExt);
 
   function toggle(id) {
     const next = (value || []).includes(id)
@@ -98,25 +103,26 @@ function FilePicker({ value, onChange, fileTree }) {
     onChange(next);
   }
 
+  // Compact summary inside the button so the cell doesn't grow a tag stack
+  // beneath it. Show up to two names; collapse the rest into "+N more".
+  const summary = (() => {
+    if (selectedNames.length === 0) return null;
+    if (selectedNames.length <= 2) return selectedNames.join(', ');
+    return `${selectedNames.slice(0, 2).join(', ')} +${selectedNames.length - 2} more`;
+  })();
+
   return (
     <div className="capstone-filepicker">
       <button
         type="button"
-        className="capstone-filepicker-btn"
+        className={`capstone-filepicker-btn${summary ? ' has-selection' : ''}`}
         onClick={() => setOpen(o => !o)}
       >
-        {selectedNames.length === 0
-          ? 'Pick files…'
-          : `${selectedNames.length} file${selectedNames.length === 1 ? '' : 's'}`}
+        <span className="capstone-filepicker-summary">
+          {summary || 'Pick files…'}
+        </span>
         <span className="capstone-filepicker-caret">{open ? '▴' : '▾'}</span>
       </button>
-      {selectedNames.length > 0 && (
-        <div className="capstone-filepicker-tags">
-          {selectedNames.map((name, i) => (
-            <span key={i} className="capstone-filepicker-tag">{name}</span>
-          ))}
-        </div>
-      )}
       {open && (
         <div className="capstone-filepicker-menu">
           {options.length === 0 ? (
@@ -131,7 +137,7 @@ function FilePicker({ value, onChange, fileTree }) {
                   checked={(value || []).includes(opt.id)}
                   onChange={() => toggle(opt.id)}
                 />
-                <span className="capstone-filepicker-option-name">{opt.name}</span>
+                <span className="capstone-filepicker-option-name">{stripExt(opt.name)}</span>
                 <span className="capstone-filepicker-option-folder">{opt.folder}</span>
               </label>
             ))

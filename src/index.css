@@ -7564,15 +7564,21 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
   border-color: var(--accent-gold, #c8956c);
   box-shadow: 0 0 0 3px rgba(200, 149, 108, 0.12);
 }
-.capstone-filepicker-btn:hover { border-color: var(--text-muted); }
-.capstone-filepicker-caret { color: var(--text-muted); font-size: 11px; }
-.capstone-filepicker-tags {
-  display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px;
+.capstone-filepicker-btn.has-selection {
+  border-color: var(--accent-gold, #c8956c);
+  background: rgba(200, 149, 108, 0.06);
 }
-.capstone-filepicker-tag {
-  font-size: 11px; padding: 2px 8px;
-  background: var(--bg-warm); border-radius: var(--radius-pill);
+.capstone-filepicker-summary {
+  flex: 1; min-width: 0;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   color: var(--text-dark);
+}
+.capstone-filepicker-btn:not(.has-selection) .capstone-filepicker-summary {
+  color: var(--text-muted);
+}
+.capstone-filepicker-caret {
+  color: var(--text-muted); font-size: 11px;
+  flex-shrink: 0; margin-left: 8px;
 }
 .capstone-filepicker-menu {
   position: absolute; top: 100%; left: 0; right: 0; z-index: 5;

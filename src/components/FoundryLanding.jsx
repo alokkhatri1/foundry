@@ -59,7 +59,6 @@ export default function FoundryLanding({ onSignIn }) {
           </p>
           <div className="fl-cta-row">
             <CtaButton onClick={onSignIn}>Continue with Google</CtaButton>
-            <span className="fl-cta-note">Sign in to join a workshop session</span>
           </div>
 
           <div className="fl-proof">

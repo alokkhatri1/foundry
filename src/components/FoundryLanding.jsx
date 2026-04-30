@@ -47,7 +47,7 @@ export default function FoundryLanding({ onSignIn }) {
 
       <section className="fl-hero">
         <div className="wrap">
-          <div className="fl-eyebrow">For senior operators</div>
+          <div className="fl-eyebrow">For professionals</div>
           <h1 className="fl-h1">
             You can&rsquo;t train your way to{' '}
             <span className="fl-highlight">AI native.</span>
@@ -55,7 +55,7 @@ export default function FoundryLanding({ onSignIn }) {
             You have to rehearse it somewhere.
           </h1>
           <p className="fl-hero-sub">
-            A six-hour workshop sandbox where senior operators live through the shift from org chart to agent chart, with AI as a peer in the room.
+            A six-hour workshop sandbox where professionals live through the shift from org chart to agent chart, with AI as a peer in the room.
           </p>
           <div className="fl-cta-row">
             <CtaButton onClick={onSignIn}>Continue with Google</CtaButton>

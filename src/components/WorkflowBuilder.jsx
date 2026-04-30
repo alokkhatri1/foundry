@@ -674,7 +674,7 @@ function StepCard({ step, index, coworkers, tools, participants, onUpdate, onDel
 // visual — nodes are draggable and their positions persist, edges are
 // drawn read-only from the linear auto-migration. Wiring, typed handles,
 // and DAG runtime arrive in later phases.
-function WorkflowCanvas({ workflow, onUpdateWorkflow, readOnly, fileTree, coworkers, tools, participants, activeRun, currentStepId, expandedStep, setExpandedStep, updateStep, deleteStep, validationErrors, showEducationalCues, callClaudeAPI, onSaveCoworkerToLibrary, onUpdateFileContent, onCopilotUsage, copilotState, onCopilotPatch, copilotHistoriesRef, copilotWfId, selfParticipantId, selfParticipantName }) {
+function WorkflowCanvas({ workflow, onUpdateWorkflow, readOnly, fileTree, coworkers, tools, participants, activeRun, currentStepId, expandedStep, setExpandedStep, updateStep, deleteStep, validationErrors, showEducationalCues, callClaudeAPI, onSaveCoworkerToLibrary, onUpdateFileContent, onCopilotUsage, copilotState, onCopilotPatch, copilotHistoriesRef, copilotWfId, selfParticipantId, selfParticipantName, copilotEnabled = true }) {
   const [nodes, setNodes] = useState([]);
   const [edges, setEdges] = useState([]);
   // Copilot state lives in the parent (WorkflowBuilder) so the transcript
@@ -929,7 +929,7 @@ function WorkflowCanvas({ workflow, onUpdateWorkflow, readOnly, fileTree, cowork
           style={{ background: 'var(--bg-white)', border: '1px solid var(--border-color)', borderRadius: 6 }}
         />
       </ReactFlow>
-      {!readOnly && (
+      {!readOnly && copilotEnabled && (
         <button
           className={`wf-copilot-toggle${copilotOpen ? ' open' : ''}`}
           onClick={() => setCopilotOpen(o => !o)}
@@ -939,7 +939,7 @@ function WorkflowCanvas({ workflow, onUpdateWorkflow, readOnly, fileTree, cowork
         </button>
       )}
     </div>
-    {!readOnly && copilotOpen && (
+    {!readOnly && copilotEnabled && copilotOpen && (
       <aside className="wf-copilot-panel">
         <div className="wf-copilot-header">
           <span className="wf-copilot-title">Workflow Copilot</span>
@@ -988,7 +988,7 @@ function WorkflowCanvas({ workflow, onUpdateWorkflow, readOnly, fileTree, cowork
 }
 
 // ===== Workflow Editor =====
-function WorkflowEditor({ workflow, onUpdateWorkflow, readOnly, fileTree, coworkers, tools, participants, onRun, onCancelRun, isRunning, currentStepId, activeRun, onBack, showEducationalCues, callClaudeAPI, onSaveCoworkerToLibrary, onUpdateFileContent, onCopilotUsage, copilotState, onCopilotPatch, copilotHistoriesRef, copilotWfId, selfParticipantId, selfParticipantName }) {
+function WorkflowEditor({ workflow, onUpdateWorkflow, readOnly, fileTree, coworkers, tools, participants, onRun, onCancelRun, isRunning, currentStepId, activeRun, onBack, showEducationalCues, callClaudeAPI, onSaveCoworkerToLibrary, onUpdateFileContent, onCopilotUsage, copilotState, onCopilotPatch, copilotHistoriesRef, copilotWfId, selfParticipantId, selfParticipantName, copilotEnabled = true }) {
   const confirm = useConfirm();
   const [expandedStep, setExpandedStep] = useState(null);
   const [showAddMenu, setShowAddMenu] = useState(false);
@@ -1214,6 +1214,7 @@ function WorkflowEditor({ workflow, onUpdateWorkflow, readOnly, fileTree, cowork
         onCopilotPatch={onCopilotPatch}
         copilotHistoriesRef={copilotHistoriesRef}
         copilotWfId={copilotWfId}
+        copilotEnabled={copilotEnabled}
       />
 
     </div>
@@ -1263,7 +1264,7 @@ function WorkflowCard({ workflow, coworkers, participants, onSelect, onDelete, o
 }
 
 // ===== Main Export =====
-export default function WorkflowBuilder({ workflows, onUpdateWorkflows, fileTree, coworkers, tools, onRun, onCancelRun, onCancelAllRuns, workflowRuns = [], participants, currentUserName, showEducationalCues, callClaudeAPI, onSaveCoworkerToLibrary, onUpdateFileContent, onCopilotUsage }) {
+export default function WorkflowBuilder({ workflows, onUpdateWorkflows, fileTree, coworkers, tools, onRun, onCancelRun, onCancelAllRuns, workflowRuns = [], participants, currentUserName, showEducationalCues, callClaudeAPI, onSaveCoworkerToLibrary, onUpdateFileContent, onCopilotUsage, copilotEnabled = true, capstoneSendoff = null, onConsumeCapstoneSendoff }) {
   const confirm = useConfirm();
   const [selectedWorkflowId, setSelectedWorkflowId] = useState(null);
   // Copilot transcript state lives up here so it survives closing the panel,
@@ -1295,6 +1296,28 @@ export default function WorkflowBuilder({ workflows, onUpdateWorkflows, fileTree
       return { ...prev, [selectedWorkflowId]: { ...curr, ...patch } };
     });
   }
+
+  // Capstone send-to-copilot bridge. App.jsx creates a fresh workflow and
+  // hands us {workflowId, prompt}. Snap the user into that workflow's
+  // editor with the copilot panel open and the prompt pre-filled into the
+  // input box. Participant hits Send themselves so they can read/edit the
+  // markdown before token spend; that also keeps the action repeatable
+  // without auto-firing duplicate turns. Consume the sendoff so React
+  // doesn't keep re-applying it on every render.
+  useEffect(() => {
+    if (!capstoneSendoff || !copilotEnabled) return;
+    const wf = workflows.find(w => w.id === capstoneSendoff.workflowId);
+    if (!wf) return;
+    setSelectedWorkflowId(capstoneSendoff.workflowId);
+    setCopilotByWf(prev => {
+      const curr = { ...COPILOT_DEFAULTS, ...(prev[capstoneSendoff.workflowId] || {}) };
+      return {
+        ...prev,
+        [capstoneSendoff.workflowId]: { ...curr, input: capstoneSendoff.prompt, open: true },
+      };
+    });
+    onConsumeCapstoneSendoff?.();
+  }, [capstoneSendoff, copilotEnabled, workflows, onConsumeCapstoneSendoff]);
 
   function handleUpdateWorkflow(updatedWf) {
     onUpdateWorkflows(workflows.map(w => w.id === updatedWf.id ? updatedWf : w));
@@ -1437,6 +1460,7 @@ export default function WorkflowBuilder({ workflows, onUpdateWorkflows, fileTree
           onCopilotPatch={patchCopilot}
           copilotHistoriesRef={copilotHistoriesRef}
           copilotWfId={selectedWorkflowId}
+          copilotEnabled={copilotEnabled}
         />
       </div>
     );

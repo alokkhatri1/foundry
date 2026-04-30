@@ -12,6 +12,8 @@
 export const EXAMPLE_FOLDER_ID = 'example-folder-root';
 export const EXAMPLE_KNOWLEDGE_FOLDER_ID = 'example-folder-knowledge';
 export const EXAMPLE_SKILLS_FOLDER_ID = 'example-folder-skills';
+export const EXAMPLE_BLUEPRINTS_FOLDER_ID = 'example-folder-blueprints';
+export const EXAMPLE_BLUEPRINT_FILE_ID = 'example-file-blueprint';
 
 export const EXAMPLE_KNOWLEDGE_FILE_IDS = [
   'example-file-retail-policy',
@@ -114,14 +116,58 @@ When given a credit memo, validate it against the Compliance Exceptions register
 - One-line rationale citing the exception number(s) involved
 `;
 
+// Capstone reference. A generic loan-processing-style review workflow used
+// as the take-away assignment in the Capstone tab (Stage 8). Same five-column
+// shape participants will fill in: Step / Node / Data source / Knowledge &
+// skills files / Remarks (Logic + DoD). Names deliberately kept generic so
+// the room admin can rewrite for their cohort's domain without renaming
+// roles. The file is editable in place via the standard FileEditor.
+const CAPSTONE_BLUEPRINT = `# Credit Application Review — Workflow Blueprint
+
+A reference blueprint for a credit application review process. Use it as a
+shape — your capstone table will list each step with a Step name, the Node
+(who owns the step), the Data source, the Knowledge & skills files that
+back the step, and Remarks (logic + definition of done).
+
+| # | Step | Node | Data source | Knowledge / skills | Remarks |
+|---|------|------|-------------|--------------------|---------|
+| 1 | Applicant profile created | Originator | Applicant onboarding form | Applicant intake checklist | **Logic:** Originator captures borrower identity, registration, ownership, and guarantor details to start the application. **DoD:** Applicant record saved and selectable for proposal creation. |
+| 2 | Credit history pulled | Operations | Credit history service | Credit history reading guide | **Logic:** System request sent to the credit bureau; the report is generated and attached to the case file. **DoD:** A valid credit history report is visible in the case attachments. |
+| 3 | Application details captured | Originator | Application proposal form | Proposal-fields checklist | **Logic:** Facility type, amount, tenure, security details, and explanations are entered into the system. **DoD:** Mandatory fields completed without validation errors. |
+| 4 | Financial statements uploaded | Originator | Financial template + uploaded file | Financial-ratios skill | **Logic:** Originator downloads the template, fills audited and projected financials, uploads the file; the system calculates ratios and populates the financial section. **DoD:** Financial ratios auto-reflected in the proposal view. |
+| 5 | Working-capital details uploaded | Originator | Stock and receivables sheet | Working-capital reading guide | **Logic:** Additional working-capital figures uploaded through dedicated sheets. **DoD:** Stock and receivable figures visible in the financial section. |
+| 6 | Collateral assessed | Valuation Officer | Valuator assignment + valuation report | Collateral valuation skill | **Logic:** System assigns a valuator via round-robin; collateral is inspected externally and the report is uploaded. **DoD:** Signed valuation report attached and linked to the collateral record. |
+| 7 | Supporting documents collected | Originator | Document repository | Required-documents checklist | **Logic:** Originator uploads the required legal, financial, identity, and business proof documents. **DoD:** Required document checklist satisfied in the system. |
+| 8 | Proposal submitted for review | Originator | Workflow routing module | Approval-chain skill | **Logic:** Originator confirms completeness and routes the proposal to the approval chain (Branch Lead → Reviewer → Approver). Query loops are handled within the workflow. **DoD:** Proposal reaches the final approver with a decision recorded. |
+| 9 | Post-approval routing | Originator | Workflow routing module | Post-approval checklist | **Logic:** After approval, the originator starts a new flow covering documentation, legal review, and disbursement preparation. **DoD:** Case appears in the post-approval queue. |
+| 10 | Security documents generated and signed | Documentation Officer | Document generation + signed copies | Security-doc templates | **Logic:** System generates standard security documents; the documentation team edits as needed; the originator collects signatures and uploads scans. **DoD:** Signed document set uploaded and tagged complete. |
+| 11 | Documentation and legal verification | Legal Reviewer | Documentation unit + legal review | Legal-compliance skill | **Logic:** Documents checked for completeness and legal compliance; a correction loop runs until satisfactory. **DoD:** Legal clearance recorded in the workflow. |
+| 12 | Loan implemented and booked | Operations | Implementation team + operations modules | Booking-checklist skill | **Logic:** Limits set, account activated, contracts and deals created, charges applied. **DoD:** Loan account operational and ready for disbursement. |
+| 13 | Workflow completed and reporting available | Reporting | Reporting module | Reporting query guide | **Logic:** Case closed in the system; the loan is visible in reports and monitoring dashboards. **DoD:** Case status marked complete and retrievable in reports. |
+
+## How to use this in the Capstone
+
+1. Open the Capstone tab and add one row per step in your own workflow.
+2. Use the columns as a planning frame — one row tells the story of one
+   handoff: who does it, where the data lives, what reading material backs
+   the work, and what done looks like.
+3. When all rows are filled, the Capstone tab unlocks a **Send to copilot**
+   action that ships your plan into the Orchestration copilot. The copilot
+   uses your plan as the brief and helps you build the actual workflow.
+
+The blueprint above is editable. Rewrite it to match your cohort's domain
+if you're running this for something other than a credit review.
+`;
+
 export function createExampleFiles(roomId) {
   const now = new Date().toISOString();
   const base = { room_id: roomId, created_by: 'System', updated_at: now };
-  // Folder hierarchy: Examples/ → knowledge/ + skills/
+  // Folder hierarchy: Examples/ → knowledge/ + skills/ + blueprints/
   const folders = [
     { ...base, id: EXAMPLE_FOLDER_ID, parent_id: null, name: 'Examples', type: 'folder', sort_order: -1 },
     { ...base, id: EXAMPLE_KNOWLEDGE_FOLDER_ID, parent_id: EXAMPLE_FOLDER_ID, name: 'knowledge', type: 'folder', sort_order: 0 },
     { ...base, id: EXAMPLE_SKILLS_FOLDER_ID, parent_id: EXAMPLE_FOLDER_ID, name: 'skills', type: 'folder', sort_order: 1 },
+    { ...base, id: EXAMPLE_BLUEPRINTS_FOLDER_ID, parent_id: EXAMPLE_FOLDER_ID, name: 'blueprints', type: 'folder', sort_order: 2 },
   ];
   const knowledge = [
     { ...base, id: 'example-file-retail-policy', parent_id: EXAMPLE_KNOWLEDGE_FOLDER_ID, name: 'retail_lending_policy.md', type: 'file', content: RETAIL_LENDING_POLICY, sort_order: 0 },
@@ -131,7 +177,10 @@ export function createExampleFiles(roomId) {
     { ...base, id: 'example-file-credit-review', parent_id: EXAMPLE_SKILLS_FOLDER_ID, name: 'credit_review.md', type: 'file', content: CREDIT_REVIEW_SKILL, sort_order: 0 },
     { ...base, id: 'example-file-compliance-check', parent_id: EXAMPLE_SKILLS_FOLDER_ID, name: 'compliance_check.md', type: 'file', content: COMPLIANCE_CHECK_SKILL, sort_order: 1 },
   ];
-  return { folders, knowledge, skills };
+  const blueprints = [
+    { ...base, id: EXAMPLE_BLUEPRINT_FILE_ID, parent_id: EXAMPLE_BLUEPRINTS_FOLDER_ID, name: 'blueprint.md', type: 'file', content: CAPSTONE_BLUEPRINT, sort_order: 0 },
+  ];
+  return { folders, knowledge, skills, blueprints };
 }
 
 // ===== Layer 2 — coworkers (stage 5) =====

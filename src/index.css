@@ -7344,6 +7344,227 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
 }
 .usage-footnote strong { color: var(--text-dark); }
 
+/* ========== CAPSTONE TAB (Stage 8) ========== */
+.capstone-page {
+  flex: 1;
+  overflow-y: auto;
+  padding: 24px 32px 48px;
+}
+.capstone-loading {
+  padding: 48px 0; text-align: center; color: var(--text-muted); font-size: 14px;
+}
+.capstone-header {
+  display: flex; align-items: flex-start; justify-content: space-between;
+  gap: 24px; margin-bottom: 8px; padding-top: 8px;
+}
+.capstone-title { font-size: 22px; font-weight: 700; color: var(--text-dark); margin: 0 0 6px; }
+.capstone-sub { font-size: 14px; color: var(--text-muted); line-height: 1.5; max-width: 760px; margin: 0; }
+.capstone-actions { display: flex; gap: 8px; flex-shrink: 0; }
+.capstone-btn-secondary {
+  padding: 9px 16px;
+  background: var(--bg-white);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-pill);
+  font-size: 13px; font-weight: 600;
+  display: inline-flex; align-items: center; gap: 8px;
+  cursor: pointer; transition: background 0.15s, border-color 0.15s;
+}
+.capstone-btn-secondary:hover { background: var(--bg-warm); border-color: var(--text-muted); }
+.capstone-btn-primary {
+  padding: 9px 18px;
+  background: var(--text-dark); color: white;
+  border: none;
+  border-radius: var(--radius-pill);
+  font-size: 13px; font-weight: 600;
+  display: inline-flex; align-items: center; gap: 8px;
+  cursor: pointer; transition: transform 0.15s, opacity 0.15s;
+}
+.capstone-btn-primary:hover:not(:disabled) { transform: translateY(-1px); }
+.capstone-btn-primary:disabled { opacity: 0.45; cursor: not-allowed; }
+.capstone-btn-icon { font-size: 12px; }
+
+.capstone-status {
+  display: flex; gap: 12px; align-items: center;
+  font-size: 12px; color: var(--text-muted);
+  margin: 14px 0 16px;
+}
+.capstone-status-saving { color: var(--text-muted); font-style: italic; }
+.capstone-status-saved { color: #5a9e6f; font-weight: 600; }
+
+/* Table — CSS grid so columns align across rows. The widths reflect the
+   relative weight of each field: Step and Remarks are the biggest because
+   they hold sentences; Node/Source/Files are tighter. */
+.capstone-table {
+  background: var(--bg-white);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius);
+  overflow: hidden;
+  margin-bottom: 16px;
+}
+.capstone-table-head,
+.capstone-row {
+  display: grid;
+  grid-template-columns: 36px 1.4fr 1fr 1fr 1.2fr 1.6fr 80px;
+  gap: 8px;
+  padding: 10px 12px;
+  align-items: stretch;
+}
+.capstone-table-head {
+  font-size: 11px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.4px; color: var(--text-muted);
+  background: var(--bg-warm); border-bottom: 1px solid var(--border-color);
+}
+.capstone-row {
+  border-bottom: 1px solid var(--border-color);
+}
+.capstone-row:last-child { border-bottom: none; }
+.capstone-row.is-complete { background: rgba(90, 158, 111, 0.06); }
+.capstone-row textarea {
+  width: 100%; padding: 8px 10px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  font-size: 13px; line-height: 1.4; resize: vertical;
+  background: var(--bg-white); font-family: inherit;
+}
+.capstone-row textarea:focus {
+  outline: none; border-color: var(--accent-gold, #c8956c);
+}
+.capstone-col-num {
+  font-weight: 700; color: var(--text-muted); font-size: 13px;
+  display: flex; align-items: center; justify-content: center;
+}
+.capstone-col-actions {
+  display: flex; flex-direction: column; gap: 4px; align-items: stretch;
+}
+.capstone-row-btn {
+  padding: 4px 8px; font-size: 12px;
+  background: var(--bg-warm); border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm); cursor: pointer; color: var(--text-dark);
+  transition: background 0.15s;
+}
+.capstone-row-btn:hover:not(:disabled) { background: var(--bg-white); }
+.capstone-row-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.capstone-row-delete:hover:not(:disabled) { background: #fff6f5; color: #c45c5c; border-color: #c45c5c; }
+
+.capstone-add-row {
+  width: 100%;
+  padding: 14px 16px;
+  background: transparent;
+  border: 1px dashed var(--border-color);
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  font-size: 13px; font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+.capstone-add-row:hover {
+  background: var(--bg-warm); color: var(--text-dark); border-color: var(--text-muted);
+}
+
+/* File picker — same row grid cell, with a self-contained dropdown. */
+.capstone-filepicker { position: relative; }
+.capstone-filepicker-btn {
+  width: 100%; padding: 8px 10px;
+  border: 1px solid var(--border-color);
+  background: var(--bg-white);
+  border-radius: var(--radius-sm);
+  font-size: 13px; text-align: left;
+  cursor: pointer;
+  display: flex; justify-content: space-between; align-items: center;
+}
+.capstone-filepicker-btn:hover { border-color: var(--text-muted); }
+.capstone-filepicker-caret { color: var(--text-muted); font-size: 11px; }
+.capstone-filepicker-tags {
+  display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px;
+}
+.capstone-filepicker-tag {
+  font-size: 11px; padding: 2px 8px;
+  background: var(--bg-warm); border-radius: var(--radius-pill);
+  color: var(--text-dark);
+}
+.capstone-filepicker-menu {
+  position: absolute; top: 100%; left: 0; right: 0; z-index: 5;
+  margin-top: 4px;
+  background: var(--bg-white);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.08);
+  max-height: 240px; overflow-y: auto;
+}
+.capstone-filepicker-empty {
+  padding: 12px; font-size: 12px; color: var(--text-muted); font-style: italic;
+}
+.capstone-filepicker-option {
+  display: grid; grid-template-columns: 18px 1fr auto;
+  gap: 8px; align-items: center;
+  padding: 8px 10px; cursor: pointer;
+  font-size: 13px;
+}
+.capstone-filepicker-option:hover { background: var(--bg-warm); }
+.capstone-filepicker-option-name { color: var(--text-dark); }
+.capstone-filepicker-option-folder {
+  font-size: 10px; text-transform: uppercase; letter-spacing: 0.4px;
+  color: var(--text-muted); font-weight: 600;
+}
+
+/* Blueprint drawer — slides in from the right over the page. */
+.capstone-drawer-backdrop {
+  position: fixed; inset: 0; z-index: 40;
+  background: rgba(26, 26, 26, 0.4);
+  display: flex; justify-content: flex-end;
+  animation: capstone-fade 0.15s ease-out;
+}
+.capstone-drawer {
+  width: min(540px, 100%);
+  background: var(--bg-white);
+  height: 100%;
+  display: flex; flex-direction: column;
+  box-shadow: -8px 0 32px rgba(0, 0, 0, 0.16);
+  animation: capstone-slide 0.2s ease-out;
+}
+.capstone-drawer-header {
+  padding: 18px 24px;
+  border-bottom: 1px solid var(--border-color);
+  display: flex; justify-content: space-between; align-items: center;
+}
+.capstone-drawer-header h3 { font-size: 16px; font-weight: 700; color: var(--text-dark); margin: 0; }
+.capstone-drawer-close {
+  background: none; border: none; cursor: pointer;
+  font-size: 18px; color: var(--text-muted); padding: 4px 8px;
+  border-radius: var(--radius-sm);
+}
+.capstone-drawer-close:hover { background: var(--bg-warm); color: var(--text-dark); }
+.capstone-drawer-body {
+  flex: 1; overflow-y: auto; padding: 24px;
+  font-size: 14px; line-height: 1.65; color: var(--text-body);
+}
+.capstone-drawer-empty { color: var(--text-muted); font-style: italic; }
+
+@keyframes capstone-slide {
+  from { transform: translateX(20px); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+@keyframes capstone-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@media (max-width: 1100px) {
+  .capstone-table-head,
+  .capstone-row {
+    grid-template-columns: 1fr;
+    gap: 6px;
+  }
+  .capstone-table-head { display: none; }
+  .capstone-row {
+    padding: 14px;
+    border-bottom: 1px solid var(--border-color);
+  }
+  .capstone-col-num { justify-content: flex-start; font-size: 12px; }
+  .capstone-col-actions { flex-direction: row; }
+  .capstone-row-btn { flex: 1; }
+}
+
 /* Attribution shown on the graduation page and the landing screens. */
 .grad-attribution {
   margin-top: 28px;

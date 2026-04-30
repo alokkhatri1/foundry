@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, useMemo } from 'react';
 import './App.css';
 import AuthGate, { useAuth } from './components/AuthGate';
 import GraduationScreen from './components/GraduationScreen';
+import Capstone from './components/Capstone';
 import FileExplorer from './components/FileExplorer';
 import FileEditor from './components/FileEditor';
 import WorkflowBuilder from './components/WorkflowBuilder';
@@ -212,10 +213,11 @@ function SettingsMenu({ userName, currentStage, sb, myParticipantId, creditsLeft
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
   const { isAdmin, openAdmin } = useAuth();
-  const showSpend = stageReached(currentStage, '8');
+  const showSpend = stageReached(currentStage, '10');
   // Workshop-wide total — matches the pedagogy of the Usage tab
   // ("look how cheap the whole room is"). We always run the hook (can't
-  // call hooks conditionally) but only render its result after Stage 8.
+  // call hooks conditionally) but only render its result after Economics
+  // (Stage 10 under the Capstone-arc renumber; was Stage 8).
   const spend = useWorkshopUsageTotal(sb);
   const showPreferences = stageReached(currentStage, '2');
   const initial = (userName || '?').trim().charAt(0).toUpperCase();
@@ -440,10 +442,11 @@ function App() {
     previousStageRef.current = currentStage;
     if (prev !== null && prev !== currentStage && currentStage !== '1') {
       setJustRevealed(currentStage);
-      // Stage 9 (Graduation) — the whole-room moment. Snap every participant
+      // Graduation — the whole-room moment. Snap every participant
       // to the graduation tab so they see their scorecard together. Later
       // navigation away is fine; this only fires on the transition.
-      if (currentStage === '9') setActiveTab('graduation');
+      // Stage 11 under the Capstone-arc renumber; was Stage 9.
+      if (currentStage === '11') setActiveTab('graduation');
     }
     // Facilitator un-reveal safety net: if the active tab requires a stage
     // that's no longer reached (admin rolled the dial back), bounce to
@@ -452,7 +455,7 @@ function App() {
     // states. Chat is always available so it's the safe fallback.
     const TAB_STAGE_REQ = {
       files: '3', coworkers: '5', workflow: '6', activity: '7',
-      usage: '8', graduation: '9',
+      capstone: '8', usage: '10', graduation: '11',
     };
     const required = TAB_STAGE_REQ[activeTab];
     if (required && !stageReached(currentStage, required)) {
@@ -1124,6 +1127,36 @@ function App() {
     );
     setFlatFiles(next);
     return next;
+  }
+
+  // Capstone send-to-copilot bridge. The Capstone tab fires this with a
+  // markdown rendering of the participant's plan. We create a fresh
+  // workflow, switch them into Orchestration on that workflow, and stash
+  // the markdown for WorkflowBuilder to inject as the copilot's pre-filled
+  // user turn (the participant still hits Send themselves so they can read
+  // and edit the prompt before firing — which avoids surprise token spend).
+  // Repeatable: each click creates another workflow + sendoff.
+  const [capstoneSendoff, setCapstoneSendoff] = useState(null);
+  function handleSendCapstoneToCopilot(markdown) {
+    if (!stageReached(currentStage, '9')) return;
+    const wfId = 'wf-' + (typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`);
+    const triggerStep = { id: 'trigger-' + wfId, type: 'trigger', name: 'Trigger', caseInput: '' };
+    const captureStep = { id: 'step-' + (typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`), type: 'capture', name: 'Capture Learning', mode: 'knowledge', targetFileId: '' };
+    const newWf = {
+      id: wfId,
+      name: 'Capstone build',
+      steps: [triggerStep, captureStep],
+      nodes: [
+        { id: triggerStep.id, type: 'trigger', position: { x: 240, y: 0 }, data: { ...triggerStep } },
+        { id: captureStep.id, type: 'capture', position: { x: 240, y: 360 }, data: { ...captureStep } },
+      ],
+      edges: [],
+      createdBy: userName,
+      createdAt: Date.now(),
+    };
+    handleUpdateWorkflows([...(workflows || []), newWf]);
+    setCapstoneSendoff({ workflowId: wfId, prompt: markdown });
+    setActiveTab('workflow');
   }
 
   function handleUpdateWorkflows(newWorkflows) {
@@ -2769,11 +2802,16 @@ Answer in ONE sentence. If the user asks "how", a second sentence is allowed —
             </button>
           </RevealAt>
           <RevealAt stage="8" currentStage={currentStage}>
+            <button className={`tab-nav-item${activeTab === 'capstone' ? ' active' : ''}`} onClick={() => setActiveTab('capstone')}>
+              Capstone
+            </button>
+          </RevealAt>
+          <RevealAt stage="10" currentStage={currentStage}>
             <button className={`tab-nav-item${activeTab === 'usage' ? ' active' : ''}`} onClick={() => setActiveTab('usage')}>
               Economics
             </button>
           </RevealAt>
-          <RevealAt stage="9" currentStage={currentStage}>
+          <RevealAt stage="11" currentStage={currentStage}>
             <button className={`tab-nav-item${activeTab === 'graduation' ? ' active' : ''}`} onClick={() => setActiveTab('graduation')}>
               Graduation
             </button>
@@ -2781,7 +2819,7 @@ Answer in ONE sentence. If the user asks "how", a second sentence is allowed —
         </nav>
         <div className="app-header-right">
           <div className="header-account-pill">
-            <RevealAt stage="8" currentStage={currentStage}>
+            <RevealAt stage="10" currentStage={currentStage}>
               <CreditsChip
                 creditsLeft={creditsLeft}
                 creditsTotal={creditsTotal}
@@ -2887,7 +2925,7 @@ Answer in ONE sentence. If the user asks "how", a second sentence is allowed —
         )}
         {activeTab === 'workflow' && (
           <div className="tab-pane tab-pane-workflow">
-            <WorkflowBuilder workflows={workflows} onUpdateWorkflows={handleUpdateWorkflows} fileTree={fileTree} onRun={runWorkflow} onCancelRun={handleCancelRun} onCancelAllRuns={handleCancelAllRuns} workflowRuns={workflowRuns} participants={participants} currentUserName={userName} coworkers={coworkers || []} tools={tools || []} showEducationalCues={showEducationalCues} callClaudeAPI={callClaudeAPI} onSaveCoworkerToLibrary={handleSaveCoworkerToLibrary} onUpdateFileContent={handleUpdateFileContent} onCopilotUsage={({ usage, model }) => sb.logLlmUsage({ participantId: myParticipantId, segment: 'workflow_copilot', model, usage, costUsd: computeCost(usage, model) })} />
+            <WorkflowBuilder workflows={workflows} onUpdateWorkflows={handleUpdateWorkflows} fileTree={fileTree} onRun={runWorkflow} onCancelRun={handleCancelRun} onCancelAllRuns={handleCancelAllRuns} workflowRuns={workflowRuns} participants={participants} currentUserName={userName} coworkers={coworkers || []} tools={tools || []} showEducationalCues={showEducationalCues} callClaudeAPI={callClaudeAPI} onSaveCoworkerToLibrary={handleSaveCoworkerToLibrary} onUpdateFileContent={handleUpdateFileContent} onCopilotUsage={({ usage, model }) => sb.logLlmUsage({ participantId: myParticipantId, segment: 'workflow_copilot', model, usage, costUsd: computeCost(usage, model) })} copilotEnabled={stageReached(currentStage, '9')} capstoneSendoff={capstoneSendoff} onConsumeCapstoneSendoff={() => setCapstoneSendoff(null)} />
           </div>
         )}
         {activeTab === 'files' && (
@@ -2927,7 +2965,20 @@ Answer in ONE sentence. If the user asks "how", a second sentence is allowed —
             />
           </div>
         )}
-        {activeTab === 'usage' && stageReached(currentStage, '8') && (
+        {activeTab === 'capstone' && stageReached(currentStage, '8') && (
+          <div className="tab-pane tab-pane-capstone">
+            <Capstone
+              sb={sb}
+              myParticipantId={myParticipantId}
+              fileTree={fileTree}
+              flatFiles={flatFiles}
+              onEnsureFileContent={handleEnsureFileContent}
+              copilotUnlocked={stageReached(currentStage, '9')}
+              onSendToCopilot={handleSendCapstoneToCopilot}
+            />
+          </div>
+        )}
+        {activeTab === 'usage' && stageReached(currentStage, '10') && (
           <div className="tab-pane tab-pane-usage">
             <UsageView
               sb={sb}

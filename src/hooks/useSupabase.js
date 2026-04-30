@@ -8,6 +8,7 @@ import {
   createExampleWorkflow,
   EXAMPLE_FOLDER_ID,
   EXAMPLE_SKILLS_FOLDER_ID,
+  EXAMPLE_BLUEPRINTS_FOLDER_ID,
 } from '../data/exampleArtifacts';
 
 // ===== Per-stage example seeding =====
@@ -59,6 +60,20 @@ async function seedStageExamples(roomId, toStage) {
     const wf = createExampleWorkflow(roomId);
     const { error } = await supabase.from('workflows').upsert(wf, { onConflict: 'id' });
     if (error) console.error('[sb] seedStageExamples(6):', error.message);
+    return;
+  }
+
+  if (stageStr === '8') {
+    // Capstone reveal — drop the Blueprints subfolder and the seeded
+    // blueprint.md so the Capstone tab's "Show blueprint" drawer has
+    // something to read from. Examples/ root re-upserted as a safety net
+    // in case the room never reached stages 3-4 (deprecated/cloned).
+    const { folders, blueprints } = createExampleFiles(roomId);
+    const blueprintsFolder = folders.find(f => f.id === EXAMPLE_BLUEPRINTS_FOLDER_ID);
+    const rootFolder = folders.find(f => f.id === EXAMPLE_FOLDER_ID);
+    const rows = [rootFolder, blueprintsFolder, ...blueprints].filter(Boolean);
+    const { error } = await supabase.from('files').upsert(rows, { onConflict: 'id' });
+    if (error) console.error('[sb] seedStageExamples(8):', error.message);
     return;
   }
 }
@@ -1166,6 +1181,38 @@ export default function useSupabase() {
     return data || [];
   }, []);
 
+  // ===== Capstone draft (Stage 8) =====
+  // Single-author per (workshop_id, participant_id). Returns the row's
+  // `rows` JSONB array (or null if the participant hasn't started yet);
+  // saveCapstoneDraft upserts the array on every commit.
+  const loadCapstoneDraft = useCallback(async (participantId) => {
+    if (!isSupabaseConfigured || !roomIdRef.current || !participantId) return null;
+    const { data, error } = await supabase
+      .from('capstone_drafts')
+      .select('rows')
+      .eq('workshop_id', roomIdRef.current)
+      .eq('participant_id', participantId)
+      .maybeSingle();
+    if (error) { console.error('[sb] loadCapstoneDraft:', error.message); return null; }
+    return data?.rows ?? null;
+  }, []);
+
+  const saveCapstoneDraft = useCallback(async (participantId, rows) => {
+    if (!isSupabaseConfigured || !roomIdRef.current) return { ok: false, error: 'Not connected' };
+    if (!participantId) return { ok: false, error: 'Missing participant_id' };
+    const payload = {
+      workshop_id: roomIdRef.current,
+      participant_id: participantId,
+      rows: rows || [],
+      updated_at: new Date().toISOString(),
+    };
+    const { error } = await supabase
+      .from('capstone_drafts')
+      .upsert(payload, { onConflict: 'workshop_id,participant_id' });
+    if (error) { console.error('[sb] saveCapstoneDraft:', error.message); return { ok: false, error: error.message }; }
+    return { ok: true };
+  }, []);
+
   // ===== Realtime: subscribe to all entity tables =====
   // handlers.onReconnect (optional): fires whenever the channel re-enters the
   // SUBSCRIBED state after previously leaving it (CHANNEL_ERROR, TIMED_OUT,
@@ -1310,5 +1357,6 @@ export default function useSupabase() {
     loadWorkshopUsage, subscribeToWorkshopUsage, loadRunUsage,
     subscribeToRoom, trackPresence, leavePresence,
     loadMyFeedback, saveFeedback, loadAllFeedback,
+    loadCapstoneDraft, saveCapstoneDraft,
   }), []);
 }

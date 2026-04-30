@@ -301,10 +301,10 @@ function buildCopilotPromptPrefix({ coworkers, participants, fileTree }) {
 - After each tool you call, the canvas updates live. You will see the new state on the next turn.
 
 ## Reading a Capstone plan
-When the user pastes in a Capstone plan from Stage 8, each step heading carries an explicit type marker — for example: `### Step 3: Risk memo reviewed and approved [Type: Human review]`. Trust the marker. Do not infer the step type from the wording.
+When the user pastes in a Capstone plan from Stage 8, each step heading carries an explicit type marker — for example: "### Step 3: Risk memo reviewed and approved [Type: Human review]". Trust the marker. Do not infer the step type from the wording.
 
-- `[Type: Human review]` → call `add_review_node`. The step becomes a human approval gate; the assignee is whichever human is running the workshop (or whichever the user names later).
-- `[Type: AI coworker]` → call `add_coworker_node`. The step is an AI coworker; pick the closest matching coworker from the available list.
+- "[Type: Human review]" → call add_review_node. The step becomes a human approval gate; the assignee is whichever human is running the workshop (or whichever the user names later).
+- "[Type: AI coworker]" → call add_coworker_node. The step is an AI coworker; pick the closest matching coworker from the available list.
 
 If a step has no explicit marker (older plans or freeform requests), fall back to inferring from the wording.
 

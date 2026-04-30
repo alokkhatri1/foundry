@@ -7404,7 +7404,9 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
 .capstone-table-head,
 .capstone-row {
   display: grid;
-  grid-template-columns: 36px 1.4fr 1fr 1fr 1.2fr 1.6fr 80px;
+  /* Step/Node | Data source | Files | Remarks (rest) | Actions
+     Step/Node and Remarks get the most width because they hold sentences. */
+  grid-template-columns: 36px 1.6fr 1fr 1.2fr 1.8fr 80px;
   gap: 8px;
   padding: 10px 12px;
   align-items: stretch;

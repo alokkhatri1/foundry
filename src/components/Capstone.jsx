@@ -27,10 +27,21 @@ function newRow() {
   };
 }
 
+// "Step / Node" is one combined column in the LOAMS reference (a step in
+// the workflow = a node in the DAG). For drafts saved before this collapse
+// the row may carry both `step` and `node` — treat them as one. Going
+// forward only `step` is required; `node` is preserved on existing rows
+// for backwards compat but no longer asked for in the UI.
+function combinedStep(row) {
+  const s = (row.step || '').trim();
+  const n = (row.node || '').trim();
+  if (s && n) return `${s} (${n})`;
+  return s || n;
+}
+
 function isRowComplete(row) {
   return !!(
-    (row.step || '').trim() &&
-    (row.node || '').trim() &&
+    combinedStep(row) &&
     (row.dataSource || '').trim() &&
     (row.fileIds || []).length > 0 &&
     (row.remarks || '').trim()
@@ -45,8 +56,7 @@ function rowsToMarkdown(rows, fileTreeFlat) {
   const lines = ['Build a workflow with these steps:', ''];
   rows.forEach((r, i) => {
     const fileNames = (r.fileIds || []).map(id => fileNameById.get(id) || id).filter(Boolean);
-    lines.push(`### Step ${i + 1}: ${r.step}`);
-    lines.push(`- **Node (owner):** ${r.node}`);
+    lines.push(`### Step ${i + 1}: ${combinedStep(r)}`);
     lines.push(`- **Data source:** ${r.dataSource}`);
     if (fileNames.length) lines.push(`- **Knowledge & skills files:** ${fileNames.join(', ')}`);
     lines.push(`- **Remarks:** ${r.remarks}`);
@@ -304,8 +314,7 @@ export default function Capstone({
       <div className="capstone-table">
         <div className="capstone-table-head">
           <div className="capstone-col-num">#</div>
-          <div className="capstone-col-step">Step</div>
-          <div className="capstone-col-node">Node</div>
+          <div className="capstone-col-step">Step / Node</div>
           <div className="capstone-col-source">Data source</div>
           <div className="capstone-col-files">Knowledge &amp; skills files</div>
           <div className="capstone-col-remarks">Remarks (logic + DoD)</div>
@@ -317,15 +326,8 @@ export default function Capstone({
             <textarea
               className="capstone-col-step"
               value={row.step}
-              placeholder="What happens"
+              placeholder="e.g. Client basic profile created"
               onChange={e => update(idx, { step: e.target.value })}
-              rows={2}
-            />
-            <textarea
-              className="capstone-col-node"
-              value={row.node}
-              placeholder="Originator / Reviewer / System"
-              onChange={e => update(idx, { node: e.target.value })}
               rows={2}
             />
             <textarea

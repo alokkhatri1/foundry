@@ -137,7 +137,23 @@ function CaptureStepNode({ data }) {
   );
 }
 
-const nodeTypes = { agent: CoworkerStepNode, approval: ReviewStepNode, trigger: TriggerNode, capture: CaptureStepNode };
+// Source node — an external integration represented as a peer node on the
+// canvas. Has no input handle (its data comes from outside the room) and
+// one output handle that emits the configured samplePayload at run time.
+// Zero token cost: the executor short-circuits the Claude call and uses
+// the static payload as the step output. Pedagogical metaphor: data
+// integrations are visible peers in the workflow, not invisible plumbing.
+function SourceStepNode({ data }) {
+  return (
+    <div className="wf-canvas-node wf-source-node" style={{ width: 420 }}>
+      <NodeDeleteButton onDelete={data.stepCardProps?.onDelete} />
+      <StepCard {...data.stepCardProps} onCanvas />
+      <Handle type="source" position={Position.Bottom} id="out" className="wf-handle wf-handle-out" />
+    </div>
+  );
+}
+
+const nodeTypes = { agent: CoworkerStepNode, approval: ReviewStepNode, trigger: TriggerNode, capture: CaptureStepNode, source: SourceStepNode };
 
 // Cycle prevention: before adding a new edge A→B, walk forward from B via
 // the existing edges and reject if we can reach A. Rejected-path edges are
@@ -296,6 +312,7 @@ function StepCard({ step, index, coworkers, tools, participants, onUpdate, onDel
             {step.type === 'agent' ? 'Coworker'
               : step.type === 'approval' ? 'Review'
               : step.type === 'capture' ? 'Capture'
+              : step.type === 'source' ? 'Source'
               : 'Trigger'}
           </span>
           {assignee && (
@@ -310,7 +327,9 @@ function StepCard({ step, index, coworkers, tools, participants, onUpdate, onDel
                 ? (assignedPerson?.name || 'Review')
                 : step.type === 'capture'
                   ? (step.name || 'Capture Learning')
-                  : step.name}
+                  : step.type === 'source'
+                    ? (step.name || 'New Source')
+                    : step.name}
           </span>
           {statusBadge}
           <span className="step-actions">
@@ -602,6 +621,32 @@ function StepCard({ step, index, coworkers, tools, participants, onUpdate, onDel
                 </div>
                 <div className="step-config-hint">
                   On reject the run bounces back to the previous review step for revision (or final-rejects if there's no prior human review).
+                </div>
+              </>
+            )}
+
+            {step.type === 'source' && (
+              <>
+                <div className="step-config-row">
+                  <label>Source name</label>
+                  <input
+                    type="text"
+                    value={step.name || ''}
+                    onChange={e => onUpdate({ ...step, name: e.target.value })}
+                    placeholder="e.g. Credit bureau pull"
+                  />
+                </div>
+                <div className="step-config-row">
+                  <label>Sample payload</label>
+                  <textarea
+                    value={step.samplePayload || ''}
+                    onChange={e => onUpdate({ ...step, samplePayload: e.target.value })}
+                    placeholder="Paste a sample of what this integration would return — a credit report, a form submission, a record from a system. Markdown is fine."
+                    rows={6}
+                  />
+                </div>
+                <div className="step-config-hint">
+                  This Source step represents an external integration. At run time it emits the sample payload above to whatever step is downstream &mdash; no Claude call, no token spend. Edit the payload between runs to try different cases.
                 </div>
               </>
             )}
@@ -920,6 +965,7 @@ function WorkflowCanvas({ workflow, onUpdateWorkflow, readOnly, fileTree, cowork
             // Tint minimap tiles by node type so the overall shape reads at a glance.
             if (n.type === 'trigger') return '#5a8f6b';
             if (n.type === 'approval') return '#c8956c';
+            if (n.type === 'source') return '#8b6fb0';
             return '#4a7fb5';
           }}
           nodeStrokeWidth={2}
@@ -1042,6 +1088,7 @@ function WorkflowEditor({ workflow, onUpdateWorkflow, readOnly, fileTree, cowork
     const defaultName = type === 'agent' ? 'New Coworker'
       : type === 'approval' ? 'Human Review'
       : type === 'capture' ? 'Capture Learning'
+      : type === 'source' ? 'New Source'
       : 'New Step';
     const newStep = {
       id: genStepId(), type,
@@ -1057,6 +1104,7 @@ function WorkflowEditor({ workflow, onUpdateWorkflow, readOnly, fileTree, cowork
         prompt: '',
       }),
       ...(type === 'capture' && { mode: 'knowledge', targetFileId: '' }),
+      ...(type === 'source' && { samplePayload: '' }),
     };
     onUpdateWorkflow({ ...workflow, steps: [...workflow.steps, newStep] });
     setShowAddMenu(false);
@@ -1116,6 +1164,7 @@ function WorkflowEditor({ workflow, onUpdateWorkflow, readOnly, fileTree, cowork
               <div className="add-step-menu">
                 <button className="add-step-option" onClick={() => addStep('agent')}><span className="dot agent"></span> Coworker Step</button>
                 <button className="add-step-option" onClick={() => addStep('approval')}><span className="dot approval"></span> Human Review</button>
+                <button className="add-step-option" onClick={() => addStep('source')}><span className="dot source"></span> Data Source</button>
                 <button className="add-step-option" onClick={() => addStep('capture')}><span className="dot capture"></span> Capture Learning</button>
               </div>
             )}
@@ -1238,6 +1287,7 @@ function WorkflowCard({ workflow, coworkers, participants, onSelect, onDelete, o
             : step.type === 'approval' ? '\uD83D\uDC64'
             : step.type === 'trigger' ? '\u25B6'
             : step.type === 'capture' ? '\uD83D\uDCDA'
+            : step.type === 'source' ? '\uD83D\uDCE1'
             : '\u2699\uFE0F';
           return (
             <span key={step.id} className="wf-card-flow-item">

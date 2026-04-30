@@ -81,6 +81,18 @@ const COPILOT_TOOL_SCHEMAS = [
       required: ['mode', 'targetFileName'],
     },
   },
+  {
+    name: 'add_source_node',
+    description: 'Add a Source step that represents an external data integration (a system, API, or feed the workflow would normally pull data from). At run time the Source emits the configured samplePayload to whatever step is downstream — no Claude call, no token spend. Use this when a step in the user\'s plan has a Data source they need to ingest. Returns the new node id — wire it upstream of the Coworker / Review step that consumes the data.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        name: { type: 'string', description: 'Short name describing what this integration represents (e.g. "Credit bureau pull", "Application form intake")' },
+        samplePayload: { type: 'string', description: 'A plausible sample of what this integration would return — a credit report, a filled-in form, a record. Markdown is fine. Leave empty to let the participant fill it in.' },
+      },
+      required: ['name'],
+    },
+  },
 ];
 
 // ===== Tool executor =====
@@ -225,6 +237,26 @@ function applyCopilotTool(name, input, workflow, ctx) {
         result: `Configured Capture: ${mode} into "${file.name}".`,
       };
     }
+    case 'add_source_node': {
+      const id = genCopilotNodeId();
+      const sourceName = (input.name || '').trim() || 'New Source';
+      const newStep = {
+        id,
+        type: 'source',
+        name: sourceName,
+        samplePayload: typeof input.samplePayload === 'string' ? input.samplePayload : '',
+      };
+      const newNode = { id, type: 'source', position: nextPosition(workflow) };
+      return {
+        workflow: {
+          ...workflow,
+          steps: [...(workflow.steps || []), newStep],
+          nodes: [...(workflow.nodes || []), newNode],
+        },
+        result: `Added Source "${sourceName}" as node ${id}.`,
+        nodeId: id,
+      };
+    }
     default:
       return { error: `Unknown tool: ${name}` };
   }
@@ -265,6 +297,7 @@ function summarizeWorkflow(workflow) {
     if (s.type === 'agent') return `- [coworker ${s.id}] ${s.name || '(no name)'}${s.coworkerId ? ` (library ref ${s.coworkerId})` : ''}`;
     if (s.type === 'approval') return `- [review ${s.id}] assigneeId=${s.assigneeId || '(none)'} prompt="${s.prompt || ''}"`;
     if (s.type === 'capture') return `- [capture ${s.id}] Capture Learning (terminal — wire the final output here; mode=${s.mode || 'knowledge'}, targetFileId=${s.targetFileId || '(unset)'})`;
+    if (s.type === 'source') return `- [source ${s.id}] ${s.name || '(no name)'} (external integration — emits samplePayload at run time, no Claude call; payload length=${(s.samplePayload || '').length})`;
     return `- [${s.type} ${s.id}]`;
   });
   const edgeLines = edges.map(e => `- ${e.source} → ${e.target}${e.sourceHandle && e.sourceHandle !== 'out' ? ` (${e.sourceHandle})` : ''}`);
@@ -295,10 +328,20 @@ function buildCopilotPromptPrefix({ coworkers, participants, fileTree }) {
   return `You are the Workflow Copilot. You help people design mixed-team workflows (AI coworkers + human review steps) on a visual DAG canvas.
 
 ## How this works
-- The workflow is a DAG with four node types: Trigger (the case input), Coworker (an AI step), Review (a human approval gate), and Capture Learning (the terminal node where the final output compounds into knowledge or skills).
+- The workflow is a DAG with five node types: Trigger (the case input), Coworker (an AI step), Review (a human approval gate), Source (an external data integration that emits a sample payload — see below), and Capture Learning (the terminal node where the final output compounds into knowledge or skills).
 - Every workflow is pre-seeded with a Trigger and a Capture node. You do NOT add them. Look for them in the "Current workflow state" below — you'll see their ids.
 - You cannot type into the canvas — every change goes through a tool call.
 - After each tool you call, the canvas updates live. You will see the new state on the next turn.
+
+## Source nodes (external data integrations)
+A Source node represents a data feed the workflow would normally pull from in real life — a CRM lookup, a credit-bureau API call, a form submission, a database query. In the sandbox, it emits a configured sample payload to whatever step is downstream and costs zero tokens.
+
+When the user's plan references a "Data source" for a step, add a Source node upstream of that step:
+- The Source's name should describe what it represents (e.g., "Credit bureau pull", "Application form intake", "Collateral valuation report").
+- Provide a plausible one-paragraph samplePayload if you can write one without inventing facts. Otherwise leave samplePayload empty and the participant will fill it in.
+- Wire the Source's output into the Coworker / Review step that consumes the data.
+
+Sources can fire upstream of any step, not just the first one. If step 5 is "Pull a credit report", that's a Source node sitting between step 4 and step 5 — emitting the report payload that step 5's coworker reads.
 
 ## Wiring the Capture node (this matters)
 The Capture Learning node is always the final step. Whatever coworker or review produces the approved output, its outgoing edge MUST terminate at the pre-seeded Capture node. Without this edge, the workflow has no way to compound learning and the run ends orphaned.

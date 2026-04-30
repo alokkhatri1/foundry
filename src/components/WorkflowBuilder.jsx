@@ -654,9 +654,11 @@ function StepCard({ step, index, coworkers, tools, participants, onUpdate, onDel
             {/* Save output toggle — off by default. When on, the step's output
                 (for coworker: what the coworker produced; for review: the
                 upstream draft at the moment of approval) is saved to the
-                configured folder on run completion. Not applicable to the
-                trigger (it has no output of its own). */}
-            {step.type !== 'trigger' && step.type !== 'capture' && (
+                configured folder on run completion. Hidden for Trigger
+                (no output of its own), Capture (already writes a file),
+                and Source (the "output" is the static sample the
+                participant already authored — nothing new to save). */}
+            {step.type !== 'trigger' && step.type !== 'capture' && step.type !== 'source' && (
             <div className="step-save-block">
               <label className="step-save-toggle">
                 <input

@@ -7422,62 +7422,107 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
 .capstone-status-saving { color: var(--text-muted); font-style: italic; }
 .capstone-status-saved { color: #5a9e6f; font-weight: 600; }
 
-/* Table — CSS grid so columns align across rows. The widths reflect the
-   relative weight of each field: Step and Remarks are the biggest because
-   they hold sentences; Node/Source/Files are tighter. */
+/* Table — CSS grid so columns align across rows. */
 .capstone-table {
   background: var(--bg-white);
   border: 1px solid var(--border-color);
   border-radius: var(--radius);
-  overflow: hidden;
+  overflow: visible; /* allow file picker dropdown to escape the box */
   margin-bottom: 16px;
 }
 .capstone-table-head,
 .capstone-row {
   display: grid;
-  /* # | Step/Node | Files | Remarks | Actions
-     Step/Node and Remarks get the most width because they hold sentences. */
-  grid-template-columns: 36px 1.6fr 1.2fr 1.8fr 80px;
-  gap: 8px;
-  padding: 10px 12px;
+  grid-template-columns: 32px 1.6fr 1.2fr 1.8fr 56px;
+  gap: 12px;
+  padding: 14px 16px;
   align-items: stretch;
 }
 .capstone-table-head {
-  font-size: 11px; font-weight: 700; text-transform: uppercase;
-  letter-spacing: 0.4px; color: var(--text-muted);
-  background: var(--bg-warm); border-bottom: 1px solid var(--border-color);
+  font-size: 10.5px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.6px; color: var(--text-muted);
+  background: var(--bg-warm);
+  border-bottom: 1px solid var(--border-color);
+  border-radius: var(--radius) var(--radius) 0 0;
+  padding: 11px 16px;
 }
 .capstone-row {
   border-bottom: 1px solid var(--border-color);
+  position: relative;
+  transition: background 0.12s;
 }
 .capstone-row:last-child { border-bottom: none; }
-.capstone-row.is-complete { background: rgba(90, 158, 111, 0.06); }
+.capstone-row:hover { background: rgba(0, 0, 0, 0.012); }
+/* Subtle left-edge accent on completed rows instead of a green tint
+   covering the whole row — quieter, still scannable. */
+.capstone-row.is-complete::before {
+  content: '';
+  position: absolute;
+  left: 0; top: 8px; bottom: 8px;
+  width: 3px;
+  background: #5a9e6f;
+  border-radius: 0 2px 2px 0;
+}
+
+/* Cells: shared height + clean borders. resize:none kills the
+   diagonal grip in the corner; min-height keeps them comfortable
+   without ballooning a long entry. */
 .capstone-row textarea {
-  width: 100%; padding: 8px 10px;
+  width: 100%;
+  min-height: 64px;
+  padding: 9px 11px;
   border: 1px solid var(--border-color);
   border-radius: var(--radius-sm);
-  font-size: 13px; line-height: 1.4; resize: vertical;
+  font-size: 13px; line-height: 1.5;
   background: var(--bg-white); font-family: inherit;
+  resize: none;
+  transition: border-color 0.12s, box-shadow 0.12s;
 }
+.capstone-row textarea:hover { border-color: var(--text-muted); }
 .capstone-row textarea:focus {
-  outline: none; border-color: var(--accent-gold, #c8956c);
+  outline: none;
+  border-color: var(--accent-gold, #c8956c);
+  box-shadow: 0 0 0 3px rgba(200, 149, 108, 0.12);
 }
+.capstone-row textarea::placeholder {
+  color: var(--text-muted);
+  opacity: 0.55;
+}
+
 .capstone-col-num {
-  font-weight: 700; color: var(--text-muted); font-size: 13px;
-  display: flex; align-items: center; justify-content: center;
+  font-weight: 600; color: var(--text-muted); font-size: 13px;
+  display: flex; align-items: flex-start; justify-content: center;
+  padding-top: 11px;
+  font-variant-numeric: tabular-nums;
 }
+
+/* Action buttons: small icon-only squares stacked tight. The previous
+   stretched-pill version made the column feel orphaned. */
 .capstone-col-actions {
-  display: flex; flex-direction: column; gap: 4px; align-items: stretch;
+  display: flex; flex-direction: column; gap: 4px;
+  align-items: center; justify-content: flex-start;
+  padding-top: 4px;
 }
 .capstone-row-btn {
-  padding: 4px 8px; font-size: 12px;
-  background: var(--bg-warm); border: 1px solid var(--border-color);
-  border-radius: var(--radius-sm); cursor: pointer; color: var(--text-dark);
-  transition: background 0.15s;
+  width: 28px; height: 28px;
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: 12px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  color: var(--text-muted);
+  transition: background 0.12s, color 0.12s, border-color 0.12s;
 }
-.capstone-row-btn:hover:not(:disabled) { background: var(--bg-white); }
-.capstone-row-btn:disabled { opacity: 0.4; cursor: not-allowed; }
-.capstone-row-delete:hover:not(:disabled) { background: #fff6f5; color: #c45c5c; border-color: #c45c5c; }
+.capstone-row-btn:hover:not(:disabled) {
+  background: var(--bg-warm);
+  color: var(--text-dark);
+  border-color: var(--border-color);
+}
+.capstone-row-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+.capstone-row-delete:hover:not(:disabled) {
+  background: #fff6f5; color: #c45c5c; border-color: #c45c5c;
+}
 
 .capstone-add-row {
   width: 100%;
@@ -7494,16 +7539,30 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
   background: var(--bg-warm); color: var(--text-dark); border-color: var(--text-muted);
 }
 
-/* File picker — same row grid cell, with a self-contained dropdown. */
-.capstone-filepicker { position: relative; }
+/* File picker — same row grid cell, with a self-contained dropdown.
+   Height matches the textarea baseline (64px) so the row reads as a
+   uniform strip; selected file tags stack below if they overflow. */
+.capstone-filepicker {
+  position: relative;
+  display: flex; flex-direction: column; gap: 6px;
+}
 .capstone-filepicker-btn {
-  width: 100%; padding: 8px 10px;
+  width: 100%;
+  min-height: 36px;
+  padding: 8px 12px;
   border: 1px solid var(--border-color);
   background: var(--bg-white);
   border-radius: var(--radius-sm);
   font-size: 13px; text-align: left;
   cursor: pointer;
   display: flex; justify-content: space-between; align-items: center;
+  transition: border-color 0.12s, box-shadow 0.12s;
+}
+.capstone-filepicker-btn:hover { border-color: var(--text-muted); }
+.capstone-filepicker-btn:focus {
+  outline: none;
+  border-color: var(--accent-gold, #c8956c);
+  box-shadow: 0 0 0 3px rgba(200, 149, 108, 0.12);
 }
 .capstone-filepicker-btn:hover { border-color: var(--text-muted); }
 .capstone-filepicker-caret { color: var(--text-muted); font-size: 11px; }

@@ -628,25 +628,25 @@ function StepCard({ step, index, coworkers, tools, participants, onUpdate, onDel
             {step.type === 'source' && (
               <>
                 <div className="step-config-row">
-                  <label>Source name</label>
+                  <label>Where this data comes from</label>
                   <input
                     type="text"
                     value={step.name || ''}
                     onChange={e => onUpdate({ ...step, name: e.target.value })}
-                    placeholder="e.g. Credit bureau pull"
+                    placeholder="e.g. Credit bureau report"
                   />
                 </div>
                 <div className="step-config-row">
-                  <label>Sample payload</label>
+                  <label>Sample data</label>
                   <textarea
                     value={step.samplePayload || ''}
                     onChange={e => onUpdate({ ...step, samplePayload: e.target.value })}
-                    placeholder="Paste a sample of what this integration would return — a credit report, a form submission, a record from a system. Markdown is fine."
+                    placeholder="Paste an example of what this would return &mdash; a credit report, a filled-in form, a record from a system. Anything text-like works."
                     rows={6}
                   />
                 </div>
                 <div className="step-config-hint">
-                  This Source step represents an external integration. At run time it emits the sample payload above to whatever step is downstream &mdash; no Claude call, no token spend. Edit the payload between runs to try different cases.
+                  This is data coming in from outside the workshop &mdash; like a system, a form, or a report. When you run the workflow, the next step reads the sample above. Change it between runs to try different cases.
                 </div>
               </>
             )}

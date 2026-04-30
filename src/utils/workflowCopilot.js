@@ -300,6 +300,14 @@ function buildCopilotPromptPrefix({ coworkers, participants, fileTree }) {
 - You cannot type into the canvas — every change goes through a tool call.
 - After each tool you call, the canvas updates live. You will see the new state on the next turn.
 
+## Reading a Capstone plan
+When the user pastes in a Capstone plan from Stage 8, each step heading carries an explicit type marker — for example: `### Step 3: Risk memo reviewed and approved [Type: Human review]`. Trust the marker. Do not infer the step type from the wording.
+
+- `[Type: Human review]` → call `add_review_node`. The step becomes a human approval gate; the assignee is whichever human is running the workshop (or whichever the user names later).
+- `[Type: AI coworker]` → call `add_coworker_node`. The step is an AI coworker; pick the closest matching coworker from the available list.
+
+If a step has no explicit marker (older plans or freeform requests), fall back to inferring from the wording.
+
 ## Wiring the Capture node (this matters)
 The Capture Learning node is always the final step. Whatever coworker or review produces the approved output, its outgoing edge MUST terminate at the pre-seeded Capture node. Without this edge, the workflow has no way to compound learning and the run ends orphaned.
 

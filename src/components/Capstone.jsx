@@ -19,11 +19,19 @@ import { EXAMPLE_BLUEPRINT_FILE_ID } from '../data/exampleArtifacts';
 function newRow() {
   return {
     id: 'row-' + Math.random().toString(36).slice(2, 10),
+    type: 'coworker', // 'coworker' | 'review' — drives whether the copilot
+                      // generates an add_coworker_node or add_review_node
+                      // for this step. Default Coworker because most rows
+                      // are AI work; Reviews are typically the minority.
     step: '',
     node: '',
     fileIds: [],
     remarks: '',
   };
+}
+
+function rowTypeLabel(type) {
+  return type === 'review' ? 'Human review' : 'AI coworker';
 }
 
 // "Step / Node" is one combined column in the LOAMS reference (a step in
@@ -39,11 +47,13 @@ function combinedStep(row) {
 }
 
 function isRowComplete(row) {
-  return !!(
-    combinedStep(row) &&
-    (row.fileIds || []).length > 0 &&
-    (row.remarks || '').trim()
-  );
+  if (!combinedStep(row)) return false;
+  if (!(row.remarks || '').trim()) return false;
+  // Files required for Coworker (the AI step needs reference material to
+  // shape its behaviour); optional for Review (a human reviewer might
+  // attach a checklist but doesn't have to).
+  if ((row.type || 'coworker') === 'coworker' && (row.fileIds || []).length === 0) return false;
+  return true;
 }
 
 // Markdown rendering of the participant's plan, used for both the
@@ -54,7 +64,7 @@ function rowsToMarkdown(rows, fileTreeFlat) {
   const lines = ['Build a workflow with these steps:', ''];
   rows.forEach((r, i) => {
     const fileNames = (r.fileIds || []).map(id => fileNameById.get(id) || id).filter(Boolean);
-    lines.push(`### Step ${i + 1}: ${combinedStep(r)}`);
+    lines.push(`### Step ${i + 1}: ${combinedStep(r)} [Type: ${rowTypeLabel(r.type)}]`);
     if (fileNames.length) lines.push(`- **Knowledge & skills files:** ${fileNames.join(', ')}`);
     lines.push(`- **Remarks:** ${r.remarks}`);
     lines.push('');
@@ -343,15 +353,34 @@ export default function Capstone({
           <div className="capstone-col-actions" />
         </div>
         {rows.map((row, idx) => (
-          <div key={row.id} className={`capstone-row${isRowComplete(row) ? ' is-complete' : ''}`}>
+          <div key={row.id} className={`capstone-row${isRowComplete(row) ? ' is-complete' : ''} type-${row.type || 'coworker'}`}>
             <div className="capstone-col-num">{idx + 1}</div>
-            <textarea
-              className="capstone-col-step"
-              value={row.step}
-              placeholder="e.g. Client basic profile created"
-              onChange={e => update(idx, { step: e.target.value })}
-              rows={2}
-            />
+            <div className="capstone-col-step">
+              <div className="capstone-type-toggle" role="group" aria-label="Step type">
+                <button
+                  type="button"
+                  className={`capstone-type-btn${(row.type || 'coworker') === 'coworker' ? ' active' : ''}`}
+                  onClick={() => update(idx, { type: 'coworker' })}
+                >
+                  <span aria-hidden>{'\u{1F916}'}</span> Coworker
+                </button>
+                <button
+                  type="button"
+                  className={`capstone-type-btn${row.type === 'review' ? ' active' : ''}`}
+                  onClick={() => update(idx, { type: 'review' })}
+                >
+                  <span aria-hidden>{'\u{1F464}'}</span> Review
+                </button>
+              </div>
+              <textarea
+                value={row.step}
+                placeholder={row.type === 'review'
+                  ? 'e.g. Risk memo reviewed and approved'
+                  : 'e.g. Client basic profile created'}
+                onChange={e => update(idx, { step: e.target.value })}
+                rows={2}
+              />
+            </div>
             <div className="capstone-col-files">
               <FilePicker
                 value={row.fileIds}

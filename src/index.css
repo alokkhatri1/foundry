@@ -7464,6 +7464,51 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
   border-radius: 0 2px 2px 0;
 }
 
+/* Step/Node cell wraps a small Coworker/Review type toggle stacked above
+   the textarea. The cell is column-flex so the toggle sits flush left
+   above the input rather than competing for horizontal space. */
+.capstone-col-step {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+.capstone-type-toggle {
+  display: inline-flex;
+  align-self: flex-start;
+  background: var(--bg-warm);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-pill);
+  padding: 2px;
+  gap: 2px;
+}
+.capstone-type-btn {
+  padding: 4px 10px;
+  font-size: 11px;
+  font-weight: 600;
+  border: none;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-family: inherit;
+  transition: background 0.12s, color 0.12s, box-shadow 0.12s;
+}
+.capstone-type-btn:hover { color: var(--text-dark); }
+.capstone-type-btn.active {
+  background: var(--bg-white);
+  color: var(--text-dark);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+}
+/* Slight tint on the row when set to Review, so a scan of the table
+   instantly shows where humans gate the flow. */
+.capstone-row.type-review {
+  background: rgba(200, 149, 108, 0.04);
+}
+
 /* Cells: shared height + clean borders. resize:none kills the
    diagonal grip in the corner; min-height keeps them comfortable
    without ballooning a long entry. */

@@ -77,6 +77,13 @@
   font-size: 18px;
   letter-spacing: -0.02em;
   color: var(--fl-ink);
+  white-space: nowrap;
+}
+.foundry-landing .fl-brand-by {
+  font-weight: 500;
+  color: var(--fl-muted);
+  letter-spacing: -0.005em;
+  margin-left: 4px;
 }
 .foundry-landing .fl-nav {
   display: flex;

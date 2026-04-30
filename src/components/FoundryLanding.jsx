@@ -33,7 +33,9 @@ export default function FoundryLanding({ onSignIn }) {
     <div className="foundry-landing">
       <header className="fl-header">
         <div className="fl-header-pill">
-          <div className="fl-brand">Foundry</div>
+          <div className="fl-brand">
+            Foundry <span className="fl-brand-by">by Alok Khatri</span>
+          </div>
           <nav className="fl-nav">
             <a href="#thesis">Thesis</a>
             <a href="#arc">The arc</a>

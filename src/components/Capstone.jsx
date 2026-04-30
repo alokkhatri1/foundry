@@ -103,23 +103,21 @@ function FilePicker({ value, onChange, fileTree }) {
     onChange(next);
   }
 
-  // Compact summary inside the button so the cell doesn't grow a tag stack
-  // beneath it. Show up to two names; collapse the rest into "+N more".
-  const summary = (() => {
-    if (selectedNames.length === 0) return null;
-    if (selectedNames.length <= 2) return selectedNames.join(', ');
-    return `${selectedNames.slice(0, 2).join(', ')} +${selectedNames.length - 2} more`;
-  })();
-
   return (
     <div className="capstone-filepicker">
       <button
         type="button"
-        className={`capstone-filepicker-btn${summary ? ' has-selection' : ''}`}
+        className={`capstone-filepicker-btn${selectedNames.length > 0 ? ' has-selection' : ''}`}
         onClick={() => setOpen(o => !o)}
       >
-        <span className="capstone-filepicker-summary">
-          {summary || 'Pick files…'}
+        <span className="capstone-filepicker-content">
+          {selectedNames.length === 0 ? (
+            <span className="capstone-filepicker-placeholder">Pick files&hellip;</span>
+          ) : (
+            selectedNames.map((name, i) => (
+              <span key={i} className="capstone-filepicker-chip">{name}</span>
+            ))
+          )}
         </span>
         <span className="capstone-filepicker-caret">{open ? '▴' : '▾'}</span>
       </button>

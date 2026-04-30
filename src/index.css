@@ -2167,21 +2167,6 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
 .step-number.capture { background: #6f4fb0; }
 .wf-canvas-node.wf-capture-node .workflow-step-card { border-color: #6f4fb0; }
 .add-step-option .dot.capture { background: #6f4fb0; }
-
-/* Source step — distinct purple/violet accent so it reads as "external".
-   No input handle (data comes from outside the room), one output handle. */
-.step-type-label.source { background: #efe6f8; color: #7a4ea8; }
-.step-number.source { background: #7a4ea8; }
-.wf-canvas-node.wf-source-node .workflow-step-card { border-color: #7a4ea8; }
-.wf-canvas-node.wf-source-node .workflow-step-card::before {
-  content: '\01F4E1';
-  position: absolute;
-  top: 12px;
-  left: -22px;
-  font-size: 14px;
-  opacity: 0.7;
-}
-.add-step-option .dot.source { background: #7a4ea8; }
 .capture-mode-toggle {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -7450,9 +7435,9 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
 .capstone-table-head,
 .capstone-row {
   display: grid;
-  /* Step/Node | Data source | Files | Remarks (rest) | Actions
+  /* # | Step/Node | Files | Remarks | Actions
      Step/Node and Remarks get the most width because they hold sentences. */
-  grid-template-columns: 36px 1.6fr 1fr 1.2fr 1.8fr 80px;
+  grid-template-columns: 36px 1.6fr 1.2fr 1.8fr 80px;
   gap: 8px;
   padding: 10px 12px;
   align-items: stretch;

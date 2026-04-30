@@ -15,7 +15,6 @@ function nodeLabel(step) {
   if (step.type === 'trigger') return 'Case Input';
   if (step.type === 'agent') return step.coworker?.name || step.name || 'Coworker';
   if (step.type === 'capture') return step.name || 'Capture';
-  if (step.type === 'source') return step.name || 'Source';
   return step.name || 'Review';
 }
 
@@ -400,18 +399,6 @@ export async function executeWorkflowRun({
 
       // Re-enqueue bounce targets to drive the revision loop.
       queue = [...bounceTargets];
-    } else if (step.type === 'source') {
-      // Source: external integration represented as a peer node. Emits the
-      // configured samplePayload as output with no Claude call (zero
-      // tokens). Downstream steps receive it through the standard upstream-
-      // outputs envelope just like a coworker's generated text.
-      const payload = (step.samplePayload || '').trim() || '(no sample payload configured)';
-      executed.set(nodeId, { output: payload });
-      executionLog.push(nodeId);
-      onStepUpdate(runId, stepIndex, { status: 'completed', output: payload, completedAt: Date.now() });
-      onMessage({ type: 'status', content: `${nodeLabel(step)} emitted ${payload.length} chars` });
-      onLog({ type: 'workflow', message: `${nodeLabel(step)} | source emitted (${payload.length} chars)` });
-      for (const e of (forwardOut.get(nodeId) || [])) queue.push(e.target);
     } else if (step.type === 'capture') {
       // Capture: terminal append. Takes the upstream output and writes it
       // into a workspace file (and optionally wires that file into a

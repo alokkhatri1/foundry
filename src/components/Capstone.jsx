@@ -21,7 +21,6 @@ function newRow() {
     id: 'row-' + Math.random().toString(36).slice(2, 10),
     step: '',
     node: '',
-    dataSource: '',
     fileIds: [],
     remarks: '',
   };
@@ -42,7 +41,6 @@ function combinedStep(row) {
 function isRowComplete(row) {
   return !!(
     combinedStep(row) &&
-    (row.dataSource || '').trim() &&
     (row.fileIds || []).length > 0 &&
     (row.remarks || '').trim()
   );
@@ -57,7 +55,6 @@ function rowsToMarkdown(rows, fileTreeFlat) {
   rows.forEach((r, i) => {
     const fileNames = (r.fileIds || []).map(id => fileNameById.get(id) || id).filter(Boolean);
     lines.push(`### Step ${i + 1}: ${combinedStep(r)}`);
-    lines.push(`- **Data source:** ${r.dataSource}`);
     if (fileNames.length) lines.push(`- **Knowledge & skills files:** ${fileNames.join(', ')}`);
     lines.push(`- **Remarks:** ${r.remarks}`);
     lines.push('');
@@ -315,7 +312,6 @@ export default function Capstone({
         <div className="capstone-table-head">
           <div className="capstone-col-num">#</div>
           <div className="capstone-col-step">Step / Node</div>
-          <div className="capstone-col-source">Data source</div>
           <div className="capstone-col-files">Knowledge &amp; skills files</div>
           <div className="capstone-col-remarks">Remarks (logic + DoD)</div>
           <div className="capstone-col-actions" />
@@ -328,13 +324,6 @@ export default function Capstone({
               value={row.step}
               placeholder="e.g. Client basic profile created"
               onChange={e => update(idx, { step: e.target.value })}
-              rows={2}
-            />
-            <textarea
-              className="capstone-col-source"
-              value={row.dataSource}
-              placeholder="Form, system, module"
-              onChange={e => update(idx, { dataSource: e.target.value })}
               rows={2}
             />
             <div className="capstone-col-files">

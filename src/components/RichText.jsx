@@ -62,6 +62,30 @@ export default function RichText({ content }) {
       continue;
     }
 
+    // GFM-style table. Detected when the current line starts and ends with
+    // `|` AND the next line is a separator row (pipes + dashes/colons).
+    // Without this the blueprint document collapses into a wall of
+    // pipe-separated text in any RichText surface (e.g. the Capstone
+    // blueprint drawer).
+    const isTableLine = (s) => /^\s*\|.*\|\s*$/.test(s);
+    const isTableSeparator = (s) => /^\s*\|?\s*:?-{3,}:?(\s*\|\s*:?-{3,}:?)+\s*\|?\s*$/.test(s);
+    if (isTableLine(line) && i + 1 < lines.length && isTableSeparator(lines[i + 1])) {
+      const splitRow = (raw) => raw
+        .replace(/^\s*\|/, '')
+        .replace(/\|\s*$/, '')
+        .split('|')
+        .map(c => c.trim());
+      const header = splitRow(line);
+      i += 2; // skip header + separator
+      const rows = [];
+      while (i < lines.length && isTableLine(lines[i])) {
+        rows.push(splitRow(lines[i]));
+        i++;
+      }
+      blocks.push({ type: 'table', header, rows });
+      continue;
+    }
+
     // Horizontal rule
     if (/^[-—*]{3,}\s*$/.test(line.trim())) {
       blocks.push({ type: 'hr' });
@@ -155,6 +179,29 @@ export default function RichText({ content }) {
             return <pre key={idx} className="rt-pre"><code>{block.content}</code></pre>;
           case 'hr':
             return <hr key={idx} className="rt-hr" />;
+          case 'table':
+            return (
+              <div key={idx} className="rt-table-wrap">
+                <table className="rt-table">
+                  <thead>
+                    <tr>
+                      {block.header.map((cell, c) => (
+                        <th key={c}>{formatInline(cell)}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {block.rows.map((row, r) => (
+                      <tr key={r}>
+                        {row.map((cell, c) => (
+                          <td key={c}>{formatInline(cell)}</td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            );
           case 'paragraph':
             return <p key={idx} className="rt-p">{formatInline(block.content)}</p>;
           default:

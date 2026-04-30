@@ -3007,6 +3007,37 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
   margin: 12px 0;
 }
 
+.rt-table-wrap {
+  margin: 12px 0;
+  overflow-x: auto;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+}
+.rt-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  line-height: 1.5;
+  background: var(--bg-white);
+}
+.rt-table th,
+.rt-table td {
+  padding: 8px 12px;
+  text-align: left;
+  vertical-align: top;
+  border-bottom: 1px solid var(--border-color);
+}
+.rt-table th {
+  background: var(--bg-warm);
+  font-weight: 700;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: var(--text-muted);
+}
+.rt-table tr:last-child td { border-bottom: none; }
+.rt-table tr:hover td { background: rgba(0, 0, 0, 0.015); }
+
 .cl-mono {
   font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
   font-size: 13px;

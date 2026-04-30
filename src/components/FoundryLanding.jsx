@@ -51,6 +51,8 @@ export default function FoundryLanding({ onSignIn }) {
           <h1 className="fl-h1">
             You can&rsquo;t train your way to{' '}
             <span className="fl-highlight">AI native.</span>
+            <br />
+            You have to rehearse it somewhere.
           </h1>
           <p className="fl-hero-sub">
             A six-hour workshop sandbox where senior operators live through the shift from org chart to agent chart, with AI as a peer in the room. Built on Liberating Structures and the AI Nativity framework.

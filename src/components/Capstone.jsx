@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import RichText from './RichText';
 import { EXAMPLE_BLUEPRINT_FILE_ID } from '../data/exampleArtifacts';
 
@@ -90,11 +90,33 @@ function stripExt(name) {
 
 function FilePicker({ value, onChange, fileTree }) {
   const [open, setOpen] = useState(false);
+  const containerRef = useRef(null);
   const options = useMemo(() => flattenForPicker(fileTree), [fileTree]);
   const selectedNames = (value || [])
     .map(id => options.find(o => o.id === id)?.name)
     .filter(Boolean)
     .map(stripExt);
+
+  // Click-outside-to-close. Without this the dropdown stays open when the
+  // participant clicks back into a textarea or anywhere else on the page,
+  // and they have to click the button again to dismiss it.
+  useEffect(() => {
+    if (!open) return;
+    function onDocClick(e) {
+      if (containerRef.current && !containerRef.current.contains(e.target)) {
+        setOpen(false);
+      }
+    }
+    function onEsc(e) {
+      if (e.key === 'Escape') setOpen(false);
+    }
+    document.addEventListener('mousedown', onDocClick);
+    document.addEventListener('keydown', onEsc);
+    return () => {
+      document.removeEventListener('mousedown', onDocClick);
+      document.removeEventListener('keydown', onEsc);
+    };
+  }, [open]);
 
   function toggle(id) {
     const next = (value || []).includes(id)
@@ -104,7 +126,7 @@ function FilePicker({ value, onChange, fileTree }) {
   }
 
   return (
-    <div className="capstone-filepicker">
+    <div className="capstone-filepicker" ref={containerRef}>
       <button
         type="button"
         className={`capstone-filepicker-btn${selectedNames.length > 0 ? ' has-selection' : ''}`}

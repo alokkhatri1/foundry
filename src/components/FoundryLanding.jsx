@@ -55,7 +55,7 @@ export default function FoundryLanding({ onSignIn }) {
             You have to rehearse it somewhere.
           </h1>
           <p className="fl-hero-sub">
-            A six-hour workshop sandbox where professionals live through the shift from org chart to agent chart, with AI as a peer in the room.
+            A workshop sandbox where professionals live through the shift from org chart to agent chart, with AI as a peer in the room.
           </p>
           <div className="fl-cta-row">
             <CtaButton onClick={onSignIn}>Continue with Google</CtaButton>

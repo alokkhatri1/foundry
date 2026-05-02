@@ -381,7 +381,7 @@ export default function FoundryLanding({ onSignIn }) {
         <div className="wrap">
           <div className="fl-hero-grid">
             <div className="fade-in">
-              <div className="fl-eyebrow">For professionals · cohort 07 open</div>
+              <div className="fl-eyebrow">Professionals · cohort 07 open</div>
               <h1 className="fl-h1">
                 You can&rsquo;t <em>train</em> your way to become{' '}
                 <span className="fl-highlight">AI&nbsp;native.</span>

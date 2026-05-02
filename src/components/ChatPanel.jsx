@@ -684,27 +684,50 @@ function ContextSidebar({ fileTree, selectedFileIds, onToggleFile, onToggleFolde
             {flatFiles.length === 0 && (
               <div className="cl-section-empty">No files yet — open the Files tab to add some.</div>
             )}
-            {flatFiles.map(f => {
-              const isSelected = selectedFileIds.includes(f.id);
-              return (
-                <label key={f.id} className="cl-file">
-                  <span className={`cl-file-check${isSelected ? ' is-checked' : ''}`}>
-                    <input
-                      type="checkbox"
-                      checked={isSelected}
-                      onChange={() => onToggleFile(f.id)}
-                    />
-                    {isSelected && (
-                      <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                        <polyline points="20 6 9 17 4 12" />
-                      </svg>
-                    )}
-                  </span>
-                  <span className="cl-file-name">{f.name.replace(/\.md$/, '')}</span>
-                  <span className="cl-file-folder">{f.folder}</span>
-                </label>
-              );
-            })}
+            {/* Group files by their parent subfolder (knowledge / skills /
+                blueprints) so the picker reads as a structured list. The
+                checkbox toggles the file into the current chat's context
+                (handleToggleFile in ChatPanel). */}
+            {departments.map(dept =>
+              dept.subfolders.map(sf => {
+                if (sf.files.length === 0) return null;
+                const sfFileIds = sf.files.map(f => f.id);
+                const selectedCount = sfFileIds.filter(id => selectedFileIds.includes(id)).length;
+                return (
+                  <div key={sf.id} className="cl-file-group">
+                    <div className="cl-file-group-head">
+                      <span className="cl-file-group-icon" aria-hidden>
+                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
+                        </svg>
+                      </span>
+                      <span className="cl-file-group-name">{sf.name}</span>
+                      <span className="cl-file-group-count">{selectedCount}/{sf.files.length}</span>
+                    </div>
+                    {sf.files.map(f => {
+                      const isSelected = selectedFileIds.includes(f.id);
+                      return (
+                        <label key={f.id} className="cl-file">
+                          <span className={`cl-file-check${isSelected ? ' is-checked' : ''}`}>
+                            <input
+                              type="checkbox"
+                              checked={isSelected}
+                              onChange={() => onToggleFile(f.id)}
+                            />
+                            {isSelected && (
+                              <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                                <polyline points="20 6 9 17 4 12" />
+                              </svg>
+                            )}
+                          </span>
+                          <span className="cl-file-name">{f.name.replace(/\.md$/, '')}</span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                );
+              })
+            )}
           </div>
         </div>
       )}

@@ -8386,23 +8386,24 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
 }
 .cl-app .cl-search-clear:hover { background: var(--cream-deep); color: var(--ink); }
 
-/* Sections wrapper */
+/* Sections wrapper — flex column with each section sharing the
+   available height. The grid+max-content version let any one section
+   (e.g. Chats with 30 entries) push the others off-screen. Flex-grow
+   with internal scroll on each section keeps the sidebar bounded. */
 .cl-app .cl-sections {
-  display: grid;
-  grid-template-rows:
-    minmax(150px, max-content)
-    minmax(110px, max-content)
-    minmax(110px, max-content)
-    minmax(160px, 1fr);
+  display: flex;
+  flex-direction: column;
   gap: 4px;
   min-height: 0;
   overflow: hidden;
+  flex: 1;
 }
 
 .cl-app .cl-section {
-  display: grid;
-  grid-template-rows: auto 1fr;
-  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 0;
+  min-height: 80px;
   overflow: hidden;
   padding: 10px 4px 6px;
 }
@@ -8415,6 +8416,7 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
   align-items: center;
   gap: 8px;
   padding: 0 8px 8px;
+  flex-shrink: 0;
 }
 .cl-app .cl-section-label {
   font-family: var(--mono);
@@ -8577,6 +8579,39 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
   font-size: 7px;
   display: grid; place-items: center;
   border: 1px solid var(--rule);
+}
+
+/* File groups — KNOWLEDGE / SKILLS subheaders with their files
+   indented underneath. Restored so the picker reads as structured
+   subfolders instead of a flat list. */
+.cl-app .cl-file-group {
+  margin-bottom: 6px;
+}
+.cl-app .cl-file-group-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px 4px;
+  font-family: var(--mono);
+  font-size: 9.5px;
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+}
+.cl-app .cl-file-group-icon {
+  display: grid;
+  place-items: center;
+  color: var(--peach-deep);
+  flex-shrink: 0;
+}
+.cl-app .cl-file-group-name { flex: 1; }
+.cl-app .cl-file-group-count {
+  color: var(--ink-faint);
+  font-variant-numeric: tabular-nums;
+}
+.cl-app .cl-file-group .cl-file {
+  padding-left: 24px;
 }
 
 /* Files row with checkbox */

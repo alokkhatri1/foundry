@@ -1394,25 +1394,28 @@ function App() {
   function handleCoworkerChange(cwId) {
     if (!cwId) return;
     setActiveDm(null);
-    setConversations(prev => {
-      const existing = prev.find(c => c.coworkerId === cwId);
-      if (existing) {
-        setActiveConvoId(existing.id);
-        return prev;
-      }
-      const coworker = (coworkers || []).find(c => c.id === cwId);
-      const newConvo = {
-        id: 'convo-' + Date.now() + '-' + Math.random().toString(36).slice(2, 5),
-        title: coworker?.name || 'Chat',
-        coworkerId: cwId,
-        createdAt: Date.now(),
-        messages: [],
-      };
-      setActiveConvoId(newConvo.id);
-      const updated = [...prev, newConvo];
-      persistConversations(updated);
-      return updated;
-    });
+    // Two-state setters here used to live inside the setConversations
+    // updater. React 18 strict mode runs updaters twice, which made the
+    // nested setActiveConvoId fire with stale data and the click "do
+    // nothing." Run the lookup outside the updater so each setState
+    // call is idempotent.
+    const existing = (conversations || []).find(c => c.coworkerId === cwId);
+    if (existing) {
+      setActiveConvoId(existing.id);
+      return;
+    }
+    const coworker = (coworkers || []).find(c => c.id === cwId);
+    const newConvo = {
+      id: 'convo-' + Date.now() + '-' + Math.random().toString(36).slice(2, 5),
+      title: coworker?.name || 'Chat',
+      coworkerId: cwId,
+      createdAt: Date.now(),
+      messages: [],
+    };
+    const updated = [...(conversations || []), newConvo];
+    setConversations(updated);
+    setActiveConvoId(newConvo.id);
+    persistConversations(updated);
   }
 
   function handleSelectConvo(convoId) {

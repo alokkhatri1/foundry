@@ -9901,8 +9901,7 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
   color: var(--ink-muted);
   font-style: italic;
 }
-.cwb-editor .cwb-desc-gen-btn,
-.cwb-editor .cwb-desc-gen {
+.cwb-editor .cwb-desc-gen-btn {
   align-self: flex-end;
   background: var(--peach-soft);
   color: var(--peach-deep);
@@ -9919,12 +9918,8 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
   gap: 8px;
   cursor: pointer;
   transition: background 0.15s, transform 0.12s;
-  /* Override the wrapping .cwb-desc styles for the button itself */
-  flex-direction: row;
-  padding: 7px 14px;
 }
-.cwb-editor .cwb-desc-gen-btn:hover,
-.cwb-editor .cwb-desc-gen:hover {
+.cwb-editor .cwb-desc-gen-btn:hover {
   background: var(--peach);
   transform: translateY(-1px);
 }

@@ -7552,13 +7552,19 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
   grid-template-columns: 1fr 1fr;
   gap: 12px;
 }
-/* Human cards: step textarea + reviewer picker side-by-side. Step gets
-   2/3 of the width since it's the main field; align-items:start keeps
-   the picker at its natural height instead of stretching to match the
-   textarea. */
+/* Human cards: step textarea + reviewer picker side-by-side. Step
+   gets 2/3 of the width since it's the main field. Cells stretch to
+   the row's natural height so the picker visually matches the
+   textarea instead of sitting short with whitespace below it. */
 .capstone-field-row-human {
   grid-template-columns: 2fr 1fr;
-  align-items: start;
+  align-items: stretch;
+}
+/* Picker button needs to fill its column when the parent stretches —
+   without explicit 100% height it sits at natural button height even
+   when the surrounding flex chain leaves it more room. */
+.capstone-field-row-human .capstone-actorpicker-btn {
+  height: 100%;
 }
 
 /* Auto-name preview under the Coworker card — confirms what the user

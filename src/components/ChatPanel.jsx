@@ -547,9 +547,9 @@ function ContextSidebar({ fileTree, selectedFileIds, onToggleFile, onToggleFolde
         )}
       </div>
 
-      {/* Sidebar tabs — switch which section fills the sidebar. Each
-          section gets the full height when its tab is active, instead
-          of all four sharing space. */}
+      {/* Sidebar tabs — switch which section fills the sidebar. All
+          four are always visible (chats/coworkers/AI coworkers/files);
+          stage gating still applies inside each section. */}
       <div className="cl-sidebar-tabs">
         <button
           type="button"
@@ -561,20 +561,16 @@ function ContextSidebar({ fileTree, selectedFileIds, onToggleFile, onToggleFolde
           className={`cl-sidebar-tab${sidebarTab === 'humans' ? ' is-active' : ''}`}
           onClick={() => setSidebarTab('humans')}
         >Coworkers</button>
-        {showCoworkersSection && (
-          <button
-            type="button"
-            className={`cl-sidebar-tab${sidebarTab === 'ai' ? ' is-active' : ''}`}
-            onClick={() => setSidebarTab('ai')}
-          >AI</button>
-        )}
-        {showFiles && (
-          <button
-            type="button"
-            className={`cl-sidebar-tab${sidebarTab === 'files' ? ' is-active' : ''}`}
-            onClick={() => setSidebarTab('files')}
-          >Files</button>
-        )}
+        <button
+          type="button"
+          className={`cl-sidebar-tab${sidebarTab === 'ai' ? ' is-active' : ''}`}
+          onClick={() => setSidebarTab('ai')}
+        >AI&nbsp;Coworkers</button>
+        <button
+          type="button"
+          className={`cl-sidebar-tab${sidebarTab === 'files' ? ' is-active' : ''}`}
+          onClick={() => setSidebarTab('files')}
+        >Files</button>
       </div>
 
       <div className="cl-sections">

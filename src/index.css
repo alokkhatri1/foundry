@@ -8405,19 +8405,31 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
 }
 .cl-app .cl-sidebar-tab {
   flex: 1;
+  min-width: 0;
   background: transparent;
   border: none;
   padding: 8px 4px 10px;
   font-family: var(--mono);
-  font-size: 9.5px;
+  font-size: 9px;
   font-weight: 500;
-  letter-spacing: 0.14em;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--ink-muted);
   cursor: pointer;
   position: relative;
   transition: color 0.15s;
-  white-space: nowrap;
+  /* "AI Coworkers" is the longest label and won't fit on one line at
+     a 280px sidebar / 4-tab width. Allow wrapping so the long label
+     stacks across two lines while shorter tabs stay vertically
+     centered. The non-breaking space in "AI&nbsp;Coworkers" keeps
+     "AI" + "Coworkers" together when only one wrap is needed. */
+  white-space: normal;
+  line-height: 1.2;
+  text-align: center;
+  min-height: 38px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 .cl-app .cl-sidebar-tab:hover { color: var(--ink); }
 .cl-app .cl-sidebar-tab.is-active { color: var(--ink); }

@@ -23,6 +23,13 @@ function newRow() {
                       // generates an add_coworker_node or add_review_node
                       // for this step. Default Coworker because most rows
                       // are AI work; Reviews are typically the minority.
+    actorId: '',      // For type=coworker: id of a saved coworker.
+                      // For type=review: id of a participant (reviewer).
+                      // Bound from the ActorPicker. Cleared when type flips.
+    actorName: '',    // Cached at bind time so the markdown export still
+                      // works if the underlying entity is later renamed
+                      // or removed; isRowComplete validates the id still
+                      // resolves before send is allowed.
     step: '',
     node: '',
     fileIds: [],
@@ -46,27 +53,79 @@ function combinedStep(row) {
   return s || n;
 }
 
-function isRowComplete(row) {
+function isRowComplete(row, coworkers, participants) {
   if (!combinedStep(row)) return false;
   if (!(row.remarks || '').trim()) return false;
+  if (!row.actorId) return false;
   // Files required for Coworker (the AI step needs reference material to
   // shape its behaviour); optional for Review (a human reviewer might
   // attach a checklist but doesn't have to).
   if ((row.type || 'coworker') === 'coworker' && (row.fileIds || []).length === 0) return false;
+  // Actor must still resolve to a real entity. A coworker deleted from the
+  // library or a participant who left the room should re-flag the row as
+  // incomplete instead of silently shipping a dangling id to the copilot.
+  if ((row.type || 'coworker') === 'coworker') {
+    if (!(coworkers || []).some(c => c.id === row.actorId)) return false;
+  } else {
+    if (!(participants || []).some(p => p.id === row.actorId)) return false;
+  }
   return true;
 }
 
-// Markdown rendering of the participant's plan, used for both the
-// "Send to copilot" payload and a copy-to-clipboard fallback. Same shape
-// for both so the copilot sees what the participant sees.
+// First-incomplete row diagnostic. Tells the participant *which* row blocks
+// Send rather than just "5 of 7 complete" — we know from the workshop the
+// count-only message left people hunting for the missing field.
+function firstIncompleteReason(rows, coworkers, participants) {
+  for (let i = 0; i < (rows || []).length; i++) {
+    const r = rows[i];
+    const num = i + 1;
+    if (!combinedStep(r)) return `Row ${num}: step description is empty`;
+    if (!r.actorId) {
+      return r.type === 'review'
+        ? `Row ${num}: pick a reviewer`
+        : `Row ${num}: pick a coworker`;
+    }
+    if ((r.type || 'coworker') === 'coworker') {
+      if (!(coworkers || []).some(c => c.id === r.actorId)) {
+        return `Row ${num}: coworker "${r.actorName || r.actorId}" no longer exists — pick another`;
+      }
+      if ((r.fileIds || []).length === 0) return `Row ${num}: attach at least one reference file`;
+    } else {
+      if (!(participants || []).some(p => p.id === r.actorId)) {
+        return `Row ${num}: reviewer "${r.actorName || r.actorId}" left the room — pick another`;
+      }
+    }
+    if (!(r.remarks || '').trim()) return `Row ${num}: remarks are empty`;
+  }
+  return null;
+}
+
+// Markdown rendering of the participant's plan. Bindings are explicit
+// (Coworker: <name> / Reviewer: <name>) so the copilot doesn't have to
+// infer which saved entity a step refers to — it can call the add_*
+// tools directly with the named entity. The copilot's system prompt
+// tells it to skip Discover when these bindings are present.
 function rowsToMarkdown(rows, fileTreeFlat) {
   const fileNameById = new Map((fileTreeFlat || []).map(f => [f.id, f.name]));
-  const lines = ['Build a workflow with these steps:', ''];
+  const lines = [
+    'Build this workflow. Bindings below are explicit — use them, don’t infer.',
+    '',
+  ];
   rows.forEach((r, i) => {
     const fileNames = (r.fileIds || []).map(id => fileNameById.get(id) || id).filter(Boolean);
-    lines.push(`### Step ${i + 1}: ${combinedStep(r)} [Type: ${rowTypeLabel(r.type)}]`);
-    if (fileNames.length) lines.push(`- **Knowledge & skills files:** ${fileNames.join(', ')}`);
-    lines.push(`- **Remarks:** ${r.remarks}`);
+    const isReview = r.type === 'review';
+    lines.push(`### Step ${i + 1}: ${combinedStep(r)}`);
+    lines.push(`- Type: ${rowTypeLabel(r.type)}`);
+    if (isReview) {
+      lines.push(`- Reviewer: ${r.actorName || ''}`);
+      // Use the step text as the review prompt. The copilot may rephrase
+      // into a question form when it calls add_review_node; that's fine.
+      lines.push(`- Prompt: ${combinedStep(r)}`);
+    } else {
+      lines.push(`- Coworker: ${r.actorName || ''}`);
+    }
+    if (fileNames.length) lines.push(`- Reference files: ${fileNames.join(', ')}`);
+    lines.push(`- Logic + DoD: ${r.remarks}`);
     lines.push('');
   });
   return lines.join('\n').trim();
@@ -178,6 +237,91 @@ function FilePicker({ value, onChange, fileTree }) {
   );
 }
 
+function ActorPicker({ row, coworkers, participants, onActorChange }) {
+  const [open, setOpen] = useState(false);
+  const containerRef = useRef(null);
+
+  // Same click-outside-to-close pattern as FilePicker. Without this the
+  // dropdown stays open when the participant clicks back into a textarea.
+  useEffect(() => {
+    if (!open) return;
+    function onDocClick(e) {
+      if (containerRef.current && !containerRef.current.contains(e.target)) setOpen(false);
+    }
+    function onEsc(e) { if (e.key === 'Escape') setOpen(false); }
+    document.addEventListener('mousedown', onDocClick);
+    document.addEventListener('keydown', onEsc);
+    return () => {
+      document.removeEventListener('mousedown', onDocClick);
+      document.removeEventListener('keydown', onEsc);
+    };
+  }, [open]);
+
+  const isCoworker = (row.type || 'coworker') === 'coworker';
+  const options = useMemo(() => {
+    if (isCoworker) {
+      return (coworkers || [])
+        .filter(c => (c.name || '').trim())
+        .map(c => ({ id: c.id, name: c.name, sub: (c.role || '').slice(0, 80) }));
+    }
+    // Humans only — exclude AI participants. Show offline humans too: a
+    // workshop where everyone happens to be offline at planning time
+    // shouldn't block them from picking a reviewer.
+    return (participants || [])
+      .filter(p => (p.kind || 'human') === 'human' && (p.name || '').trim())
+      .map(p => ({ id: p.id, name: p.name, sub: p.online ? 'online' : 'offline' }));
+  }, [isCoworker, coworkers, participants]);
+
+  const selected = options.find(o => o.id === row.actorId);
+  const placeholder = isCoworker ? 'Pick a coworker…' : 'Pick a reviewer…';
+  const emptyMsg = isCoworker
+    ? 'No saved coworkers yet — build one in the Coworkers tab.'
+    : 'No humans in the workshop yet.';
+
+  function pick(opt) {
+    onActorChange({ actorId: opt.id, actorName: opt.name });
+    setOpen(false);
+  }
+
+  return (
+    <div className="capstone-actorpicker" ref={containerRef}>
+      <button
+        type="button"
+        className={`capstone-actorpicker-btn${selected ? ' has-selection' : ''}`}
+        onClick={() => setOpen(o => !o)}
+      >
+        <span className="capstone-actorpicker-content">
+          {selected ? (
+            <span className="capstone-actorpicker-chip">{selected.name}</span>
+          ) : (
+            <span className="capstone-actorpicker-placeholder">{placeholder}</span>
+          )}
+        </span>
+        <span className="capstone-actorpicker-caret">{open ? '▴' : '▾'}</span>
+      </button>
+      {open && (
+        <div className="capstone-actorpicker-menu">
+          {options.length === 0 ? (
+            <div className="capstone-actorpicker-empty">{emptyMsg}</div>
+          ) : (
+            options.map(opt => (
+              <button
+                type="button"
+                key={opt.id}
+                className={`capstone-actorpicker-option${opt.id === row.actorId ? ' is-selected' : ''}`}
+                onClick={() => pick(opt)}
+              >
+                <span className="capstone-actorpicker-option-name">{opt.name}</span>
+                {opt.sub && <span className="capstone-actorpicker-option-sub">{opt.sub}</span>}
+              </button>
+            ))
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function BlueprintDrawer({ open, onClose, blueprintContent }) {
   if (!open) return null;
   return (
@@ -208,6 +352,8 @@ export default function Capstone({
   fileTree,
   flatFiles,
   onEnsureFileContent,
+  coworkers,
+  participants,
   copilotUnlocked,
   onSendToCopilot,
 }) {
@@ -282,10 +428,14 @@ export default function Capstone({
   }, [rows, sb, myParticipantId]);
 
   const completeCount = useMemo(
-    () => (rows || []).filter(isRowComplete).length,
-    [rows],
+    () => (rows || []).filter(r => isRowComplete(r, coworkers, participants)).length,
+    [rows, coworkers, participants],
   );
-  const allComplete = rows !== null && rows.length > 0 && rows.every(isRowComplete);
+  const allComplete = rows !== null && rows.length > 0 && rows.every(r => isRowComplete(r, coworkers, participants));
+  const incompleteReason = useMemo(
+    () => firstIncompleteReason(rows || [], coworkers, participants),
+    [rows, coworkers, participants],
+  );
 
   function handleSend() {
     const md = rowsToMarkdown(rows, flatFiles);
@@ -306,12 +456,14 @@ export default function Capstone({
         <div>
           <h2 className="capstone-title">Capstone</h2>
           <p className="capstone-sub">
-            Lay out a real workflow as a five-column plan. Each row is one step:
-            who owns it, where the data lives, what reading material backs it,
-            and what done looks like. When every row is filled,{' '}
+            Lay out a real workflow. Each row is one step: what happens, who
+            owns it (a saved coworker or a real reviewer), what reading
+            material backs it, and what done looks like. When every row is
+            bound,{' '}
             {copilotUnlocked
-              ? 'send the plan to the copilot to build it together.'
-              : 'a copilot stage will unlock and you can send the plan to it to build the workflow together.'}
+              ? 'send the plan to the copilot to build it in seconds.'
+              : 'a copilot stage will unlock and you can send the plan to it to build the workflow in seconds.'}
+            {' '}You’ll need at least one saved coworker in the library to fill this in.
           </p>
         </div>
         <div className="capstone-actions">
@@ -329,7 +481,7 @@ export default function Capstone({
               className="capstone-btn-primary"
               onClick={handleSend}
               disabled={!allComplete}
-              title={allComplete ? 'Send your plan to the workflow copilot' : `Fill all 5 fields on every row first (${completeCount}/${rows.length} complete)`}
+              title={allComplete ? 'Send your plan to the workflow copilot' : (incompleteReason || `Fill every row first (${completeCount}/${rows.length} complete)`)}
             >
               Send to copilot
               <span className="capstone-btn-icon" aria-hidden>{'↗'}</span>
@@ -347,31 +499,16 @@ export default function Capstone({
       <div className="capstone-table">
         <div className="capstone-table-head">
           <div className="capstone-col-num">#</div>
-          <div className="capstone-col-step">Step / Node</div>
-          <div className="capstone-col-files">Knowledge &amp; skills files</div>
+          <div className="capstone-col-step">Step</div>
+          <div className="capstone-col-actor">Actor</div>
+          <div className="capstone-col-files">Reference files</div>
           <div className="capstone-col-remarks">Remarks (logic + DoD)</div>
           <div className="capstone-col-actions" />
         </div>
         {rows.map((row, idx) => (
-          <div key={row.id} className={`capstone-row${isRowComplete(row) ? ' is-complete' : ''} type-${row.type || 'coworker'}`}>
+          <div key={row.id} className={`capstone-row${isRowComplete(row, coworkers, participants) ? ' is-complete' : ''} type-${row.type || 'coworker'}`}>
             <div className="capstone-col-num">{idx + 1}</div>
             <div className="capstone-col-step">
-              <div className="capstone-type-toggle" role="group" aria-label="Step type">
-                <button
-                  type="button"
-                  className={`capstone-type-btn${(row.type || 'coworker') === 'coworker' ? ' active' : ''}`}
-                  onClick={() => update(idx, { type: 'coworker' })}
-                >
-                  <span aria-hidden>{'\u{1F916}'}</span> Coworker
-                </button>
-                <button
-                  type="button"
-                  className={`capstone-type-btn${row.type === 'review' ? ' active' : ''}`}
-                  onClick={() => update(idx, { type: 'review' })}
-                >
-                  <span aria-hidden>{'\u{1F464}'}</span> Review
-                </button>
-              </div>
               <textarea
                 value={row.step}
                 placeholder={row.type === 'review'
@@ -379,6 +516,38 @@ export default function Capstone({
                   : 'e.g. Client basic profile created'}
                 onChange={e => update(idx, { step: e.target.value })}
                 rows={2}
+              />
+            </div>
+            <div className="capstone-col-actor">
+              <div className="capstone-type-toggle" role="group" aria-label="Step type">
+                <button
+                  type="button"
+                  className={`capstone-type-btn${(row.type || 'coworker') === 'coworker' ? ' active' : ''}`}
+                  onClick={() => {
+                    if ((row.type || 'coworker') === 'coworker') return;
+                    // Type flip clears the actor binding — coworker ids and
+                    // participant ids don't cross-reference.
+                    update(idx, { type: 'coworker', actorId: '', actorName: '' });
+                  }}
+                >
+                  <span aria-hidden>{'\u{1F916}'}</span> Coworker
+                </button>
+                <button
+                  type="button"
+                  className={`capstone-type-btn${row.type === 'review' ? ' active' : ''}`}
+                  onClick={() => {
+                    if (row.type === 'review') return;
+                    update(idx, { type: 'review', actorId: '', actorName: '' });
+                  }}
+                >
+                  <span aria-hidden>{'\u{1F464}'}</span> Review
+                </button>
+              </div>
+              <ActorPicker
+                row={row}
+                coworkers={coworkers}
+                participants={participants}
+                onActorChange={patch => update(idx, patch)}
               />
             </div>
             <div className="capstone-col-files">

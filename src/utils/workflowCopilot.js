@@ -301,12 +301,20 @@ function buildCopilotPromptPrefix({ coworkers, participants, fileTree }) {
 - After each tool you call, the canvas updates live. You will see the new state on the next turn.
 
 ## Reading a Capstone plan
-When the user pastes in a Capstone plan from Stage 8, each step heading carries an explicit type marker — for example: "### Step 3: Risk memo reviewed and approved [Type: Human review]". Trust the marker. Do not infer the step type from the wording.
+When the user pastes a plan whose first line says "Build this workflow. Bindings below are explicit", each step carries authoritative bindings — Coworker: <name> for AI steps, Reviewer: <name> for human reviews. The participant has already done the thinking. Your job is to assemble the canvas fast.
 
-- "[Type: Human review]" → call add_review_node. The step becomes a human approval gate; the assignee is whichever human is running the workshop (or whichever the user names later).
-- "[Type: AI coworker]" → call add_coworker_node. The step is an AI coworker; pick the closest matching coworker from the available list.
+**Skip Discover entirely.** Do not ask clarifying questions. Do exactly two things:
 
-If a step has no explicit marker (older plans or freeform requests), fall back to inferring from the wording.
+1. **Preview (one short line).** Restate the shape: "Got it — N coworker steps and M reviews, wiring the final approved output into Capture. Building now." That's it. No yes/no question.
+2. **Build immediately.** No further confirmation needed.
+
+Read each step like this:
+- "Type: AI coworker" + "Coworker: Ravi" → call add_coworker_node({ coworkerName: "Ravi" }). Use the exact name from the binding. Don't substitute.
+- "Type: Human review" + "Reviewer: Alok" + "Prompt: ..." → call add_review_node({ assigneeName: "Alok", prompt: "..." }). Use the binding's prompt verbatim if it reads as a question; otherwise rephrase into a short reviewer-facing question (e.g., "Risk memo reviewed and approved" → "Approve the risk memo?").
+
+If a Coworker: name doesn't exist in the available list, or a Reviewer: name isn't in the workshop humans, surface that mismatch as a single message — name the row and the missing entity — and stop. Do not silently substitute.
+
+If a plan does NOT carry the "Bindings below are explicit" header (older plans, freeform requests), fall back to the normal Discover → Preview → Build flow below.
 
 ## Wiring the Capture node (this matters)
 The Capture Learning node is always the final step. Whatever coworker or review produces the approved output, its outgoing edge MUST terminate at the pre-seeded Capture node. Without this edge, the workflow has no way to compound learning and the run ends orphaned.

@@ -125,39 +125,45 @@ When given a credit memo, validate it against the Compliance Exceptions register
 const CAPSTONE_BLUEPRINT = `# Credit Application Review — Workflow Blueprint
 
 A reference blueprint for a credit application review process. Use it as a
-shape. Your capstone table lists each step with a **Step / Node** name
-(the workflow node — what happens), the **Knowledge & skills files**
-that inform the work, and **Remarks** (logic + definition of done;
-mention the actor in the logic).
+shape. The Capstone table commits each row to four things: **what happens**,
+**who runs it** (a saved AI coworker, or a real human reviewer in the room),
+**what files back it**, and **the logic + definition of done**.
 
-| # | Step / Node | Knowledge / skills | Remarks |
-|---|-------------|--------------------|---------|
-| 1 | Applicant profile created | Applicant intake checklist | **Logic:** Originator captures borrower identity, registration, ownership, and guarantor details to start the application. **DoD:** Applicant record saved and selectable for proposal creation. |
-| 2 | Credit history report requested and uploaded | Credit history reading guide | **Logic:** System request sent to the credit bureau; the report is generated and attached to the case file. **DoD:** A valid credit history report is visible in the case attachments. |
-| 3 | Application details entered | Proposal-fields checklist | **Logic:** Originator inputs facility type, amount, tenure, security details, and explanations into the system. **DoD:** Mandatory fields completed without validation errors. |
-| 4 | Financial statements uploaded | Financial-ratios skill | **Logic:** Originator downloads the template, fills audited and projected financials, uploads the file; the system calculates ratios and populates the financial section. **DoD:** Financial ratios auto-reflected in the proposal view. |
-| 5 | Working-capital details uploaded | Working-capital reading guide | **Logic:** Additional working-capital figures uploaded through dedicated sheets. **DoD:** Stock and receivable figures visible in the financial section. |
-| 6 | Valuator assigned and collateral valued | Collateral valuation skill | **Logic:** System assigns a valuator via round-robin; collateral is inspected externally and the report is uploaded. **DoD:** Signed valuation report attached and linked to the collateral record. |
-| 7 | Supporting documents uploaded | Required-documents checklist | **Logic:** Originator uploads the required legal, financial, identity, and business proof documents. **DoD:** Required document checklist satisfied in the system. |
-| 8 | Proposal finalized and submitted to workflow | Approval-chain skill | **Logic:** Originator confirms completeness and routes the proposal to the approval chain (Branch Lead → Reviewer → Approver). Query loops are handled within the workflow. **DoD:** Proposal reaches the final approver with a decision recorded. |
-| 9 | Approved proposal returned and post-approval workflow initiated | Post-approval checklist | **Logic:** After approval, the originator starts a new flow covering documentation, legal review, and disbursement preparation. **DoD:** Case appears in the post-approval queue. |
-| 10 | Security documents generated and signed | Security-doc templates | **Logic:** System generates standard security documents; the documentation team edits as needed; the originator collects signatures and uploads scans. **DoD:** Signed document set uploaded and tagged complete. |
-| 11 | Documentation check and legal verification | Legal-compliance skill | **Logic:** Documents checked for completeness and legal compliance; a correction loop runs until satisfactory. **DoD:** Legal clearance recorded in the workflow. |
-| 12 | Loan implemented and booked in the system | Booking-checklist skill | **Logic:** Limits set, account activated, contracts and deals created, charges applied. **DoD:** Loan account operational and ready for disbursement. |
-| 13 | Workflow completed and reporting available | Reporting query guide | **Logic:** Case closed in the system; the loan is visible in reports and monitoring dashboards. **DoD:** Case status marked complete and retrievable in reports. |
+The Actor column below shows role names. In your own Capstone, pick a real
+entity instead — a coworker from your library, or a reviewer who's in the
+workshop with you. That binding is what lets the copilot build the workflow
+in seconds without asking clarifying questions.
+
+| # | Step | Actor (role) | Reference files | Remarks |
+|---|------|--------------|-----------------|---------|
+| 1 | Applicant profile created | Originator (coworker) | Applicant intake checklist | **Logic:** Capture borrower identity, registration, ownership, and guarantor details to start the application. **DoD:** Applicant record saved and selectable for proposal creation. |
+| 2 | Credit history report requested and uploaded | Originator (coworker) | Credit history reading guide | **Logic:** System request sent to the credit bureau; report generated and attached to the case file. **DoD:** A valid credit history report is visible in the case attachments. |
+| 3 | Application details entered | Originator (coworker) | Proposal-fields checklist | **Logic:** Input facility type, amount, tenure, security details, and explanations. **DoD:** Mandatory fields completed without validation errors. |
+| 4 | Financial statements uploaded | Originator (coworker) | Financial-ratios skill | **Logic:** Download the template, fill audited and projected financials, upload; the system calculates ratios. **DoD:** Financial ratios auto-reflected in the proposal view. |
+| 5 | Collateral valued | Valuator (coworker) | Collateral valuation skill | **Logic:** Inspect collateral externally; produce a valuation report. **DoD:** Signed valuation report attached and linked to the collateral record. |
+| 6 | Supporting documents complete | Originator (coworker) | Required-documents checklist | **Logic:** Upload legal, financial, identity, and business proof documents. **DoD:** Required document checklist satisfied. |
+| 7 | Proposal reviewed and approved | Approver (review) | Approval-chain skill | **Logic:** Reviewer reads the proposal pack and approves, rejects, or requests revision. **DoD:** Proposal reaches a final approved/rejected state with a recorded decision. |
+| 8 | Security documents generated and signed | Documentation team (coworker) | Security-doc templates | **Logic:** Generate standard security documents; collect signatures; upload scans. **DoD:** Signed document set uploaded and tagged complete. |
+| 9 | Documentation check and legal verification | Legal Reviewer (review) | Legal-compliance skill | **Logic:** Verify documents for completeness and legal compliance. **DoD:** Legal clearance recorded in the workflow. |
+| 10 | Loan implemented and booked | Operations (coworker) | Booking-checklist skill | **Logic:** Set limits, activate accounts, create contracts and deals, apply charges. **DoD:** Loan account operational and ready for disbursement. |
 
 ## How to use this in the Capstone
 
 1. Open the Capstone tab and add one row per step in your own workflow.
-2. Use the three columns as a planning frame:
-   - **Step / Node** — what happens in this step (the workflow node).
-   - **Knowledge & skills files** — files from your room that back the
-     step (policy docs, skill prompts, checklists).
-   - **Remarks** — the logic and the definition of done. Name the actor
-     here (Originator, Reviewer, Operations, etc.).
-3. When all rows are filled, the Capstone tab unlocks a **Send to copilot**
-   action that ships your plan into the Orchestration copilot. The copilot
-   uses your plan as the brief and helps you build the actual workflow.
+2. For each row:
+   - **Step** — what happens. Be concrete (one line).
+   - **Actor** — toggle between **Coworker** and **Review**, then pick:
+     - **Coworker** rows: pick one of your saved coworkers from the
+       Coworkers tab. (No saved coworkers? Build one first — the
+       Capstone needs them.)
+     - **Review** rows: pick a real human in the room.
+   - **Reference files** — knowledge or skills files that back the step.
+   - **Remarks** — the logic and the definition of done.
+3. When every row is bound, hit **Send to copilot**. The copilot reads
+   the bindings and assembles the workflow on the canvas — no clarifying
+   questions, just a one-line preview and the build.
+
+The clarity is the slow step. The build is fast.
 
 The blueprint above is editable. Rewrite it to match your cohort's domain
 if you're running this for something other than a credit review.

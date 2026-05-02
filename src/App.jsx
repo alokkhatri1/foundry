@@ -2973,6 +2973,8 @@ Answer in ONE sentence. If the user asks "how", a second sentence is allowed —
               fileTree={fileTree}
               flatFiles={flatFiles}
               onEnsureFileContent={handleEnsureFileContent}
+              coworkers={coworkers || []}
+              participants={participants || []}
               copilotUnlocked={stageReached(currentStage, '9')}
               onSendToCopilot={handleSendCapstoneToCopilot}
             />

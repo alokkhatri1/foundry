@@ -10130,3 +10130,812 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
 @media (max-width: 600px) {
   .cwb-editor .cwb-identity { flex-direction: column; align-items: flex-start; }
 }
+
+/* ================================================================
+   FOUNDRY ORCHESTRATION v2
+   List view (.wf-page) + editor (.wf-editor) ported from
+   Orchestration Export. Scoped under wrappers so the warm cream +
+   peach + Fraunces tokens don't leak into other surfaces. The
+   four node-type colors (ink/blue/peach/green) stay load-bearing —
+   they survive the palette change and let participants scan a DAG
+   without reading every label.
+   ================================================================ */
+
+.wf-page,
+.wf-editor {
+  --paper:        #fffdf9;
+  --cream:        #f5ede0;
+  --cream-soft:   #ede1cf;
+  --cream-deep:   #e1d3bc;
+  --ink:          #1d1611;
+  --ink-mid:      #4a3f33;
+  --ink-muted:    #8a7a64;
+  --ink-faint:    #b8a98f;
+  --peach:        #f4c8a8;
+  --peach-deep:   #d97757;
+  --peach-soft:   #fbe5d2;
+  --rule:         #d8c8ad;
+  --rule-soft:    #e6dcc6;
+  --green:        #5a9e6f;
+  --green-soft:   rgba(90, 158, 111, 0.12);
+  --red:          #c75a4a;
+  --node-trigger: #1d1611;
+  --node-agent:   #4a7fb5;
+  --node-review:  #d97757;
+  --node-capture: #5a9e6f;
+  --serif: 'Fraunces', 'Cormorant Garamond', Georgia, serif;
+  --sans:  'Inter', 'Inter Tight', -apple-system, BlinkMacSystemFont, sans-serif;
+  --mono:  'JetBrains Mono', ui-monospace, monospace;
+  --radius: 14px;
+  --radius-sm: 10px;
+  --radius-pill: 999px;
+}
+
+/* The list view sits inside .panel-center; ensure its scroll is local
+   so the whole page can grow + breathe like the marketing surfaces. */
+.wf-page-shell {
+  background: var(--cream);
+  overflow-y: auto;
+  height: 100%;
+}
+
+.wf-page {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 36px 32px 64px;
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+  font-family: var(--sans);
+  color: var(--ink);
+}
+.wf-page-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 28px;
+  padding-bottom: 22px;
+  border-bottom: 1px solid var(--rule-soft);
+}
+.wf-page-title {
+  font-family: var(--serif);
+  font-weight: 400;
+  font-size: 38px;
+  letter-spacing: -0.015em;
+  color: var(--ink);
+  margin-bottom: 6px;
+  line-height: 1.1;
+}
+.wf-page-sub {
+  font-size: 14.5px;
+  color: var(--ink-mid);
+  max-width: 560px;
+  line-height: 1.55;
+}
+.wf-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--ink);
+  color: var(--paper);
+  border: none;
+  border-radius: var(--radius-pill);
+  padding: 5px 6px 5px 18px;
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.005em;
+  font-family: var(--sans);
+  flex-shrink: 0;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.wf-cta-arrow {
+  width: 28px; height: 28px;
+  border-radius: 50%;
+  background: var(--peach-deep);
+  color: var(--paper);
+  display: grid; place-items: center;
+  font-size: 14px; line-height: 1;
+  transition: transform 0.18s;
+}
+.wf-cta:hover { background: #2a1f15; }
+.wf-cta:hover .wf-cta-arrow { transform: translateX(2px); }
+
+.wf-page-body {
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+}
+.wf-page-empty {
+  background: var(--paper);
+  border: 1px dashed var(--rule);
+  border-radius: var(--radius);
+  padding: 60px 24px;
+  text-align: center;
+  color: var(--ink-muted);
+  font-size: 14.5px;
+  font-style: italic;
+}
+
+.wf-page .wf-section {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 0;
+  margin: 0;
+}
+.wf-page .wf-section + .wf-section { margin-top: 4px; }
+.wf-page .wf-section-head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  background: transparent;
+  border: none;
+  padding: 0;
+  margin: 0;
+}
+.wf-page .wf-section-title {
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+  background: transparent;
+  border: none;
+  padding: 0;
+  margin: 0;
+}
+.wf-page .wf-section-count {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--ink-muted);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.06em;
+  border-left: 1px solid var(--rule);
+  padding-left: 10px;
+  margin-left: 2px;
+  background: transparent;
+}
+.wf-page .wf-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  gap: 16px;
+}
+
+/* ── Card (overrides legacy .wf-card chrome) ─────────────────── */
+.wf-page .wf-card {
+  text-align: left;
+  background: var(--paper);
+  border: 1px solid var(--rule-soft);
+  border-radius: var(--radius);
+  padding: 22px 20px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  cursor: pointer;
+  transition: border-color 0.2s, box-shadow 0.2s, transform 0.18s;
+  position: relative;
+  overflow: hidden;
+}
+.wf-page .wf-card::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 2px;
+  background: var(--peach-deep);
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 0.25s ease;
+}
+.wf-page .wf-card:hover {
+  border-color: var(--rule);
+  box-shadow: 0 12px 32px -16px rgba(60, 40, 20, 0.18);
+  transform: translateY(-2px);
+}
+.wf-page .wf-card:hover::before { transform: scaleX(1); }
+
+.wf-page .wf-card-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0;
+}
+.wf-page .wf-card-name {
+  font-family: var(--serif);
+  font-weight: 500;
+  font-size: 19px;
+  letter-spacing: -0.005em;
+  color: var(--ink);
+  line-height: 1.25;
+}
+.wf-page .wf-card-running {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--green);
+  background: var(--green-soft);
+  padding: 4px 9px;
+  border-radius: var(--radius-pill);
+  flex-shrink: 0;
+  font-weight: 500;
+  animation: none;
+}
+.wf-page .wf-card-running-dot {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--green);
+  box-shadow: 0 0 0 3px rgba(90, 158, 111, 0.22);
+  animation: wf-pulse-v2 1.5s infinite;
+}
+@keyframes wf-pulse-v2 {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%      { opacity: 0.5; transform: scale(0.85); }
+}
+.wf-page .wf-card-desc {
+  font-size: 13.5px;
+  color: var(--ink-mid);
+  line-height: 1.55;
+  text-wrap: pretty;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  margin: 0;
+}
+.wf-page .wf-card-flow {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 6px 0;
+  margin: 0;
+}
+.wf-page .wf-card-flow-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.wf-page .wf-card-flow-arrow {
+  font-size: 11px;
+  color: var(--ink-faint);
+}
+.wf-page .wf-card-flow-dot {
+  width: 26px; height: 26px;
+  border-radius: 7px;
+  border: none;
+  display: grid; place-items: center;
+  font-size: 11px;
+  font-family: var(--mono);
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  color: var(--paper);
+}
+.wf-page .wf-card-flow-dot.trigger  { background: var(--node-trigger); }
+.wf-page .wf-card-flow-dot.agent    { background: var(--node-agent); }
+.wf-page .wf-card-flow-dot.approval { background: var(--node-review); }
+.wf-page .wf-card-flow-dot.capture  { background: var(--node-capture); }
+.wf-page .wf-card-meta {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+  padding-top: 12px;
+  border-top: 1px solid var(--rule-soft);
+  display: flex;
+  gap: 12px;
+}
+.wf-page .wf-card-actions {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  display: flex;
+  gap: 4px;
+  opacity: 0;
+  transition: opacity 0.15s;
+  z-index: 2;
+}
+.wf-page .wf-card:hover .wf-card-actions { opacity: 1; }
+.wf-page .wf-card-action {
+  padding: 4px 10px;
+  font-size: 11px;
+  font-family: var(--mono);
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  color: var(--ink-muted);
+  background: var(--paper);
+  border: 1px solid var(--rule-soft);
+  border-radius: var(--radius-pill);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+.wf-page .wf-card-action:hover { background: var(--cream); color: var(--ink); border-color: var(--rule); }
+.wf-page .wf-card-action-delete:hover { background: #fdf0f0; color: var(--red); border-color: var(--red); }
+
+/* ── Editor shell ────────────────────────────────────────────── */
+.wf-editor {
+  font-family: var(--sans);
+  color: var(--ink);
+  background: var(--cream);
+}
+.wf-editor .wf-editor-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 24px;
+  background: var(--paper);
+  border-bottom: 1px solid var(--rule-soft);
+  flex-shrink: 0;
+  gap: 16px;
+}
+.wf-editor .wf-editor-head-left {
+  display: flex; align-items: center; gap: 14px;
+  flex: 1; min-width: 0;
+}
+.wf-editor .wf-editor-head-right {
+  display: flex; align-items: center; gap: 10px;
+  flex-shrink: 0;
+}
+.wf-editor .wf-back {
+  background: transparent;
+  border: 1px solid var(--rule);
+  color: var(--ink-mid);
+  padding: 7px 14px;
+  border-radius: var(--radius-pill);
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s, border-color 0.12s;
+  white-space: nowrap;
+}
+.wf-editor .wf-back:hover {
+  background: var(--cream);
+  color: var(--ink);
+  border-color: var(--ink-muted);
+}
+.wf-editor .wf-editor-name-input {
+  font-family: var(--serif);
+  font-style: italic;
+  font-weight: 400;
+  font-size: 22px;
+  letter-spacing: -0.005em;
+  color: var(--ink);
+  background: transparent;
+  border: none;
+  outline: none;
+  border-bottom: 1px solid transparent;
+  padding: 4px 0;
+  width: 100%;
+  max-width: 460px;
+  transition: border-color 0.12s;
+}
+.wf-editor .wf-editor-name-input:focus { border-bottom-color: var(--peach-deep); }
+.wf-editor .wf-editor-name-input::placeholder { color: var(--ink-muted); font-style: italic; }
+.wf-editor .wf-readonly-banner {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+  background: var(--cream);
+  border: 1px solid var(--rule-soft);
+  border-radius: var(--radius-pill);
+  padding: 5px 12px;
+  white-space: nowrap;
+}
+
+.wf-editor .wf-editor-action {
+  background: transparent;
+  border: 1px solid var(--rule);
+  color: var(--ink-mid);
+  padding: 7px 14px;
+  border-radius: var(--radius-pill);
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s, border-color 0.12s;
+}
+.wf-editor .wf-editor-action:hover {
+  background: var(--cream);
+  color: var(--ink);
+  border-color: var(--peach-deep);
+}
+.wf-editor .wf-editor-action:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.wf-editor .wf-editor-run {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--ink);
+  color: var(--paper);
+  border: none;
+  padding: 5px 6px 5px 16px;
+  border-radius: var(--radius-pill);
+  font-family: var(--sans);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.wf-editor .wf-editor-run-arrow {
+  width: 28px; height: 28px;
+  border-radius: 50%;
+  background: var(--peach-deep);
+  color: var(--paper);
+  display: grid; place-items: center;
+  font-size: 14px; line-height: 1;
+  transition: transform 0.18s;
+}
+.wf-editor .wf-editor-run:hover { background: #2a1f15; }
+.wf-editor .wf-editor-run:hover .wf-editor-run-arrow { transform: translateX(2px); }
+.wf-editor .wf-editor-run:disabled { opacity: 0.45; cursor: not-allowed; }
+.wf-editor .wf-editor-run:disabled:hover { background: var(--ink); }
+.wf-editor .wf-editor-run:disabled:hover .wf-editor-run-arrow { transform: none; }
+
+.wf-editor .wf-editor-run.is-running {
+  background: var(--green);
+  color: var(--paper);
+  padding: 8px 16px;
+  gap: 8px;
+}
+.wf-editor .wf-editor-run-dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: var(--paper);
+  animation: wf-pulse-v2 1.5s infinite;
+}
+.wf-editor .wf-editor-run-cancel {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  text-decoration: underline;
+  margin-left: 4px;
+  opacity: 0.85;
+}
+
+/* Add-step menu surfaces inside the v2 head — restyle the legacy
+   dropdown so it matches the editor palette. */
+.wf-editor .add-step-dropdown { position: relative; }
+.wf-editor .add-step-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  background: var(--paper);
+  border: 1px solid var(--rule-soft);
+  border-radius: var(--radius-sm);
+  box-shadow: 0 12px 32px -16px rgba(60, 40, 20, 0.22);
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  z-index: 100;
+  min-width: 200px;
+}
+.wf-editor .add-step-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 12px;
+  background: transparent;
+  border: none;
+  border-radius: 8px;
+  font-family: var(--sans);
+  font-size: 13px;
+  color: var(--ink);
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.12s;
+}
+.wf-editor .add-step-option:hover { background: var(--cream); }
+.wf-editor .add-step-option .dot {
+  width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
+}
+.wf-editor .add-step-option .dot.agent    { background: var(--node-agent); }
+.wf-editor .add-step-option .dot.approval { background: var(--node-review); }
+.wf-editor .add-step-option .dot.capture  { background: var(--node-capture); }
+
+/* ── Canvas + copilot split ─────────────────────────────────── */
+.wf-editor .wf-editor-canvas-wrap {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 1fr 56px;
+  min-height: 0;
+  overflow: hidden;
+  background: var(--cream);
+}
+.wf-editor .wf-editor-canvas-wrap.copilot-open { grid-template-columns: 1fr 380px; }
+.wf-editor .wf-editor-canvas-wrap.copilot-hidden { grid-template-columns: 1fr; }
+.wf-editor .wf-editor-canvas-wrap > .wf-editor-canvas {
+  position: relative;
+  background-color: var(--cream);
+  overflow: hidden;
+  min-width: 0;
+}
+.wf-editor .wf-editor-canvas-eyebrow {
+  position: absolute;
+  top: 18px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 5;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--mono);
+  font-size: 10.5px;
+  font-weight: 500;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--peach-deep);
+  background: var(--paper);
+  border: 1px solid var(--peach);
+  border-radius: var(--radius-pill);
+  padding: 7px 14px;
+  box-shadow: 0 4px 12px -8px rgba(217, 119, 87, 0.3);
+  pointer-events: none;
+  white-space: nowrap;
+}
+.wf-editor .wf-canvas-dot {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--green);
+  box-shadow: 0 0 0 3px rgba(90, 158, 111, 0.22);
+}
+
+/* React Flow surface tweaks inside the v2 canvas. */
+.wf-editor .wf-editor-canvas .react-flow {
+  background: var(--cream);
+}
+.wf-editor .wf-editor-canvas .react-flow__controls {
+  background: var(--paper);
+  border: 1px solid var(--rule-soft);
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: 0 8px 24px -16px rgba(60, 40, 20, 0.16);
+}
+.wf-editor .wf-editor-canvas .react-flow__controls button {
+  background: var(--paper);
+  border-bottom: 1px solid var(--rule-soft);
+  color: var(--ink-mid);
+}
+.wf-editor .wf-editor-canvas .react-flow__controls button:hover { background: var(--cream); color: var(--peach-deep); }
+
+/* ── Copilot side panel (collapsible) ────────────────────────── */
+.wf-editor .wf-copilot {
+  background: var(--paper);
+  border-left: 1px solid var(--rule-soft);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  transition: width 0.22s ease;
+}
+.wf-editor .wf-copilot-head {
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--rule-soft);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 56px;
+  flex-shrink: 0;
+}
+.wf-editor .wf-copilot .wf-copilot-toggle {
+  background: transparent;
+  border: 1px solid var(--rule);
+  color: var(--ink-muted);
+  width: 28px; height: 28px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  font-size: 12px;
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s, border-color 0.12s;
+  position: static;
+  padding: 0;
+  font-family: var(--sans);
+  letter-spacing: normal;
+  text-transform: none;
+  box-shadow: none;
+}
+.wf-editor .wf-copilot .wf-copilot-toggle:hover {
+  background: var(--cream);
+  color: var(--peach-deep);
+  border-color: var(--peach-deep);
+}
+.wf-editor .wf-copilot-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--serif);
+  font-weight: 500;
+  font-style: italic;
+  font-size: 16px;
+  color: var(--ink);
+  letter-spacing: -0.005em;
+  text-transform: none;
+}
+.wf-editor .wf-copilot-title-spark {
+  color: var(--peach-deep);
+  font-size: 13px;
+  font-style: normal;
+}
+.wf-editor .wf-copilot-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-height: 0;
+}
+.wf-editor .wf-copilot-empty {
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--ink-mid);
+  background: var(--cream);
+  border: 1px dashed var(--rule);
+  border-radius: var(--radius-sm);
+  padding: 14px 16px;
+}
+.wf-editor .wf-copilot-empty em {
+  color: var(--peach-deep);
+  font-style: italic;
+}
+.wf-editor .wf-copilot-msg {
+  font-size: 13px;
+  line-height: 1.6;
+  background: transparent;
+  border: none;
+  padding: 0;
+  margin: 0;
+  color: var(--ink);
+}
+.wf-editor .wf-copilot-user {
+  align-self: flex-end;
+  background: var(--cream-soft);
+  border: 1px solid var(--rule-soft);
+  border-radius: 14px 14px 4px 14px;
+  padding: 10px 14px;
+  max-width: 88%;
+}
+.wf-editor .wf-copilot-ai {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 10px;
+  align-items: flex-start;
+}
+.wf-editor .wf-copilot-error {
+  align-self: stretch;
+  background: rgba(199, 90, 74, 0.08);
+  border: 1px solid rgba(199, 90, 74, 0.3);
+  border-radius: var(--radius-sm);
+  padding: 10px 14px;
+  color: var(--red);
+}
+.wf-editor .wf-copilot-msg-spark {
+  width: 22px; height: 22px;
+  border-radius: 50%;
+  background: var(--peach-soft);
+  color: var(--peach-deep);
+  display: grid;
+  place-items: center;
+  font-size: 11px;
+  flex-shrink: 0;
+  border: 1px solid var(--peach);
+}
+.wf-editor .wf-copilot-msg-name {
+  font-family: var(--mono);
+  font-size: 9.5px;
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+  margin-bottom: 4px;
+}
+.wf-editor .wf-copilot-user .wf-copilot-msg-name { color: var(--peach-deep); }
+.wf-editor .wf-copilot-msg-body { color: var(--ink); text-wrap: pretty; }
+.wf-editor .wf-copilot-msg-body p:first-child { margin-top: 0; }
+.wf-editor .wf-copilot-msg-body p:last-child { margin-bottom: 0; }
+.wf-editor .wf-copilot-thinking .wf-copilot-msg-body { color: var(--ink-muted); font-style: italic; }
+.wf-editor .wf-copilot-composer {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px;
+  border-top: 1px solid var(--rule-soft);
+  background: var(--paper);
+  flex-shrink: 0;
+}
+.wf-editor .wf-copilot-composer .wf-copilot-input {
+  flex: 1;
+  background: var(--cream);
+  border: 1px solid var(--rule-soft);
+  border-radius: var(--radius-pill);
+  padding: 9px 16px;
+  font-size: 13px;
+  font-family: var(--sans);
+  outline: none;
+  color: var(--ink);
+  transition: border-color 0.15s, background 0.15s;
+  resize: none;
+  line-height: 1.5;
+  min-height: 36px;
+  max-height: 120px;
+}
+.wf-editor .wf-copilot-composer .wf-copilot-input::placeholder { color: var(--ink-muted); }
+.wf-editor .wf-copilot-composer .wf-copilot-input:focus {
+  border-color: var(--peach-deep);
+  background: var(--paper);
+}
+.wf-editor .wf-copilot-composer .wf-copilot-input:disabled {
+  background: var(--cream);
+  color: var(--ink-muted);
+}
+.wf-editor .wf-copilot-composer .wf-copilot-send {
+  width: 32px; height: 32px;
+  border-radius: 50%;
+  background: var(--ink);
+  color: var(--paper);
+  border: none;
+  display: grid; place-items: center;
+  flex-shrink: 0;
+  cursor: pointer;
+  padding: 0;
+  transition: background 0.15s, transform 0.12s;
+  box-shadow: none;
+}
+.wf-editor .wf-copilot-composer .wf-copilot-send:hover:not(:disabled) {
+  background: var(--peach-deep);
+  transform: translateX(2px);
+}
+.wf-editor .wf-copilot-composer .wf-copilot-send:disabled {
+  background: var(--ink-faint);
+  cursor: not-allowed;
+}
+
+/* Run banner overrides under the v2 editor — softer cream tones. */
+.wf-editor .wf-run-banner {
+  background: var(--paper);
+  border-left: 3px solid var(--peach-deep);
+  border-top: 1px solid var(--rule-soft);
+  border-bottom: 1px solid var(--rule-soft);
+  border-right: 1px solid var(--rule-soft);
+  border-radius: 0;
+  padding: 12px 18px;
+  margin: 0;
+}
+.wf-editor .wf-run-banner-title {
+  font-family: var(--serif);
+  font-style: italic;
+  font-size: 15px;
+  color: var(--ink);
+}
+.wf-editor .wf-run-banner-body { color: var(--ink-mid); font-size: 13px; }
+.wf-editor .wf-run-banner.success { border-left-color: var(--green); }
+.wf-editor .wf-run-banner.rejected { border-left-color: var(--red); }
+.wf-editor .wf-run-banner.running { border-left-color: var(--peach-deep); }
+
+/* Make the editor itself a column — header / banner / canvas. */
+.wf-editor.workflow-builder { display: flex; flex-direction: column; height: 100%; }
+
+/* Responsive */
+@media (max-width: 880px) {
+  .wf-page { padding: 28px 20px; }
+  .wf-page-head { flex-direction: column; align-items: stretch; }
+  .wf-page-title { font-size: 30px; }
+  .wf-page .wf-grid { grid-template-columns: 1fr; }
+  .wf-editor .wf-editor-head { padding: 12px 16px; flex-wrap: wrap; }
+  .wf-editor .wf-editor-canvas-wrap { grid-template-columns: 1fr; }
+  .wf-editor .wf-editor-canvas-wrap.copilot-open { grid-template-columns: 1fr; }
+  .wf-editor .wf-copilot { width: 100%; border-left: none; border-top: 1px solid var(--rule-soft); }
+}

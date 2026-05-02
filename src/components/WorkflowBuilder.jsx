@@ -892,97 +892,152 @@ function WorkflowCanvas({ workflow, onUpdateWorkflow, readOnly, fileTree, cowork
     }
   }, [copilotInput, copilotBusy, workflow, coworkers, participants, onUpdateWorkflow, setCopilotInput, setCopilotMessages, setCopilotBusy, copilotHistoriesRef, copilotWfId, onCopilotUsage]);
 
+  // DAG status caption shown in the canvas eyebrow chip — derived from the
+  // current step + edge counts so it tracks live edits as the user builds.
+  const eyebrowSteps = (workflow.steps || []).length;
+  const realStepCount = (workflow.steps || []).filter(s => s.type !== 'trigger').length;
+  const eyebrowText = realStepCount === 0
+    ? `DAG · ${eyebrowSteps} ${eyebrowSteps === 1 ? 'node' : 'nodes'} · build to start`
+    : `DAG · ${eyebrowSteps} ${eyebrowSteps === 1 ? 'node' : 'nodes'} · ready to run`;
+  const showCopilot = !readOnly && copilotEnabled;
   return (
-    <div className={`wf-canvas-layout${copilotOpen ? ' copilot-open' : ''}`}>
-    <div className="wf-canvas-wrap">
-      <ReactFlow
-        nodes={nodes}
-        edges={edges}
-        nodeTypes={nodeTypes}
-        edgeTypes={wfEdgeTypes}
-        onNodesChange={readOnly ? undefined : handleNodesChange}
-        onEdgesChange={readOnly ? undefined : handleEdgesChange}
-        onConnect={readOnly ? undefined : handleConnect}
-        nodesConnectable={!readOnly}
-        nodesDraggable={!readOnly}
-        edgesFocusable={!readOnly}
-        elementsSelectable
-        fitView
-        fitViewOptions={{ padding: 0.2, maxZoom: 1 }}
-        proOptions={{ hideAttribution: true }}
-        defaultEdgeOptions={{ type: 'deletable', animated: false, style: { stroke: '#c8956c', strokeWidth: 2 } }}
-        nodeDragThreshold={5}
-      >
-        <Background gap={20} size={1} color="#d4ccc2" />
-        <Controls showInteractive={false} />
-        <MiniMap
-          nodeColor={(n) => {
-            // Tint minimap tiles by node type so the overall shape reads at a glance.
-            if (n.type === 'trigger') return '#5a8f6b';
-            if (n.type === 'approval') return '#c8956c';
-            return '#4a7fb5';
-          }}
-          nodeStrokeWidth={2}
-          maskColor="rgba(250, 247, 242, 0.6)"
-          pannable
-          zoomable
-          style={{ background: 'var(--bg-white)', border: '1px solid var(--border-color)', borderRadius: 6 }}
-        />
-      </ReactFlow>
-      {!readOnly && copilotEnabled && (
-        <button
-          className={`wf-copilot-toggle${copilotOpen ? ' open' : ''}`}
-          onClick={() => setCopilotOpen(o => !o)}
-          title={copilotOpen ? 'Hide copilot' : 'Open copilot'}
+    <div className={`wf-editor-canvas-wrap${copilotOpen ? ' copilot-open' : ''}${showCopilot ? '' : ' copilot-hidden'}`}>
+      <div className="wf-editor-canvas wf-canvas-wrap">
+        <div className="wf-editor-canvas-eyebrow">
+          <span className="wf-canvas-dot" />
+          {eyebrowText}
+        </div>
+        <ReactFlow
+          nodes={nodes}
+          edges={edges}
+          nodeTypes={nodeTypes}
+          edgeTypes={wfEdgeTypes}
+          onNodesChange={readOnly ? undefined : handleNodesChange}
+          onEdgesChange={readOnly ? undefined : handleEdgesChange}
+          onConnect={readOnly ? undefined : handleConnect}
+          nodesConnectable={!readOnly}
+          nodesDraggable={!readOnly}
+          edgesFocusable={!readOnly}
+          elementsSelectable
+          fitView
+          fitViewOptions={{ padding: 0.2, maxZoom: 1 }}
+          proOptions={{ hideAttribution: true }}
+          defaultEdgeOptions={{ type: 'deletable', animated: false, style: { stroke: '#d97757', strokeWidth: 2 } }}
+          nodeDragThreshold={5}
         >
-          {copilotOpen ? '\u2192' : '\u2190'} Copilot
-        </button>
-      )}
-    </div>
-    {!readOnly && copilotEnabled && copilotOpen && (
-      <aside className="wf-copilot-panel">
-        <div className="wf-copilot-header">
-          <span className="wf-copilot-title">Workflow Copilot</span>
-          <button className="wf-copilot-close" onClick={() => setCopilotOpen(false)}>{'\u2715'}</button>
-        </div>
-        <div className="wf-copilot-messages" ref={copilotScrollRef}>
-          {copilotMessages.length === 0 && !copilotBusy && (
-            <div className="wf-copilot-empty">
-              Describe the workflow you want. I'll stitch the DAG — add coworker steps, wire reviews, connect the edges.
-              <br /><br />
-              Try: <em>"Ravi drafts a risk memo, Priya reviews, then Legal AI checks exceptions, then I sign off."</em>
-            </div>
-          )}
-          {copilotMessages.map((m, i) => (
-            <div key={i} className={`wf-copilot-msg wf-copilot-msg-${m.kind}`}>
-              <RichText content={m.text} />
-            </div>
-          ))}
-          {copilotBusy && <div className="wf-copilot-msg wf-copilot-msg-thinking">Thinking\u2026</div>}
-        </div>
-        <div className="wf-copilot-input-row">
-          <textarea
-            className="wf-copilot-input"
-            value={copilotInput}
-            onChange={e => setCopilotInput(e.target.value)}
-            onKeyDown={e => {
-              if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                handleCopilotSend();
-              }
+          <Background gap={22} size={1} color="rgba(45, 30, 15, 0.10)" />
+          <Controls showInteractive={false} />
+          <MiniMap
+            nodeColor={(n) => {
+              if (n.type === 'trigger')  return '#1d1611';
+              if (n.type === 'approval') return '#d97757';
+              if (n.type === 'capture')  return '#5a9e6f';
+              return '#4a7fb5';
             }}
-            placeholder={copilotBusy ? 'Copilot is working\u2026' : 'Describe the workflow or a change\u2026'}
-            rows={2}
-            disabled={copilotBusy}
+            nodeStrokeWidth={2}
+            maskColor="rgba(245, 237, 224, 0.6)"
+            pannable
+            zoomable
+            style={{ background: 'var(--paper, #fffdf9)', border: '1px solid #d8c8ad', borderRadius: 8 }}
           />
-          <button
-            className="wf-copilot-send"
-            onClick={handleCopilotSend}
-            disabled={copilotBusy || !copilotInput.trim()}
-          >Send</button>
-        </div>
-      </aside>
-    )}
+        </ReactFlow>
+      </div>
+      {showCopilot && (
+        <aside className={`wf-copilot${copilotOpen ? ' is-open' : ''}`}>
+          <div className="wf-copilot-head">
+            <button
+              className="wf-copilot-toggle"
+              onClick={() => setCopilotOpen(o => !o)}
+              aria-label={copilotOpen ? 'Collapse copilot' : 'Expand copilot'}
+              title={copilotOpen ? 'Collapse copilot' : 'Expand copilot'}
+            >
+              {copilotOpen ? '→' : '←'}
+            </button>
+            {copilotOpen && (
+              <div className="wf-copilot-title">
+                <span className="wf-copilot-title-spark" aria-hidden>✦</span>
+                Workflow copilot
+              </div>
+            )}
+          </div>
+          {copilotOpen && (
+            <>
+              <div className="wf-copilot-body" ref={copilotScrollRef}>
+                {copilotMessages.length === 0 && !copilotBusy && (
+                  <div className="wf-copilot-empty">
+                    Describe the workflow you want. I’ll stitch the DAG — add coworker steps, wire reviews, connect the edges.
+                    <br /><br />
+                    Try: <em>“Ravi drafts a risk memo, Priya reviews, then Legal AI checks exceptions, then I sign off.”</em>
+                  </div>
+                )}
+                {copilotMessages.map((m, i) => {
+                  if (m.kind === 'user') {
+                    return (
+                      <div key={i} className="wf-copilot-msg wf-copilot-user">
+                        <div className="wf-copilot-msg-name">You</div>
+                        <div className="wf-copilot-msg-body"><RichText content={m.text} /></div>
+                      </div>
+                    );
+                  }
+                  if (m.kind === 'error') {
+                    return (
+                      <div key={i} className="wf-copilot-msg wf-copilot-error">
+                        <div className="wf-copilot-msg-name">Error</div>
+                        <div className="wf-copilot-msg-body"><RichText content={m.text} /></div>
+                      </div>
+                    );
+                  }
+                  return (
+                    <div key={i} className="wf-copilot-msg wf-copilot-ai">
+                      <span className="wf-copilot-msg-spark" aria-hidden>✦</span>
+                      <div>
+                        <div className="wf-copilot-msg-name">Foundry copilot</div>
+                        <div className="wf-copilot-msg-body"><RichText content={m.text} /></div>
+                      </div>
+                    </div>
+                  );
+                })}
+                {copilotBusy && (
+                  <div className="wf-copilot-msg wf-copilot-ai wf-copilot-thinking">
+                    <span className="wf-copilot-msg-spark" aria-hidden>✦</span>
+                    <div>
+                      <div className="wf-copilot-msg-name">Foundry copilot</div>
+                      <div className="wf-copilot-msg-body">Thinking…</div>
+                    </div>
+                  </div>
+                )}
+              </div>
+              <div className="wf-copilot-composer">
+                <textarea
+                  className="wf-copilot-input"
+                  value={copilotInput}
+                  onChange={e => setCopilotInput(e.target.value)}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                      e.preventDefault();
+                      handleCopilotSend();
+                    }
+                  }}
+                  placeholder={copilotBusy ? 'Copilot is working…' : 'Tell the copilot what to build…'}
+                  rows={1}
+                  disabled={copilotBusy}
+                />
+                <button
+                  className="wf-copilot-send"
+                  onClick={handleCopilotSend}
+                  disabled={copilotBusy || !copilotInput.trim()}
+                  aria-label="Send"
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <line x1="5" y1="12" x2="19" y2="12" />
+                    <polyline points="12 5 19 12 12 19" />
+                  </svg>
+                </button>
+              </div>
+            </>
+          )}
+        </aside>
+      )}
     </div>
   );
 }
@@ -1096,54 +1151,60 @@ function WorkflowEditor({ workflow, onUpdateWorkflow, readOnly, fileTree, cowork
   }
 
   return (
-    <div className={`workflow-builder${readOnly ? ' workflow-builder-readonly' : ''}`}>
-      <div className="workflow-header-bar">
-        <button className="files-back-btn" onClick={onBack}>{'\u2190'} All Workflows</button>
-        <input
-          className="workflow-name-input"
-          value={workflow.name}
-          onChange={e => onUpdateWorkflow({ ...workflow, name: e.target.value })}
-          placeholder="Workflow name..."
-          disabled={readOnly}
-        />
-        {readOnly && (
-          <div className="wf-readonly-banner">Read-only — built by {workflow.createdBy || 'another participant'}</div>
-        )}
-        {!readOnly && (
-          <div className="add-step-dropdown">
-            <button className="add-step-btn" onClick={() => setShowAddMenu(!showAddMenu)} disabled={isRunning}>+ Add Step</button>
-            {showAddMenu && (
-              <div className="add-step-menu">
-                <button className="add-step-option" onClick={() => addStep('agent')}><span className="dot agent"></span> Coworker Step</button>
-                <button className="add-step-option" onClick={() => addStep('approval')}><span className="dot approval"></span> Human Review</button>
-                <button className="add-step-option" onClick={() => addStep('capture')}><span className="dot capture"></span> Capture Learning</button>
-              </div>
-            )}
-          </div>
-        )}
-        {isRunning ? (
-          <button
-            className="run-btn run-btn-stop"
-            onClick={() => activeRun && onCancelRun && onCancelRun(activeRun.id)}
-            title="Stop this run"
-          >
-            Stop
-          </button>
-        ) : (
-          <button
-            className="run-btn"
-            onClick={handleRun}
-            disabled={realStepCount === 0 || !hasTriggerInput}
-            title={
-              realStepCount === 0 ? 'Add at least one step before running'
-              : !hasTriggerInput ? 'Add instructions or pick at least one document in the Trigger'
-              : ''
-            }
-          >
-            Run
-          </button>
-        )}
-      </div>
+    <div className={`workflow-builder wf-editor${readOnly ? ' workflow-builder-readonly' : ''}`}>
+      <header className="wf-editor-head">
+        <div className="wf-editor-head-left">
+          <button className="wf-back" onClick={onBack}>← All workflows</button>
+          <input
+            className="wf-editor-name-input"
+            value={workflow.name}
+            onChange={e => onUpdateWorkflow({ ...workflow, name: e.target.value })}
+            placeholder="Workflow name…"
+            disabled={readOnly}
+          />
+          {readOnly && (
+            <span className="wf-readonly-banner">Read-only — built by {workflow.createdBy || 'another participant'}</span>
+          )}
+        </div>
+        <div className="wf-editor-head-right">
+          {!readOnly && (
+            <div className="add-step-dropdown">
+              <button className="wf-editor-action" onClick={() => setShowAddMenu(!showAddMenu)} disabled={isRunning}>+ Add step</button>
+              {showAddMenu && (
+                <div className="add-step-menu">
+                  <button className="add-step-option" onClick={() => addStep('agent')}><span className="dot agent"></span> Coworker Step</button>
+                  <button className="add-step-option" onClick={() => addStep('approval')}><span className="dot approval"></span> Human Review</button>
+                  <button className="add-step-option" onClick={() => addStep('capture')}><span className="dot capture"></span> Capture Learning</button>
+                </div>
+              )}
+            </div>
+          )}
+          {isRunning ? (
+            <button
+              className="wf-editor-run is-running"
+              onClick={() => activeRun && onCancelRun && onCancelRun(activeRun.id)}
+              title="Stop this run"
+            >
+              <span className="wf-editor-run-dot" />
+              Running… <span className="wf-editor-run-cancel">Cancel</span>
+            </button>
+          ) : (
+            <button
+              className="wf-editor-run"
+              onClick={handleRun}
+              disabled={realStepCount === 0 || !hasTriggerInput}
+              title={
+                realStepCount === 0 ? 'Add at least one step before running'
+                : !hasTriggerInput ? 'Add instructions or pick at least one document in the Trigger'
+                : ''
+              }
+            >
+              Run workflow
+              <span className="wf-editor-run-arrow" aria-hidden>→</span>
+            </button>
+          )}
+        </div>
+      </header>
 
       {(activeRun && activeRun.status === 'completed') && (() => {
         // A run can reach 'completed' two ways: clean approve-path, or via a
@@ -1223,21 +1284,33 @@ function WorkflowEditor({ workflow, onUpdateWorkflow, readOnly, fileTree, cowork
 
 // ===== Workflow Card =====
 function WorkflowCard({ workflow, coworkers, participants, onSelect, onDelete, onDuplicate, isRunning, readOnly }) {
+  const realSteps = (workflow.steps || []).filter(s => s.type !== 'trigger');
+  // Workflows don't store a description — synthesize one from step
+  // composition so the card has the secondary line the design wants.
+  const counts = realSteps.reduce((acc, s) => { acc[s.type] = (acc[s.type] || 0) + 1; return acc; }, {});
+  const captionParts = [];
+  if (counts.agent)    captionParts.push(`${counts.agent} ${counts.agent === 1 ? 'coworker' : 'coworkers'}`);
+  if (counts.approval) captionParts.push(`${counts.approval} ${counts.approval === 1 ? 'review' : 'reviews'}`);
+  if (counts.capture)  captionParts.push(`${counts.capture} ${counts.capture === 1 ? 'capture' : 'captures'}`);
+  const caption = captionParts.length ? captionParts.join(' · ') : 'No steps yet — click to start building.';
   return (
     <div className="wf-card" onClick={() => onSelect(workflow.id)}>
       <div className="wf-card-top">
         <div className="wf-card-name">{workflow.name || 'Untitled Workflow'}</div>
-        {isRunning && <span className="wf-card-running">Running</span>}
+        {isRunning && (
+          <span className="wf-card-running"><span className="wf-card-running-dot" />Running</span>
+        )}
       </div>
+      <p className="wf-card-desc">{caption}</p>
       {/* Mini flow preview */}
       <div className="wf-card-flow">
         {(workflow.steps || []).map((step, i) => {
           const cw = resolveStepCoworker(step, coworkers);
           const icon = step.type === 'agent'
             ? <CoworkerGlyph avatar={cw?.avatar} size={12} color="#ffffff" />
-            : step.type === 'approval' ? '\uD83D\uDC64'
+            : step.type === 'approval' ? '\u25F7'
             : step.type === 'trigger' ? '\u25B6'
-            : step.type === 'capture' ? '\uD83D\uDCDA'
+            : step.type === 'capture' ? '\u2726'
             : '\u2699\uFE0F';
           return (
             <span key={step.id} className="wf-card-flow-item">
@@ -1246,10 +1319,9 @@ function WorkflowCard({ workflow, coworkers, participants, onSelect, onDelete, o
             </span>
           );
         })}
-        {(workflow.steps || []).filter(s => s.type !== 'trigger').length === 0 && <span className="wf-card-empty">No steps yet</span>}
       </div>
       <div className="wf-card-meta">
-        <span>{(workflow.steps || []).filter(s => s.type !== 'trigger').length} steps</span>
+        <span>{realSteps.length} {realSteps.length === 1 ? 'step' : 'steps'}</span>
       </div>
       <div className="wf-card-actions">
         {/* Duplicate stays enabled either way — cloning a shared workflow
@@ -1467,23 +1539,22 @@ export default function WorkflowBuilder({ workflows, onUpdateWorkflows, fileTree
   }
 
   return (
-    <div className="panel panel-center">
-      <div className="wf-list">
-        <div className="wf-list-header">
+    <div className="panel panel-center wf-page-shell">
+      <div className="wf-page">
+        <header className="wf-page-head">
           <div>
-            <h2 className="wf-list-title">Workflows</h2>
-            <p className="wf-list-subtitle">Multi-step processes with AI coworkers, human approvals, and system actions.</p>
+            <h1 className="wf-page-title">Orchestration</h1>
+            <p className="wf-page-sub">Wire AI coworkers and human reviews into a workflow. Each step produces; each review gates; the artifact only exists when the team agrees.</p>
             <EducationalCue cueId="workflow-overview" show={showEducationalCues} />
           </div>
-          <div style={{ display: 'flex', gap: 8 }}>
-            <button className="wf-create-btn" onClick={handleCreateWorkflow}>+ New Workflow</button>
-          </div>
-        </div>
+          <button className="wf-cta" onClick={handleCreateWorkflow}>
+            New workflow
+            <span className="wf-cta-arrow" aria-hidden>→</span>
+          </button>
+        </header>
         {workflows.length === 0 ? (
-          <div className="wf-list-grid">
-            <div className="wf-list-empty">
-              <p>No workflows yet.</p>
-            </div>
+          <div className="wf-page-empty">
+            <p>No workflows yet — spin one up to get started.</p>
           </div>
         ) : (() => {
           // Three buckets — Examples (System-seeded canonical workflows),
@@ -1506,26 +1577,22 @@ export default function WorkflowBuilder({ workflows, onUpdateWorkflows, fileTree
               readOnly={readOnly}
             />
           );
+          const sections = [
+            { key: 'examples', label: 'Examples', list: examples, readOnly: true },
+            { key: 'mine',     label: 'Built by you', list: mine, readOnly: false },
+            { key: 'others',   label: 'Built by others', list: others, readOnly: true },
+          ].filter(s => s.list.length > 0);
           return (
-            <div className="wf-list-scroll">
-              {examples.length > 0 && (
-                <div className="wf-section">
-                  <div className="wf-section-title">Examples <span className="wf-section-count">{examples.length}</span></div>
-                  <div className="wf-list-grid">{examples.map(wf => renderCard(wf, true))}</div>
+            <div className="wf-page-body">
+              {sections.map(s => (
+                <div key={s.key} className="wf-section">
+                  <div className="wf-section-head">
+                    <span className="wf-section-title">{s.label}</span>
+                    <span className="wf-section-count">{s.list.length}</span>
+                  </div>
+                  <div className="wf-grid">{s.list.map(wf => renderCard(wf, s.readOnly))}</div>
                 </div>
-              )}
-              {mine.length > 0 && (
-                <div className="wf-section">
-                  <div className="wf-section-title">Built by you <span className="wf-section-count">{mine.length}</span></div>
-                  <div className="wf-list-grid">{mine.map(wf => renderCard(wf, false))}</div>
-                </div>
-              )}
-              {others.length > 0 && (
-                <div className="wf-section">
-                  <div className="wf-section-title">Built by others <span className="wf-section-count">{others.length}</span></div>
-                  <div className="wf-list-grid">{others.map(wf => renderCard(wf, true))}</div>
-                </div>
-              )}
+              ))}
             </div>
           );
         })()}

@@ -87,14 +87,12 @@ function ChatMessage({ msg, onApprovalAction, onPickRecipient, onNudgeRecipient,
   }
 
   if (msg.type === 'user') {
-    // Same shape as an agent message — avatar + sender name + body. The
-    // user explicitly asked for one consistent representation across the
-    // thread, no dark bubble for user messages and no white for agent.
-    // Reads like a transcript of speakers.
+    // Same transcript shape as an agent message (avatar + name + body,
+    // no bubble), but right-aligned — name+body column sits to the
+    // left of the avatar so the row mirrors the agent variant.
     return (
-      <div className="cl-msg-ai">
-        <UserAvatar name={msg.participantName} color={sender?.color} />
-        <div>
+      <div className="cl-msg-row cl-msg-row-user">
+        <div className="cl-msg-row-text">
           <div className="cl-msg-ai-name">{msg.participantName || 'You'}</div>
           <div className="cl-msg-ai-body">
             <div>{msg.content}</div>
@@ -110,6 +108,7 @@ function ChatMessage({ msg, onApprovalAction, onPickRecipient, onNudgeRecipient,
             )}
           </div>
         </div>
+        <UserAvatar name={msg.participantName} color={sender?.color} />
       </div>
     );
   }

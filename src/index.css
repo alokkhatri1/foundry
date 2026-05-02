@@ -8889,16 +8889,41 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
   max-width: 720px;
   width: fit-content;
 }
-/* User and agent messages share the same grid (avatar + name + body)
-   so the thread reads like a clean transcript. The legacy dark-bubble
-   user style was dropped per the consistency request. */
+/* User and agent messages share the same transcript shape (avatar +
+   Fraunces italic name + body, no bubble) — agent floats left, user
+   floats right. The mirroring lets a long thread read at a glance:
+   left = the room, right = me. */
+.cl-app .cl-msg-row {
+  display: grid;
+  gap: 12px;
+  max-width: 720px;
+}
+.cl-app .cl-msg-row-user {
+  grid-template-columns: 1fr auto;
+  align-self: flex-end;
+  text-align: right;
+  margin-left: auto;
+}
+.cl-app .cl-msg-row-user .cl-msg-row-text {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+}
+.cl-app .cl-msg-row-user .cl-msg-ai-body {
+  color: var(--ink);
+  text-align: right;
+}
+.cl-app .cl-msg-row-user .cl-msg-attachments {
+  justify-content: flex-end;
+}
+/* Legacy .cl-msg-user from earlier port — keep the alias for any
+   transient code paths still rendering it. */
 .cl-app .cl-msg-user {
   display: grid;
   grid-template-columns: auto 1fr;
   gap: 12px;
   max-width: 720px;
 }
-.cl-app .cl-msg-user .cl-msg-ai-body { color: var(--ink); }
 .cl-app .cl-msg-ai {
   display: grid;
   grid-template-columns: auto 1fr;

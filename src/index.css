@@ -9225,3 +9225,821 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
   .cl-app { grid-template-columns: 1fr; }
   .cl-app .cl-sidebar { display: none; }
 }
+
+/* ==================================================================
+   FOUNDRY COWORKERS v2 — warm cream + peach + Fraunces editorial
+   Aligned with the marketing landing, JoinScreen, header, and chat
+   sidebar surfaces. Tokens (--paper, --cream, --peach-deep, --ink,
+   --serif, --mono) come from FoundryLanding.css's :root globally,
+   so we don't redeclare them here. v2 rules are appended last so
+   they cascade-win against the legacy .cwb-* / .cw-* block earlier
+   in the file.
+   ================================================================== */
+
+/* Page wrapper — renames .cw-list/.panel-center for the redesigned
+   list view. The legacy classes still exist on the markup but the
+   .cwb-page wrapper takes precedence on layout. */
+.cwb-page {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 36px 32px 64px;
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+}
+.cwb-page-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 28px;
+  padding-bottom: 22px;
+  border-bottom: 1px solid var(--rule-soft);
+}
+.cwb-page-title {
+  font-family: var(--serif);
+  font-weight: 400;
+  font-size: 38px;
+  letter-spacing: -0.015em;
+  color: var(--ink);
+  margin-bottom: 6px;
+  line-height: 1.1;
+}
+.cwb-page-sub {
+  font-size: 14.5px;
+  color: var(--ink-mid);
+  max-width: 540px;
+  line-height: 1.55;
+}
+.cwb-page-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+/* Search pill */
+.cwb-page .cwb-search,
+.cwb-search-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  background: var(--paper);
+  border: 1px solid var(--rule-soft);
+  border-radius: 999px;
+  padding: 0 14px;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.cwb-page .cwb-search:focus-within {
+  border-color: var(--peach-deep);
+  box-shadow: 0 0 0 3px rgba(217, 119, 87, 0.12);
+}
+.cwb-page .cwb-search-icon {
+  color: var(--ink-muted);
+  margin-right: 8px;
+  display: grid;
+  place-items: center;
+}
+.cwb-page .cwb-search-input {
+  flex: 1;
+  padding: 9px 0;
+  font-size: 13px;
+  color: var(--ink);
+  background: transparent;
+  border: none;
+  outline: none;
+  width: 200px;
+  font-family: inherit;
+}
+.cwb-page .cwb-search-input::placeholder { color: var(--ink-muted); }
+
+/* Grid / list toggle (mono uppercase, ink active) */
+.cwb-page .cwb-view-toggle {
+  display: inline-flex;
+  background: var(--paper);
+  border: 1px solid var(--rule-soft);
+  border-radius: 999px;
+  padding: 3px;
+}
+.cwb-page .cwb-view-toggle button {
+  border: none;
+  background: transparent;
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+  padding: 6px 12px;
+  border-radius: 999px;
+  transition: background 0.12s, color 0.12s;
+  cursor: pointer;
+}
+.cwb-page .cwb-view-toggle button.is-active,
+.cwb-page .cwb-view-toggle button.active {
+  background: var(--ink);
+  color: var(--peach);
+}
+
+/* Primary CTA — dark pill with peach arrow circle */
+.cwb-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--ink);
+  color: var(--paper);
+  border: none;
+  border-radius: 999px;
+  padding: 5px 6px 5px 18px;
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.005em;
+  cursor: pointer;
+  transition: background 0.15s, transform 0.12s;
+  font-family: inherit;
+}
+.cwb-cta-arrow {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--peach-deep);
+  color: var(--paper);
+  display: grid;
+  place-items: center;
+  font-size: 14px;
+  line-height: 1;
+  font-weight: 400;
+  transition: transform 0.18s;
+}
+.cwb-cta:hover { background: #2a1f15; }
+.cwb-cta:hover .cwb-cta-arrow { transform: translateX(2px); }
+
+/* Page body */
+.cwb-page-body {
+  display: flex;
+  flex-direction: column;
+  gap: 36px;
+}
+
+/* Section heads */
+.cwb-page .cwb-section,
+.cwb-page .cw-section {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+.cwb-page .cwb-section-head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+.cwb-page .cwb-section-title,
+.cwb-page .cw-section-title {
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+  border: none;
+  padding: 0;
+  margin: 0;
+  background: transparent;
+}
+.cwb-page .cwb-section-count,
+.cwb-page .cw-section-count {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--ink-muted);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.06em;
+  border-left: 1px solid var(--rule);
+  padding-left: 10px;
+  margin-left: 2px;
+  background: transparent;
+}
+
+/* Avatar with peach spark badge (matches chat sidebar) */
+.cwb-page .cwb-avatar,
+.cwb-editor .cwb-avatar {
+  position: relative;
+  border-radius: 10px;
+  display: grid;
+  place-items: center;
+  color: white;
+  font-weight: 500;
+  font-family: var(--mono);
+  flex-shrink: 0;
+  letter-spacing: 0.04em;
+}
+.cwb-avatar-spark {
+  position: absolute;
+  right: -3px; top: -3px;
+  width: 14px; height: 14px;
+  border-radius: 50%;
+  background: var(--paper);
+  color: var(--peach-deep);
+  font-size: 8px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--rule);
+}
+
+/* Status pill (Ready / Needs setup) */
+.cwb-page .cwb-status,
+.cwb-page .cwb-card-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+  background: var(--cream-soft);
+  padding: 4px 9px;
+  border-radius: 999px;
+}
+.cwb-page .cwb-status-dot,
+.cwb-page .cwb-card-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--ink-faint);
+}
+.cwb-page .cwb-status.is-ready,
+.cwb-page .cwb-card-status.ready {
+  color: var(--green);
+  background: rgba(90, 158, 111, 0.10);
+}
+.cwb-page .cwb-status.is-ready .cwb-status-dot,
+.cwb-page .cwb-card-status.ready .cwb-card-dot {
+  background: var(--green);
+  box-shadow: 0 0 0 3px rgba(90, 158, 111, 0.18);
+}
+
+/* Card grid + cards */
+.cwb-page .cwb-grid,
+.cwb-page .cw-list-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 16px;
+}
+.cwb-page .cwb-card {
+  text-align: left;
+  background: var(--paper);
+  border: 1px solid var(--rule-soft);
+  border-radius: 14px;
+  padding: 20px 18px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  cursor: pointer;
+  transition: border-color 0.2s, box-shadow 0.2s, transform 0.18s;
+  position: relative;
+  overflow: hidden;
+}
+.cwb-page .cwb-card::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 2px;
+  background: var(--peach-deep);
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 0.25s ease;
+}
+.cwb-page .cwb-card:hover {
+  border-color: var(--rule);
+  box-shadow: 0 12px 32px -16px rgba(60, 40, 20, 0.18);
+  transform: translateY(-2px);
+}
+.cwb-page .cwb-card:hover::before { transform: scaleX(1); }
+
+.cwb-page .cwb-card-top {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  min-width: 0;
+}
+.cwb-page .cwb-card-avatar-wrap {
+  position: relative;
+  flex-shrink: 0;
+}
+.cwb-page .cwb-card-info { flex: 1; min-width: 0; }
+.cwb-page .cwb-card-name {
+  font-family: var(--serif);
+  font-weight: 500;
+  font-size: 18px;
+  letter-spacing: -0.005em;
+  color: var(--ink);
+  line-height: 1.2;
+  margin-bottom: 6px;
+}
+.cwb-page .cwb-card-role {
+  font-size: 13px;
+  color: var(--ink-mid);
+  line-height: 1.5;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-wrap: pretty;
+}
+.cwb-page .cwb-card-role.is-empty {
+  font-style: italic;
+  color: var(--ink-muted);
+}
+.cwb-page .cwb-card-bottom {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding-top: 12px;
+  border-top: 1px solid var(--rule-soft);
+}
+.cwb-page .cwb-card-actions {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.cwb-page .cwb-card-clone,
+.cwb-page .cwb-card-edit {
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+  border: 1px solid transparent;
+  padding: 5px 10px;
+  border-radius: 999px;
+  background: transparent;
+  cursor: pointer;
+  transition: background 0.12s, border-color 0.12s, color 0.12s;
+}
+.cwb-page .cwb-card-edit { color: var(--peach-deep); }
+.cwb-page .cwb-card-clone:hover { background: var(--cream-soft); color: var(--ink); }
+.cwb-page .cwb-card-edit:hover { background: var(--peach-soft); color: var(--peach-deep); }
+.cwb-page .cwb-card-delete {
+  position: absolute;
+  top: 8px; right: 8px;
+  background: transparent;
+  border: none;
+  color: var(--ink-muted);
+  font-size: 13px;
+  width: 24px; height: 24px;
+  border-radius: 50%;
+  display: grid; place-items: center;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity .15s, background .12s, color .12s;
+}
+.cwb-page .cwb-card:hover .cwb-card-delete { opacity: 1; }
+.cwb-page .cwb-card-delete:hover { background: rgba(199,90,74,0.1); color: var(--red); }
+
+/* List view rows */
+.cwb-page .cwb-list {
+  display: flex;
+  flex-direction: column;
+  background: var(--paper);
+  border: 1px solid var(--rule-soft);
+  border-radius: 14px;
+  overflow: hidden;
+}
+.cwb-page .cwb-row {
+  display: grid;
+  grid-template-columns: auto 1.2fr 2fr auto auto;
+  gap: 18px;
+  align-items: center;
+  padding: 14px 18px;
+  text-align: left;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid var(--rule-soft);
+  transition: background 0.12s;
+  cursor: pointer;
+}
+.cwb-page .cwb-row:last-child { border-bottom: none; }
+.cwb-page .cwb-row:hover { background: var(--cream); }
+.cwb-page .cwb-row-name {
+  font-family: var(--serif);
+  font-weight: 500;
+  font-size: 16px;
+  color: var(--ink);
+  letter-spacing: -0.005em;
+}
+.cwb-page .cwb-row-role {
+  font-size: 13px;
+  color: var(--ink-mid);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.cwb-page .cwb-row-edit {
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--peach-deep);
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  background: transparent;
+  cursor: pointer;
+  transition: background .12s, border-color .12s;
+}
+.cwb-page .cwb-row:hover .cwb-row-edit {
+  background: var(--peach-soft);
+  border-color: var(--peach);
+}
+.cwb-page .cwb-row-clone,
+.cwb-page .cwb-row-delete {
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--ink-muted);
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  padding: 4px 10px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background .12s, color .12s;
+}
+.cwb-page .cwb-row-clone:hover { background: var(--cream-soft); color: var(--ink); }
+.cwb-page .cwb-row-delete:hover { background: rgba(199,90,74,0.1); color: var(--red); }
+
+/* Empty state */
+.cwb-page .cwb-empty,
+.cwb-page .cw-list-empty,
+.cwb-page .cwb-empty-search {
+  background: var(--paper);
+  border: 1px dashed var(--rule);
+  border-radius: 14px;
+  padding: 56px;
+  text-align: center;
+  font-family: var(--serif);
+  font-style: italic;
+  font-size: 16px;
+  color: var(--ink-muted);
+  font-weight: 300;
+}
+
+/* ── Editor ── */
+.cwb-editor {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 28px 32px 64px;
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+}
+.cwb-editor-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-bottom: 18px;
+  border-bottom: 1px solid var(--rule-soft);
+  gap: 12px;
+}
+.cwb-editor .files-back-btn,
+.cwb-editor .cwb-back {
+  background: transparent;
+  border: 1px solid var(--rule);
+  color: var(--ink-mid);
+  padding: 8px 16px;
+  border-radius: 999px;
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s, border-color 0.12s;
+}
+.cwb-editor .files-back-btn:hover,
+.cwb-editor .cwb-back:hover {
+  background: var(--paper);
+  color: var(--ink);
+  border-color: var(--ink-muted);
+}
+.cwb-readonly-banner {
+  flex: 1;
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+  background: var(--cream-soft);
+  padding: 8px 14px;
+  border-radius: 999px;
+  text-align: center;
+}
+
+.cwb-editor-scroll,
+.cwb-editor-content {
+  display: flex;
+  flex-direction: column;
+  gap: 36px;
+}
+.cwb-editor-fieldset {
+  border: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 36px;
+}
+
+.cwb-editor .cwb-section {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.cwb-editor .cwb-section-h {
+  font-family: var(--serif);
+  font-weight: 500;
+  font-size: 22px;
+  letter-spacing: -0.005em;
+  color: var(--ink);
+  line-height: 1.2;
+}
+.cwb-editor .cwb-section-p,
+.cwb-editor .cwb-section-desc {
+  font-size: 13.5px;
+  color: var(--ink-mid);
+  line-height: 1.6;
+  margin-top: 4px;
+  max-width: 580px;
+}
+
+/* Section step number ("01 / ABOUT") */
+.cwb-step-row {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  margin-bottom: 6px;
+}
+.cwb-step-num {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  color: var(--peach-deep);
+  font-weight: 500;
+  flex-shrink: 0;
+  padding-top: 4px;
+}
+
+/* Identity block in editor */
+.cwb-editor .cwb-identity {
+  display: flex;
+  align-items: center;
+  gap: 22px;
+  background: var(--paper);
+  border: 1px solid var(--rule-soft);
+  border-radius: 14px;
+  padding: 24px;
+}
+.cwb-editor .cwb-identity-avatar,
+.cwb-editor .cwb-identity-avatar-btn {
+  position: relative;
+  width: 72px;
+  height: 72px;
+  border-radius: 14px;
+  display: grid;
+  place-items: center;
+  color: white;
+  font-family: var(--mono);
+  font-weight: 500;
+  font-size: 22px;
+  letter-spacing: 0.04em;
+  flex-shrink: 0;
+  cursor: pointer;
+  border: none;
+  padding: 0;
+}
+.cwb-editor .cwb-identity-avatar .cwb-avatar-spark {
+  width: 18px; height: 18px;
+  font-size: 10px;
+  right: -5px; top: -5px;
+}
+.cwb-editor .cwb-identity-fields {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+.cwb-editor .cwb-name-input {
+  font-family: var(--serif);
+  font-weight: 500;
+  font-size: 28px;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+  background: transparent;
+  border: none;
+  outline: none;
+  padding: 4px 0;
+  border-bottom: 1px solid transparent;
+  transition: border-color 0.12s;
+  width: 100%;
+}
+.cwb-editor .cwb-name-input:focus { border-bottom-color: var(--peach-deep); }
+.cwb-editor .cwb-name-input::placeholder {
+  color: var(--ink-faint);
+  font-style: italic;
+  font-weight: 400;
+}
+.cwb-editor .cwb-identity-customize {
+  background: transparent;
+  border: 1px solid var(--rule);
+  color: var(--ink-muted);
+  padding: 6px 14px;
+  border-radius: 999px;
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  align-self: flex-start;
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s, border-color 0.12s;
+}
+.cwb-editor .cwb-identity-customize:hover {
+  background: var(--cream-soft);
+  color: var(--ink);
+  border-color: var(--ink-muted);
+}
+
+/* Description block */
+.cwb-editor .cwb-desc,
+.cwb-editor .cwb-desc-gen {
+  background: var(--paper);
+  border: 1px solid var(--rule-soft);
+  border-radius: 14px;
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  transition: border-color 0.12s;
+}
+.cwb-editor .cwb-desc:focus-within { border-color: var(--peach-deep); }
+.cwb-editor .cwb-desc-input,
+.cwb-editor .cwb-desc-input-wrap textarea {
+  width: 100%;
+  border: none;
+  background: transparent;
+  font-size: 14.5px;
+  line-height: 1.7;
+  color: var(--ink);
+  resize: vertical;
+  outline: none;
+  font-family: inherit;
+  min-height: 80px;
+}
+.cwb-editor .cwb-desc-input::placeholder,
+.cwb-editor .cwb-desc-input-wrap textarea::placeholder {
+  color: var(--ink-muted);
+  font-style: italic;
+}
+.cwb-editor .cwb-desc-gen-btn,
+.cwb-editor .cwb-desc-gen {
+  align-self: flex-end;
+  background: var(--peach-soft);
+  color: var(--peach-deep);
+  border: 1px solid var(--peach);
+  padding: 7px 14px;
+  border-radius: 999px;
+  font-family: var(--mono);
+  font-size: 10.5px;
+  font-weight: 500;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  transition: background 0.15s, transform 0.12s;
+  /* Override the wrapping .cwb-desc styles for the button itself */
+  flex-direction: row;
+  padding: 7px 14px;
+}
+.cwb-editor .cwb-desc-gen-btn:hover,
+.cwb-editor .cwb-desc-gen:hover {
+  background: var(--peach);
+  transform: translateY(-1px);
+}
+.cwb-editor .cwb-desc-gen-spark {
+  font-size: 12px;
+  color: var(--peach-deep);
+}
+
+/* Save button (dark pill with peach circle) */
+.cwb-save {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--ink);
+  color: var(--paper);
+  border: none;
+  padding: 5px 6px 5px 18px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.cwb-save-arrow {
+  width: 26px; height: 26px;
+  border-radius: 50%;
+  background: var(--peach-deep);
+  color: var(--paper);
+  display: grid;
+  place-items: center;
+  font-size: 13px;
+}
+.cwb-save:hover { background: #2a1f15; }
+
+/* File picker rows in editor */
+.cwb-editor .cwb-picker {
+  background: var(--paper);
+  border: 1px solid var(--rule-soft);
+  border-radius: 14px;
+  overflow: hidden;
+}
+.cwb-editor .cwb-picker-row {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 14px;
+  align-items: center;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--rule-soft);
+  cursor: pointer;
+  transition: background 0.12s;
+}
+.cwb-editor .cwb-picker-row:last-child { border-bottom: none; }
+.cwb-editor .cwb-picker-row:hover { background: var(--cream); }
+.cwb-editor .cwb-picker-row.is-selected,
+.cwb-editor .cwb-picker-row.selected { background: var(--peach-soft); }
+.cwb-editor .cwb-picker-check {
+  width: 16px;
+  height: 16px;
+  border-radius: 4px;
+  border: 1.5px solid var(--ink-muted);
+  background: var(--paper);
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  color: white;
+  transition: background 0.12s, border-color 0.12s;
+}
+.cwb-editor .cwb-picker-check.is-checked,
+.cwb-editor .cwb-picker-check.checked {
+  background: var(--peach-deep);
+  border-color: var(--peach-deep);
+}
+.cwb-editor .cwb-picker-check input { display: none; }
+.cwb-editor .cwb-picker-name {
+  font-size: 13.5px;
+  color: var(--ink);
+  font-weight: 500;
+}
+.cwb-editor .cwb-picker-ext {
+  font-family: var(--mono);
+  font-size: 9.5px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+}
+.cwb-editor .cwb-picker-empty {
+  background: var(--paper);
+  border: 1px dashed var(--rule);
+  border-radius: 14px;
+  padding: 28px;
+  text-align: center;
+  font-family: var(--serif);
+  font-style: italic;
+  font-size: 14px;
+  color: var(--ink-muted);
+}
+
+/* Responsive */
+@media (max-width: 880px) {
+  .cwb-page { padding: 28px 20px; }
+  .cwb-page-head {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 18px;
+  }
+  .cwb-page-actions { flex-wrap: wrap; }
+  .cwb-page-title { font-size: 30px; }
+  .cwb-page .cwb-search-input { width: 140px; }
+  .cwb-page .cwb-grid { grid-template-columns: 1fr; }
+  .cwb-page .cwb-row {
+    grid-template-columns: auto 1fr auto;
+    gap: 12px;
+  }
+  .cwb-page .cwb-row-role { display: none; }
+}
+@media (max-width: 600px) {
+  .cwb-editor .cwb-identity { flex-direction: column; align-items: flex-start; }
+}

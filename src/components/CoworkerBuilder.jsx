@@ -168,8 +168,11 @@ Write in second person ("You are...", "You analyze...", "You produce..."). Be sp
 
   return (
     <div className="cwb-section">
-      <h3 className="cwb-section-title">About</h3>
-      <p className="cwb-section-desc">What does this coworker do? Describe it roughly and generate a polished description.</p>
+      <div className="cwb-step-row">
+        <span className="cwb-step-num">01 / ABOUT</span>
+      </div>
+      <h3 className="cwb-section-h">What does this coworker do?</h3>
+      <p className="cwb-section-p">A short, plain description of the work — Claude can polish a rough one into something a teammate would understand.</p>
       <div className="cwb-desc-gen">
         <div className="cwb-desc-input-wrap">
           <textarea
@@ -494,13 +497,19 @@ function CoworkerCard({ coworker, onStartChat, onEdit, onDelete, onClone, readOn
   const instrCount = coworker.instructionFileIds?.length || 0;
   const isReady = instrCount > 0;
 
+  const hasRole = !!(coworker.role && coworker.role.trim());
   return (
     <div className="cwb-card" onClick={() => onStartChat(coworker.id)}>
       <div className="cwb-card-top">
-        <AvatarDisplay avatar={coworker.avatar} color={coworker.color} size={42} />
+        <span className="cwb-card-avatar-wrap">
+          <AvatarDisplay avatar={coworker.avatar} color={coworker.color} size={44} />
+          <span className="cwb-avatar-spark" aria-hidden>{'✦'}</span>
+        </span>
         <div className="cwb-card-info">
           <div className="cwb-card-name">{coworker.name}</div>
-          <div className="cwb-card-role">{coworker.role || 'No role defined'}</div>
+          <div className={`cwb-card-role${hasRole ? '' : ' is-empty'}`}>
+            {hasRole ? coworker.role : 'No role defined yet'}
+          </div>
         </div>
       </div>
       <div className="cwb-card-bottom">
@@ -592,8 +601,11 @@ function CoworkerEditor({ coworker, onUpdate, onBack, fileTree, callClaudeAPI, s
 
           {/* Skills */}
           <div className="cwb-section">
-            <h3 className="cwb-section-title">Skills</h3>
-            <p className="cwb-section-desc">How this coworker behaves — its process and output format.</p>
+            <div className="cwb-step-row">
+              <span className="cwb-step-num">02 / SKILLS</span>
+            </div>
+            <h3 className="cwb-section-h">How it behaves</h3>
+            <p className="cwb-section-p">The process and output format. Pick one or more skill files — these shape <em>how</em> the coworker thinks.</p>
             <FilePicker
               fileTree={fileTree}
               selectedIds={coworker.instructionFileIds || []}
@@ -605,8 +617,11 @@ function CoworkerEditor({ coworker, onUpdate, onBack, fileTree, callClaudeAPI, s
 
           {/* Knowledge */}
           <div className="cwb-section">
-            <h3 className="cwb-section-title">Knowledge</h3>
-            <p className="cwb-section-desc">Reference material — policies, rules, criteria.</p>
+            <div className="cwb-step-row">
+              <span className="cwb-step-num">03 / KNOWLEDGE</span>
+            </div>
+            <h3 className="cwb-section-h">What it can read</h3>
+            <p className="cwb-section-p">Reference material the coworker can pull from — policies, rules, criteria.</p>
             <FilePicker
               fileTree={fileTree}
               selectedIds={coworker.knowledgeFileIds || []}
@@ -743,58 +758,63 @@ export default function CoworkerBuilder({ coworkers, onUpdateCoworkers, fileTree
   }
 
   return (
-    <div className="panel panel-center">
-      <div className="cw-list">
-        <div className="cw-list-header">
-          <div>
-            <h2 className="cw-list-title">Coworkers</h2>
-            <p className="cw-list-subtitle">AI team members that process cases, review documents, and make assessments.</p>
-            <EducationalCue cueId="coworkers-overview" show={showEducationalCues} />
-          </div>
-          <div className="cw-list-actions">
-            {coworkers.length > 0 && (
-              <>
+    <div className="cwb-page">
+      <header className="cwb-page-head">
+        <div>
+          <h1 className="cwb-page-title">Coworkers</h1>
+          <p className="cwb-page-sub">AI teammates that read your files, follow your skills, and produce artifacts the rest of the room can use.</p>
+          <EducationalCue cueId="coworkers-overview" show={showEducationalCues} />
+        </div>
+        <div className="cwb-page-actions">
+          {coworkers.length > 0 && (
+            <>
+              <div className="cwb-search">
+                <span className="cwb-search-icon" aria-hidden>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="11" cy="11" r="7" />
+                    <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                  </svg>
+                </span>
                 <input
                   type="text"
-                  className="cwb-search cwb-search-inline"
-                  placeholder={'Search\u2026'}
+                  className="cwb-search-input"
+                  placeholder={'Search coworkers'}
                   value={searchQ}
                   onChange={e => setSearchQ(e.target.value)}
                 />
-                <div className="cwb-view-toggle">
-                  <button
-                    className={`cwb-view-btn${viewMode === 'grid' ? ' active' : ''}`}
-                    onClick={() => setViewMode('grid')}
-                    title="Grid view"
-                  >Grid</button>
-                  <button
-                    className={`cwb-view-btn${viewMode === 'list' ? ' active' : ''}`}
-                    onClick={() => setViewMode('list')}
-                    title="List view"
-                  >List</button>
-                </div>
-              </>
-            )}
-            <button className="cw-hire-btn" onClick={handleCreate}>+ New Coworker</button>
-          </div>
+              </div>
+              <div className="cwb-view-toggle">
+                <button
+                  className={viewMode === 'grid' ? 'is-active' : ''}
+                  onClick={() => setViewMode('grid')}
+                  title="Grid view"
+                >Grid</button>
+                <button
+                  className={viewMode === 'list' ? 'is-active' : ''}
+                  onClick={() => setViewMode('list')}
+                  title="List view"
+                >List</button>
+              </div>
+            </>
+          )}
+          <button className="cwb-cta" onClick={handleCreate}>
+            New coworker
+            <span className="cwb-cta-arrow" aria-hidden>{'\u2192'}</span>
+          </button>
         </div>
+      </header>
 
-        {coworkers.length === 0 ? (
-          <div className="cw-list-grid">
-            <div className="cw-list-empty">
-              <p>No coworkers yet.</p>
-            </div>
-          </div>
-        ) : visibleCoworkers.length === 0 ? (
-          <div className="cwb-empty-search">
-            No coworkers match &ldquo;{searchQ}&rdquo;.
-          </div>
-        ) : (
-          <div className="cw-list-scroll">
+      {coworkers.length === 0 ? (
+        <div className="cwb-empty">No coworkers yet.</div>
+      ) : visibleCoworkers.length === 0 ? (
+        <div className="cwb-empty">No coworkers match &ldquo;{searchQ}&rdquo;.</div>
+      ) : (
+        <div className="cwb-page-body">
             {exampleCoworkers.length > 0 && (
-              <div className="cw-section">
-                <div className="cw-section-title">
-                  Examples <span className="cw-section-count">{exampleCoworkers.length}</span>
+              <div className="cwb-section">
+                <div className="cwb-section-head">
+                  <span className="cwb-section-title">Examples</span>
+                  <span className="cwb-section-count">{exampleCoworkers.length}</span>
                 </div>
                 {viewMode === 'grid' ? (
                   <div className="cw-list-grid">
@@ -812,9 +832,10 @@ export default function CoworkerBuilder({ coworkers, onUpdateCoworkers, fileTree
               </div>
             )}
             {myCoworkers.length > 0 && (
-              <div className="cw-section">
-                <div className="cw-section-title">
-                  Built by you <span className="cw-section-count">{myCoworkers.length}</span>
+              <div className="cwb-section">
+                <div className="cwb-section-head">
+                  <span className="cwb-section-title">Built by you</span>
+                  <span className="cwb-section-count">{myCoworkers.length}</span>
                 </div>
                 {viewMode === 'grid' ? (
                   <div className="cw-list-grid">
@@ -832,9 +853,10 @@ export default function CoworkerBuilder({ coworkers, onUpdateCoworkers, fileTree
               </div>
             )}
             {otherCoworkers.length > 0 && (
-              <div className="cw-section">
-                <div className="cw-section-title">
-                  Built by others <span className="cw-section-count">{otherCoworkers.length}</span>
+              <div className="cwb-section">
+                <div className="cwb-section-head">
+                  <span className="cwb-section-title">Built by others</span>
+                  <span className="cwb-section-count">{otherCoworkers.length}</span>
                 </div>
                 {viewMode === 'grid' ? (
                   <div className="cw-list-grid">
@@ -851,9 +873,8 @@ export default function CoworkerBuilder({ coworkers, onUpdateCoworkers, fileTree
                 )}
               </div>
             )}
-          </div>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 }

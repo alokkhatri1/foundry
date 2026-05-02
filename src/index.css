@@ -8984,6 +8984,94 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
   background: var(--rule);
 }
 
+/* Override legacy .cl-input-area chrome inside the v3 chat shell so the
+   composer pill centers correctly and the orphaned legacy bits (active-
+   context badge, file-attach row, context warning) don't render twice. */
+.cl-app .cl-input-area {
+  padding: 16px 28px 24px;
+  background: var(--cream);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  border-top: 1px solid var(--rule-soft);
+  flex-shrink: 0;
+}
+/* The active-context "Talking to X" / file chips row was showing
+   alongside the v3 thread banner — duplicate and visually orphaned.
+   The banner already conveys this info. */
+.cl-app .cl-input-row { display: none; }
+/* Context warning is rare and can land back if needed; keep it muted
+   inside the v3 shell for now. */
+.cl-app .cl-context-warning {
+  font-size: 11.5px;
+  color: var(--ink-muted);
+  font-family: var(--mono);
+  letter-spacing: 0.04em;
+  background: var(--cream-soft);
+  border: 1px solid var(--rule-soft);
+  border-radius: 999px;
+  padding: 6px 14px;
+  max-width: 640px;
+}
+.cl-app .cl-attached-files {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  max-width: 640px;
+  width: 100%;
+  justify-content: center;
+}
+.cl-app .cl-attached-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 4px 4px 12px;
+  background: var(--paper);
+  border: 1px solid var(--rule-soft);
+  border-radius: 999px;
+  font-size: 11.5px;
+  color: var(--ink);
+}
+.cl-app .cl-attached-chip-icon { color: var(--peach-deep); }
+.cl-app .cl-attached-chip-remove {
+  background: transparent;
+  border: none;
+  color: var(--ink-muted);
+  width: 18px; height: 18px;
+  border-radius: 50%;
+  display: grid; place-items: center;
+  font-size: 11px;
+  cursor: pointer;
+}
+.cl-app .cl-attached-chip-remove:hover { background: var(--cream-deep); color: var(--red); }
+
+/* User bubble — the legacy markup carries an inner sender label
+   ("Alok Khatri") above the content. v3 design puts the bubble on the
+   right and doesn't show the sender name (the avatar would convey it).
+   Hide the inner sender div so the bubble reads as just the message. */
+.cl-app .cl-msg-user-sender { display: none; }
+/* Tighten the user bubble so the inner content sits flush. */
+.cl-app .cl-msg-user > div { line-height: 1.55; }
+
+/* Agent message body — the legacy RichText injects .rt-* paragraphs
+   that have their own margins. Trim so the body looks cohesive in the
+   v3 grid layout. */
+.cl-app .cl-msg-ai-body .rt-p { margin: 0 0 8px; line-height: 1.65; }
+.cl-app .cl-msg-ai-body .rt-p:last-child { margin-bottom: 0; }
+.cl-app .cl-msg-ai-body .rt-h1,
+.cl-app .cl-msg-ai-body .rt-h2,
+.cl-app .cl-msg-ai-body .rt-h3 {
+  font-family: var(--serif);
+  font-weight: 500;
+  margin: 14px 0 6px;
+  color: var(--ink);
+}
+.cl-app .cl-msg-ai-body .rt-ul,
+.cl-app .cl-msg-ai-body .rt-ol { margin: 0 0 8px 20px; }
+.cl-app .cl-msg-ai-body .rt-li { margin: 2px 0; }
+.cl-app .cl-msg-ai-body strong { font-weight: 600; }
+
 /* Responsive */
 @media (max-width: 880px) {
   .cl-app { grid-template-columns: 240px 1fr; }

@@ -404,6 +404,13 @@ function ContextSidebar({ fileTree, selectedFileIds, onToggleFile, onToggleFolde
   // full sidebar height. 'chats' default; switches to humans / ai /
   // files on demand. The tab buttons sit between search and content.
   const [sidebarTab, setSidebarTab] = useState('chats');
+  // If the active tab is gated by a stage that hasn't unlocked yet
+  // (Files=Stage 3, AI Coworkers=Stage 5), fall back to Chats so the
+  // participant doesn't land on a blank section.
+  useEffect(() => {
+    if (sidebarTab === 'files' && !stageReached(currentStage, '3')) setSidebarTab('chats');
+    else if (sidebarTab === 'ai' && !stageReached(currentStage, '5')) setSidebarTab('chats');
+  }, [sidebarTab, currentStage]);
 
   if (!fileTree) return null;
 
@@ -547,30 +554,37 @@ function ContextSidebar({ fileTree, selectedFileIds, onToggleFile, onToggleFolde
         )}
       </div>
 
-      {/* Sidebar tabs — 2×2 grid, row-major:
-          row 1: Chats | Files     (the two most-used surfaces)
-          row 2: Coworkers | AI Coworkers   (the team) */}
+      {/* Sidebar tabs — 2×2 grid, stage-gated:
+          row 1: Chats (always) | Files (Stage 3+)
+          row 2: Coworkers (always) | AI Coworkers (Stage 5+)
+          When a tab's stage hasn't unlocked, the tab is hidden from
+          the strip entirely so the participant only sees what they
+          actually have access to. */}
       <div className="cl-sidebar-tabs">
         <button
           type="button"
           className={`cl-sidebar-tab${sidebarTab === 'chats' ? ' is-active' : ''}`}
           onClick={() => setSidebarTab('chats')}
         >Chats</button>
-        <button
-          type="button"
-          className={`cl-sidebar-tab${sidebarTab === 'files' ? ' is-active' : ''}`}
-          onClick={() => setSidebarTab('files')}
-        >Files</button>
+        {showFiles && (
+          <button
+            type="button"
+            className={`cl-sidebar-tab${sidebarTab === 'files' ? ' is-active' : ''}`}
+            onClick={() => setSidebarTab('files')}
+          >Files</button>
+        )}
         <button
           type="button"
           className={`cl-sidebar-tab${sidebarTab === 'humans' ? ' is-active' : ''}`}
           onClick={() => setSidebarTab('humans')}
         >Coworkers</button>
-        <button
-          type="button"
-          className={`cl-sidebar-tab${sidebarTab === 'ai' ? ' is-active' : ''}`}
-          onClick={() => setSidebarTab('ai')}
-        >AI&nbsp;Coworkers</button>
+        {showCoworkersSection && (
+          <button
+            type="button"
+            className={`cl-sidebar-tab${sidebarTab === 'ai' ? ' is-active' : ''}`}
+            onClick={() => setSidebarTab('ai')}
+          >AI&nbsp;Coworkers</button>
+        )}
       </div>
 
       <div className="cl-sections">

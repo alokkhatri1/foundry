@@ -360,53 +360,42 @@ function FilePicker({ fileTree, selectedIds, onChange, folderName, onUpdateConte
     setCollapsedDepts(prev => ({ ...prev, [dept]: !prev[dept] }));
   }
 
+  // v2 picker \u2014 always-expanded flat list. Each row is a checkbox row;
+  // clicking the file name opens the preview modal (legacy behavior
+  // preserved). Drops the chip-and-Browse toggle in favor of seeing
+  // every available file at a glance, matching the v2 redesign.
+  const allFiles = groups.flatMap(g => g.files);
   return (
-    <div className="ftp">
-      <div className="ftp-selected">
-        {selected.map(f => (
-          <span key={f.id} className="ftp-chip">
-            <span className="ftp-chip-name">{f.name.replace(/\.md$/, '')}</span>
-            <button className="ftp-chip-remove" onClick={() => onChange(selectedIds.filter(id => id !== f.id))}>{'\u2715'}</button>
-          </span>
-        ))}
-        <button className="ftp-browse-btn" onClick={() => { setOpen(!open); setPreviewId(null); }}>
-          {open ? 'Done' : '+ Browse'}
-        </button>
-      </div>
-      {open && (
-        <div className="ftp-browser">
-          <div className="ftp-tree">
-            {groups.length === 0 && (
-              <div className="ftp-empty">No {folderName || ''} files found. Create them in the Files tab.</div>
-            )}
-            {groups.map(g => {
-              const isCollapsed = collapsedDepts[g.dept];
-              const selectedInDept = g.files.filter(f => selectedIds.includes(f.id)).length;
-              return (
-                <div key={g.dept}>
-                  <div className="ftp-dept" onClick={() => toggleDept(g.dept)}>
-                    <span className={`ftp-dept-caret${!isCollapsed ? ' open' : ''}`}>{'\u25B6'}</span>
-                    <span className="ftp-dept-name">{g.dept}</span>
-                    <span className="ftp-dept-count">{selectedInDept > 0 ? `${selectedInDept}/` : ''}{g.files.length}</span>
-                  </div>
-                  {!isCollapsed && g.files.map(f => {
-                    const isSelected = selectedIds.includes(f.id);
-                    const isPreviewing = previewId === f.id;
-                    return (
-                      <div key={f.id} className={`ftp-file${isSelected ? ' selected' : ''}${isPreviewing ? ' previewing' : ''}`}>
-                        <span className="ftp-file-name" onClick={() => setPreviewId(isPreviewing ? null : f.id)}>{f.name.replace(/\.md$/, '')}</span>
-                        <button className={`ftp-file-toggle${isSelected ? ' on' : ''}`} onClick={() => toggleFile(f.id)}>
-                          {isSelected ? '\u2713' : '+'}
-                        </button>
-                      </div>
-                    );
-                  })}
-                </div>
-              );
-            })}
+    <div className="cwb-picker">
+      {allFiles.length === 0 ? (
+        <div className="cwb-picker-empty">No {folderName || ''} files yet. Create them in the Files tab.</div>
+      ) : allFiles.map(f => {
+        const isSelected = selectedIds.includes(f.id);
+        const isPreviewing = previewId === f.id;
+        return (
+          <div key={f.id} className={`cwb-picker-row${isSelected ? ' is-selected' : ''}${isPreviewing ? ' is-previewing' : ''}`}>
+            <span
+              className={`cwb-picker-check${isSelected ? ' is-checked' : ''}`}
+              onClick={(e) => { e.preventDefault(); toggleFile(f.id); }}
+            >
+              <input type="checkbox" checked={isSelected} readOnly />
+              {isSelected && (
+                <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="20 6 9 17 4 12" />
+                </svg>
+              )}
+            </span>
+            <span
+              className="cwb-picker-name"
+              onClick={() => setPreviewId(isPreviewing ? null : f.id)}
+              title="Click to preview"
+            >
+              {f.name.replace(/\.md$/, '')}
+            </span>
+            <span className="cwb-picker-ext">.md</span>
           </div>
-        </div>
-      )}
+        );
+      })}
       {previewFile && createPortal(
         <div className="ftp-preview-overlay" onClick={tryClosePreview}>
           <div className="ftp-preview-modal" onClick={e => e.stopPropagation()}>

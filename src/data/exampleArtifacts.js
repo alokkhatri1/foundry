@@ -116,12 +116,75 @@ When given a credit memo, validate it against the Compliance Exceptions register
 - One-line rationale citing the exception number(s) involved
 `;
 
-// Capstone reference. A generic loan-processing-style review workflow used
-// as the take-away assignment in the Capstone tab (Stage 8). Each step
-// block below mirrors the Capstone card shape 1:1 so participants can
-// scan a step and know exactly which fields they're filling. The room
-// admin can rewrite for their cohort's domain — the file is editable
-// in place via the standard FileEditor.
+// Capstone reference. Structured form drives the in-app blueprint
+// drawer (Capstone.jsx renders these as read-only StepCards so the
+// reference *is* the same shape as what the participant fills in).
+// The markdown form below is kept for the seeded blueprint.md file so
+// participants who'd rather copy-paste a doc still have one. Both
+// must stay in sync if you edit either.
+export const CAPSTONE_BLUEPRINT_REFERENCE = {
+  title: 'Credit Application Review',
+  intro: 'A reference workflow for a credit application review. Use it as a shape. The clarity is the slow step. The build is fast.',
+  rows: [
+    {
+      type: 'coworker',
+      step: 'Capture borrower identity, registration, ownership, and guarantor details to start the application.',
+      knowledgeFiles: ['applicant intake checklist'],
+      skillsFiles: ['borrower capture'],
+    },
+    {
+      type: 'coworker',
+      step: 'Request the credit bureau report and attach it to the case file.',
+      knowledgeFiles: ['credit history reading guide'],
+      skillsFiles: ['bureau request'],
+    },
+    {
+      type: 'coworker',
+      step: 'Enter facility type, amount, tenure, security details, and any exception explanations into the application.',
+      knowledgeFiles: ['proposal-fields checklist'],
+      skillsFiles: ['proposal entry'],
+    },
+    {
+      type: 'coworker',
+      step: 'Compile audited and projected financials and calculate the standard financial ratios.',
+      knowledgeFiles: [],
+      skillsFiles: ['financial-ratios'],
+    },
+    {
+      type: 'coworker',
+      step: 'Inspect the collateral and produce a signed valuation report.',
+      knowledgeFiles: [],
+      skillsFiles: ['collateral valuation'],
+    },
+    {
+      type: 'coworker',
+      step: 'Verify that the supporting-documents pack is complete (legal, financial, identity, business proof).',
+      knowledgeFiles: ['required-documents checklist'],
+      skillsFiles: [],
+    },
+    {
+      type: 'human',
+      step: 'Review the proposal pack and approve, reject, or request revision.',
+    },
+    {
+      type: 'coworker',
+      step: 'Generate standard security documents; collect signatures; upload the signed scans.',
+      knowledgeFiles: [],
+      skillsFiles: ['security-doc templates'],
+    },
+    {
+      type: 'human',
+      step: 'Verify documents for completeness and legal compliance before disbursement.',
+    },
+    {
+      type: 'coworker',
+      step: 'Set limits, activate accounts, create contracts and deals, apply the relevant charges.',
+      knowledgeFiles: [],
+      skillsFiles: ['booking checklist'],
+    },
+  ],
+};
+
 const CAPSTONE_BLUEPRINT = `# Credit Application Review — Workflow Blueprint
 
 A reference workflow for a credit application review. Use it as a shape.

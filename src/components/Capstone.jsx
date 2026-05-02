@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import RichText from './RichText';
-import { EXAMPLE_BLUEPRINT_FILE_ID } from '../data/exampleArtifacts';
+import { CAPSTONE_BLUEPRINT_REFERENCE } from '../data/exampleArtifacts';
 
 // Capstone tab — Stage 8. Each row is a step spec for the workflow.
 //
@@ -402,12 +401,82 @@ function StepCard({ row, idx, isLast, isComplete, fileTree, participants, onUpda
   );
 }
 
-function BlueprintDrawer({ open, onClose, blueprintContent }) {
+// Read-only StepCard variant. Renders a blueprint row in the same
+// shape as the editable cards above so the reference *is* the same
+// surface the participant fills in — labels in the same places, file
+// chips where the FilePicker would be, the auto-name preview where
+// the live one shows.
+function BlueprintCard({ row, idx }) {
+  const isCoworker = row.type !== 'human';
+  const derivedName = isCoworker ? deriveCoworkerName(row.step) : '';
+  return (
+    <div className={`capstone-card capstone-card--blueprint type-${isCoworker ? 'coworker' : 'human'}`}>
+      <div className="capstone-card-header">
+        <div className="capstone-card-num">Step {idx + 1}</div>
+        <div className={`capstone-card-type-badge type-${isCoworker ? 'coworker' : 'human'}`}>
+          <span aria-hidden>{isCoworker ? '\u{1F916}' : '\u{1F464}'}</span>
+          {isCoworker ? 'Coworker' : 'Human'}
+        </div>
+      </div>
+      <div className="capstone-card-body">
+        {isCoworker ? (
+          <>
+            <div className="capstone-blueprint-field">
+              <span className="capstone-field-label">What does the coworker do</span>
+              <p className="capstone-blueprint-text">{row.step}</p>
+            </div>
+            <div className="capstone-field-row">
+              <div className="capstone-blueprint-field">
+                <span className="capstone-field-label">Knowledge files</span>
+                <BlueprintChips items={row.knowledgeFiles} />
+              </div>
+              <div className="capstone-blueprint-field">
+                <span className="capstone-field-label">Skills files</span>
+                <BlueprintChips items={row.skillsFiles} />
+              </div>
+            </div>
+            {derivedName && (
+              <div className="capstone-card-name-preview">
+                Will create coworker: <strong>{derivedName}</strong>
+              </div>
+            )}
+          </>
+        ) : (
+          <div className="capstone-field-row capstone-field-row-human">
+            <div className="capstone-blueprint-field">
+              <span className="capstone-field-label">What does the human verify</span>
+              <p className="capstone-blueprint-text">{row.step}</p>
+            </div>
+            <div className="capstone-blueprint-field">
+              <span className="capstone-field-label">Reviewer</span>
+              <p className="capstone-blueprint-empty">Pick someone in the room</p>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function BlueprintChips({ items }) {
+  if (!items || items.length === 0) {
+    return <p className="capstone-blueprint-empty">—</p>;
+  }
+  return (
+    <div className="capstone-blueprint-chips">
+      {items.map((name, i) => (
+        <span key={i} className="capstone-filepicker-chip">{name}</span>
+      ))}
+    </div>
+  );
+}
+
+function BlueprintDrawer({ open, onClose, blueprint }) {
   if (!open) return null;
   return (
     <div className="capstone-drawer-backdrop" onClick={onClose}>
       <aside
-        className="capstone-drawer"
+        className="capstone-drawer capstone-drawer--blueprint"
         onClick={e => e.stopPropagation()}
         role="dialog"
         aria-label="Workflow blueprint reference"
@@ -416,10 +485,16 @@ function BlueprintDrawer({ open, onClose, blueprintContent }) {
           <h3>Workflow blueprint</h3>
           <button className="capstone-drawer-close" onClick={onClose} aria-label="Close blueprint">{'✕'}</button>
         </div>
-        <div className="capstone-drawer-body md-doc">
-          {blueprintContent
-            ? <RichText content={blueprintContent} />
-            : <p className="capstone-drawer-empty">Blueprint hasn&rsquo;t been seeded for this room yet. Ask the facilitator to reveal Stage 8 again.</p>}
+        <div className="capstone-drawer-body capstone-drawer-body--blueprint">
+          <div className="capstone-blueprint-intro">
+            <h4 className="capstone-blueprint-title">{blueprint.title}</h4>
+            <p className="capstone-blueprint-sub">{blueprint.intro}</p>
+          </div>
+          <div className="capstone-blueprint-cards">
+            {blueprint.rows.map((row, idx) => (
+              <BlueprintCard key={idx} row={row} idx={idx} />
+            ))}
+          </div>
         </div>
       </aside>
     </div>
@@ -430,8 +505,6 @@ export default function Capstone({
   sb,
   myParticipantId,
   fileTree,
-  flatFiles,
-  onEnsureFileContent,
   participants,
   copilotUnlocked,
   onSendToCopilot,
@@ -461,13 +534,6 @@ export default function Capstone({
     }).catch(() => { if (!cancelled) setRows([newRow()]); });
     return () => { cancelled = true; };
   }, [sb, myParticipantId]);
-
-  const blueprintFile = (flatFiles || []).find(f => f.id === EXAMPLE_BLUEPRINT_FILE_ID);
-  useEffect(() => {
-    if (drawerOpen && blueprintFile && typeof blueprintFile.content !== 'string') {
-      onEnsureFileContent?.(blueprintFile.id);
-    }
-  }, [drawerOpen, blueprintFile, onEnsureFileContent]);
 
   function update(idx, patch) {
     setRows(prev => prev.map((r, i) => i === idx ? { ...r, ...patch } : r));
@@ -604,7 +670,7 @@ export default function Capstone({
       <BlueprintDrawer
         open={drawerOpen}
         onClose={() => setDrawerOpen(false)}
-        blueprintContent={blueprintFile?.content}
+        blueprint={CAPSTONE_BLUEPRINT_REFERENCE}
       />
     </div>
   );

@@ -7828,6 +7828,89 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
 }
 .capstone-drawer-empty { color: var(--text-muted); font-style: italic; }
 
+/* Blueprint drawer — wider than the markdown drawer to fit the
+   read-only Capstone cards comfortably. */
+.capstone-drawer.capstone-drawer--blueprint { width: min(620px, 100%); }
+.capstone-drawer-body--blueprint {
+  background: var(--bg-warm);
+  padding: 20px;
+}
+.capstone-blueprint-intro {
+  margin-bottom: 16px;
+  padding: 4px 4px 14px;
+  border-bottom: 1px solid var(--border-color);
+}
+.capstone-blueprint-title {
+  font-size: 18px; font-weight: 700; color: var(--text-dark);
+  margin: 0 0 6px;
+}
+.capstone-blueprint-sub {
+  font-size: 13px; color: var(--text-muted); margin: 0;
+  line-height: 1.5;
+}
+.capstone-blueprint-cards {
+  display: flex; flex-direction: column; gap: 12px;
+}
+/* Read-only card variant — no hover lift, static type badge in
+   place of the toggle, paragraph text instead of textareas, file
+   chips instead of pickers. Visually echoes the editable cards
+   above so the participant reads "what I'm about to fill" at a
+   glance. */
+.capstone-card.capstone-card--blueprint {
+  cursor: default;
+  pointer-events: none; /* read-only — disable hover/focus too */
+}
+.capstone-card-type-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  font-size: 11px;
+  font-weight: 600;
+  border-radius: var(--radius-pill);
+  background: var(--bg-white);
+  border: 1px solid var(--border-color);
+  color: var(--text-dark);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+.capstone-card-type-badge.type-human {
+  background: rgba(200, 149, 108, 0.12);
+  border-color: rgba(200, 149, 108, 0.4);
+  color: var(--text-dark);
+}
+.capstone-blueprint-field {
+  display: flex; flex-direction: column; gap: 6px;
+  flex: 1; min-width: 0;
+}
+.capstone-blueprint-text {
+  margin: 0;
+  padding: 9px 11px;
+  border: 1px dashed var(--border-color);
+  border-radius: var(--radius-sm);
+  font-size: 13px; line-height: 1.5;
+  background: var(--bg-warm);
+  color: var(--text-dark);
+}
+.capstone-blueprint-empty {
+  margin: 0;
+  padding: 9px 11px;
+  border: 1px dashed var(--border-color);
+  border-radius: var(--radius-sm);
+  font-size: 12.5px;
+  color: var(--text-muted);
+  font-style: italic;
+  background: transparent;
+}
+.capstone-blueprint-chips {
+  display: flex; flex-wrap: wrap; gap: 4px;
+  padding: 9px 11px;
+  border: 1px dashed var(--border-color);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  min-height: 36px;
+  align-items: flex-start;
+}
+
 @keyframes capstone-slide {
   from { transform: translateX(20px); opacity: 0; }
   to { transform: translateX(0); opacity: 1; }

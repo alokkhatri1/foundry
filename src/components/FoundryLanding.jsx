@@ -68,23 +68,47 @@ function useReveal() {
 // 4.2 seconds. Pauses on hover; users can also click the Org/Agent
 // pill toggle to lock a side. Two layouts share the same node ids;
 // `posOf` resolves the active layout's coordinates per node.
+// Cadence for the org → agent → org animation. The initial delay is
+// deliberately short so a first-time visitor sees the morph almost
+// immediately on landing — without it, the hero looks static for the
+// first several seconds and the whole "shape of work" point lands late.
+// The steady-state interval is longer so the cycling doesn't feel
+// strobe-y once the page is sitting in view.
+const HERO_FIRST_TOGGLE_MS = 900;
+const HERO_INTERVAL_MS = 3200;
+
 function HeroStage() {
   const [mode, setMode] = useState('org'); // 'org' | 'agent'
-  const intervalRef = useRef(null);
+  // Single timer ref — holds either a setTimeout id (during the
+  // initial-delay phase) or a setInterval id (steady state). Both
+  // clearTimeout and clearInterval can safely be called against either
+  // per the HTML timer spec.
+  const timerRef = useRef(null);
+
+  const cycle = () => setMode(m => (m === 'org' ? 'agent' : 'org'));
+
+  const stopTimer = () => {
+    if (timerRef.current) {
+      clearTimeout(timerRef.current);
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+  };
 
   useEffect(() => {
-    intervalRef.current = setInterval(() => {
-      setMode(m => (m === 'org' ? 'agent' : 'org'));
-    }, 4200);
-    return () => clearInterval(intervalRef.current);
+    // Fast first toggle, then settle into the steady interval.
+    timerRef.current = setTimeout(() => {
+      cycle();
+      timerRef.current = setInterval(cycle, HERO_INTERVAL_MS);
+    }, HERO_FIRST_TOGGLE_MS);
+    return stopTimer;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const pause = () => clearInterval(intervalRef.current);
+  const pause = () => stopTimer();
   const resume = () => {
-    clearInterval(intervalRef.current);
-    intervalRef.current = setInterval(() => {
-      setMode(m => (m === 'org' ? 'agent' : 'org'));
-    }, 4200);
+    stopTimer();
+    timerRef.current = setInterval(cycle, HERO_INTERVAL_MS);
   };
 
   const nodes = [
@@ -368,9 +392,6 @@ export default function FoundryLanding({ onSignIn }) {
               </p>
               <div className="fl-cta-row">
                 <CtaButton onClick={handleSignIn}>Continue with Google</CtaButton>
-                <span className="fl-cta-note">
-                  Free sandbox. <a href="#join">See cohort dates →</a>
-                </span>
               </div>
 
               <div className="fl-proof">

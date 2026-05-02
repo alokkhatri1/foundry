@@ -8405,11 +8405,11 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
 .cl-app .cl-sidebar-tab {
   background: transparent;
   border: none;
-  padding: 9px 6px 11px;
+  padding: 5px 6px 7px;
   font-family: var(--mono);
-  font-size: 10px;
+  font-size: 9.5px;
   font-weight: 500;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--ink-muted);
   cursor: pointer;
@@ -8417,6 +8417,7 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
   transition: color 0.15s;
   text-align: center;
   white-space: nowrap;
+  line-height: 1.1;
 }
 .cl-app .cl-sidebar-tab:hover { color: var(--ink); }
 .cl-app .cl-sidebar-tab.is-active { color: var(--ink); }
@@ -8441,7 +8442,7 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
   min-height: 0;
   overflow: hidden;
   flex: 1;
-  padding-top: 8px;
+  padding-top: 4px;
 }
 
 .cl-app .cl-section {

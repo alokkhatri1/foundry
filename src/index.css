@@ -9707,16 +9707,25 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
 /* Save button pushes itself to the right of the header. */
 .cwb-editor .cwb-save { margin-left: auto; }
 
-/* Make .cwb-editor itself the sole scroll container — header and
-   content scroll together so the experience feels like a single
-   page scroll rather than a panel with a pinned header above an
-   inner scroller. The legacy structure had a fixed header + inner
-   .cwb-editor-scroll; both wrappers stay in the JSX but the inner
-   one drops its scroll. */
-.cwb-editor {
+/* Coworkers tab — scroll moves up to the tab-pane level so the Back
+   / Save header rides with the content and the scrollbar sits at the
+   right edge of the page (matches the v2 design intent). The editor
+   itself becomes overflow-visible; the panel and editor flex out so
+   the tab-pane controls scroll. */
+.tab-pane-coworkers {
   overflow-y: auto !important;
-  overflow-x: hidden !important;
-  background: var(--cream);
+  overflow-x: hidden;
+}
+.tab-pane-coworkers .panel,
+.tab-pane-coworkers .panel-center {
+  overflow: visible !important;
+  flex: none !important;
+  min-height: 0;
+}
+.cwb-editor {
+  overflow: visible !important;
+  flex: none !important;
+  background: transparent;
 }
 .cwb-editor-scroll {
   background: transparent !important;

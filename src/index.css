@@ -7552,6 +7552,12 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
   grid-template-columns: 1fr 1fr;
   gap: 12px;
 }
+/* Human cards have a single bottom field (Reviewer) — constrain to the
+   left half so the card visually matches the rhythm of Coworker cards
+   (which fill the row with two pickers). */
+.capstone-field-half {
+  max-width: calc(50% - 6px);
+}
 
 /* Auto-name preview under the Coworker card — confirms what the user
    will see in their library after Send, before they hit Send. */

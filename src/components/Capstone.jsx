@@ -87,10 +87,10 @@ function isRowComplete(row, participants) {
     const hasFiles = (row.knowledgeFileIds || []).length > 0 || (row.skillsFileIds || []).length > 0;
     return hasFiles;
   }
-  // Human row — reviewer must still be in the room.
+  // Human row — reviewer must still be in the room. The step textarea
+  // doubles as the prompt the reviewer sees; no separate remarks field.
   if (!row.reviewerId) return false;
   if (!(participants || []).some(p => p.id === row.reviewerId)) return false;
-  if (!(row.remarks || '').trim()) return false;
   return true;
 }
 
@@ -111,7 +111,6 @@ function firstIncompleteReason(rows, participants) {
       if (!(participants || []).some(p => p.id === r.reviewerId)) {
         return `Step ${num}: reviewer "${r.reviewerName || ''}" left the room — pick another`;
       }
-      if (!(r.remarks || '').trim()) return `Step ${num}: remarks are empty`;
     }
   }
   return null;
@@ -378,27 +377,15 @@ function StepCard({ row, idx, isLast, isComplete, fileTree, participants, onUpda
             )}
           </>
         ) : (
-          <div className="capstone-field-row">
-            <label className="capstone-field">
-              <span className="capstone-field-label">Reviewer</span>
-              <ReviewerPicker
-                value={row.reviewerId}
-                valueName={row.reviewerName}
-                participants={participants}
-                onChange={patch => onUpdate(patch)}
-              />
-            </label>
-            <label className="capstone-field">
-              <span className="capstone-field-label">Remarks (what they verify)</span>
-              <textarea
-                className="capstone-field-input"
-                value={row.remarks}
-                placeholder="e.g. Verify financial ratios match policy."
-                onChange={e => onUpdate({ remarks: e.target.value })}
-                rows={2}
-              />
-            </label>
-          </div>
+          <label className="capstone-field capstone-field-half">
+            <span className="capstone-field-label">Reviewer</span>
+            <ReviewerPicker
+              value={row.reviewerId}
+              valueName={row.reviewerName}
+              participants={participants}
+              onChange={patch => onUpdate(patch)}
+            />
+          </label>
         )}
       </div>
     </div>

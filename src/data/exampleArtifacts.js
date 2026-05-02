@@ -117,38 +117,128 @@ When given a credit memo, validate it against the Compliance Exceptions register
 `;
 
 // Capstone reference. A generic loan-processing-style review workflow used
-// as the take-away assignment in the Capstone tab (Stage 8). Same five-column
-// shape participants will fill in: Step / Node / Data source / Knowledge &
-// skills files / Remarks (Logic + DoD). Names deliberately kept generic so
-// the room admin can rewrite for their cohort's domain without renaming
-// roles. The file is editable in place via the standard FileEditor.
+// as the take-away assignment in the Capstone tab (Stage 8). Each step
+// block below mirrors the Capstone card shape 1:1 so participants can
+// scan a step and know exactly which fields they're filling. The room
+// admin can rewrite for their cohort's domain — the file is editable
+// in place via the standard FileEditor.
 const CAPSTONE_BLUEPRINT = `# Credit Application Review — Workflow Blueprint
 
-A reference blueprint for a credit application review process. Use it as
-a shape. Each Capstone step is one of two kinds:
+A reference workflow for a credit application review. Use it as a shape.
+The clarity is the slow step. The build is fast.
+
+Each Capstone card is one of two kinds:
 
 - **Coworker step** — the step description becomes an AI coworker's role.
   You attach knowledge files (reading material) and skills files
-  (instructions that shape behaviour). When you hit Send, the system
-  creates that coworker in your library, named for you, and drops it
-  onto the workflow canvas.
-- **Human step** — you assign a real human in the room as the reviewer
-  and write remarks describing what they verify.
+  (instructions that shape behaviour). On Send, the system creates that
+  coworker in your library and drops it onto the canvas.
+- **Human step** — you assign a real human in the room as the reviewer.
 
-The clarity is the slow step. The build is fast.
+Each step below is laid out the way a card is laid out: type, what
+happens, and the slots you'd fill on the right of the card.
 
-| # | Step description | Type | Knowledge / Skills (Coworker) — or Reviewer (Human) |
-|---|------------------|------|------|
-| 1 | Capture borrower identity, registration, ownership, and guarantor details to start the application | Coworker | Knowledge: applicant intake checklist • Skills: borrower capture |
-| 2 | Request and attach the credit bureau report to the case file | Coworker | Knowledge: credit history reading guide • Skills: bureau request |
-| 3 | Enter facility type, amount, tenure, security details, and explanations | Coworker | Knowledge: proposal-fields checklist • Skills: proposal entry |
-| 4 | Compile audited and projected financials; calculate financial ratios | Coworker | Skills: financial-ratios |
-| 5 | Inspect collateral and produce a signed valuation report | Coworker | Skills: collateral valuation |
-| 6 | Verify the supporting-documents pack is complete | Coworker | Knowledge: required-documents checklist |
-| 7 | Review the proposal pack and approve, reject, or request revision | Human | Reviewer: a real reviewer in the room |
-| 8 | Generate standard security documents; collect signatures; upload scans | Coworker | Skills: security-doc templates |
-| 9 | Verify documents for completeness and legal compliance | Human | Reviewer: a real reviewer in the room |
-| 10 | Set limits, activate accounts, create contracts and deals, apply charges | Coworker | Skills: booking checklist |
+---
+
+### Step 1 · Coworker
+
+**What does the coworker do**
+Capture borrower identity, registration, ownership, and guarantor
+details to start the application.
+
+**Knowledge files** — applicant intake checklist
+**Skills files** — borrower capture
+
+---
+
+### Step 2 · Coworker
+
+**What does the coworker do**
+Request the credit bureau report and attach it to the case file.
+
+**Knowledge files** — credit history reading guide
+**Skills files** — bureau request
+
+---
+
+### Step 3 · Coworker
+
+**What does the coworker do**
+Enter facility type, amount, tenure, security details, and any
+exception explanations into the application.
+
+**Knowledge files** — proposal-fields checklist
+**Skills files** — proposal entry
+
+---
+
+### Step 4 · Coworker
+
+**What does the coworker do**
+Compile audited and projected financials and calculate the standard
+financial ratios.
+
+**Skills files** — financial-ratios
+
+---
+
+### Step 5 · Coworker
+
+**What does the coworker do**
+Inspect the collateral and produce a signed valuation report.
+
+**Skills files** — collateral valuation
+
+---
+
+### Step 6 · Coworker
+
+**What does the coworker do**
+Verify that the supporting-documents pack is complete (legal,
+financial, identity, business proof).
+
+**Knowledge files** — required-documents checklist
+
+---
+
+### Step 7 · Human review
+
+**What does the human verify**
+Review the proposal pack and approve, reject, or request revision.
+
+**Reviewer** — a real reviewer in the room
+
+---
+
+### Step 8 · Coworker
+
+**What does the coworker do**
+Generate standard security documents; collect signatures; upload
+the signed scans.
+
+**Skills files** — security-doc templates
+
+---
+
+### Step 9 · Human review
+
+**What does the human verify**
+Verify documents for completeness and legal compliance before
+disbursement.
+
+**Reviewer** — a real reviewer in the room
+
+---
+
+### Step 10 · Coworker
+
+**What does the coworker do**
+Set limits, activate accounts, create contracts and deals, apply
+the relevant charges.
+
+**Skills files** — booking checklist
+
+---
 
 ## How to use this in the Capstone
 
@@ -156,11 +246,10 @@ The clarity is the slow step. The build is fast.
 2. For each card:
    - Toggle **Coworker** or **Human** at the top of the card.
    - **Coworker** cards: write what the coworker does — that text becomes
-     the coworker's role. Then attach knowledge files and skills files.
+     the coworker's role. Then pick knowledge files and skills files.
      The card shows you the auto-generated coworker name as you type.
-   - **Human** cards: write the action ("Risk memo reviewed and
-     approved"), pick a reviewer from the room, and add remarks
-     describing what they verify.
+   - **Human** cards: write what gets verified, then pick a reviewer
+     from the room.
 3. When every card is filled, hit **Send to copilot**. The system
    creates a fresh coworker for each Coworker card (named from your
    step text) and pre-fills the workflow copilot with a build prompt.

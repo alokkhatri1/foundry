@@ -187,7 +187,7 @@ Write in second person ("You are...", "You analyze...", "You produce..."). Be sp
         </div>
         <button className="cwb-desc-gen-btn" onClick={handleGenerate} disabled={generating || !role?.trim()}>
           <span className="cwb-desc-gen-spark" aria-hidden>{'✦'}</span>
-          {generating ? 'Generating…' : 'Polish with Claude'}
+          {generating ? 'Generating…' : 'Polish with Foundry AI'}
         </button>
       </div>
     </div>

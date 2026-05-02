@@ -547,15 +547,20 @@ function ContextSidebar({ fileTree, selectedFileIds, onToggleFile, onToggleFolde
         )}
       </div>
 
-      {/* Sidebar tabs — switch which section fills the sidebar. All
-          four are always visible (chats/coworkers/AI coworkers/files);
-          stage gating still applies inside each section. */}
+      {/* Sidebar tabs — 2×2 grid, row-major:
+          row 1: Chats | Files     (the two most-used surfaces)
+          row 2: Coworkers | AI Coworkers   (the team) */}
       <div className="cl-sidebar-tabs">
         <button
           type="button"
           className={`cl-sidebar-tab${sidebarTab === 'chats' ? ' is-active' : ''}`}
           onClick={() => setSidebarTab('chats')}
         >Chats</button>
+        <button
+          type="button"
+          className={`cl-sidebar-tab${sidebarTab === 'files' ? ' is-active' : ''}`}
+          onClick={() => setSidebarTab('files')}
+        >Files</button>
         <button
           type="button"
           className={`cl-sidebar-tab${sidebarTab === 'humans' ? ' is-active' : ''}`}
@@ -566,11 +571,6 @@ function ContextSidebar({ fileTree, selectedFileIds, onToggleFile, onToggleFolde
           className={`cl-sidebar-tab${sidebarTab === 'ai' ? ' is-active' : ''}`}
           onClick={() => setSidebarTab('ai')}
         >AI&nbsp;Coworkers</button>
-        <button
-          type="button"
-          className={`cl-sidebar-tab${sidebarTab === 'files' ? ' is-active' : ''}`}
-          onClick={() => setSidebarTab('files')}
-        >Files</button>
       </div>
 
       <div className="cl-sections">

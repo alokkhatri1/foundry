@@ -8407,7 +8407,7 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
 .cl-app .cl-sidebar-tab {
   background: transparent;
   border: none;
-  padding: 5px 6px 7px;
+  padding: 9px 6px 11px;
   font-family: var(--mono);
   font-size: 9.5px;
   font-weight: 500;

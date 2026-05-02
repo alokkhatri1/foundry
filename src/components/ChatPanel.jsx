@@ -87,20 +87,29 @@ function ChatMessage({ msg, onApprovalAction, onPickRecipient, onNudgeRecipient,
   }
 
   if (msg.type === 'user') {
+    // Same shape as an agent message — avatar + sender name + body. The
+    // user explicitly asked for one consistent representation across the
+    // thread, no dark bubble for user messages and no white for agent.
+    // Reads like a transcript of speakers.
     return (
-      <div className="cl-msg cl-msg-user">
-        {msg.participantName && <div className="cl-msg-user-sender">{msg.participantName}</div>}
-        {msg.attachments && msg.attachments.length > 0 && (
-          <div className="cl-msg-user-attachments">
-            {msg.attachments.map((att, i) => (
-              <span key={i} className="cl-msg-user-attachment">
-                <span aria-hidden>{getFileIcon(att.category)}</span>
-                {att.fileName}
-              </span>
-            ))}
+      <div className="cl-msg-ai">
+        <UserAvatar name={msg.participantName} color={sender?.color} />
+        <div>
+          <div className="cl-msg-ai-name">{msg.participantName || 'You'}</div>
+          <div className="cl-msg-ai-body">
+            <div>{msg.content}</div>
+            {msg.attachments && msg.attachments.length > 0 && (
+              <div className="cl-msg-attachments">
+                {msg.attachments.map((att, i) => (
+                  <span key={i} className="cl-msg-attachment">
+                    <span aria-hidden>{getFileIcon(att.category)}</span>
+                    {att.fileName}
+                  </span>
+                ))}
+              </div>
+            )}
           </div>
-        )}
-        <div>{msg.content}</div>
+        </div>
       </div>
     );
   }
@@ -574,11 +583,11 @@ function ContextSidebar({ fileTree, selectedFileIds, onToggleFile, onToggleFolde
         </div>
       </div>
 
-      {/* Teammates (humans in the room) */}
+      {/* Coworkers (humans in the room) */}
       {visibleHumans.length > 0 && (
         <div className="cl-section">
           <div className="cl-section-head">
-            <div className="cl-section-label">Teammates</div>
+            <div className="cl-section-label">Coworkers</div>
             <span className="cl-section-tag">Human</span>
           </div>
           <div className="cl-section-body">
@@ -612,11 +621,11 @@ function ContextSidebar({ fileTree, selectedFileIds, onToggleFile, onToggleFolde
         </div>
       )}
 
-      {/* Coworkers — Stage 5+ */}
+      {/* AI Coworkers — Stage 5+ */}
       {showCoworkersSection && visibleCoworkers.length > 0 && (
         <div className="cl-section">
           <div className="cl-section-head">
-            <div className="cl-section-label">Coworkers</div>
+            <div className="cl-section-label">AI Coworkers</div>
             <span className="cl-section-tag is-ai">Agent</span>
           </div>
           <div className="cl-section-body">

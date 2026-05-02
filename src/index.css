@@ -8784,15 +8784,16 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
   max-width: 720px;
   width: fit-content;
 }
+/* User and agent messages share the same grid (avatar + name + body)
+   so the thread reads like a clean transcript. The legacy dark-bubble
+   user style was dropped per the consistency request. */
 .cl-app .cl-msg-user {
-  align-self: flex-end;
-  background: var(--ink);
-  color: var(--paper);
-  padding: 12px 18px;
-  border-radius: 18px 18px 4px 18px;
-  font-size: 14px;
-  line-height: 1.55;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 12px;
+  max-width: 720px;
 }
+.cl-app .cl-msg-user .cl-msg-ai-body { color: var(--ink); }
 .cl-app .cl-msg-ai {
   display: grid;
   grid-template-columns: auto 1fr;
@@ -8939,20 +8940,22 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
 }
 .cl-app .cl-approval-comment:focus { border-color: var(--peach-deep); }
 
-/* Attached file chips inside a user bubble */
-.cl-app .cl-msg-user-attachments {
+/* Attached file chips inside a message body — work for both user and
+   agent transcript rows. */
+.cl-app .cl-msg-attachments {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
   margin-top: 8px;
 }
-.cl-app .cl-msg-user-attachment {
+.cl-app .cl-msg-attachment {
   display: inline-flex;
   align-items: center;
   gap: 5px;
   padding: 3px 9px;
-  background: rgba(255,253,249,0.18);
-  color: var(--paper);
+  background: var(--cream-soft);
+  border: 1px solid var(--rule-soft);
+  color: var(--ink);
   font-size: 11px;
   border-radius: 999px;
 }

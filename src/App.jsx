@@ -215,7 +215,7 @@ function SpendChip({ total, tokenTotal, onClick }) {
 // Current Level, live spend total (when Stage 8 / Economics is revealed),
 // Preferences (Stage 2+), and Exit Workshop. Frees the header to show
 // every stage tab without wrapping.
-function SettingsMenu({ userName, currentStage, sb, myParticipantId, creditsLeft, creditsTotal, onOpenUsage, onOpenPreferences, onExit }) {
+function SettingsMenu({ userName, orgName, currentStage, sb, myParticipantId, creditsLeft, creditsTotal, onOpenUsage, onOpenPreferences, onExit }) {
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
   const { isAdmin, openAdmin } = useAuth();
@@ -227,6 +227,7 @@ function SettingsMenu({ userName, currentStage, sb, myParticipantId, creditsLeft
   const spend = useWorkshopUsageTotal(sb);
   const showPreferences = stageReached(currentStage, '2');
   const initial = (userName || '?').trim().charAt(0).toUpperCase();
+  const firstName = (userName || 'You').trim().split(/\s+/)[0];
   const stageLabel = currentStage ? STAGE_META[currentStage]?.label : null;
   const creditsLow = creditsLeft != null && creditsLeft <= CREDITS_WARN_THRESHOLD;
 
@@ -247,16 +248,21 @@ function SettingsMenu({ userName, currentStage, sb, myParticipantId, creditsLeft
         title="Settings"
       >
         <span className="header-settings-avatar">{initial}</span>
-        <span className="header-settings-caret">{open ? '\u25B4' : '\u25BE'}</span>
+        <span className="header-settings-name">{firstName}</span>
+        <span className="header-settings-caret">{'\u25BE'}</span>
       </button>
       {open && (
         <div className="header-settings-menu" role="menu">
           <div className="header-settings-identity">
-            <div className="header-settings-name">{userName || 'You'}</div>
+            <div className="header-settings-menu-name">{userName || 'You'}</div>
+            {orgName && <div className="header-settings-menu-org">{orgName}</div>}
+          </div>
+
+          <div className="header-settings-meta-grid">
             {stageLabel && (
               <div className="header-settings-meta">
                 <span className="header-settings-meta-label">Current Level</span>
-                <span className="header-settings-meta-value">{stageLabel}</span>
+                <span className="header-settings-meta-value is-stage">{stageLabel}</span>
               </div>
             )}
             {creditsLeft != null && (
@@ -265,11 +271,8 @@ function SettingsMenu({ userName, currentStage, sb, myParticipantId, creditsLeft
                 title={`${Math.max(0, creditsLeft).toLocaleString()} of ${creditsTotal.toLocaleString()} credits left. ~10 credits = a typical chat. ~50 credits = a workflow run.`}
               >
                 <span className="header-settings-meta-label">Credits</span>
-                <span
-                  className={`header-settings-meta-value header-settings-credits${creditsLow ? ' header-settings-meta-low' : ''}`}
-                >
-                  <span className="header-settings-credits-star" aria-hidden>✦</span>
-                  {Math.max(0, creditsLeft).toLocaleString()}
+                <span className={`header-settings-meta-value${creditsLow ? ' header-settings-meta-low' : ''}`}>
+                  <span aria-hidden>{'✦'}</span> {Math.max(0, creditsLeft).toLocaleString()}
                 </span>
               </div>
             )}
@@ -285,25 +288,51 @@ function SettingsMenu({ userName, currentStage, sb, myParticipantId, creditsLeft
               </div>
             )}
           </div>
+
           <div className="header-settings-divider" />
-          {isAdmin && (
+          <div className="header-settings-section">
+            {isAdmin && (
+              <button
+                className="header-settings-item"
+                onClick={() => { openAdmin?.(); setOpen(false); }}
+              >Admin Panel<span className="header-settings-item-arrow">{'↗'}</span></button>
+            )}
+            {showPreferences && (
+              <button
+                className="header-settings-item"
+                onClick={() => { onOpenPreferences?.(); setOpen(false); }}
+              >Preferences<span className="header-settings-item-arrow">{'↗'}</span></button>
+            )}
             <button
-              className="header-settings-item"
-              onClick={() => { openAdmin?.(); setOpen(false); }}
-            >Admin Panel</button>
-          )}
-          {showPreferences && (
-            <button
-              className="header-settings-item"
-              onClick={() => { onOpenPreferences?.(); setOpen(false); }}
-            >Preferences</button>
-          )}
-          <button
-            className="header-settings-item danger"
-            onClick={() => { onExit?.(); setOpen(false); }}
-          >Exit Workshop</button>
+              className="header-settings-item danger"
+              onClick={() => { onExit?.(); setOpen(false); }}
+            >Exit Workshop<span className="header-settings-item-arrow">{'→'}</span></button>
+          </div>
         </div>
       )}
+    </div>
+  );
+}
+
+// Stage progress meter that sits inside the masthead area. Defined in
+// the v2 redesign but the redesign forgot to render it; wired here so
+// participants see "I'm at stage X of 11" beside the wordmark.
+function StageMeter({ currentStage }) {
+  const order = ['1','2','3','4','5','6','7','8','9','10','11'];
+  const idx = order.indexOf(currentStage);
+  if (idx < 0) return null;
+  const total = order.length;
+  const num = String(idx + 1).padStart(2, '0');
+  const totalStr = String(total).padStart(2, '0');
+  const pct = ((idx + 1) / total) * 100;
+  return (
+    <div className="app-stage-meter" title={`Stage ${num} of ${totalStr}`}>
+      <div className="app-stage-meter-num">
+        {num}<span> / {totalStr}</span>
+      </div>
+      <div className="app-stage-meter-bar">
+        <div className="app-stage-meter-fill" style={{ width: `${pct}%` }} />
+      </div>
     </div>
   );
 }
@@ -2848,12 +2877,12 @@ Answer in ONE sentence. If the user asks "how", a second sentence is allowed —
         </div>
       )}
       <header className="app-header">
-        <div className="app-header-left" onClick={() => { setActiveTab('chat'); setChatBadge(false); }} style={{ cursor: 'pointer' }}>
+        <div className="app-header-left" onClick={() => { setActiveTab('chat'); setChatBadge(false); }}>
           <span className="app-logo">F</span>
-          <div>
+          <div className="app-masthead">
             <h1>Foundry</h1>
-            <span className="app-header-subtitle">{orgName}</span>
           </div>
+          <StageMeter currentStage={currentStage} />
         </div>
         <nav className="tab-nav">
           <button className={`tab-nav-item${activeTab === 'chat' ? ' active' : ''}`} onClick={() => { setActiveTab('chat'); setChatBadge(false); }}>
@@ -2896,26 +2925,25 @@ Answer in ONE sentence. If the user asks "how", a second sentence is allowed —
           </RevealAt>
         </nav>
         <div className="app-header-right">
-          <div className="header-account-pill">
-            <RevealAt stage="10" currentStage={currentStage}>
-              <CreditsChip
-                creditsLeft={creditsLeft}
-                creditsTotal={creditsTotal}
-                onClick={() => setActiveTab('usage')}
-              />
-            </RevealAt>
-            <SettingsMenu
-              userName={userName}
-              currentStage={currentStage}
-              sb={sb}
-              myParticipantId={myParticipantId}
+          <RevealAt stage="10" currentStage={currentStage}>
+            <CreditsChip
               creditsLeft={creditsLeft}
               creditsTotal={creditsTotal}
-              onOpenUsage={() => setActiveTab('usage')}
-              onOpenPreferences={() => setShowPreferences(true)}
-              onExit={() => setShowExitConfirm(true)}
+              onClick={() => setActiveTab('usage')}
             />
-          </div>
+          </RevealAt>
+          <SettingsMenu
+            userName={userName}
+            orgName={orgName}
+            currentStage={currentStage}
+            sb={sb}
+            myParticipantId={myParticipantId}
+            creditsLeft={creditsLeft}
+            creditsTotal={creditsTotal}
+            onOpenUsage={() => setActiveTab('usage')}
+            onOpenPreferences={() => setShowPreferences(true)}
+            onExit={() => setShowExitConfirm(true)}
+          />
         </div>
       </header>
 

@@ -942,343 +942,444 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
   background: var(--bg-warm);
 }
 
-/* ========== HEADER — matches website nav style ========== */
+/* ========== HEADER — editorial masthead (v2) ==========
+   Aligned with the marketing landing aesthetic: warm cream + peach
+   + Fraunces editorial type. Tokens (--cream, --ink, --peach, etc.)
+   come from FoundryLanding.css's :root, which is bundled globally
+   so they're available here without re-declaration. */
 .app-header {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(220px, auto) 1fr auto;
   align-items: center;
-  justify-content: space-between;
-  padding: 12px 28px;
-  background: rgba(255,255,255,0.85);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border-radius: var(--radius-pill);
-  margin: 16px 24px 0;
-  box-shadow: var(--shadow-sm);
+  gap: 32px;
+  padding: 14px 32px;
+  background: var(--cream);
+  border-bottom: 1px solid var(--rule-soft);
   flex-shrink: 0;
-  gap: 16px;
 }
+
+/* ── Left: masthead lockup ── */
 .app-header-left {
   display: flex;
   align-items: center;
-  gap: 12px;
-  flex-shrink: 0;
+  gap: 14px;
+  cursor: pointer;
 }
 .app-logo {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 36px;
-  height: 36px;
-  background: var(--text-dark);
-  color: white;
-  border-radius: 8px;
-  font-size: 16px;
-  font-weight: 800;
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  background: var(--ink);
+  color: var(--peach);
+  font-family: var(--serif);
+  font-weight: 600;
+  font-size: 19px;
+  display: grid;
+  place-items: center;
+  letter-spacing: -0.02em;
+  flex-shrink: 0;
+  transition: background .2s, transform .2s;
 }
-.app-header h1 {
-  font-size: 15px;
-  font-weight: 700;
-  color: var(--text-dark);
-  line-height: 1.2;
+.app-header-left:hover .app-logo { background: var(--ink-soft); transform: rotate(-3deg); }
+
+.app-masthead {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+.app-masthead h1 {
+  font-family: var(--serif);
+  font-weight: 500;
+  font-size: 18px;
+  line-height: 1.05;
+  letter-spacing: -0.015em;
+  color: var(--ink);
 }
 .app-header-subtitle {
-  font-size: 12px;
-  color: var(--text-muted);
+  font-family: var(--mono);
+  font-size: 10.5px;
   font-weight: 500;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+  white-space: nowrap;
 }
 
-/* Tab nav inside header */
+/* Stage progress meter — tucked next to masthead, hairline-divider on the left. */
+.app-stage-meter {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding-left: 20px;
+  margin-left: 4px;
+  border-left: 1px solid var(--rule);
+}
+.app-stage-meter-num {
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  color: var(--ink);
+}
+.app-stage-meter-num span { color: var(--ink-muted); font-weight: 400; }
+.app-stage-meter-bar {
+  width: 64px;
+  height: 3px;
+  background: var(--cream-deep);
+  border-radius: 2px;
+  overflow: hidden;
+  position: relative;
+}
+.app-stage-meter-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  background: var(--peach-deep);
+  border-radius: 2px;
+  transition: width .35s cubic-bezier(.2,.7,.2,1);
+}
+
+/* ── Middle: editorial tab nav with peach underline indicator ── */
 .tab-nav {
   display: flex;
   align-items: center;
   gap: 4px;
+  justify-self: center;
 }
 .tab-nav-item {
-  padding: 8px 20px;
-  font-size: 14px;
-  font-weight: 500;
-  color: var(--text-body);
-  border-radius: var(--radius-pill);
-  /* Scope the transition so font-weight / badge visibility snap instantly.
-     `all 0.2s` was morphing every property simultaneously on old + new
-     tab, which made neighbouring badges and counts appear "active" for
-     the 200 ms of the switch. */
-  transition: color 0.15s, background 0.15s;
   position: relative;
+  padding: 14px 16px 12px;
+  font-family: var(--serif);
+  font-size: 16px;
+  font-weight: 400;
+  color: var(--ink-muted);
+  background: transparent;
+  border: none;
   white-space: nowrap;
+  letter-spacing: -0.005em;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  transition: color .18s;
+  cursor: pointer;
 }
-.tab-nav-item:hover {
-  color: var(--text-dark);
-  background: rgba(0,0,0,0.04);
+.tab-nav-item::after {
+  content: "";
+  position: absolute;
+  left: 16px;
+  right: 16px;
+  bottom: 4px;
+  height: 2px;
+  background: transparent;
+  border-radius: 1px;
+  transition: background .2s, transform .2s;
+  transform: scaleX(0);
+  transform-origin: center;
+}
+.tab-nav-item:hover { color: var(--ink); }
+.tab-nav-item:hover::after {
+  background: var(--rule);
+  transform: scaleX(1);
 }
 .tab-nav-item.active {
-  color: var(--text-dark);
-  font-weight: 600;
-  background: var(--bg-warm);
+  color: var(--ink);
+  font-weight: 500;
+  font-style: italic;
 }
+.tab-nav-item.active::after {
+  background: var(--peach-deep);
+  transform: scaleX(1);
+  height: 2px;
+}
+
+/* Tab indicators — small signals next to the label */
 .tab-badge {
   width: 7px;
   height: 7px;
-  background: var(--accent-approval);
+  background: var(--peach-deep);
   border-radius: 50%;
-  display: inline-block;
-  margin-left: 4px;
-  vertical-align: top;
+  flex-shrink: 0;
+  box-shadow: 0 0 0 3px rgba(232,153,84,0.18);
 }
 .tab-running-dot {
-  width: 6px;
-  height: 6px;
-  background: var(--accent-system);
+  width: 7px;
+  height: 7px;
+  background: #28A76B;
   border-radius: 50%;
-  display: inline-block;
-  margin-left: 4px;
-  animation: pulse 1.5s infinite;
+  flex-shrink: 0;
+  animation: header-pulse 1.6s infinite;
 }
+@keyframes header-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(40,167,107,0.5); }
+  50%      { box-shadow: 0 0 0 5px rgba(40,167,107,0); }
+}
+/* Renamed @keyframes pulse → header-pulse so it doesn't collide with
+   the older `pulse` animation referenced by other in-app surfaces.
+   The legacy keyframe is still defined further down for those. */
 .tab-count {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 18px;
-  height: 18px;
-  padding: 0 5px;
-  background: var(--border-color);
-  color: var(--text-body);
-  border-radius: 9px;
-  font-size: 11px;
-  font-weight: 600;
-  margin-left: 6px;
+  font-family: var(--mono);
+  font-size: 10.5px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  color: var(--ink-muted);
+  font-style: normal;
+  font-variant-numeric: tabular-nums;
+  padding: 1px 5px;
+  background: var(--cream-deep);
+  border-radius: 4px;
+  line-height: 1.4;
 }
-@keyframes pulse {
-  0%, 100% { opacity: 1; transform: scale(1); }
-  50% { opacity: 0.4; transform: scale(1.4); }
+.tab-nav-item.active .tab-count {
+  background: var(--peach);
+  color: var(--ink);
 }
 
+/* ── Right: account cluster ── */
 .app-header-right {
   display: flex;
   align-items: center;
-  gap: 0;
-  flex-shrink: 0;
-  background: transparent;
-  padding: 0;
-  position: relative;
+  gap: 12px;
+  justify-self: end;
 }
 
-/* ===== Settings menu (single right-side button + dropdown) ===== */
+/* Credits chip — quieter status pill with mini meter */
+.header-credits-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 12px 7px 14px;
+  background: var(--paper);
+  border: 1px solid var(--rule-soft);
+  border-radius: 999px;
+  cursor: pointer;
+  transition: border-color .18s, background .18s;
+}
+.header-credits-chip:hover {
+  border-color: var(--peach-deep);
+  background: var(--cream-soft);
+}
+.header-credits-chip-star {
+  font-size: 12px;
+  color: var(--peach-deep);
+  line-height: 1;
+}
+.header-credits-chip-value {
+  font-family: var(--mono);
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  letter-spacing: 0.02em;
+}
+.header-credits-chip-label {
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+  line-height: 1;
+}
+.header-credits-chip.low {
+  border-color: #C84D3A;
+  background: #FBE9E2;
+}
+.header-credits-chip.low .header-credits-chip-star,
+.header-credits-chip.low .header-credits-chip-value { color: #C84D3A; }
+
+/* Settings button — separate from credits, avatar-led */
 .header-settings { position: relative; }
 .header-settings-btn {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 4px 10px 4px 4px;
-  border-radius: var(--radius-pill);
-  background: white;
-  border: 1px solid var(--border-color);
+  gap: 8px;
+  padding: 4px 12px 4px 4px;
+  background: var(--paper);
+  border: 1px solid var(--rule-soft);
+  border-radius: 999px;
   cursor: pointer;
-  transition: background 0.15s, border-color 0.15s;
+  transition: border-color .18s, background .18s;
 }
-.header-settings-btn:hover { background: var(--bg-warm); border-color: var(--accent-gold); }
-.header-settings-btn.open { border-color: var(--accent-gold); background: var(--bg-warm); }
+.header-settings-btn:hover {
+  border-color: var(--peach-deep);
+  background: var(--cream-soft);
+}
+.header-settings-btn.open {
+  border-color: var(--ink);
+  background: var(--cream-soft);
+}
 .header-settings-avatar {
-  width: 26px;
-  height: 26px;
+  width: 28px;
+  height: 28px;
   border-radius: 50%;
-  background: var(--accent-gold);
-  color: #fff;
-  font-size: 12px;
-  font-weight: 700;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  background: var(--ink);
+  color: var(--peach);
+  font-family: var(--serif);
+  font-weight: 500;
+  font-size: 13px;
+  display: grid;
+  place-items: center;
   flex-shrink: 0;
 }
-.header-settings-caret { font-size: 10px; color: var(--text-muted); }
+.header-settings-name {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ink);
+}
+.header-settings-caret {
+  font-size: 9px;
+  color: var(--ink-muted);
+  transition: transform .2s;
+}
+.header-settings-btn.open .header-settings-caret { transform: rotate(180deg); color: var(--ink); }
 
+/* Settings dropdown */
 .header-settings-menu {
   position: absolute;
-  top: calc(100% + 6px);
+  top: calc(100% + 10px);
   right: 0;
-  min-width: 240px;
-  background: white;
-  border: 1px solid var(--border-color);
-  border-radius: var(--radius);
-  box-shadow: 0 6px 20px rgba(0,0,0,0.08);
+  min-width: 280px;
+  background: var(--paper);
+  border: 1px solid var(--rule-soft);
+  border-radius: 18px;
+  box-shadow:
+    0 1px 0 rgba(255,255,255,0.6) inset,
+    0 18px 40px -16px rgba(60,40,20,0.18);
   z-index: 100;
   overflow: hidden;
+  animation: header-menu-in .18s cubic-bezier(.2,.7,.2,1);
 }
-.header-settings-identity { padding: 14px 16px 10px; }
-.header-settings-name {
-  font-size: 14px;
-  font-weight: 700;
-  color: var(--text-dark);
-  margin-bottom: 8px;
+@keyframes header-menu-in {
+  from { opacity: 0; transform: translateY(-6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.header-settings-identity {
+  padding: 18px 18px 14px;
+  background: var(--cream-soft);
+  border-bottom: 1px solid var(--rule-soft);
+}
+.header-settings-menu-name {
+  font-family: var(--serif);
+  font-weight: 500;
+  font-size: 18px;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+  margin-bottom: 2px;
+}
+.header-settings-menu-org {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+}
+
+.header-settings-meta-grid {
+  padding: 12px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
 }
 .header-settings-meta {
   display: flex;
   justify-content: space-between;
   align-items: baseline;
-  padding: 4px 0;
+  padding: 6px 0;
   font-size: 12px;
+  border-bottom: 1px dashed var(--rule-soft);
 }
-.header-settings-meta-label { color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; font-size: 10px; font-weight: 600; }
-.header-settings-meta-value { color: var(--text-dark); font-weight: 600; font-variant-numeric: tabular-nums; }
-.header-settings-meta-cost { color: var(--accent-gold); }
-.header-settings-meta-low { color: var(--accent-error); }
-.header-settings-meta-tokens { color: var(--text-muted); font-weight: 500; font-size: 11px; }
-.header-settings-meta-clickable { cursor: pointer; border-radius: 6px; margin: 0 -6px; padding: 4px 6px; }
-.header-settings-meta-clickable:hover { background: var(--bg-warm); }
+.header-settings-meta:last-child { border-bottom: none; }
+.header-settings-meta-label {
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+}
+.header-settings-meta-value {
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+.header-settings-meta-value.is-stage {
+  font-family: var(--serif);
+  font-size: 14px;
+  font-weight: 500;
+  font-style: italic;
+  letter-spacing: 0;
+  text-transform: none;
+}
+.header-settings-meta-cost { color: var(--peach-deep); }
+.header-settings-meta-low { color: #C84D3A; }
+.header-settings-meta-clickable {
+  cursor: pointer;
+  margin: 0 -8px;
+  padding: 6px 8px;
+  border-radius: 6px;
+}
+.header-settings-meta-clickable:hover { background: var(--cream-deep); border-bottom-color: transparent; }
 
-.header-settings-divider { height: 1px; background: var(--border-color); margin: 4px 0; }
+.header-settings-divider {
+  height: 1px;
+  background: var(--rule-soft);
+}
+.header-settings-section {
+  padding: 6px 0;
+}
 .header-settings-item {
-  display: block;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   width: 100%;
   text-align: left;
-  padding: 10px 16px;
+  padding: 11px 18px;
   background: transparent;
   border: none;
-  font-size: 13px;
-  color: var(--text-body);
+  font-size: 13.5px;
+  font-weight: 500;
+  color: var(--ink-mid);
   cursor: pointer;
-  transition: background 0.1s;
+  transition: background .12s, color .12s;
 }
-.header-settings-item:hover { background: var(--bg-warm); color: var(--text-dark); }
-.header-settings-item.danger { color: var(--accent-error); }
-.header-settings-item.danger:hover { background: #fdf0f0; }
-.header-stage-chip {
-  display: inline-flex;
-  flex-direction: column;
-  align-items: flex-start;
-  padding: 4px 12px;
-  border-radius: var(--radius-pill);
-  background: white;
-  margin-right: 4px;
-  line-height: 1.1;
+.header-settings-item:hover { background: var(--cream-soft); color: var(--ink); }
+.header-settings-item-arrow {
+  font-size: 11px;
+  color: var(--ink-muted);
+  transition: transform .15s;
 }
-.header-spend-chip {
-  display: inline-flex;
-  flex-direction: column;
-  align-items: flex-start;
-  padding: 4px 12px;
-  border-radius: var(--radius-pill);
-  background: white;
-  margin-right: 4px;
-  line-height: 1.1;
-  cursor: pointer;
-  transition: background 0.15s;
+.header-settings-item:hover .header-settings-item-arrow {
+  transform: translateX(2px);
+  color: var(--peach-deep);
 }
-.header-spend-chip:hover { background: var(--bg-warm); }
-.header-spend-chip-amount { font-size: 12px; font-weight: 600; color: var(--accent-gold); }
-.header-spend-chip-tokens { font-size: 9px; font-weight: 600; color: var(--text-muted); letter-spacing: 0.04em; }
+.header-settings-item.danger { color: #C84D3A; }
+.header-settings-item.danger:hover { background: #FBE9E2; color: #C84D3A; }
 
-/* ===== Credits chip (header, post-7b) ===== */
-.header-credits-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 12px;
-  border-radius: var(--radius-pill);
-  background: white;
-  border: 1px solid var(--border-color);
-  margin-right: 6px;
-  cursor: pointer;
-  transition: background 0.15s, border-color 0.15s;
+/* Responsive */
+@media (max-width: 1180px) {
+  .tab-nav-item { padding: 14px 10px 12px; font-size: 14.5px; }
+  .tab-nav-item::after { left: 10px; right: 10px; }
+  .app-header { gap: 20px; padding: 14px 24px; }
+  .header-credits-chip-label { display: none; }
+  .header-settings-name { display: none; }
 }
-.header-credits-chip:hover { background: var(--bg-warm); border-color: var(--accent-gold); }
-.header-credits-chip.low {
-  border-color: var(--accent-error);
-  background: #fdf0f0;
+@media (max-width: 880px) {
+  .app-stage-meter { display: none; }
+}
+@media (max-width: 720px) {
+  .app-header { grid-template-columns: auto auto; gap: 12px; padding: 12px 16px; }
+  .tab-nav { display: none; }
 }
 
-/* When credits and settings sit side-by-side, merge them into a single
-   pill so they read as one account-meta control. The wrapper owns the
-   border + radius; inner buttons strip theirs and a 1px divider sits
-   between them. */
-.header-account-pill {
-  display: inline-flex;
-  align-items: stretch;
-  background: white;
-  border: 1px solid var(--border-color);
-  border-radius: var(--radius-pill);
-  transition: border-color 0.15s;
-}
-.header-account-pill:hover { border-color: var(--accent-gold); }
-.header-account-pill:has(.header-credits-chip.low) {
-  border-color: var(--accent-error);
-  background: #fdf0f0;
-}
-.header-account-pill .header-credits-chip,
-.header-account-pill .header-settings-btn {
-  border: 1px solid transparent;
-  background: transparent;
-  margin: 0;
-  border-radius: var(--radius-pill);
-}
-.header-account-pill .header-credits-chip:hover,
-.header-account-pill .header-settings-btn:hover {
-  background: var(--bg-warm);
-  border-color: transparent;
-}
-.header-account-pill .header-credits-chip.low { background: transparent; }
-.header-account-pill .header-credits-chip + .header-settings {
-  border-left: 1px solid var(--border-color);
-}
-.header-account-pill:has(.header-credits-chip.low) .header-credits-chip + .header-settings {
-  border-left-color: rgba(197, 48, 48, 0.25);
-}
-.header-credits-chip-star {
-  font-size: 13px;
-  color: var(--accent-gold);
-  line-height: 1;
-}
-.header-credits-chip.low .header-credits-chip-star { color: var(--accent-error); }
-.header-credits-chip-value {
-  font-size: 14px;
-  font-weight: 700;
-  color: var(--text-primary);
-  font-variant-numeric: tabular-nums;
-  line-height: 1;
-}
-.header-credits-chip.low .header-credits-chip-value { color: var(--accent-error); }
-.header-credits-chip-label {
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--text-primary);
-  line-height: 1;
-}
-.header-credits-chip.low .header-credits-chip-label { color: var(--accent-error); }
-.header-settings-credits {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-}
-.header-settings-credits-star {
-  color: var(--accent-gold);
-  font-size: 12px;
-}
-.header-settings-meta-low .header-settings-credits-star { color: var(--accent-error); }
-.header-stage-chip-eyebrow {
-  font-size: 9px;
-  font-weight: 600;
-  color: var(--text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-}
-.header-stage-chip-label {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--accent-gold);
-}
-.header-btn {
-  padding: 6px 16px;
-  border-radius: var(--radius-pill);
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--text-body);
-  transition: all 0.15s;
-}
-.header-btn:hover {
-  color: var(--text-dark);
-  background: white;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+/* Legacy `pulse` keyframe — still referenced by other in-app surfaces
+   (e.g. ChatPanel typing dots). The header now uses header-pulse. */
+@keyframes pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.4; transform: scale(1.4); }
 }
 .header-btn-reset {
   padding: 8px 18px;

@@ -35,8 +35,16 @@
 }
 
 /* Wrapping rules apply only inside .foundry-landing instead of html/body
-   so authenticated app surfaces keep their own typography + background. */
+   so authenticated app surfaces keep their own typography + background.
+   The landing is its own scroll container — index.css globally locks
+   html/body/#root with `overflow: hidden` so in-app panels can scroll
+   independently, which would otherwise trap this taller marketing page
+   inside a non-scrollable viewport. height:100vh + overflow-y:auto
+   gives the landing its own scrollable shell within that lock. */
 .foundry-landing {
+  height: 100vh;
+  overflow-y: auto;
+  overflow-x: hidden;
   background: var(--cream);
   color: var(--ink);
   font-family: var(--sans);
@@ -44,7 +52,6 @@
   line-height: 1.55;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
-  overflow-x: hidden;
 }
 .foundry-landing *,
 .foundry-landing *::before,

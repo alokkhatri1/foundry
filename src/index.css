@@ -8340,7 +8340,8 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
   background: var(--paper);
   border-right: 1px solid var(--rule-soft);
   display: grid;
-  grid-template-rows: auto 1fr;
+  /* search (auto) → tabs (auto) → sections (1fr fills remaining) */
+  grid-template-rows: auto auto 1fr;
   overflow: hidden;
   padding: 18px 14px;
   gap: 14px;

@@ -400,6 +400,10 @@ function ContextSidebar({ fileTree, selectedFileIds, onToggleFile, onToggleFolde
   // One sidebar-wide search term: filters Files, Chats, and AI Coworkers
   // simultaneously so the sidebar doesn't grow multiple input chrome.
   const [searchFilter, setSearchFilter] = useState('');
+  // Sidebar tabs: only one section visible at a time so each gets the
+  // full sidebar height. 'chats' default; switches to humans / ai /
+  // files on demand. The tab buttons sit between search and content.
+  const [sidebarTab, setSidebarTab] = useState('chats');
 
   if (!fileTree) return null;
 
@@ -543,9 +547,40 @@ function ContextSidebar({ fileTree, selectedFileIds, onToggleFile, onToggleFolde
         )}
       </div>
 
+      {/* Sidebar tabs — switch which section fills the sidebar. Each
+          section gets the full height when its tab is active, instead
+          of all four sharing space. */}
+      <div className="cl-sidebar-tabs">
+        <button
+          type="button"
+          className={`cl-sidebar-tab${sidebarTab === 'chats' ? ' is-active' : ''}`}
+          onClick={() => setSidebarTab('chats')}
+        >Chats</button>
+        <button
+          type="button"
+          className={`cl-sidebar-tab${sidebarTab === 'humans' ? ' is-active' : ''}`}
+          onClick={() => setSidebarTab('humans')}
+        >Coworkers</button>
+        {showCoworkersSection && (
+          <button
+            type="button"
+            className={`cl-sidebar-tab${sidebarTab === 'ai' ? ' is-active' : ''}`}
+            onClick={() => setSidebarTab('ai')}
+          >AI</button>
+        )}
+        {showFiles && (
+          <button
+            type="button"
+            className={`cl-sidebar-tab${sidebarTab === 'files' ? ' is-active' : ''}`}
+            onClick={() => setSidebarTab('files')}
+          >Files</button>
+        )}
+      </div>
+
       <div className="cl-sections">
 
-      {/* Chats — always visible */}
+      {/* Chats */}
+      {sidebarTab === 'chats' && (
       <div className="cl-section">
         <div className="cl-section-head">
           <div className="cl-section-label">Chats</div>
@@ -581,9 +616,10 @@ function ContextSidebar({ fileTree, selectedFileIds, onToggleFile, onToggleFolde
           })}
         </div>
       </div>
+      )}
 
       {/* Coworkers (humans in the room) */}
-      {visibleHumans.length > 0 && (
+      {sidebarTab === 'humans' && visibleHumans.length > 0 && (
         <div className="cl-section">
           <div className="cl-section-head">
             <div className="cl-section-label">Coworkers</div>
@@ -621,7 +657,7 @@ function ContextSidebar({ fileTree, selectedFileIds, onToggleFile, onToggleFolde
       )}
 
       {/* AI Coworkers — Stage 5+ */}
-      {showCoworkersSection && visibleCoworkers.length > 0 && (
+      {sidebarTab === 'ai' && showCoworkersSection && visibleCoworkers.length > 0 && (
         <div className="cl-section">
           <div className="cl-section-head">
             <div className="cl-section-label">AI Coworkers</div>
@@ -671,7 +707,7 @@ function ContextSidebar({ fileTree, selectedFileIds, onToggleFile, onToggleFolde
       )}
 
       {/* Files in context — Stage 3+ */}
-      {showFiles && (
+      {sidebarTab === 'files' && showFiles && (
         <div className="cl-section">
           <div className="cl-section-head">
             <div className="cl-section-label">Files in context</div>

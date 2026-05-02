@@ -8391,45 +8391,32 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
 }
 .cl-app .cl-search-clear:hover { background: var(--cream-deep); color: var(--ink); }
 
-/* Sidebar tab strip — sits between search and sections. Only one
-   section is visible at a time so it can use the full sidebar
-   height. Mono uppercase labels with a peach-deep underline on the
-   active tab (matches the editorial tab nav in the header). */
+/* Sidebar tab strip — sits between search and sections. 2x2 grid
+   of tabs (Chats / Coworkers above, AI Coworkers / Files below) so
+   every label fits on one line. Mono uppercase, peach-deep underline
+   on the active tab. */
 .cl-app .cl-sidebar-tabs {
-  display: flex;
-  align-items: stretch;
-  gap: 0;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
   padding: 0 4px;
   border-bottom: 1px solid var(--rule-soft);
   flex-shrink: 0;
 }
 .cl-app .cl-sidebar-tab {
-  flex: 1;
-  min-width: 0;
   background: transparent;
   border: none;
-  padding: 8px 4px 10px;
+  padding: 9px 6px 11px;
   font-family: var(--mono);
-  font-size: 9px;
+  font-size: 10px;
   font-weight: 500;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--ink-muted);
   cursor: pointer;
   position: relative;
   transition: color 0.15s;
-  /* "AI Coworkers" is the longest label and won't fit on one line at
-     a 280px sidebar / 4-tab width. Allow wrapping so the long label
-     stacks across two lines while shorter tabs stay vertically
-     centered. The non-breaking space in "AI&nbsp;Coworkers" keeps
-     "AI" + "Coworkers" together when only one wrap is needed. */
-  white-space: normal;
-  line-height: 1.2;
   text-align: center;
-  min-height: 38px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  white-space: nowrap;
 }
 .cl-app .cl-sidebar-tab:hover { color: var(--ink); }
 .cl-app .cl-sidebar-tab.is-active { color: var(--ink); }

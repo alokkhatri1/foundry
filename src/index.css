@@ -8398,9 +8398,10 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
 .cl-app .cl-sidebar-tabs {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  padding: 0 4px;
+  padding: 0;
   border-bottom: 1px solid var(--rule-soft);
   flex-shrink: 0;
+  width: 100%;
 }
 .cl-app .cl-sidebar-tab {
   background: transparent;
@@ -8425,7 +8426,7 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
   content: '';
   position: absolute;
   bottom: -1px;
-  left: 4px; right: 4px;
+  left: 0; right: 0;
   height: 2px;
   background: var(--peach-deep);
   border-radius: 1px;

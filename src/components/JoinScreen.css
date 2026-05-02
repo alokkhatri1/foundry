@@ -1,0 +1,301 @@
+/* ============================================
+   FOUNDRY — Workshop Join (post sign-in)
+   Layered onto the FoundryLanding tokens (cream / peach / Fraunces).
+   The :root vars come from FoundryLanding.css which is also imported
+   by JoinScreen.jsx. Self-contained scroll shell because index.css
+   globally locks html/body/#root with overflow:hidden so in-app
+   panels can manage their own scroll.
+   ============================================ */
+
+.join-page {
+  min-height: 100vh;
+  height: 100vh;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  background: var(--cream);
+  color: var(--ink);
+  font-family: var(--sans);
+  font-size: 16px;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+}
+.join-page *,
+.join-page *::before,
+.join-page *::after { box-sizing: border-box; }
+.join-page a { color: inherit; text-decoration: none; }
+.join-page button { font-family: inherit; cursor: pointer; }
+
+.join-main {
+  flex: 1;
+  padding: 56px 0 80px;
+}
+.join-main--centered {
+  display: grid;
+  place-items: center;
+  min-height: 100vh;
+  padding: 40px 24px;
+}
+.join-wrap-narrow {
+  max-width: 560px;
+  width: 100%;
+}
+
+/* Brand line above welcome */
+.join-brand-line {
+  text-align: center;
+  font-family: var(--serif);
+  font-size: 17px;
+  font-weight: 500;
+  color: var(--ink);
+  margin-bottom: 18px;
+}
+.join-brand-line .join-brand-by {
+  font-style: italic;
+  font-weight: 400;
+  color: var(--ink-mid);
+  margin-left: 4px;
+}
+.join-brand-line .join-brand-by a {
+  color: var(--peach-deep);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  text-decoration-thickness: 1px;
+}
+
+.join-welcome-h--centered {
+  text-align: center;
+  font-size: clamp(36px, 4.5vw, 52px);
+  margin-bottom: 44px;
+  font-weight: 500;
+  font-family: var(--serif);
+  letter-spacing: -0.02em;
+  color: var(--ink);
+  margin-top: 0;
+  text-wrap: balance;
+}
+.join-welcome-h--centered .fl-highlight em {
+  font-style: italic;
+  font-weight: 500;
+}
+/* fl-highlight is shared with the marketing landing — re-declare here
+   so JoinScreen doesn't depend on FoundryLanding.css being loaded for
+   the peach skewed wash behind the user's name. */
+.join-page .fl-highlight {
+  position: relative;
+  display: inline-block;
+  padding: 0 4px;
+  font-style: italic;
+  font-weight: 500;
+  z-index: 1;
+}
+.join-page .fl-highlight::before {
+  content: "";
+  position: absolute;
+  inset: 8% -2px 6% -2px;
+  background: var(--peach);
+  z-index: -1;
+  border-radius: 3px;
+  transform: skew(-3deg);
+}
+
+/* ── Code entry card ── */
+.join-card {
+  background: var(--paper);
+  border: 1px solid var(--rule-soft);
+  border-radius: 24px;
+  padding: 36px;
+  box-shadow:
+    0 1px 0 rgba(255,255,255,0.6) inset,
+    0 24px 48px -32px rgba(60,40,20,0.18);
+}
+.join-card-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--mono);
+  font-size: 10.5px;
+  font-weight: 500;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--peach-deep);
+  margin-bottom: 14px;
+}
+.join-card-eyebrow::before {
+  content: "";
+  width: 6px; height: 6px;
+  background: var(--peach-deep);
+  border-radius: 50%;
+}
+.join-card-h {
+  font-family: var(--serif);
+  font-weight: 500;
+  font-size: 28px;
+  line-height: 1.15;
+  letter-spacing: -0.015em;
+  color: var(--ink);
+  margin: 0 0 8px;
+}
+.join-card-sub {
+  font-size: 14.5px;
+  color: var(--ink-mid);
+  margin: 0 0 28px;
+  max-width: 420px;
+}
+
+/* ── Segmented 6-cell code input (3 + dot + 3) ── */
+.code-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr) auto repeat(3, 1fr);
+  gap: 10px;
+  max-width: 480px;
+  margin-bottom: 6px;
+}
+.code-cell {
+  width: 100%;
+  aspect-ratio: 1 / 1.15;
+  background: var(--cream-soft);
+  border: 1.5px solid var(--rule);
+  border-radius: 14px;
+  font-family: var(--serif);
+  font-size: 32px;
+  font-weight: 500;
+  text-align: center;
+  color: var(--ink);
+  caret-color: var(--peach-deep);
+  outline: none;
+  transition: all .18s;
+  letter-spacing: -0.01em;
+  text-transform: uppercase;
+  -moz-appearance: textfield;
+}
+.code-cell::-webkit-outer-spin-button,
+.code-cell::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.code-cell:focus {
+  border-color: var(--ink);
+  background: var(--paper);
+  box-shadow: 0 0 0 4px rgba(232,153,84,0.16);
+}
+.code-cell.filled {
+  background: var(--paper);
+  border-color: var(--ink-muted);
+}
+.code-cell.error {
+  border-color: #c84d3a;
+  background: #fbe9e2;
+  animation: join-shake .35s;
+}
+@keyframes join-shake {
+  0%, 100% { transform: translateX(0); }
+  20%, 60% { transform: translateX(-4px); }
+  40%, 80% { transform: translateX(4px); }
+}
+.code-divider {
+  align-self: center;
+  text-align: center;
+  font-size: 22px;
+  color: var(--ink-muted);
+  font-weight: 300;
+  user-select: none;
+}
+
+.code-status {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+  display: flex; align-items: center; gap: 8px;
+  min-height: 16px;
+  margin-top: 18px;
+}
+.code-status .dot {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--ink-muted);
+}
+.code-status.checking .dot {
+  background: var(--peach-deep);
+  animation: join-pulse 1.2s infinite;
+}
+.code-status.ready { color: var(--peach-deep); }
+.code-status.ready .dot { background: var(--peach-deep); }
+.code-status.error { color: #c84d3a; }
+.code-status.error .dot { background: #c84d3a; }
+@keyframes join-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+
+/* CTA inside the card */
+.join-card-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 14px;
+  background: var(--ink);
+  color: var(--cream);
+  border: none;
+  border-radius: 999px;
+  padding: 8px 8px 8px 26px;
+  font-family: var(--sans);
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  margin-top: 28px;
+  transition: background .2s, transform .15s, opacity .2s;
+}
+.join-card-cta:hover:not(:disabled) { background: var(--ink-soft); transform: translateY(-1px); }
+.join-card-cta:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  transform: none;
+}
+.join-card-cta:disabled:hover { background: var(--ink); transform: none; }
+.join-card-cta-arrow {
+  width: 36px; height: 36px;
+  border-radius: 50%;
+  background: var(--peach-deep);
+  display: grid; place-items: center;
+  color: var(--ink);
+  transition: transform .25s;
+}
+.join-card-cta:hover:not(:disabled) .join-card-cta-arrow { transform: rotate(-12deg); }
+
+/* Helper row at bottom of card */
+.join-card-foot {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 32px;
+  padding-top: 24px;
+  border-top: 1px solid var(--rule-soft);
+  font-size: 13px;
+  color: var(--ink-muted);
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.join-card-foot button {
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: 13px;
+  color: var(--ink-mid);
+  border-bottom: 1px solid var(--rule);
+  transition: color .2s, border-color .2s;
+}
+.join-card-foot button:hover { color: var(--ink); border-bottom-color: var(--ink); }
+.join-card-foot .join-foot-error { color: #b8453d; border-bottom-color: rgba(184,69,61,0.4); }
+
+/* Responsive */
+@media (max-width: 920px) {
+  .join-card { padding: 24px; }
+  .code-row { gap: 6px; }
+  .code-cell { font-size: 24px; border-radius: 10px; }
+}
+@media (max-width: 520px) {
+  .join-welcome-h--centered { font-size: 32px; margin-bottom: 32px; }
+  .join-card { padding: 22px 18px; }
+  .code-row { gap: 5px; }
+  .code-cell { font-size: 22px; aspect-ratio: 1 / 1.2; }
+}

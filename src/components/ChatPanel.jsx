@@ -1382,8 +1382,14 @@ export default function ChatPanel({ messages, onSendMessage, onApprovalAction, o
               const node = findNode(fileTree, id);
               if (!node) return null;
               const isSkill = skillFileIds.includes(id);
+              const showRole = stageReached(currentStage, '4');
               return (
                 <span key={id} className={`cl-context-chip${isSkill ? ' is-skill' : ''}`}>
+                  {showRole && (
+                    <span className="cl-context-chip-role" title={isSkill ? 'Skill file (from skills folder)' : 'Knowledge file (from knowledge folder)'}>
+                      {isSkill ? 'skill' : 'knowledge'}
+                    </span>
+                  )}
                   <span className="cl-context-chip-name">{node.name.replace(/\.md$/, '')}</span>
                   <button
                     type="button"

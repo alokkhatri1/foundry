@@ -1,4 +1,19 @@
 import { useState } from 'react';
+import './FoundryLanding.css';
+
+// Code-entry screen shown after Google sign-in but before joining a
+// workshop. Visual language mirrors the marketing landing (cream +
+// peach + Fraunces) so the participant sees the same brand voice
+// from sign-in through the workshop. Behavior is unchanged: a single
+// text input, Enter or button click hands the code up to App.handleJoin.
+function ArrowIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+      <line x1="7" y1="17" x2="17" y2="7" />
+      <polyline points="7 7 17 7 17 17" />
+    </svg>
+  );
+}
 
 export default function JoinScreen({ user, isAdmin, adminStatus, adminError, onRetryAdminCheck, onJoin, onSignOut, onAdminDashboard }) {
   const [code, setCode] = useState('');
@@ -13,10 +28,8 @@ export default function JoinScreen({ user, isAdmin, adminStatus, adminError, onR
     setJoining(true);
     // Defense in depth: if onJoin throws (e.g. any sb.* call in the join
     // chain rejects), we must still clear the spinner and show something
-    // actionable — otherwise the button sits on "Joining…" forever and the
-    // user thinks the app is dead. App.handleJoin already wraps its own
-    // sequence in try/catch, but we keep this catch in case a future caller
-    // forgets to.
+    // actionable — otherwise the button sits on "Joining…" forever and
+    // the user thinks the app is dead.
     try {
       const result = await onJoin(userName, code.trim().toUpperCase(), user?.id, user?.email);
       if (result?.error) {
@@ -38,26 +51,22 @@ export default function JoinScreen({ user, isAdmin, adminStatus, adminError, onR
   }
 
   return (
-    <div className="landing">
-      <div className="landing-content" style={{ flexDirection: 'column', alignItems: 'center', gap: 32 }}>
-        <div style={{ textAlign: 'center' }}>
-          <div className="landing-wordmark" style={{ marginBottom: 24, textAlign: 'center' }}>
-            <span className="landing-wordmark-name">Foundry</span>
-            <span className="landing-wordmark-by">
-              {' '}by{' '}
-              <a href="https://alokkhatri.com" target="_blank" rel="noopener noreferrer">Alok Khatri</a>
-            </span>
-          </div>
-          <h1 className="landing-title" style={{ fontSize: 36, textAlign: 'center' }}>
-            Welcome, <span className="landing-highlight">{userName}</span>
-          </h1>
+    <div className="foundry-join">
+      <div className="fj-stage">
+        <div className="fj-wordmark">
+          <span className="fj-wordmark-name">Foundry</span>
+          <span className="fj-wordmark-by">
+            {' '}by{' '}
+            <a href="https://alokkhatri.com" target="_blank" rel="noopener noreferrer">Alok Khatri</a>
+          </span>
         </div>
+        <h2 className="fj-welcome">Welcome, <span className="fj-welcome-name">{userName}</span></h2>
 
-        <div className="landing-card" style={{ maxWidth: 380, width: '100%' }}>
-          <h2 className="landing-card-title">Join a Workshop</h2>
-          <p className="landing-card-desc">Enter the code provided by your facilitator.</p>
+        <div className="fj-card">
+          <h3 className="fj-card-title">Join a Workshop</h3>
+          <p className="fj-card-desc">Enter the code provided by your facilitator.</p>
 
-          <div className="landing-field">
+          <div className="fj-field">
             <label>Workshop Code</label>
             <input
               type="text"
@@ -66,34 +75,32 @@ export default function JoinScreen({ user, isAdmin, adminStatus, adminError, onR
               placeholder="Enter code"
               onKeyDown={e => e.key === 'Enter' && handleJoin()}
               autoFocus
-              style={{ textAlign: 'center', letterSpacing: 2, fontSize: 18, fontWeight: 700 }}
             />
           </div>
 
-          {error && <div className="landing-error">{error}</div>}
+          {error && <div className="fj-error">{error}</div>}
 
-          <button className="landing-join-btn" onClick={handleJoin} disabled={!code.trim() || joining}>
-            {joining ? 'Joining...' : 'Join Workshop'}
+          <button className="fj-cta" onClick={handleJoin} disabled={!code.trim() || joining}>
+            {joining ? 'Joining…' : 'Join Workshop'}
+            <span className="fj-cta-arrow"><ArrowIcon /></span>
           </button>
 
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 16, alignItems: 'center' }}>
+          <div className="fj-card-footer">
             {isAdmin && (
-              <button className="landing-admin-link" onClick={onAdminDashboard}>Admin Dashboard</button>
+              <button className="fj-link" onClick={onAdminDashboard}>Admin Dashboard</button>
             )}
             {adminStatus === 'error' && (
               <button
-                className="landing-admin-link"
+                className="fj-link fj-link-error"
                 onClick={onRetryAdminCheck}
                 title={adminError || 'Admin check failed'}
-                style={{ color: '#b8453d' }}
               >
                 Admin check failed — Retry
               </button>
             )}
-            <button className="landing-admin-link" onClick={onSignOut} style={{ marginLeft: 'auto' }}>Sign Out</button>
+            <button className="fj-link fj-link-end" onClick={onSignOut}>Sign Out</button>
           </div>
         </div>
-
       </div>
     </div>
   );

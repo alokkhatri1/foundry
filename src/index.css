@@ -7552,11 +7552,13 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
   grid-template-columns: 1fr 1fr;
   gap: 12px;
 }
-/* Human cards have a single bottom field (Reviewer) — constrain to the
-   left half so the card visually matches the rhythm of Coworker cards
-   (which fill the row with two pickers). */
-.capstone-field-half {
-  max-width: calc(50% - 6px);
+/* Human cards: step textarea + reviewer picker side-by-side. Step gets
+   2/3 of the width since it's the main field; align-items:start keeps
+   the picker at its natural height instead of stretching to match the
+   textarea. */
+.capstone-field-row-human {
+  grid-template-columns: 2fr 1fr;
+  align-items: start;
 }
 
 /* Auto-name preview under the Coworker card — confirms what the user

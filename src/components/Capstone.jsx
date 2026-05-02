@@ -331,25 +331,20 @@ function StepCard({ row, idx, isLast, isComplete, fileTree, participants, onUpda
       </div>
 
       <div className="capstone-card-body">
-        <label className="capstone-field">
-          <span className="capstone-field-label">
-            {isCoworker
-              ? 'What does the coworker do? (becomes the coworker’s role)'
-              : 'What does the human verify or approve?'}
-          </span>
-          <textarea
-            className="capstone-field-input"
-            value={row.step}
-            placeholder={isCoworker
-              ? 'e.g. Capture borrower identity, registration, ownership, and guarantor details.'
-              : 'e.g. Risk memo reviewed and approved.'}
-            onChange={e => onUpdate({ step: e.target.value })}
-            rows={3}
-          />
-        </label>
-
         {isCoworker ? (
           <>
+            <label className="capstone-field">
+              <span className="capstone-field-label">
+                What does the coworker do? (becomes the coworker’s role)
+              </span>
+              <textarea
+                className="capstone-field-input"
+                value={row.step}
+                placeholder="e.g. Capture borrower identity, registration, ownership, and guarantor details."
+                onChange={e => onUpdate({ step: e.target.value })}
+                rows={3}
+              />
+            </label>
             <div className="capstone-field-row">
               <label className="capstone-field">
                 <span className="capstone-field-label">Knowledge files</span>
@@ -377,15 +372,30 @@ function StepCard({ row, idx, isLast, isComplete, fileTree, participants, onUpda
             )}
           </>
         ) : (
-          <label className="capstone-field capstone-field-half">
-            <span className="capstone-field-label">Reviewer</span>
-            <ReviewerPicker
-              value={row.reviewerId}
-              valueName={row.reviewerName}
-              participants={participants}
-              onChange={patch => onUpdate(patch)}
-            />
-          </label>
+          // Human card: single content row — step textarea on the left
+          // (wider) with the reviewer picker on the right. Eliminates the
+          // dead column that appeared when remarks went away.
+          <div className="capstone-field-row capstone-field-row-human">
+            <label className="capstone-field">
+              <span className="capstone-field-label">What does the human verify or approve?</span>
+              <textarea
+                className="capstone-field-input"
+                value={row.step}
+                placeholder="e.g. Risk memo reviewed and approved."
+                onChange={e => onUpdate({ step: e.target.value })}
+                rows={3}
+              />
+            </label>
+            <label className="capstone-field">
+              <span className="capstone-field-label">Reviewer</span>
+              <ReviewerPicker
+                value={row.reviewerId}
+                valueName={row.reviewerName}
+                participants={participants}
+                onChange={patch => onUpdate(patch)}
+              />
+            </label>
+          </div>
         )}
       </div>
     </div>

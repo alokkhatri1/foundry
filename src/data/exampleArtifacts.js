@@ -124,49 +124,54 @@ When given a credit memo, validate it against the Compliance Exceptions register
 // roles. The file is editable in place via the standard FileEditor.
 const CAPSTONE_BLUEPRINT = `# Credit Application Review — Workflow Blueprint
 
-A reference blueprint for a credit application review process. Use it as a
-shape. The Capstone table commits each row to four things: **what happens**,
-**who runs it** (a saved AI coworker, or a real human reviewer in the room),
-**what files back it**, and **the logic + definition of done**.
+A reference blueprint for a credit application review process. Use it as
+a shape. Each Capstone step is one of two kinds:
 
-The Actor column below shows role names. In your own Capstone, pick a real
-entity instead — a coworker from your library, or a reviewer who's in the
-workshop with you. That binding is what lets the copilot build the workflow
-in seconds without asking clarifying questions.
-
-| # | Step | Actor (role) | Reference files | Remarks |
-|---|------|--------------|-----------------|---------|
-| 1 | Applicant profile created | Originator (coworker) | Applicant intake checklist | **Logic:** Capture borrower identity, registration, ownership, and guarantor details to start the application. **DoD:** Applicant record saved and selectable for proposal creation. |
-| 2 | Credit history report requested and uploaded | Originator (coworker) | Credit history reading guide | **Logic:** System request sent to the credit bureau; report generated and attached to the case file. **DoD:** A valid credit history report is visible in the case attachments. |
-| 3 | Application details entered | Originator (coworker) | Proposal-fields checklist | **Logic:** Input facility type, amount, tenure, security details, and explanations. **DoD:** Mandatory fields completed without validation errors. |
-| 4 | Financial statements uploaded | Originator (coworker) | Financial-ratios skill | **Logic:** Download the template, fill audited and projected financials, upload; the system calculates ratios. **DoD:** Financial ratios auto-reflected in the proposal view. |
-| 5 | Collateral valued | Valuator (coworker) | Collateral valuation skill | **Logic:** Inspect collateral externally; produce a valuation report. **DoD:** Signed valuation report attached and linked to the collateral record. |
-| 6 | Supporting documents complete | Originator (coworker) | Required-documents checklist | **Logic:** Upload legal, financial, identity, and business proof documents. **DoD:** Required document checklist satisfied. |
-| 7 | Proposal reviewed and approved | Approver (review) | Approval-chain skill | **Logic:** Reviewer reads the proposal pack and approves, rejects, or requests revision. **DoD:** Proposal reaches a final approved/rejected state with a recorded decision. |
-| 8 | Security documents generated and signed | Documentation team (coworker) | Security-doc templates | **Logic:** Generate standard security documents; collect signatures; upload scans. **DoD:** Signed document set uploaded and tagged complete. |
-| 9 | Documentation check and legal verification | Legal Reviewer (review) | Legal-compliance skill | **Logic:** Verify documents for completeness and legal compliance. **DoD:** Legal clearance recorded in the workflow. |
-| 10 | Loan implemented and booked | Operations (coworker) | Booking-checklist skill | **Logic:** Set limits, activate accounts, create contracts and deals, apply charges. **DoD:** Loan account operational and ready for disbursement. |
-
-## How to use this in the Capstone
-
-1. Open the Capstone tab and add one row per step in your own workflow.
-2. For each row:
-   - **Step** — what happens. Be concrete (one line).
-   - **Actor** — toggle between **Coworker** and **Review**, then pick:
-     - **Coworker** rows: pick one of your saved coworkers from the
-       Coworkers tab. (No saved coworkers? Build one first — the
-       Capstone needs them.)
-     - **Review** rows: pick a real human in the room.
-   - **Reference files** — knowledge or skills files that back the step.
-   - **Remarks** — the logic and the definition of done.
-3. When every row is bound, hit **Send to copilot**. The copilot reads
-   the bindings and assembles the workflow on the canvas — no clarifying
-   questions, just a one-line preview and the build.
+- **Coworker step** — the step description becomes an AI coworker's role.
+  You attach knowledge files (reading material) and skills files
+  (instructions that shape behaviour). When you hit Send, the system
+  creates that coworker in your library, named for you, and drops it
+  onto the workflow canvas.
+- **Human step** — you assign a real human in the room as the reviewer
+  and write remarks describing what they verify.
 
 The clarity is the slow step. The build is fast.
 
-The blueprint above is editable. Rewrite it to match your cohort's domain
-if you're running this for something other than a credit review.
+| # | Step description | Type | Knowledge / Skills (Coworker) — or Reviewer (Human) |
+|---|------------------|------|------|
+| 1 | Capture borrower identity, registration, ownership, and guarantor details to start the application | Coworker | Knowledge: applicant intake checklist • Skills: borrower capture |
+| 2 | Request and attach the credit bureau report to the case file | Coworker | Knowledge: credit history reading guide • Skills: bureau request |
+| 3 | Enter facility type, amount, tenure, security details, and explanations | Coworker | Knowledge: proposal-fields checklist • Skills: proposal entry |
+| 4 | Compile audited and projected financials; calculate financial ratios | Coworker | Skills: financial-ratios |
+| 5 | Inspect collateral and produce a signed valuation report | Coworker | Skills: collateral valuation |
+| 6 | Verify the supporting-documents pack is complete | Coworker | Knowledge: required-documents checklist |
+| 7 | Review the proposal pack and approve, reject, or request revision | Human | Reviewer: a real reviewer in the room |
+| 8 | Generate standard security documents; collect signatures; upload scans | Coworker | Skills: security-doc templates |
+| 9 | Verify documents for completeness and legal compliance | Human | Reviewer: a real reviewer in the room |
+| 10 | Set limits, activate accounts, create contracts and deals, apply charges | Coworker | Skills: booking checklist |
+
+## How to use this in the Capstone
+
+1. Open the Capstone tab. Each card is one step in your workflow.
+2. For each card:
+   - Toggle **Coworker** or **Human** at the top of the card.
+   - **Coworker** cards: write what the coworker does — that text becomes
+     the coworker's role. Then attach knowledge files and skills files.
+     The card shows you the auto-generated coworker name as you type.
+   - **Human** cards: write the action ("Risk memo reviewed and
+     approved"), pick a reviewer from the room, and add remarks
+     describing what they verify.
+3. When every card is filled, hit **Send to copilot**. The system
+   creates a fresh coworker for each Coworker card (named from your
+   step text) and pre-fills the workflow copilot with a build prompt.
+   The copilot reads the bindings and assembles the canvas — no
+   clarifying questions, just a one-line preview and the build.
+
+You don't need to pre-build coworkers in the Coworkers tab — the
+Capstone creates them for you from the step descriptions.
+
+The blueprint above is editable. Rewrite it to match your cohort's
+domain if you're running this for something other than a credit review.
 `;
 
 export function createExampleFiles(roomId) {

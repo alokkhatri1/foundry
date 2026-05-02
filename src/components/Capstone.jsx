@@ -2,150 +2,132 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import RichText from './RichText';
 import { EXAMPLE_BLUEPRINT_FILE_ID } from '../data/exampleArtifacts';
 
-// Capstone tab — Stage 8. Each participant fills a 5-column workflow plan
-// (Step / Node / Data source / Knowledge & skills files / Remarks). When
-// every row has all five fields non-empty AND the Copilot stage (9) has
-// been revealed, a "Send to copilot" action ships the table as markdown
-// into the Orchestration copilot.
+// Capstone tab — Stage 8. Each row is a step spec for the workflow.
+//
+// Coworker step: the step text becomes the coworker's role, and the row
+// also picks knowledge files and skills files. On Send-to-copilot, the
+// row materializes into a real saved coworker (auto-named from the step
+// text) that lands in the participant's library and is then referenced
+// by name on the canvas.
+//
+// Human step: pick a real human in the room + remarks describing what
+// they verify. Materializes as a Review node assigned to that human.
+//
+// Stage 5 (Coworkers) teaches the primitive — name, role, knowledge,
+// skills. Stage 8 USES the same primitive at workflow scale: every
+// coworker step IS a coworker spec. The teaching arc is "one coworker,
+// then a team of them, defined the same way."
 //
 // Persistence: per-participant per-room via sb.loadCapstoneDraft /
 // sb.saveCapstoneDraft. No realtime — single-author edits.
-//
-// Blueprint reference: a side drawer reads the seeded blueprint.md file
-// (Examples/blueprints/blueprint.md, dropped at Stage 8 reveal). The file
-// is editable by admins via the standard FileEditor, so each cohort can
-// rewrite the blueprint without a code deploy.
 
 function newRow() {
   return {
     id: 'row-' + Math.random().toString(36).slice(2, 10),
-    type: 'coworker', // 'coworker' | 'review' — drives whether the copilot
-                      // generates an add_coworker_node or add_review_node
-                      // for this step. Default Coworker because most rows
-                      // are AI work; Reviews are typically the minority.
-    actorId: '',      // For type=coworker: id of a saved coworker.
-                      // For type=review: id of a participant (reviewer).
-                      // Bound from the ActorPicker. Cleared when type flips.
-    actorName: '',    // Cached at bind time so the markdown export still
-                      // works if the underlying entity is later renamed
-                      // or removed; isRowComplete validates the id still
-                      // resolves before send is allowed.
+    type: 'coworker', // 'coworker' | 'human'
     step: '',
-    node: '',
-    fileIds: [],
-    remarks: '',
+    knowledgeFileIds: [], // coworker-only
+    skillsFileIds: [],    // coworker-only
+    reviewerId: '',       // human-only
+    reviewerName: '',     // human-only — cached for stale-handling
+    remarks: '',          // human-only — what they verify
   };
 }
 
-function rowTypeLabel(type) {
-  return type === 'review' ? 'Human review' : 'AI coworker';
-}
-
-// "Step / Node" is one combined column in the LOAMS reference (a step in
-// the workflow = a node in the DAG). For drafts saved before this collapse
-// the row may carry both `step` and `node` — treat them as one. Going
-// forward only `step` is required; `node` is preserved on existing rows
-// for backwards compat but no longer asked for in the UI.
-function combinedStep(row) {
-  const s = (row.step || '').trim();
-  const n = (row.node || '').trim();
-  if (s && n) return `${s} (${n})`;
-  return s || n;
-}
-
-function isRowComplete(row, coworkers, participants) {
-  if (!combinedStep(row)) return false;
-  if (!(row.remarks || '').trim()) return false;
-  if (!row.actorId) return false;
-  // Files required for Coworker (the AI step needs reference material to
-  // shape its behaviour); optional for Review (a human reviewer might
-  // attach a checklist but doesn't have to).
-  if ((row.type || 'coworker') === 'coworker' && (row.fileIds || []).length === 0) return false;
-  // Actor must still resolve to a real entity. A coworker deleted from the
-  // library or a participant who left the room should re-flag the row as
-  // incomplete instead of silently shipping a dangling id to the copilot.
-  if ((row.type || 'coworker') === 'coworker') {
-    if (!(coworkers || []).some(c => c.id === row.actorId)) return false;
-  } else {
-    if (!(participants || []).some(p => p.id === row.actorId)) return false;
+// One-time migration of pre-redesign drafts. Old shape had:
+//   { type: 'coworker'|'review', actorId, actorName, fileIds, remarks }
+// where files were a single combined knowledge+skills picker and the
+// actor pointed at a saved coworker (coworker rows) or participant
+// (review rows). We map it forward best-effort: the freeform actor binding
+// no longer applies to coworker rows (the spec replaces it), but for
+// review rows we copy actor → reviewer. Old fileIds get parked into
+// knowledgeFileIds since we can't tell from the row alone which folder
+// they came from; the participant can re-split if it matters.
+function migrateRow(row) {
+  if (!row || typeof row !== 'object') return newRow();
+  const next = { ...newRow(), ...row };
+  if (row.type === 'review') next.type = 'human';
+  if (row.type === 'review' && row.actorId && !row.reviewerId) {
+    next.reviewerId = row.actorId;
+    next.reviewerName = row.actorName || '';
   }
+  if (Array.isArray(row.fileIds) && row.fileIds.length && !row.knowledgeFileIds && !row.skillsFileIds) {
+    next.knowledgeFileIds = row.fileIds;
+  }
+  // Drop legacy fields so the saved draft converges on the new shape.
+  delete next.actorId;
+  delete next.actorName;
+  delete next.fileIds;
+  delete next.node;
+  return next;
+}
+
+function rowTypeLabel(type) {
+  return type === 'human' ? 'Human review' : 'AI coworker';
+}
+
+// Derive a coworker name from the step text. Takes the first ~5 words,
+// title-cased, capped. The participant sees this preview under the row
+// before they hit Send. Uniqueness against other rows in the same plan
+// (and against the existing library) is handled in App.jsx at send time.
+export function deriveCoworkerName(step) {
+  const cleaned = (step || '').trim().replace(/\s+/g, ' ');
+  if (!cleaned) return '';
+  const words = cleaned.split(' ').slice(0, 5);
+  const titled = words.map(w => w ? w[0].toUpperCase() + w.slice(1).toLowerCase() : w).join(' ');
+  return titled.replace(/[.,;:!?]+$/, '').slice(0, 60);
+}
+
+function isRowComplete(row, participants) {
+  const step = (row.step || '').trim();
+  if (!step) return false;
+  if ((row.type || 'coworker') === 'coworker') {
+    // At least one knowledge or skills file backing the spec — the
+    // materialized coworker has nothing to behave from otherwise.
+    const hasFiles = (row.knowledgeFileIds || []).length > 0 || (row.skillsFileIds || []).length > 0;
+    return hasFiles;
+  }
+  // Human row — reviewer must still be in the room.
+  if (!row.reviewerId) return false;
+  if (!(participants || []).some(p => p.id === row.reviewerId)) return false;
+  if (!(row.remarks || '').trim()) return false;
   return true;
 }
 
-// First-incomplete row diagnostic. Tells the participant *which* row blocks
-// Send rather than just "5 of 7 complete" — we know from the workshop the
-// count-only message left people hunting for the missing field.
-function firstIncompleteReason(rows, coworkers, participants) {
+function firstIncompleteReason(rows, participants) {
   for (let i = 0; i < (rows || []).length; i++) {
     const r = rows[i];
     const num = i + 1;
-    if (!combinedStep(r)) return `Row ${num}: step description is empty`;
-    if (!r.actorId) {
-      return r.type === 'review'
-        ? `Row ${num}: pick a reviewer`
-        : `Row ${num}: pick a coworker`;
+    if (!(r.step || '').trim()) {
+      return (r.type || 'coworker') === 'coworker'
+        ? `Step ${num}: describe what the coworker does`
+        : `Step ${num}: describe what the human verifies`;
     }
     if ((r.type || 'coworker') === 'coworker') {
-      if (!(coworkers || []).some(c => c.id === r.actorId)) {
-        return `Row ${num}: coworker "${r.actorName || r.actorId}" no longer exists — pick another`;
-      }
-      if ((r.fileIds || []).length === 0) return `Row ${num}: attach at least one reference file`;
+      const hasFiles = (r.knowledgeFileIds || []).length > 0 || (r.skillsFileIds || []).length > 0;
+      if (!hasFiles) return `Step ${num}: attach at least one knowledge or skills file`;
     } else {
-      if (!(participants || []).some(p => p.id === r.actorId)) {
-        return `Row ${num}: reviewer "${r.actorName || r.actorId}" left the room — pick another`;
+      if (!r.reviewerId) return `Step ${num}: pick a reviewer`;
+      if (!(participants || []).some(p => p.id === r.reviewerId)) {
+        return `Step ${num}: reviewer "${r.reviewerName || ''}" left the room — pick another`;
       }
+      if (!(r.remarks || '').trim()) return `Step ${num}: remarks are empty`;
     }
-    if (!(r.remarks || '').trim()) return `Row ${num}: remarks are empty`;
   }
   return null;
 }
 
-// Markdown rendering of the participant's plan. Bindings are explicit
-// (Coworker: <name> / Reviewer: <name>) so the copilot doesn't have to
-// infer which saved entity a step refers to — it can call the add_*
-// tools directly with the named entity. The copilot's system prompt
-// tells it to skip Discover when these bindings are present.
-function rowsToMarkdown(rows, fileTreeFlat) {
-  const fileNameById = new Map((fileTreeFlat || []).map(f => [f.id, f.name]));
-  const lines = [
-    'Build this workflow. Bindings below are explicit — use them, don’t infer.',
-    '',
-  ];
-  rows.forEach((r, i) => {
-    const fileNames = (r.fileIds || []).map(id => fileNameById.get(id) || id).filter(Boolean);
-    const isReview = r.type === 'review';
-    lines.push(`### Step ${i + 1}: ${combinedStep(r)}`);
-    lines.push(`- Type: ${rowTypeLabel(r.type)}`);
-    if (isReview) {
-      lines.push(`- Reviewer: ${r.actorName || ''}`);
-      // Use the step text as the review prompt. The copilot may rephrase
-      // into a question form when it calls add_review_node; that's fine.
-      lines.push(`- Prompt: ${combinedStep(r)}`);
-    } else {
-      lines.push(`- Coworker: ${r.actorName || ''}`);
-    }
-    if (fileNames.length) lines.push(`- Reference files: ${fileNames.join(', ')}`);
-    lines.push(`- Logic + DoD: ${r.remarks}`);
-    lines.push('');
-  });
-  return lines.join('\n').trim();
-}
-
-// Flatten a FileExplorer-style tree into rows for the file picker. Filters
-// out folders and the participant's own / system files restricted to the
-// knowledge + skills folders, since those are the ones that actually back
-// workflow steps.
-function flattenForPicker(tree) {
+// Walk the file tree, returning files inside the named subfolder
+// ('knowledge' or 'skills'). Used by FilePicker; supports the two
+// pickers on a coworker card without leaking files between folders.
+function flattenForPicker(tree, folder) {
   const out = [];
   if (!tree) return out;
   function walk(node, ancestorFolderName) {
     if (!node) return;
     const nextAncestor = node.type === 'folder' ? node.name : ancestorFolderName;
-    if (node.type === 'file') {
-      const inKnowledgeOrSkills = ancestorFolderName === 'knowledge' || ancestorFolderName === 'skills';
-      if (inKnowledgeOrSkills) {
-        out.push({ id: node.id, name: node.name, folder: ancestorFolderName });
-      }
+    if (node.type === 'file' && ancestorFolderName === folder) {
+      out.push({ id: node.id, name: node.name });
     }
     for (const child of node.children || []) walk(child, nextAncestor);
   }
@@ -157,28 +139,21 @@ function stripExt(name) {
   return (name || '').replace(/\.md$/i, '');
 }
 
-function FilePicker({ value, onChange, fileTree }) {
+function FilePicker({ value, onChange, fileTree, folder }) {
   const [open, setOpen] = useState(false);
   const containerRef = useRef(null);
-  const options = useMemo(() => flattenForPicker(fileTree), [fileTree]);
+  const options = useMemo(() => flattenForPicker(fileTree, folder), [fileTree, folder]);
   const selectedNames = (value || [])
     .map(id => options.find(o => o.id === id)?.name)
     .filter(Boolean)
     .map(stripExt);
 
-  // Click-outside-to-close. Without this the dropdown stays open when the
-  // participant clicks back into a textarea or anywhere else on the page,
-  // and they have to click the button again to dismiss it.
   useEffect(() => {
     if (!open) return;
     function onDocClick(e) {
-      if (containerRef.current && !containerRef.current.contains(e.target)) {
-        setOpen(false);
-      }
+      if (containerRef.current && !containerRef.current.contains(e.target)) setOpen(false);
     }
-    function onEsc(e) {
-      if (e.key === 'Escape') setOpen(false);
-    }
+    function onEsc(e) { if (e.key === 'Escape') setOpen(false); }
     document.addEventListener('mousedown', onDocClick);
     document.addEventListener('keydown', onEsc);
     return () => {
@@ -194,6 +169,11 @@ function FilePicker({ value, onChange, fileTree }) {
     onChange(next);
   }
 
+  const placeholder = folder === 'skills' ? 'Pick skills files…' : 'Pick knowledge files…';
+  const emptyMsg = folder === 'skills'
+    ? 'No skills files yet — write one in the Files tab.'
+    : 'No knowledge files yet — add one in the Files tab.';
+
   return (
     <div className="capstone-filepicker" ref={containerRef}>
       <button
@@ -203,7 +183,7 @@ function FilePicker({ value, onChange, fileTree }) {
       >
         <span className="capstone-filepicker-content">
           {selectedNames.length === 0 ? (
-            <span className="capstone-filepicker-placeholder">Pick files&hellip;</span>
+            <span className="capstone-filepicker-placeholder">{placeholder}</span>
           ) : (
             selectedNames.map((name, i) => (
               <span key={i} className="capstone-filepicker-chip">{name}</span>
@@ -215,9 +195,7 @@ function FilePicker({ value, onChange, fileTree }) {
       {open && (
         <div className="capstone-filepicker-menu">
           {options.length === 0 ? (
-            <div className="capstone-filepicker-empty">
-              No files in your knowledge or skills folders yet.
-            </div>
+            <div className="capstone-filepicker-empty">{emptyMsg}</div>
           ) : (
             options.map(opt => (
               <label key={opt.id} className="capstone-filepicker-option">
@@ -227,7 +205,6 @@ function FilePicker({ value, onChange, fileTree }) {
                   onChange={() => toggle(opt.id)}
                 />
                 <span className="capstone-filepicker-option-name">{stripExt(opt.name)}</span>
-                <span className="capstone-filepicker-option-folder">{opt.folder}</span>
               </label>
             ))
           )}
@@ -237,12 +214,15 @@ function FilePicker({ value, onChange, fileTree }) {
   );
 }
 
-function ActorPicker({ row, coworkers, participants, onActorChange }) {
+// Reviewer picker for human steps — single-select dropdown over the
+// room's humans. Mirrors the FilePicker shell so the row reads as a
+// uniform strip. Shows offline humans too: a workshop where everyone
+// happens to be offline at planning time shouldn't block them from
+// picking a reviewer.
+function ReviewerPicker({ value, valueName, participants, onChange }) {
   const [open, setOpen] = useState(false);
   const containerRef = useRef(null);
 
-  // Same click-outside-to-close pattern as FilePicker. Without this the
-  // dropdown stays open when the participant clicks back into a textarea.
   useEffect(() => {
     if (!open) return;
     function onDocClick(e) {
@@ -257,29 +237,17 @@ function ActorPicker({ row, coworkers, participants, onActorChange }) {
     };
   }, [open]);
 
-  const isCoworker = (row.type || 'coworker') === 'coworker';
-  const options = useMemo(() => {
-    if (isCoworker) {
-      return (coworkers || [])
-        .filter(c => (c.name || '').trim())
-        .map(c => ({ id: c.id, name: c.name, sub: (c.role || '').slice(0, 80) }));
-    }
-    // Humans only — exclude AI participants. Show offline humans too: a
-    // workshop where everyone happens to be offline at planning time
-    // shouldn't block them from picking a reviewer.
-    return (participants || [])
+  const options = useMemo(() => (
+    (participants || [])
       .filter(p => (p.kind || 'human') === 'human' && (p.name || '').trim())
-      .map(p => ({ id: p.id, name: p.name, sub: p.online ? 'online' : 'offline' }));
-  }, [isCoworker, coworkers, participants]);
+      .map(p => ({ id: p.id, name: p.name, sub: p.online ? 'online' : 'offline' }))
+  ), [participants]);
 
-  const selected = options.find(o => o.id === row.actorId);
-  const placeholder = isCoworker ? 'Pick a coworker…' : 'Pick a reviewer…';
-  const emptyMsg = isCoworker
-    ? 'No saved coworkers yet — build one in the Coworkers tab.'
-    : 'No humans in the workshop yet.';
+  const selected = options.find(o => o.id === value);
+  const stale = !selected && valueName ? valueName : null;
 
   function pick(opt) {
-    onActorChange({ actorId: opt.id, actorName: opt.name });
+    onChange({ reviewerId: opt.id, reviewerName: opt.name });
     setOpen(false);
   }
 
@@ -293,8 +261,10 @@ function ActorPicker({ row, coworkers, participants, onActorChange }) {
         <span className="capstone-actorpicker-content">
           {selected ? (
             <span className="capstone-actorpicker-chip">{selected.name}</span>
+          ) : stale ? (
+            <span className="capstone-actorpicker-chip is-stale">{stale} (left room)</span>
           ) : (
-            <span className="capstone-actorpicker-placeholder">{placeholder}</span>
+            <span className="capstone-actorpicker-placeholder">Pick a reviewer…</span>
           )}
         </span>
         <span className="capstone-actorpicker-caret">{open ? '▴' : '▾'}</span>
@@ -302,13 +272,13 @@ function ActorPicker({ row, coworkers, participants, onActorChange }) {
       {open && (
         <div className="capstone-actorpicker-menu">
           {options.length === 0 ? (
-            <div className="capstone-actorpicker-empty">{emptyMsg}</div>
+            <div className="capstone-actorpicker-empty">No humans in the workshop yet.</div>
           ) : (
             options.map(opt => (
               <button
                 type="button"
                 key={opt.id}
-                className={`capstone-actorpicker-option${opt.id === row.actorId ? ' is-selected' : ''}`}
+                className={`capstone-actorpicker-option${opt.id === value ? ' is-selected' : ''}`}
                 onClick={() => pick(opt)}
               >
                 <span className="capstone-actorpicker-option-name">{opt.name}</span>
@@ -318,6 +288,119 @@ function ActorPicker({ row, coworkers, participants, onActorChange }) {
           )}
         </div>
       )}
+    </div>
+  );
+}
+
+function StepCard({ row, idx, isLast, isComplete, fileTree, participants, onUpdate, onMove, onDelete, canDelete }) {
+  const isCoworker = (row.type || 'coworker') !== 'human';
+  const derivedName = isCoworker ? deriveCoworkerName(row.step) : '';
+
+  return (
+    <div className={`capstone-card${isComplete ? ' is-complete' : ''} type-${isCoworker ? 'coworker' : 'human'}`}>
+      <div className="capstone-card-header">
+        <div className="capstone-card-num">Step {idx + 1}</div>
+        <div className="capstone-type-toggle" role="group" aria-label="Step type">
+          <button
+            type="button"
+            className={`capstone-type-btn${isCoworker ? ' active' : ''}`}
+            onClick={() => {
+              if (isCoworker) return;
+              // Type flip clears the human-only fields. Step text stays;
+              // the participant usually wants to keep the description.
+              onUpdate({ type: 'coworker', reviewerId: '', reviewerName: '', remarks: '' });
+            }}
+          >
+            <span aria-hidden>{'\u{1F916}'}</span> Coworker
+          </button>
+          <button
+            type="button"
+            className={`capstone-type-btn${!isCoworker ? ' active' : ''}`}
+            onClick={() => {
+              if (!isCoworker) return;
+              onUpdate({ type: 'human', knowledgeFileIds: [], skillsFileIds: [] });
+            }}
+          >
+            <span aria-hidden>{'\u{1F464}'}</span> Human
+          </button>
+        </div>
+        <div className="capstone-card-actions">
+          <button type="button" className="capstone-row-btn" onClick={() => onMove(-1)} disabled={idx === 0} title="Move up">{'↑'}</button>
+          <button type="button" className="capstone-row-btn" onClick={() => onMove(1)} disabled={isLast} title="Move down">{'↓'}</button>
+          <button type="button" className="capstone-row-btn capstone-row-delete" onClick={onDelete} disabled={!canDelete} title="Delete step">{'✕'}</button>
+        </div>
+      </div>
+
+      <div className="capstone-card-body">
+        <label className="capstone-field">
+          <span className="capstone-field-label">
+            {isCoworker
+              ? 'What does the coworker do? (becomes the coworker’s role)'
+              : 'What does the human verify or approve?'}
+          </span>
+          <textarea
+            className="capstone-field-input"
+            value={row.step}
+            placeholder={isCoworker
+              ? 'e.g. Capture borrower identity, registration, ownership, and guarantor details.'
+              : 'e.g. Risk memo reviewed and approved.'}
+            onChange={e => onUpdate({ step: e.target.value })}
+            rows={3}
+          />
+        </label>
+
+        {isCoworker ? (
+          <>
+            <div className="capstone-field-row">
+              <label className="capstone-field">
+                <span className="capstone-field-label">Knowledge files</span>
+                <FilePicker
+                  value={row.knowledgeFileIds || []}
+                  onChange={ids => onUpdate({ knowledgeFileIds: ids })}
+                  fileTree={fileTree}
+                  folder="knowledge"
+                />
+              </label>
+              <label className="capstone-field">
+                <span className="capstone-field-label">Skills files</span>
+                <FilePicker
+                  value={row.skillsFileIds || []}
+                  onChange={ids => onUpdate({ skillsFileIds: ids })}
+                  fileTree={fileTree}
+                  folder="skills"
+                />
+              </label>
+            </div>
+            {derivedName && (
+              <div className="capstone-card-name-preview">
+                Will create coworker: <strong>{derivedName}</strong>
+              </div>
+            )}
+          </>
+        ) : (
+          <div className="capstone-field-row">
+            <label className="capstone-field">
+              <span className="capstone-field-label">Reviewer</span>
+              <ReviewerPicker
+                value={row.reviewerId}
+                valueName={row.reviewerName}
+                participants={participants}
+                onChange={patch => onUpdate(patch)}
+              />
+            </label>
+            <label className="capstone-field">
+              <span className="capstone-field-label">Remarks (what they verify)</span>
+              <textarea
+                className="capstone-field-input"
+                value={row.remarks}
+                placeholder="e.g. Verify financial ratios match policy."
+                onChange={e => onUpdate({ remarks: e.target.value })}
+                rows={2}
+              />
+            </label>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -352,7 +435,6 @@ export default function Capstone({
   fileTree,
   flatFiles,
   onEnsureFileContent,
-  coworkers,
   participants,
   copilotUnlocked,
   onSendToCopilot,
@@ -361,8 +443,11 @@ export default function Capstone({
   const [saving, setSaving] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [savedNotice, setSavedNotice] = useState(false);
+  const [sending, setSending] = useState(false);
 
-  // One-shot load of the participant's draft (or seed an empty row if none).
+  // One-shot load. Old drafts use the previous shape ({ actorId, fileIds,
+  // type:'review' }); migrateRow rewrites them on load so the participant
+  // doesn't see broken cards.
   useEffect(() => {
     let cancelled = false;
     if (!myParticipantId || !sb) {
@@ -372,7 +457,7 @@ export default function Capstone({
     sb.loadCapstoneDraft(myParticipantId).then(serverRows => {
       if (cancelled) return;
       if (Array.isArray(serverRows) && serverRows.length > 0) {
-        setRows(serverRows);
+        setRows(serverRows.map(migrateRow));
       } else {
         setRows([newRow()]);
       }
@@ -380,9 +465,6 @@ export default function Capstone({
     return () => { cancelled = true; };
   }, [sb, myParticipantId]);
 
-  // Pull the seeded blueprint markdown when the drawer opens. We use the
-  // standard lazy-load path so admin edits via FileEditor are reflected
-  // here without needing a separate fetch route.
   const blueprintFile = (flatFiles || []).find(f => f.id === EXAMPLE_BLUEPRINT_FILE_ID);
   useEffect(() => {
     if (drawerOpen && blueprintFile && typeof blueprintFile.content !== 'string') {
@@ -409,10 +491,7 @@ export default function Capstone({
     });
   }
 
-  // Auto-save: debounce 800ms after the last edit. Avoids a write per
-  // keystroke while still landing the row safely on idle. The save is
-  // fire-and-forget — we surface a transient "Saved" pill so the
-  // participant has feedback without an explicit Save button.
+  // Auto-save: debounce 800ms after the last edit. Same pattern as before.
   useEffect(() => {
     if (rows === null || !myParticipantId) return;
     const handle = setTimeout(async () => {
@@ -428,18 +507,23 @@ export default function Capstone({
   }, [rows, sb, myParticipantId]);
 
   const completeCount = useMemo(
-    () => (rows || []).filter(r => isRowComplete(r, coworkers, participants)).length,
-    [rows, coworkers, participants],
+    () => (rows || []).filter(r => isRowComplete(r, participants)).length,
+    [rows, participants],
   );
-  const allComplete = rows !== null && rows.length > 0 && rows.every(r => isRowComplete(r, coworkers, participants));
+  const allComplete = rows !== null && rows.length > 0 && rows.every(r => isRowComplete(r, participants));
   const incompleteReason = useMemo(
-    () => firstIncompleteReason(rows || [], coworkers, participants),
-    [rows, coworkers, participants],
+    () => firstIncompleteReason(rows || [], participants),
+    [rows, participants],
   );
 
-  function handleSend() {
-    const md = rowsToMarkdown(rows, flatFiles);
-    onSendToCopilot?.(md);
+  async function handleSend() {
+    if (!allComplete || sending) return;
+    setSending(true);
+    try {
+      await onSendToCopilot?.(rows);
+    } finally {
+      setSending(false);
+    }
   }
 
   if (rows === null) {
@@ -456,14 +540,12 @@ export default function Capstone({
         <div>
           <h2 className="capstone-title">Capstone</h2>
           <p className="capstone-sub">
-            Lay out a real workflow. Each row is one step: what happens, who
-            owns it (a saved coworker or a real reviewer), what reading
-            material backs it, and what done looks like. When every row is
-            bound,{' '}
-            {copilotUnlocked
-              ? 'send the plan to the copilot to build it in seconds.'
-              : 'a copilot stage will unlock and you can send the plan to it to build the workflow in seconds.'}
-            {' '}You’ll need at least one saved coworker in the library to fill this in.
+            Lay out a real workflow step by step. Each Coworker step
+            describes what an AI teammate does — and on Send, that
+            description becomes a coworker in your library, named for
+            you, ready to wire onto the canvas. Human steps assign a
+            real reviewer in the room. Clarity is the slow step;
+            building should feel fast.
           </p>
         </div>
         <div className="capstone-actions">
@@ -480,11 +562,11 @@ export default function Capstone({
               type="button"
               className="capstone-btn-primary"
               onClick={handleSend}
-              disabled={!allComplete}
-              title={allComplete ? 'Send your plan to the workflow copilot' : (incompleteReason || `Fill every row first (${completeCount}/${rows.length} complete)`)}
+              disabled={!allComplete || sending}
+              title={allComplete ? 'Materialize coworkers and send the plan to the copilot' : (incompleteReason || `Fill every step first (${completeCount}/${rows.length} complete)`)}
             >
-              Send to copilot
-              <span className="capstone-btn-icon" aria-hidden>{'↗'}</span>
+              {sending ? 'Sending…' : 'Send to copilot'}
+              <span className="capstone-btn-icon" aria-hidden>↗</span>
             </button>
           )}
         </div>
@@ -496,98 +578,21 @@ export default function Capstone({
         {!saving && savedNotice && <span className="capstone-status-saved">Saved</span>}
       </div>
 
-      <div className="capstone-table">
-        <div className="capstone-table-head">
-          <div className="capstone-col-num">#</div>
-          <div className="capstone-col-step">Step</div>
-          <div className="capstone-col-actor">Actor</div>
-          <div className="capstone-col-files">Reference files</div>
-          <div className="capstone-col-remarks">Remarks (logic + DoD)</div>
-          <div className="capstone-col-actions" />
-        </div>
+      <div className="capstone-cards">
         {rows.map((row, idx) => (
-          <div key={row.id} className={`capstone-row${isRowComplete(row, coworkers, participants) ? ' is-complete' : ''} type-${row.type || 'coworker'}`}>
-            <div className="capstone-col-num">{idx + 1}</div>
-            <div className="capstone-col-step">
-              <textarea
-                value={row.step}
-                placeholder={row.type === 'review'
-                  ? 'e.g. Risk memo reviewed and approved'
-                  : 'e.g. Client basic profile created'}
-                onChange={e => update(idx, { step: e.target.value })}
-                rows={2}
-              />
-            </div>
-            <div className="capstone-col-actor">
-              <div className="capstone-type-toggle" role="group" aria-label="Step type">
-                <button
-                  type="button"
-                  className={`capstone-type-btn${(row.type || 'coworker') === 'coworker' ? ' active' : ''}`}
-                  onClick={() => {
-                    if ((row.type || 'coworker') === 'coworker') return;
-                    // Type flip clears the actor binding — coworker ids and
-                    // participant ids don't cross-reference.
-                    update(idx, { type: 'coworker', actorId: '', actorName: '' });
-                  }}
-                >
-                  <span aria-hidden>{'\u{1F916}'}</span> Coworker
-                </button>
-                <button
-                  type="button"
-                  className={`capstone-type-btn${row.type === 'review' ? ' active' : ''}`}
-                  onClick={() => {
-                    if (row.type === 'review') return;
-                    update(idx, { type: 'review', actorId: '', actorName: '' });
-                  }}
-                >
-                  <span aria-hidden>{'\u{1F464}'}</span> Review
-                </button>
-              </div>
-              <ActorPicker
-                row={row}
-                coworkers={coworkers}
-                participants={participants}
-                onActorChange={patch => update(idx, patch)}
-              />
-            </div>
-            <div className="capstone-col-files">
-              <FilePicker
-                value={row.fileIds}
-                onChange={fileIds => update(idx, { fileIds })}
-                fileTree={fileTree}
-              />
-            </div>
-            <textarea
-              className="capstone-col-remarks"
-              value={row.remarks}
-              placeholder="Logic + Definition of Done"
-              onChange={e => update(idx, { remarks: e.target.value })}
-              rows={3}
-            />
-            <div className="capstone-col-actions">
-              <button
-                type="button"
-                className="capstone-row-btn"
-                onClick={() => moveRow(idx, -1)}
-                disabled={idx === 0}
-                title="Move up"
-              >{'↑'}</button>
-              <button
-                type="button"
-                className="capstone-row-btn"
-                onClick={() => moveRow(idx, 1)}
-                disabled={idx === rows.length - 1}
-                title="Move down"
-              >{'↓'}</button>
-              <button
-                type="button"
-                className="capstone-row-btn capstone-row-delete"
-                onClick={() => deleteRow(idx)}
-                disabled={rows.length === 1}
-                title="Delete row"
-              >{'✕'}</button>
-            </div>
-          </div>
+          <StepCard
+            key={row.id}
+            row={row}
+            idx={idx}
+            isLast={idx === rows.length - 1}
+            isComplete={isRowComplete(row, participants)}
+            fileTree={fileTree}
+            participants={participants}
+            onUpdate={patch => update(idx, patch)}
+            onMove={dir => moveRow(idx, dir)}
+            onDelete={() => deleteRow(idx)}
+            canDelete={rows.length > 1}
+          />
         ))}
       </div>
 

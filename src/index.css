@@ -7422,68 +7422,61 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
 .capstone-status-saving { color: var(--text-muted); font-style: italic; }
 .capstone-status-saved { color: #5a9e6f; font-weight: 600; }
 
-/* Table — CSS grid so columns align across rows. */
-.capstone-table {
+/* Cards — one card per workflow step. Replaces the earlier table layout;
+   the row's content is polymorphic (Coworker rows show knowledge+skills
+   pickers; Human rows show a reviewer picker + remarks), and a card is
+   honest with that asymmetry. */
+.capstone-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.capstone-card {
   background: var(--bg-white);
   border: 1px solid var(--border-color);
   border-radius: var(--radius);
-  overflow: visible; /* allow file picker dropdown to escape the box */
-  margin-bottom: 16px;
-}
-.capstone-table-head,
-.capstone-row {
-  display: grid;
-  grid-template-columns: 32px 1.4fr 1fr 1fr 1.6fr 56px;
-  gap: 12px;
-  padding: 14px 16px;
-  align-items: stretch;
-}
-.capstone-table-head {
-  font-size: 10.5px; font-weight: 700; text-transform: uppercase;
-  letter-spacing: 0.6px; color: var(--text-muted);
-  background: var(--bg-warm);
-  border-bottom: 1px solid var(--border-color);
-  border-radius: var(--radius) var(--radius) 0 0;
-  padding: 11px 16px;
-}
-.capstone-row {
-  border-bottom: 1px solid var(--border-color);
+  padding: 16px;
   position: relative;
-  transition: background 0.12s;
+  transition: border-color 0.12s, background 0.12s;
 }
-.capstone-row:last-child { border-bottom: none; }
-.capstone-row:hover { background: rgba(0, 0, 0, 0.012); }
-/* Subtle left-edge accent on completed rows instead of a green tint
-   covering the whole row — quieter, still scannable. */
-.capstone-row.is-complete::before {
+/* Subtle left-edge accent on completed cards — quiet but scannable. */
+.capstone-card.is-complete::before {
   content: '';
   position: absolute;
-  left: 0; top: 8px; bottom: 8px;
+  left: 0; top: 12px; bottom: 12px;
   width: 3px;
   background: #5a9e6f;
   border-radius: 0 2px 2px 0;
 }
-
-/* Step cell holds just the freeform "what happens" textarea. Type toggle
-   moved out into the Actor column so the type marker sits next to the
-   bound entity, not the description. */
-.capstone-col-step {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
+/* Slight tint on Human cards so scanning the plan instantly shows where
+   humans gate the flow. */
+.capstone-card.type-human {
+  background: rgba(200, 149, 108, 0.04);
 }
 
-/* Actor cell stacks the Coworker|Review type toggle above the
-   ActorPicker dropdown — the toggle sets which list the picker shows. */
-.capstone-col-actor {
+.capstone-card-header {
   display: flex;
-  flex-direction: column;
-  gap: 6px;
-  min-width: 0;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
 }
+.capstone-card-num {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+.capstone-card-actions {
+  margin-left: auto;
+  display: flex; gap: 4px;
+}
+
+/* Type toggle (Coworker | Human) sits in the card header. */
 .capstone-type-toggle {
   display: inline-flex;
-  align-self: flex-start;
   background: var(--bg-warm);
   border: 1px solid var(--border-color);
   border-radius: var(--radius-pill);
@@ -7511,18 +7504,31 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
   color: var(--text-dark);
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
 }
-/* Slight tint on the row when set to Review, so a scan of the table
-   instantly shows where humans gate the flow. */
-.capstone-row.type-review {
-  background: rgba(200, 149, 108, 0.04);
+
+.capstone-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
 }
 
-/* Cells: shared height + clean borders. resize:none kills the
-   diagonal grip in the corner; min-height keeps them comfortable
-   without ballooning a long entry. */
-.capstone-row textarea {
+/* Field — a stacked label + input. `capstone-field-row` lays two
+   fields side-by-side (used for Knowledge|Skills on coworker cards
+   and Reviewer|Remarks on human cards). */
+.capstone-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+}
+.capstone-field-label {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--text-muted);
+  letter-spacing: 0.2px;
+}
+.capstone-field-input {
   width: 100%;
-  min-height: 64px;
   padding: 9px 11px;
   border: 1px solid var(--border-color);
   border-radius: var(--radius-sm);
@@ -7531,31 +7537,35 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
   resize: none;
   transition: border-color 0.12s, box-shadow 0.12s;
 }
-.capstone-row textarea:hover { border-color: var(--text-muted); }
-.capstone-row textarea:focus {
+.capstone-field-input:hover { border-color: var(--text-muted); }
+.capstone-field-input:focus {
   outline: none;
   border-color: var(--accent-gold, #c8956c);
   box-shadow: 0 0 0 3px rgba(200, 149, 108, 0.12);
 }
-.capstone-row textarea::placeholder {
+.capstone-field-input::placeholder {
   color: var(--text-muted);
   opacity: 0.55;
 }
-
-.capstone-col-num {
-  font-weight: 600; color: var(--text-muted); font-size: 13px;
-  display: flex; align-items: flex-start; justify-content: center;
-  padding-top: 11px;
-  font-variant-numeric: tabular-nums;
+.capstone-field-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
 }
 
-/* Action buttons: small icon-only squares stacked tight. The previous
-   stretched-pill version made the column feel orphaned. */
-.capstone-col-actions {
-  display: flex; flex-direction: column; gap: 4px;
-  align-items: center; justify-content: flex-start;
-  padding-top: 4px;
+/* Auto-name preview under the Coworker card — confirms what the user
+   will see in their library after Send, before they hit Send. */
+.capstone-card-name-preview {
+  font-size: 12px;
+  color: var(--text-muted);
+  padding: 4px 0 0;
 }
+.capstone-card-name-preview strong {
+  color: var(--text-dark);
+  font-weight: 600;
+}
+
+/* Action buttons in the card header right (move up/down/delete). */
 .capstone-row-btn {
   width: 28px; height: 28px;
   display: inline-flex; align-items: center; justify-content: center;
@@ -7729,6 +7739,12 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
   font-weight: 500;
   max-width: 100%;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+/* Stale variant — the originally picked human has left the room. Red
+   tint so the participant sees they need to re-pick. */
+.capstone-actorpicker-chip.is-stale {
+  background: rgba(196, 92, 92, 0.12);
+  color: #c45c5c;
 }
 .capstone-actorpicker-caret {
   position: absolute;

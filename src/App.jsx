@@ -2,7 +2,8 @@ import { useState, useRef, useEffect, useMemo } from 'react';
 import './App.css';
 import AuthGate, { useAuth } from './components/AuthGate';
 import GraduationScreen from './components/GraduationScreen';
-import Capstone from './components/Capstone';
+import Capstone, { deriveCoworkerName } from './components/Capstone';
+import { COWORKER_ICONS } from './components/Icon';
 import FileExplorer from './components/FileExplorer';
 import FileEditor from './components/FileEditor';
 import WorkflowBuilder from './components/WorkflowBuilder';
@@ -36,6 +37,11 @@ import { callClaudeProxy } from './utils/claudeFetch';
 import { supabase as supabaseClient } from './supabase';
 
 const STORAGE_KEY = 'sandbox:state';
+
+// Avatar colors for Capstone-materialized coworkers. Mirrors the palette
+// CoworkerBuilder uses for hand-built coworkers so the library stays
+// visually coherent regardless of how a coworker was created.
+const CAPSTONE_COWORKER_COLORS = ['#4a7fb5', '#5a9e6f', '#c8956c', '#8b6fb0', '#c45c5c', '#4a9e9e', '#b5784a', '#6f8bb0'];
 
 function migrateState(saved) {
   if (!saved) return saved;
@@ -1129,16 +1135,88 @@ function App() {
     return next;
   }
 
-  // Capstone send-to-copilot bridge. The Capstone tab fires this with a
-  // markdown rendering of the participant's plan. We create a fresh
-  // workflow, switch them into Orchestration on that workflow, and stash
-  // the markdown for WorkflowBuilder to inject as the copilot's pre-filled
-  // user turn (the participant still hits Send themselves so they can read
-  // and edit the prompt before firing — which avoids surprise token spend).
-  // Repeatable: each click creates another workflow + sendoff.
+  // Capstone send-to-copilot bridge. Each Coworker row in the plan
+  // materializes into a real saved coworker (auto-named from the step
+  // text, uniquified against the existing library) so the workflow
+  // copilot can reference it by name through its existing
+  // add_coworker_node tool. We then create a fresh workflow, drop the
+  // user into Orchestration on it, and stash a build-prompt for
+  // WorkflowBuilder to inject as the copilot's pre-filled input. The
+  // user still hits Send themselves to fire the build — that gives them
+  // a chance to read/edit the prompt and avoids surprise token spend.
+  // Repeatable: each click creates a fresh batch of coworkers + a fresh
+  // workflow.
   const [capstoneSendoff, setCapstoneSendoff] = useState(null);
-  function handleSendCapstoneToCopilot(markdown) {
+  function handleSendCapstoneToCopilot(rows) {
     if (!stageReached(currentStage, '9')) return;
+    if (!Array.isArray(rows) || rows.length === 0) return;
+
+    // Pre-create coworkers for every coworker row. Names are derived from
+    // step text and uniquified against the existing library — duplicates
+    // would break the copilot's name → coworker lookup.
+    const usedNames = new Set((coworkers || []).map(c => (c.name || '').toLowerCase()).filter(Boolean));
+    const newCoworkers = [];
+    const coworkerNameByRowId = new Map();
+    for (const r of rows) {
+      if (r.type !== 'coworker') continue;
+      const base = deriveCoworkerName(r.step) || 'Coworker';
+      let name = base;
+      let n = 2;
+      while (usedNames.has(name.toLowerCase())) {
+        name = `${base} ${n}`;
+        n++;
+      }
+      usedNames.add(name.toLowerCase());
+      const id = 'cw-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6);
+      newCoworkers.push({
+        id,
+        name,
+        role: (r.step || '').trim(),
+        avatar: 'icon:' + COWORKER_ICONS[Math.floor(Math.random() * COWORKER_ICONS.length)],
+        color: CAPSTONE_COWORKER_COLORS[Math.floor(Math.random() * CAPSTONE_COWORKER_COLORS.length)],
+        instructionFileIds: r.skillsFileIds || [],
+        knowledgeFileIds: r.knowledgeFileIds || [],
+        toolIds: [],
+        createdBy: userName,
+        createdAt: Date.now(),
+      });
+      coworkerNameByRowId.set(r.id, name);
+    }
+    if (newCoworkers.length) {
+      handleUpdateCoworkers([...(coworkers || []), ...newCoworkers]);
+    }
+
+    // Build the markdown prompt that pre-fills the copilot input. The
+    // coworkers are already saved by the time the participant hits Send
+    // (handleUpdateCoworkers fires sb.saveCoworker per coworker), so the
+    // copilot's existing add_coworker_node({coworkerName}) flow Just Works.
+    const fileNameById = new Map((flatFiles || []).map(f => [f.id, f.name]));
+    const lines = [
+      'Build this workflow. The coworkers below have already been created in my library — reference them by name. Bindings are explicit; skip Discover, do a one-line preview, then build.',
+      '',
+    ];
+    rows.forEach((r, i) => {
+      const stepText = (r.step || '').trim();
+      lines.push(`### Step ${i + 1}: ${stepText}`);
+      if (r.type === 'human') {
+        lines.push(`- Type: Human review`);
+        lines.push(`- Reviewer: ${r.reviewerName || ''}`);
+        lines.push(`- Prompt: ${stepText}`);
+        if ((r.remarks || '').trim()) lines.push(`- Remarks: ${r.remarks.trim()}`);
+      } else {
+        const knowFiles = (r.knowledgeFileIds || []).map(id => fileNameById.get(id) || id).filter(Boolean);
+        const skillFiles = (r.skillsFileIds || []).map(id => fileNameById.get(id) || id).filter(Boolean);
+        lines.push(`- Type: AI coworker`);
+        lines.push(`- Coworker: ${coworkerNameByRowId.get(r.id) || ''}`);
+        if (knowFiles.length) lines.push(`- Knowledge: ${knowFiles.join(', ')}`);
+        if (skillFiles.length) lines.push(`- Skills: ${skillFiles.join(', ')}`);
+      }
+      lines.push('');
+    });
+    lines.push('Wire the steps in order; terminate the final step into the pre-seeded Capture Learning node.');
+    const markdown = lines.join('\n').trim();
+
+    // Fresh workflow, pre-seeded with Trigger + Capture (unwired).
     const wfId = 'wf-' + (typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`);
     const triggerStep = { id: 'trigger-' + wfId, type: 'trigger', name: 'Trigger', caseInput: '' };
     const captureStep = { id: 'step-' + (typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`), type: 'capture', name: 'Capture Learning', mode: 'knowledge', targetFileId: '' };
@@ -2973,7 +3051,6 @@ Answer in ONE sentence. If the user asks "how", a second sentence is allowed —
               fileTree={fileTree}
               flatFiles={flatFiles}
               onEnsureFileContent={handleEnsureFileContent}
-              coworkers={coworkers || []}
               participants={participants || []}
               copilotUnlocked={stageReached(currentStage, '9')}
               onSendToCopilot={handleSendCapstoneToCopilot}

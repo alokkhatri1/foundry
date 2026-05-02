@@ -424,7 +424,7 @@ function FilePicker({ fileTree, selectedIds, onChange, folderName, onUpdateConte
                     >Save</button>
                   </>
                 )}
-                <button className="ftp-preview-close" onClick={tryClosePreview}>{'\u2715'}</button>
+                <button className="ftp-preview-close" onClick={tryClosePreview}>{'✕'}</button>
               </div>
             </div>
             {previewMode === 'edit' && onUpdateContent ? (
@@ -461,7 +461,7 @@ function CoworkerRow({ coworker, onStartChat, onEdit, onDelete, onClone, readOnl
     <div className="cwb-row" onClick={() => onStartChat(coworker.id)}>
       <AvatarDisplay avatar={coworker.avatar} color={coworker.color} size={32} />
       <div className="cwb-row-name">{coworker.name || 'Untitled'}</div>
-      <div className="cwb-row-role">{coworker.role ? (coworker.role.length > 80 ? coworker.role.slice(0, 80) + '\u2026' : coworker.role) : 'No role defined'}</div>
+      <div className="cwb-row-role">{coworker.role ? (coworker.role.length > 80 ? coworker.role.slice(0, 80) + '…' : coworker.role) : 'No role defined'}</div>
       <span className={`cwb-card-status${isReady ? ' ready' : ''}`}>
         <span className="cwb-card-dot" />
         {isReady ? 'Ready' : 'Needs setup'}
@@ -474,7 +474,7 @@ function CoworkerRow({ coworker, onStartChat, onEdit, onDelete, onClone, readOnl
       ) : (
         <>
           <button className="cwb-row-edit" onClick={e => { e.stopPropagation(); onEdit(coworker.id); }} title="Edit">Edit</button>
-          <button className="cwb-row-delete" onClick={e => { e.stopPropagation(); onDelete(coworker.id); }} title="Delete">{'\u2715'}</button>
+          <button className="cwb-row-delete" onClick={e => { e.stopPropagation(); onDelete(coworker.id); }} title="Delete">{'✕'}</button>
         </>
       )}
     </div>
@@ -526,7 +526,7 @@ function CoworkerCard({ coworker, onStartChat, onEdit, onDelete, onClone, readOn
         </div>
       </div>
       {!readOnly && (
-        <button className="cwb-card-delete" onClick={e => { e.stopPropagation(); onDelete(coworker.id); }} title="Delete">{'\u2715'}</button>
+        <button className="cwb-card-delete" onClick={e => { e.stopPropagation(); onDelete(coworker.id); }} title="Delete">{'✕'}</button>
       )}
     </div>
   );
@@ -539,11 +539,17 @@ function CoworkerEditor({ coworker, onUpdate, onBack, fileTree, callClaudeAPI, s
   return (
     <div className={`cwb-editor${readOnly ? ' cwb-editor-readonly' : ''}`}>
       <div className="cwb-editor-header">
-        <button className="files-back-btn" onClick={onBack}>{'\u2190'} Back</button>
+        <button className="cwb-back" onClick={onBack}>{'←'} Back</button>
         {readOnly && (
           <div className="cwb-readonly-banner" title="This coworker was built by another participant — you can view it but not change it.">
             Read-only — built by {coworker.createdBy || 'another participant'}
           </div>
+        )}
+        {!readOnly && (
+          <button className="cwb-save" onClick={onBack} title="Changes save automatically; click to return to the list">
+            Save changes
+            <span className="cwb-save-arrow" aria-hidden>{'→'}</span>
+          </button>
         )}
       </div>
 

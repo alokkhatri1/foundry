@@ -9702,6 +9702,33 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
   padding-bottom: 18px;
   border-bottom: 1px solid var(--rule-soft);
   gap: 12px;
+  background: transparent !important;
+}
+/* Save button pushes itself to the right of the header. */
+.cwb-editor .cwb-save { margin-left: auto; }
+/* Re-center the actual editor content card with v2 width and use the
+   warm cream background. Legacy .cwb-editor-content was capped at
+   600px; the v2 design calls for ~800px so the file picker + textarea
+   have room to breathe. */
+.cwb-editor-scroll {
+  background: var(--cream) !important;
+  flex: 1;
+  overflow-y: auto;
+}
+.cwb-editor-content {
+  max-width: 800px !important;
+  width: 100%;
+  margin: 0 auto !important;
+  padding: 36px 32px 64px !important;
+}
+/* Editor header padding was 12px 24px in legacy — bump to match the
+   v2 horizontal rhythm so Back/Save line up with the content card. */
+.cwb-editor > .cwb-editor-header {
+  padding: 24px 32px 18px !important;
+  max-width: 800px;
+  width: 100%;
+  margin: 0 auto;
+  border-bottom: 1px solid var(--rule-soft);
 }
 .cwb-editor .files-back-btn,
 .cwb-editor .cwb-back {

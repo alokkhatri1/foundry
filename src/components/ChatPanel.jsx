@@ -340,19 +340,25 @@ function ChatMessage({ msg, onApprovalAction, onPickRecipient, onNudgeRecipient,
 
   if (msg.type === 'direct-response') {
     return (
-      <div className="cl-row cl-row-ai">
+      <div className="cl-msg-ai">
         <AssistantAvatar label={msg.label || 'AI'} coworkerAvatar={msg.coworkerAvatar} />
-        <div className="cl-bubble cl-bubble-ai">
-          {msg.label && <div className="cl-bubble-label agent">{msg.label}</div>}
-          <RichText content={msg.content} />
+        <div>
+          {msg.label && <div className="cl-msg-ai-name">{msg.label}</div>}
+          <div className="cl-msg-ai-body">
+            <RichText content={msg.content} />
+          </div>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="cl-row cl-row-ai"><AssistantAvatar label="AI" />
-      <div className="cl-bubble cl-bubble-ai"><RichText content={msg.content} /></div>
+    <div className="cl-msg-ai">
+      <AssistantAvatar label="AI" />
+      <div>
+        <div className="cl-msg-ai-name">AI</div>
+        <div className="cl-msg-ai-body"><RichText content={msg.content} /></div>
+      </div>
     </div>
   );
 }

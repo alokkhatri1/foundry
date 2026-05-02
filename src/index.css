@@ -8281,3 +8281,714 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
   font-size: 11px; text-transform: uppercase; letter-spacing: 0.4px;
   color: var(--text-muted); font-weight: 600; margin-bottom: 2px;
 }
+
+/* ==================================================================
+   FOUNDRY CHAT v3 — Pilled, simple, warm
+   Appended at the bottom so v3 rules cascade-win against the legacy
+   chat block (which still defines .cl-bubble-*, approval cards,
+   error pills, system pills, file attachment chips). The v3 sidebar
+   row class is renamed .cl-list-row to avoid clashing with the
+   legacy .cl-row used by message bubbles in older markup paths.
+   Local design tokens are scoped under .cl-app so they don't bleed
+   into the rest of the app (which uses the marketing-landing
+   palette via FoundryLanding.css's :root).
+   ================================================================== */
+.cl-app {
+  --paper:        #fffdf9;
+  --cream:        #f5ede0;
+  --cream-soft:   #ede1cf;
+  --cream-deep:   #e1d3bc;
+  --cream-deeper: #d4c2a4;
+  --ink:          #1d1611;
+  --ink-mid:      #4a3f33;
+  --ink-muted:    #8a7a64;
+  --ink-faint:    #b8a98f;
+  --peach:        #f4c8a8;
+  --peach-deep:   #d97757;
+  --peach-soft:   #fbe5d2;
+  --rule:         #d8c8ad;
+  --rule-soft:    #e6dcc6;
+  --green:        #5a9e6f;
+  --red:          #c75a4a;
+  --gold:         #c8956c;
+  --serif: 'Fraunces', 'Cormorant Garamond', Georgia, serif;
+  --sans:  'Inter', 'Inter Tight', -apple-system, BlinkMacSystemFont, sans-serif;
+  --mono:  'JetBrains Mono', ui-monospace, monospace;
+
+  display: grid;
+  grid-template-columns: 280px 1fr;
+  height: 100%;
+  background: var(--cream);
+  font-family: var(--sans);
+  color: var(--ink);
+}
+
+.cl-app .cl-main {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  background: var(--cream);
+}
+
+/* ── Sidebar ── */
+.cl-app .cl-sidebar {
+  background: var(--paper);
+  border-right: 1px solid var(--rule-soft);
+  display: grid;
+  grid-template-rows: auto 1fr;
+  overflow: hidden;
+  padding: 18px 14px;
+  gap: 14px;
+}
+
+/* Search */
+.cl-app .cl-search {
+  position: relative;
+  display: flex;
+  align-items: center;
+  padding: 0 14px;
+  background: var(--paper);
+  border: 1px solid var(--rule-soft);
+  border-radius: 999px;
+  transition: border-color .15s, box-shadow .15s;
+}
+.cl-app .cl-search:focus-within {
+  border-color: var(--peach-deep);
+  box-shadow: 0 0 0 3px rgba(217, 119, 87, 0.12);
+}
+.cl-app .cl-search-icon {
+  display: grid; place-items: center;
+  color: var(--ink-muted);
+  margin-right: 8px;
+  flex-shrink: 0;
+}
+.cl-app .cl-search-input {
+  flex: 1;
+  padding: 9px 0;
+  background: transparent;
+  border: none;
+  outline: none;
+  font-size: 13px;
+  color: var(--ink);
+  min-width: 0;
+}
+.cl-app .cl-search-input::placeholder { color: var(--ink-muted); }
+.cl-app .cl-search-clear {
+  border: none;
+  background: transparent;
+  color: var(--ink-muted);
+  font-size: 11px;
+  width: 18px; height: 18px;
+  border-radius: 50%;
+  display: grid; place-items: center;
+  margin-left: 4px;
+  transition: background .12s, color .12s;
+}
+.cl-app .cl-search-clear:hover { background: var(--cream-deep); color: var(--ink); }
+
+/* Sections wrapper */
+.cl-app .cl-sections {
+  display: grid;
+  grid-template-rows:
+    minmax(150px, max-content)
+    minmax(110px, max-content)
+    minmax(110px, max-content)
+    minmax(160px, 1fr);
+  gap: 4px;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.cl-app .cl-section {
+  display: grid;
+  grid-template-rows: auto 1fr;
+  min-height: 0;
+  overflow: hidden;
+  padding: 10px 4px 6px;
+}
+.cl-app .cl-section + .cl-section {
+  border-top: 1px solid var(--rule-soft);
+}
+
+.cl-app .cl-section-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 8px 8px;
+}
+.cl-app .cl-section-label {
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+  flex: 1;
+}
+.cl-app .cl-section-tag {
+  font-family: var(--mono);
+  font-size: 8.5px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  padding: 2px 6px 1px;
+  border-radius: 3px;
+  background: rgba(74, 127, 181, 0.12);
+  color: #3d6a99;
+}
+.cl-app .cl-section-tag.is-ai {
+  background: rgba(217, 119, 87, 0.16);
+  color: var(--peach-deep);
+}
+.cl-app .cl-section-action {
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--peach-deep);
+  background: transparent;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+}
+.cl-app .cl-section-action:hover { color: var(--ink); }
+
+.cl-app .cl-section-body {
+  overflow-y: auto;
+  min-height: 0;
+  padding-right: 2px;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.cl-app .cl-section-body::-webkit-scrollbar { width: 6px; }
+.cl-app .cl-section-body::-webkit-scrollbar-thumb {
+  background: var(--rule);
+  border-radius: 3px;
+}
+
+.cl-app .cl-section-empty {
+  font-size: 12px;
+  color: var(--ink-muted);
+  font-style: italic;
+  padding: 6px 10px;
+}
+
+/* Sidebar list rows. Renamed from v3's .cl-row so it doesn't collide
+   with the legacy .cl-row used by older message-bubble markup. */
+.cl-app .cl-list-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  background: transparent;
+  border: none;
+  border-radius: 999px;
+  text-align: left;
+  width: 100%;
+  color: var(--ink-mid);
+  cursor: pointer;
+  transition: background .12s, color .12s;
+}
+.cl-app .cl-list-row:hover { background: var(--cream-soft); color: var(--ink); }
+.cl-app .cl-list-row.is-active {
+  background: var(--cream);
+  color: var(--ink);
+  box-shadow: 0 1px 0 rgba(29,22,17,0.04);
+}
+.cl-app .cl-list-row-title {
+  font-size: 13px;
+  font-weight: 500;
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.cl-app .cl-list-row.is-active .cl-list-row-title {
+  font-family: var(--serif);
+  font-style: italic;
+  font-weight: 500;
+  font-size: 14.5px;
+}
+.cl-app .cl-list-row-time {
+  font-family: var(--mono);
+  font-size: 9.5px;
+  letter-spacing: 0.06em;
+  color: var(--ink-muted);
+  flex-shrink: 0;
+}
+.cl-app .cl-list-row-meta { min-width: 0; flex: 1; display: flex; flex-direction: column; }
+.cl-app .cl-list-row-name {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.cl-app .cl-list-row.is-active .cl-list-row-name {
+  font-family: var(--serif);
+  font-style: italic;
+  font-size: 14px;
+}
+.cl-app .cl-list-row-sub {
+  font-size: 10.5px;
+  color: var(--ink-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* v3 avatars — only inside .cl-app to not disturb other surfaces */
+.cl-app .cl-avatar {
+  position: relative;
+  width: 26px; height: 26px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-family: var(--mono);
+  font-size: 10px;
+  color: white;
+  flex-shrink: 0;
+}
+.cl-app .cl-avatar-ai { border-radius: 8px; }
+.cl-app .cl-avatar-human {
+  background: var(--paper);
+  border: 1px solid var(--rule);
+  color: var(--ink-mid);
+}
+.cl-app .cl-avatar-dot {
+  position: absolute;
+  right: -1px; bottom: -1px;
+  width: 9px; height: 9px;
+  border-radius: 50%;
+  background: var(--green);
+  border: 2px solid var(--paper);
+}
+.cl-app .cl-avatar-dot.is-off { background: var(--ink-faint); }
+.cl-app .cl-avatar-spark {
+  position: absolute;
+  right: -3px; top: -3px;
+  width: 12px; height: 12px;
+  border-radius: 50%;
+  background: var(--paper);
+  color: var(--peach-deep);
+  font-size: 7px;
+  display: grid; place-items: center;
+  border: 1px solid var(--rule);
+}
+
+/* Files row with checkbox */
+.cl-app .cl-file {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 10px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background .12s;
+}
+.cl-app .cl-file:hover { background: var(--cream-soft); }
+.cl-app .cl-file-check {
+  width: 14px; height: 14px;
+  border-radius: 3px;
+  border: 1.5px solid var(--ink-muted);
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  background: var(--paper);
+  transition: background .12s, border-color .12s;
+}
+.cl-app .cl-file-check.is-checked {
+  background: var(--peach-deep);
+  border-color: var(--peach-deep);
+}
+.cl-app .cl-file-check svg { color: white; }
+.cl-app .cl-file-check input { display: none; }
+.cl-app .cl-file-name {
+  flex: 1;
+  font-size: 12.5px;
+  color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.cl-app .cl-file-folder {
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.1em;
+  color: var(--ink-muted);
+  text-transform: uppercase;
+  flex-shrink: 0;
+}
+
+/* ── Main pane ── */
+.cl-app .cl-empty {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 24px;
+  gap: 24px;
+}
+.cl-app .cl-empty-greeting {
+  font-family: var(--serif);
+  font-weight: 400;
+  font-size: 32px;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+  text-align: center;
+}
+.cl-app .cl-empty-greeting em {
+  font-style: italic;
+  color: var(--peach-deep);
+}
+.cl-app .cl-empty-sub {
+  font-size: 13.5px;
+  color: var(--ink-muted);
+  margin-top: -16px;
+  text-align: center;
+}
+
+/* Pilled composer */
+.cl-app .cl-composer {
+  width: min(640px, 92%);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 8px 8px 18px;
+  background: var(--paper);
+  border: 1px solid var(--rule-soft);
+  border-radius: 999px;
+  box-shadow: 0 4px 22px rgba(29,22,17,0.04);
+  transition: border-color .15s, box-shadow .15s;
+}
+.cl-app .cl-composer:focus-within {
+  border-color: var(--peach-deep);
+  box-shadow: 0 4px 28px rgba(217,119,87,0.18);
+}
+.cl-app .cl-composer-attach {
+  width: 32px; height: 32px;
+  border: none;
+  background: transparent;
+  color: var(--ink-muted);
+  border-radius: 50%;
+  display: grid; place-items: center;
+  flex-shrink: 0;
+  cursor: pointer;
+  transition: background .12s, color .12s;
+}
+.cl-app .cl-composer-attach:hover { background: var(--cream); color: var(--peach-deep); }
+.cl-app .cl-composer-input {
+  flex: 1;
+  padding: 8px 4px;
+  background: transparent;
+  border: none;
+  outline: none;
+  font-size: 14px;
+  color: var(--ink);
+  min-width: 0;
+  font-family: inherit;
+}
+.cl-app .cl-composer-input::placeholder {
+  color: var(--ink-muted);
+  font-style: italic;
+  font-family: var(--serif);
+  font-weight: 300;
+  font-size: 15px;
+}
+.cl-app .cl-composer-send {
+  width: 36px; height: 36px;
+  border-radius: 50%;
+  background: var(--ink);
+  color: var(--paper);
+  border: none;
+  display: grid; place-items: center;
+  flex-shrink: 0;
+  cursor: pointer;
+  transition: background .15s, transform .12s;
+}
+.cl-app .cl-composer-send:hover:not(:disabled) { background: var(--peach-deep); }
+.cl-app .cl-composer-send:disabled { background: var(--ink-faint); cursor: not-allowed; }
+.cl-app .cl-composer-send:active:not(:disabled) { transform: scale(0.96); }
+
+/* Thread (active conversation) */
+.cl-app .cl-thread {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.cl-app .cl-thread-banner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 28px;
+  border-bottom: 1px solid var(--rule-soft);
+  background: var(--cream);
+  flex-shrink: 0;
+}
+.cl-app .cl-thread-banner-avatar {
+  width: 32px; height: 32px;
+  border-radius: 8px;
+  display: grid; place-items: center;
+  color: white;
+  font-family: var(--mono);
+  font-size: 11px;
+}
+.cl-app .cl-thread-banner-text {
+  font-size: 13px;
+  color: var(--ink-mid);
+  flex: 1;
+}
+.cl-app .cl-thread-banner-text em {
+  font-family: var(--serif);
+  font-style: italic;
+  font-weight: 500;
+  color: var(--ink);
+  font-size: 15px;
+  margin-left: 4px;
+}
+.cl-app .cl-thread-banner-close {
+  background: transparent;
+  border: none;
+  color: var(--ink-muted);
+  font-size: 14px;
+  width: 28px; height: 28px;
+  border-radius: 50%;
+  display: grid; place-items: center;
+  cursor: pointer;
+  transition: background .12s, color .12s;
+}
+.cl-app .cl-thread-banner-close:hover { background: var(--cream-soft); color: var(--ink); }
+
+.cl-app .cl-messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.cl-app .cl-msg {
+  max-width: 720px;
+  width: fit-content;
+}
+.cl-app .cl-msg-user {
+  align-self: flex-end;
+  background: var(--ink);
+  color: var(--paper);
+  padding: 12px 18px;
+  border-radius: 18px 18px 4px 18px;
+  font-size: 14px;
+  line-height: 1.55;
+}
+.cl-app .cl-msg-ai {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 12px;
+  max-width: 720px;
+}
+.cl-app .cl-msg-ai-body {
+  font-size: 14px;
+  line-height: 1.65;
+  color: var(--ink);
+}
+.cl-app .cl-msg-ai-name {
+  font-family: var(--serif);
+  font-style: italic;
+  font-weight: 500;
+  color: var(--ink);
+  font-size: 14px;
+  margin-bottom: 4px;
+}
+/* Status row beneath the body — confidence + time */
+.cl-app .cl-msg-ai-status {
+  margin-top: 8px;
+  font-size: 11px;
+  color: var(--ink-muted);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.cl-app .cl-msg-user-status {
+  margin-top: 6px;
+  font-size: 11px;
+  color: rgba(255,253,249,0.55);
+  text-align: right;
+}
+
+/* System notice — centered dashed pill, sits flat in the message column. */
+.cl-app .cl-msg-system {
+  align-self: center;
+  font-size: 12px;
+  color: var(--ink-muted);
+  font-style: italic;
+  border: 1px dashed var(--rule);
+  border-radius: 999px;
+  padding: 6px 14px;
+  background: transparent;
+  max-width: none;
+}
+
+/* Error notice — peach-tinged red insert */
+.cl-app .cl-msg-error {
+  align-self: center;
+  background: rgba(199, 90, 74, 0.08);
+  border: 1px solid var(--red);
+  color: var(--red);
+  border-radius: 14px;
+  padding: 10px 16px;
+  font-size: 13px;
+  max-width: 560px;
+}
+.cl-app .cl-msg-error-label {
+  font-family: var(--mono);
+  font-size: 9.5px;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--red);
+  margin-bottom: 4px;
+}
+
+/* Approval card — peach-bordered insert with prompt + actions, fits
+   beside an AI avatar like a regular .cl-msg-ai. The card itself is
+   a paper panel with a peach-deep stripe on the left edge. */
+.cl-app .cl-msg-approval {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 12px;
+  max-width: 720px;
+}
+.cl-app .cl-approval-card {
+  position: relative;
+  background: var(--paper);
+  border: 1px solid var(--peach);
+  border-left: 4px solid var(--peach-deep);
+  border-radius: 14px;
+  padding: 14px 18px;
+  font-size: 13.5px;
+  color: var(--ink);
+}
+.cl-app .cl-approval-label {
+  font-family: var(--mono);
+  font-size: 9.5px;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--peach-deep);
+  margin-bottom: 6px;
+}
+.cl-app .cl-approval-prompt {
+  line-height: 1.5;
+}
+.cl-app .cl-approval-prompt + .cl-approval-prompt { margin-top: 6px; }
+.cl-app .cl-approval-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.cl-app .cl-btn {
+  padding: 6px 14px;
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: 999px;
+  border: 1px solid var(--rule);
+  background: var(--paper);
+  color: var(--ink);
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+  font-family: inherit;
+}
+.cl-app .cl-btn-approve {
+  background: var(--green);
+  color: var(--paper);
+  border-color: var(--green);
+}
+.cl-app .cl-btn-approve:hover { background: #4d8a5e; }
+.cl-app .cl-btn-reject {
+  background: var(--paper);
+  color: var(--red);
+  border-color: var(--red);
+}
+.cl-app .cl-btn-reject:hover { background: rgba(199, 90, 74, 0.08); }
+.cl-app .cl-approval-comment {
+  flex: 1;
+  min-width: 160px;
+  padding: 6px 10px;
+  border: 1px solid var(--rule-soft);
+  border-radius: 8px;
+  font-size: 12px;
+  background: var(--paper);
+  color: var(--ink);
+  outline: none;
+  font-family: inherit;
+}
+.cl-app .cl-approval-comment:focus { border-color: var(--peach-deep); }
+
+/* Attached file chips inside a user bubble */
+.cl-app .cl-msg-user-attachments {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+.cl-app .cl-msg-user-attachment {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 9px;
+  background: rgba(255,253,249,0.18);
+  color: var(--paper);
+  font-size: 11px;
+  border-radius: 999px;
+}
+
+.cl-app .cl-thread-composer {
+  padding: 16px 28px 24px;
+  display: flex;
+  justify-content: center;
+  background: var(--cream);
+  flex-shrink: 0;
+}
+
+.cl-app .cl-empty-foot {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+  margin-top: 8px;
+  display: flex;
+  gap: 18px;
+  align-items: center;
+}
+.cl-app .cl-empty-foot a {
+  color: var(--ink-muted);
+  text-decoration: none;
+  border-bottom: 1px solid transparent;
+  padding-bottom: 1px;
+  transition: color .15s, border-color .15s;
+  cursor: pointer;
+}
+.cl-app .cl-empty-foot a:hover { color: var(--ink); border-bottom-color: var(--peach-deep); }
+.cl-app .cl-empty-foot-sep {
+  width: 14px;
+  height: 1px;
+  background: var(--rule);
+}
+
+/* Responsive */
+@media (max-width: 880px) {
+  .cl-app { grid-template-columns: 240px 1fr; }
+}
+@media (max-width: 640px) {
+  .cl-app { grid-template-columns: 1fr; }
+  .cl-app .cl-sidebar { display: none; }
+}

@@ -60,7 +60,7 @@ function ChatMessage({ msg, onApprovalAction, onPickRecipient, onNudgeRecipient,
     return (
       <div className="cl-row cl-row-ai">
         <div className="cl-final-rejected">
-          <div className="cl-final-rejected-icon">{'\u2715'}</div>
+          <div className="cl-final-rejected-icon">{'✕'}</div>
           <div className="cl-final-rejected-body">
             <div className="cl-final-rejected-headline">
               {subject} rejected the workflow step.
@@ -88,22 +88,19 @@ function ChatMessage({ msg, onApprovalAction, onPickRecipient, onNudgeRecipient,
 
   if (msg.type === 'user') {
     return (
-      <div className="cl-row cl-row-user">
-        <UserAvatar name={msg.participantName} color={sender?.color} />
-        <div className="cl-bubble cl-bubble-user">
-          {msg.participantName && <div className="cl-bubble-sender">{msg.participantName}</div>}
-          {msg.attachments && msg.attachments.length > 0 && (
-            <div className="cl-attachments">
-              {msg.attachments.map((att, i) => (
-                <span key={i} className="cl-attachment-chip">
-                  <span className="cl-attachment-icon">{getFileIcon(att.category)}</span>
-                  {att.fileName}
-                </span>
-              ))}
-            </div>
-          )}
-          <div>{msg.content}</div>
-        </div>
+      <div className="cl-msg cl-msg-user">
+        {msg.participantName && <div className="cl-msg-user-sender">{msg.participantName}</div>}
+        {msg.attachments && msg.attachments.length > 0 && (
+          <div className="cl-msg-user-attachments">
+            {msg.attachments.map((att, i) => (
+              <span key={i} className="cl-msg-user-attachment">
+                <span aria-hidden>{getFileIcon(att.category)}</span>
+                {att.fileName}
+              </span>
+            ))}
+          </div>
+        )}
+        <div>{msg.content}</div>
       </div>
     );
   }
@@ -111,13 +108,19 @@ function ChatMessage({ msg, onApprovalAction, onPickRecipient, onNudgeRecipient,
   if (msg.type === 'agent') {
     const confidence = parseConfidence(msg.content);
     return (
-      <div className="cl-row cl-row-ai">
+      <div className="cl-msg-ai">
         <AssistantAvatar label={msg.label} coworkerAvatar={msg.coworkerAvatar} />
-        <div className="cl-bubble cl-bubble-ai">
-          <div className="cl-bubble-label agent">{msg.label || 'Agent'}</div>
-          <ConfidenceBadge score={confidence} />
-          {confidence !== null && <EducationalCue cueId="chat-confidence" show={showEducationalCues} />}
-          <RichText content={msg.content} />
+        <div>
+          <div className="cl-msg-ai-name">{msg.label || 'Agent'}</div>
+          <div className="cl-msg-ai-body">
+            <RichText content={msg.content} />
+          </div>
+          {confidence !== null && (
+            <div className="cl-msg-ai-status">
+              <ConfidenceBadge score={confidence} />
+              <EducationalCue cueId="chat-confidence" show={showEducationalCues} />
+            </div>
+          )}
         </div>
       </div>
     );
@@ -204,7 +207,7 @@ function ChatMessage({ msg, onApprovalAction, onPickRecipient, onNudgeRecipient,
               );
             }
             const kind = a === 'Approve' ? 'approved' : a === 'Cancelled' ? 'cancelled' : 'rejected';
-            const label = a === 'Approve' ? '\u2713 Approved' : a === 'Cancelled' ? '\u2298 Cancelled' : '\u2715 Rejected';
+            const label = a === 'Approve' ? '✓ Approved' : a === 'Cancelled' ? '\u2298 Cancelled' : '✕ Rejected';
             return (
               <div className={`cl-approval-resolved ${kind}`}>
                 <span className="cl-approval-resolved-action">{label}</span>
@@ -265,7 +268,7 @@ function ChatMessage({ msg, onApprovalAction, onPickRecipient, onNudgeRecipient,
     const label =
       status === 'pending' && isDm ? `${coworkerLabel} wants to send a message`
       : status === 'pending' ? `${coworkerLabel} needs a human`
-      : status === 'waiting' && isDm ? `Sending to ${msg.resolvedRecipient}\u2026`
+      : status === 'waiting' && isDm ? `Sending to ${msg.resolvedRecipient}…`
       : status === 'waiting' ? `${coworkerLabel} is waiting on ${msg.resolvedRecipient}`
       : status === 'sent' ? `Message delivered to ${msg.resolvedRecipient}`
       : status === 'resolved' ? `${msg.resolvedRecipient} replied to ${coworkerLabel}`
@@ -492,235 +495,206 @@ function ContextSidebar({ fileTree, selectedFileIds, onToggleFile, onToggleFolde
     ? (coworkers || []).filter(cw => matchesQuery(cw.name))
     : (coworkers || []).filter(ownedByMe);
 
+  // Flatten the file tree into a flat list with folder labels for the v3
+  // sidebar. We lose the dept/subfolder collapse, but the workshop tree
+  // is shallow (knowledge / skills) so we don't lose meaningful structure.
+  const flatFiles = [];
+  departments.forEach(dept => {
+    dept.subfolders.forEach(sf => {
+      sf.files.forEach(f => flatFiles.push({ id: f.id, name: f.name, folder: sf.name }));
+    });
+  });
+  const initials = (name) => (name || '?').trim().split(/\s+/).slice(0, 2).map(s => s[0]?.toUpperCase()).join('');
+  const showFiles = stageReached(currentStage, '3');
+  const showCoworkersSection = stageReached(currentStage, '5');
+
   return (
-    <div className="sl-sidebar">
-      {/* Unified sidebar search — filters Files, Chats, and AI Coworkers
-          simultaneously so the sidebar only ever carries one input pill. */}
-      <div className="sl-sidebar-search-wrap">
+    <aside className="cl-sidebar">
+      {/* Unified search — filters chats / teammates / coworkers / files. */}
+      <div className="cl-search">
+        <span className="cl-search-icon" aria-hidden>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="11" cy="11" r="7" />
+            <line x1="21" y1="21" x2="16.65" y2="16.65" />
+          </svg>
+        </span>
         <input
-          type="text"
-          className="sl-sidebar-search"
-          placeholder={'Search files, chats, coworkers\u2026'}
+          className="cl-search-input"
+          placeholder={'Search files, chats, coworkers'}
           value={searchFilter}
           onChange={e => setSearchFilter(e.target.value)}
         />
         {searchFilter && (
-          <button className="sl-sidebar-search-clear" onClick={() => setSearchFilter('')} title="Clear">{'\u2715'}</button>
+          <button className="cl-search-clear" onClick={() => setSearchFilter('')} aria-label="Clear">{'✕'}</button>
         )}
       </div>
 
-      {/* Files — Stage 3 */}
-      {stageReached(currentStage, '3') && (
-      <div className="sl-section sl-context-section">
-        <div className="sl-section-header">
-          <span className="sl-section-name">Files</span>
-        </div>
-        <div className="sl-section-body sl-files-body">
+      <div className="cl-sections">
 
-        {departments.map(dept => {
-          // When searching, force every dept/subfolder open so the user sees
-          // the matches without having to click through collapsed groups.
-          const isDeptCollapsed = !q && collapsedSections[dept.id];
-          return (
-            <div key={dept.id} className="sl-dept">
-              <div className="sl-dept-header" onClick={() => toggleSection(dept.id)}>
-                <span className={`sl-group-caret${!isDeptCollapsed ? ' open' : ''}`}>{'\u25B6'}</span>
-                <span className="sl-dept-name">{dept.name}</span>
-              </div>
-              {!isDeptCollapsed && dept.subfolders.map(subfolder => {
-                const isCollapsed = !q && collapsedSections[subfolder.id];
-                const subfolderFileIds = subfolder.files.map(f => f.id);
-                const folderAllOn = subfolderFileIds.length > 0 && subfolderFileIds.every(id => selectedFileIds.includes(id));
-                return (
-                  <div key={subfolder.id} className="sl-channel-group">
-                    <div className="sl-group-header" onClick={() => toggleSection(subfolder.id)}>
-                      <span className={`sl-group-caret${!isCollapsed ? ' open' : ''}`}>{'\u25B6'}</span>
-                      <span className="sl-group-name">{subfolder.name}</span>
-                      {subfolderFileIds.length > 0 && (
-                        <span
-                          className={`sl-channel-dot${folderAllOn ? ' on' : ''}`}
-                          onClick={e => { e.stopPropagation(); onToggleSubfolder(subfolderFileIds); }}
-                          title={folderAllOn ? 'Remove folder from context' : `Add all ${subfolderFileIds.length} file${subfolderFileIds.length === 1 ? '' : 's'} as context`}
-                        ></span>
-                      )}
-                    </div>
-                    {!isCollapsed && subfolder.files.map(file => {
-                      const isActive = selectedFileIds.includes(file.id);
-                      const displayName = file.name.replace(/\.md$/, '');
-                      return (
-                        <div key={file.id} className={`sl-channel${isActive ? ' active' : ''}`}>
-                          <span className={`sl-channel-hash${isActive ? ' on' : ''}`}>#</span>
-                          <span className="sl-channel-name" onClick={() => onOpenFile(file.id)}>{displayName}</span>
-                          <span className={`sl-channel-dot${isActive ? ' on' : ''}`} onClick={e => { e.stopPropagation(); onToggleFile(file.id); }} title={isActive ? 'Remove from context' : 'Add to context'}></span>
-                        </div>
-                      );
-                    })}
-                  </div>
-                );
-              })}
-            </div>
-          );
-        })}
+      {/* Chats — always visible */}
+      <div className="cl-section">
+        <div className="cl-section-head">
+          <div className="cl-section-label">Chats</div>
+          <button className="cl-section-action" onClick={onNewChat}>+ New</button>
         </div>
-      </div>
-      )}
-
-      {/* Chat History */}
-      <div className="sl-section sl-chats-section">
-        <div className="sl-section-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <span className="sl-section-name">Chats</span>
-          <button className="sl-new-chat-btn" onClick={onNewChat}>+ New</button>
-        </div>
-        <div className="sl-chat-list">
+        <div className="cl-section-body">
+          {sortedConvos.length === 0 && q && (
+            <div className="cl-section-empty">No chats match &ldquo;{searchFilter}&rdquo;</div>
+          )}
+          {sortedConvos.length === 0 && !q && (
+            <div className="cl-section-empty">Start a conversation</div>
+          )}
           {sortedConvos.map(c => {
             const isRun = typeof c.id === 'string' && c.id.startsWith('convo-run-');
-            // Two visual states for run chats: live (run still
-            // running/waiting) vs completed (done / cancelled / error).
-            // Detection strips the "convo-run-" prefix to find the matching
-            // workflowRun and reads its status.
             let runLive = false;
             if (isRun) {
               const runId = c.id.slice('convo-run-'.length);
               const run = (workflowRuns || []).find(r => r.id === runId);
               runLive = !!(run && (run.status === 'running' || run.status === 'waiting_approval'));
             }
+            const tsLabel = isRun ? (runLive ? 'Live' : 'Done') : `${c.messages?.length || 0}`;
             return (
-            <div
-              key={c.id}
-              className={`sl-chat-item${activeConvoId === c.id ? ' active' : ''}${isRun ? ' sl-chat-item-run' : ''}`}
-              onClick={() => onSelectConvo(c.id)}
-            >
-              {isRun && (
-                runLive ? (
-                  <span className="sl-chat-kind-glyph live" title="Live run">
-                    <span className="sl-chat-kind-dot" />
-                  </span>
-                ) : (
-                  <span className="sl-chat-kind-glyph done" title="Completed run">{'\u2713'}</span>
-                )
-              )}
-              <span className="sl-chat-title">{c.title || 'New Chat'}</span>
-              <span className="sl-chat-meta">{c.messages?.length || 0} msgs</span>
-              {(conversations || []).length > 1 && (
-                <button className="sl-chat-delete" onClick={e => { e.stopPropagation(); onDeleteConvo(c.id); }}>{'\u2715'}</button>
-              )}
-            </div>
+              <button
+                key={c.id}
+                type="button"
+                className={`cl-list-row${activeConvoId === c.id ? ' is-active' : ''}`}
+                onClick={() => onSelectConvo(c.id)}
+              >
+                <div className="cl-list-row-title">{c.title || 'New Chat'}</div>
+                <div className="cl-list-row-time">{tsLabel}</div>
+              </button>
             );
           })}
-          {sortedConvos.length === 0 && q && (
-            <div className="sl-chat-empty" style={{ cursor: 'default' }}>No chats match "{searchFilter}"</div>
-          )}
-          {sortedConvos.length === 0 && !q && (
-            <div className="sl-chat-empty" onClick={onNewChat}>Start a conversation</div>
-          )}
         </div>
       </div>
 
-      {/* AI Coworkers — Stage 5. Room-wide list; anyone can chat with any
-          coworker. The unified sidebar search narrows by name. */}
-      {stageReached(currentStage, '5') && visibleCoworkers.length > 0 && (
-        <div className="sl-section sl-agents-section">
-          <div className="sl-section-header" onClick={() => toggleSection('agents')}>
-            <span className="sl-section-name">AI Coworkers</span>
-            <span className="sl-section-count">{visibleCoworkers.length}</span>
+      {/* Teammates (humans in the room) */}
+      {visibleHumans.length > 0 && (
+        <div className="cl-section">
+          <div className="cl-section-head">
+            <div className="cl-section-label">Teammates</div>
+            <span className="cl-section-tag">Human</span>
           </div>
-          {(q || !collapsedSections['agents']) && (
-          <div className="sl-section-body sl-agents-body">
-          {[...visibleCoworkers].sort(sortByUnread).map(cw => {
-            const unread = (unreadDmCounts && unreadDmCounts[cw.name]) || 0;
-            const canDm = stageReached(currentStage, '5') && sb?.getCoworkerParticipantId;
-            const isMine = cw.createdBy && cw.createdBy === currentUserName;
-            const handleOpenAiDm = async (e) => {
-              if (e) e.stopPropagation();
-              const mirrorId = await sb.getCoworkerParticipantId(cw.id);
-              if (mirrorId && onOpenDm) {
-                onOpenDm({ id: mirrorId, name: cw.name, color: cw.color, kind: 'ai', coworkerId: cw.id });
-              }
-            };
-            // Row-click routing:
-            //   - My own coworker → main chat (the "Talking to X" flow)
-            //   - Someone else's coworker → DM thread (the persisted history
-            //     of everything that's happened between me and that coworker,
-            //     including review requests, approvals, and replies). Chat
-            //     mode for someone else's coworker would spin up an empty
-            //     conversation and make the real DM history look lost.
-            //   - An unread badge always forces DM so replies route back
-            //     to direct_messages.
-            const handleRowClick = () => {
-              if (canDm && (unread > 0 || !isMine)) {
-                handleOpenAiDm();
-              } else {
-                onSelectCoworker(cw.id);
-              }
-            };
-            return (
-              <div
-                key={cw.id}
-                className={`sl-dm sl-agent-item${activeCoworkerId === cw.id ? ' active-agent' : ''}${unread > 0 ? ' has-unread' : ''}`}
-                onClick={handleRowClick}
-              >
-                <span className="sl-agent-emoji"><CoworkerGlyph avatar={cw.avatar} size={14} color="currentColor" /></span>
-                <span className="sl-dm-name">{cw.name}</span>
-                {unread > 0 && <span className="sl-dm-badge">{unread}</span>}
-                {canDm && (
-                  <button className="sl-ai-dm-btn" onClick={handleOpenAiDm} title={`DM ${cw.name}`}>{'\u2709\uFE0F'}</button>
-                )}
-              </div>
-            );
-          })}
-          </div>
-          )}
-        </div>
-      )}
-
-      {/* Co-workers / People — hidden entirely when the search filters all
-          humans out, so an active search doesn't leave an empty stub. */}
-      {(q ? visibleHumans.length > 0 : true) && (
-      <div className="sl-section sl-people-section">
-        <div className="sl-section-header" onClick={() => toggleSection('people')}>
-          <span className="sl-section-name">Coworkers</span>
-          <span className="sl-section-count">{online.length}</span>
-        </div>
-        {(q || !collapsedSections['people']) && (
-          <div className="sl-section-body sl-people-body">
-            {online.map(p => {
+          <div className="cl-section-body">
+            {[...online, ...offline].map(p => {
               const isMe = p.name === currentUserName;
               const isActive = activeDm?.name === p.name;
               const unread = (unreadDmCounts && unreadDmCounts[p.name]) || 0;
               return (
-                <div
+                <button
                   key={p.id}
-                  className={`sl-dm online${isActive ? ' active-agent' : ''}${unread > 0 ? ' has-unread' : ''}`}
+                  type="button"
+                  className={`cl-list-row${isActive ? ' is-active' : ''}`}
                   style={{ cursor: isMe ? 'default' : 'pointer' }}
                   onClick={() => !isMe && onOpenDm && onOpenDm(p)}
                 >
-                  <span className="sl-dm-status on"></span>
-                  <span className="sl-dm-name">{p.name}{isMe ? ' (you)' : ''}</span>
-                  {unread > 0 && <span className="sl-dm-badge">{unread}</span>}
-                </div>
-              );
-            })}
-            {offline.map(p => {
-              const isActive = activeDm?.name === p.name;
-              const unread = (unreadDmCounts && unreadDmCounts[p.name]) || 0;
-              return (
-                <div
-                  key={p.id}
-                  className={`sl-dm${isActive ? ' active-agent' : ''}${unread > 0 ? ' has-unread' : ''}`}
-                  style={{ cursor: 'pointer' }}
-                  onClick={() => onOpenDm && onOpenDm(p)}
-                >
-                  <span className="sl-dm-status"></span>
-                  <span className="sl-dm-name">{p.name}</span>
-                  {unread > 0 && <span className="sl-dm-badge">{unread}</span>}
-                </div>
+                  <span className="cl-avatar cl-avatar-human">
+                    {initials(p.name)}
+                    <span className={`cl-avatar-dot${p.online ? '' : ' is-off'}`} aria-hidden></span>
+                  </span>
+                  <div className="cl-list-row-meta">
+                    <div className="cl-list-row-name">{p.name}{isMe ? ' (you)' : ''}</div>
+                    <div className="cl-list-row-sub">
+                      {p.online ? 'Online' : 'Offline'}
+                      {unread > 0 ? ` · ${unread} new` : ''}
+                    </div>
+                  </div>
+                </button>
               );
             })}
           </div>
-        )}
-      </div>
+        </div>
       )}
-    </div>
+
+      {/* Coworkers — Stage 5+ */}
+      {showCoworkersSection && visibleCoworkers.length > 0 && (
+        <div className="cl-section">
+          <div className="cl-section-head">
+            <div className="cl-section-label">Coworkers</div>
+            <span className="cl-section-tag is-ai">Agent</span>
+          </div>
+          <div className="cl-section-body">
+            {[...visibleCoworkers].sort(sortByUnread).map(cw => {
+              const unread = (unreadDmCounts && unreadDmCounts[cw.name]) || 0;
+              const canDm = sb?.getCoworkerParticipantId;
+              const isMine = cw.createdBy && cw.createdBy === currentUserName;
+              const handleOpenAiDm = async () => {
+                const mirrorId = await sb.getCoworkerParticipantId(cw.id);
+                if (mirrorId && onOpenDm) {
+                  onOpenDm({ id: mirrorId, name: cw.name, color: cw.color, kind: 'ai', coworkerId: cw.id });
+                }
+              };
+              const handleRowClick = () => {
+                if (canDm && (unread > 0 || !isMine)) {
+                  handleOpenAiDm();
+                } else {
+                  onSelectCoworker(cw.id);
+                }
+              };
+              return (
+                <button
+                  key={cw.id}
+                  type="button"
+                  className={`cl-list-row${activeCoworkerId === cw.id ? ' is-active' : ''}`}
+                  onClick={handleRowClick}
+                >
+                  <span className="cl-avatar cl-avatar-ai" style={{ background: cw.color || '#4a7fb5' }}>
+                    <CoworkerGlyph avatar={cw.avatar} size={12} color="#ffffff" />
+                    <span className="cl-avatar-spark" aria-hidden>{'✦'}</span>
+                  </span>
+                  <div className="cl-list-row-meta">
+                    <div className="cl-list-row-name">{cw.name}</div>
+                    <div className="cl-list-row-sub">
+                      {isMine ? 'Yours' : 'Shared'}
+                      {unread > 0 ? ` · ${unread} new` : ''}
+                    </div>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Files in context — Stage 3+ */}
+      {showFiles && (
+        <div className="cl-section">
+          <div className="cl-section-head">
+            <div className="cl-section-label">Files in context</div>
+            {selectedFileIds.length > 0 && (
+              <span className="cl-section-tag">{selectedFileIds.length}</span>
+            )}
+          </div>
+          <div className="cl-section-body">
+            {flatFiles.length === 0 && (
+              <div className="cl-section-empty">No files yet — open the Files tab to add some.</div>
+            )}
+            {flatFiles.map(f => {
+              const isSelected = selectedFileIds.includes(f.id);
+              return (
+                <label key={f.id} className="cl-file">
+                  <span className={`cl-file-check${isSelected ? ' is-checked' : ''}`}>
+                    <input
+                      type="checkbox"
+                      checked={isSelected}
+                      onChange={() => onToggleFile(f.id)}
+                    />
+                    {isSelected && (
+                      <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                        <polyline points="20 6 9 17 4 12" />
+                      </svg>
+                    )}
+                  </span>
+                  <span className="cl-file-name">{f.name.replace(/\.md$/, '')}</span>
+                  <span className="cl-file-folder">{f.folder}</span>
+                </label>
+              );
+            })}
+          </div>
+        </div>
+      )}
+      </div>
+    </aside>
   );
 }
 
@@ -784,7 +758,7 @@ function InlineEditor({ file, onUpdateContent, onClose }) {
             >Save</button>
           )}
         </div>
-        <button className="ctx-editor-close" onClick={tryClose}>{'\u2715'}</button>
+        <button className="ctx-editor-close" onClick={tryClose}>{'✕'}</button>
       </div>
       {mode === 'view' ? (
         <div className="ctx-editor-view md-doc">
@@ -1206,7 +1180,7 @@ export default function ChatPanel({ messages, onSendMessage, onApprovalAction, o
                               <span key={chip.key} className="cl-context-file-chip folder" title={`All ${chip.count} file${chip.count === 1 ? '' : 's'} in ${chip.name} attached`}>
                                 <span className="cl-context-file-chip-role">{chip.count}</span>
                                 <span className="cl-context-file-chip-name">{chip.name}</span>
-                                <button className="cl-context-file-chip-remove" onClick={() => handleToggleSubfolder(chip.fileIds)}>{'\u2715'}</button>
+                                <button className="cl-context-file-chip-remove" onClick={() => handleToggleSubfolder(chip.fileIds)}>{'✕'}</button>
                               </span>
                             );
                           }
@@ -1219,7 +1193,7 @@ export default function ChatPanel({ messages, onSendMessage, onApprovalAction, o
                                 </span>
                               )}
                               <span className="cl-context-file-chip-name">{chip.node.name.replace(/\.md$/, '')}</span>
-                              <button className="cl-context-file-chip-remove" onClick={() => handleToggleFile(chip.id)}>{'\u2715'}</button>
+                              <button className="cl-context-file-chip-remove" onClick={() => handleToggleFile(chip.id)}>{'✕'}</button>
                             </span>
                           );
                         });
@@ -1251,22 +1225,43 @@ export default function ChatPanel({ messages, onSendMessage, onApprovalAction, o
               <span key={i} className="cl-attached-chip">
                 <span className="cl-attached-chip-icon">{getFileIcon(f.category)}</span>
                 <span className="cl-attached-chip-name">{f.fileName}</span>
-                <button className="cl-attached-chip-remove" onClick={() => removeAttachment(i)}>{'\u2715'}</button>
+                <button className="cl-attached-chip-remove" onClick={() => removeAttachment(i)}>{'✕'}</button>
               </span>
             ))}
           </div>
         )}
-        <div className="cl-input-box">
+        <div className="cl-composer">
           {!activeDm && (
-            <button className="cl-attach-btn" onClick={() => fileInputRef.current?.click()} disabled={isLoading || parsingFiles} title="Attach file">
-              <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M15.75 8.49L9.12 15.12C7.56 16.68 5.04 16.68 3.48 15.12C1.92 13.56 1.92 11.04 3.48 9.48L10.11 2.85C11.1 1.86 12.72 1.86 13.71 2.85C14.7 3.84 14.7 5.46 13.71 6.45L7.78 12.38C7.29 12.87 6.48 12.87 5.99 12.38C5.5 11.89 5.5 11.08 5.99 10.59L11.22 5.36" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
+            <button
+              className="cl-composer-attach"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={isLoading || parsingFiles}
+              aria-label="Attach"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48" />
+              </svg>
             </button>
           )}
-          <textarea className="cl-input" placeholder={placeholder} value={input} onChange={e => setInput(e.target.value)}
+          <textarea
+            className="cl-composer-input"
+            placeholder={placeholder}
+            value={input}
+            onChange={e => setInput(e.target.value)}
             onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
-            disabled={isLoading || parsingFiles} rows={1} />
-          <button className="cl-send-btn" onClick={handleSend} disabled={(!input.trim() && attachedFiles.length === 0) || isLoading || parsingFiles}>
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 13L13 8L3 3V7L9 8L3 9V13Z" fill="currentColor"/></svg>
+            disabled={isLoading || parsingFiles}
+            rows={1}
+          />
+          <button
+            className="cl-composer-send"
+            onClick={handleSend}
+            disabled={(!input.trim() && attachedFiles.length === 0) || isLoading || parsingFiles}
+            aria-label="Send"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="5" y1="12" x2="19" y2="12" />
+              <polyline points="12 5 19 12 12 19" />
+            </svg>
           </button>
         </div>
       </div>
@@ -1276,7 +1271,7 @@ export default function ChatPanel({ messages, onSendMessage, onApprovalAction, o
   const editingFile = editingFileId ? findNode(fileTree, editingFileId) : null;
 
   return (
-    <div className="cl-chat-teams">
+    <div className="cl-app">
       {/* Left: context sidebar */}
       <ContextSidebar
         fileTree={fileTree}
@@ -1315,28 +1310,24 @@ export default function ChatPanel({ messages, onSendMessage, onApprovalAction, o
       )}
 
       {/* Right: main chat area — one interface; context swaps via banner */}
-      <div className="cl-chat-main">
+      <div className="cl-main cl-chat-main">
         {(activeDm || activeCoworker) && (
-          <div className="cl-agent-banner">
+          <div className="cl-thread-banner">
             {activeDm ? (
               <>
-                <span className="cl-agent-banner-avatar" style={{ background: activeDm.color || '#888', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 600, fontSize: 13 }}>
+                <span className="cl-thread-banner-avatar" style={{ background: activeDm.color || '#888', color: '#fff' }}>
                   {activeDm.name?.charAt(0)?.toUpperCase() || '?'}
                 </span>
-                <div className="cl-agent-banner-info">
-                  <span className="cl-agent-banner-name">Talking to {activeDm.name}</span>
-                </div>
-                <button className="cl-agent-banner-close" onClick={onCloseDm}>{'\u2715'}</button>
+                <div className="cl-thread-banner-text">Talking to <em>{activeDm.name}</em></div>
+                <button className="cl-thread-banner-close" onClick={onCloseDm} aria-label="Close DM">{'✕'}</button>
               </>
             ) : (
               <>
-                <span className="cl-agent-banner-avatar" style={{ background: activeCoworker.color || '#4a7fb5' }}>
-                  <CoworkerGlyph avatar={activeCoworker.avatar} size={18} color="#ffffff" />
+                <span className="cl-thread-banner-avatar" style={{ background: activeCoworker.color || '#4a7fb5' }}>
+                  <CoworkerGlyph avatar={activeCoworker.avatar} size={16} color="#ffffff" />
                 </span>
-                <div className="cl-agent-banner-info">
-                  <span className="cl-agent-banner-name">Talking to {activeCoworker.name}</span>
-                </div>
-                <button className="cl-agent-banner-close" onClick={() => { if (onNewChat) onNewChat(); }} title="Close chat">{'\u2715'}</button>
+                <div className="cl-thread-banner-text">Talking to <em>{activeCoworker.name}</em></div>
+                <button className="cl-thread-banner-close" onClick={() => { if (onNewChat) onNewChat(); }} aria-label="Close chat">{'✕'}</button>
               </>
             )}
           </div>

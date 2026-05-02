@@ -86,10 +86,12 @@ function isRowComplete(row, participants) {
     const hasFiles = (row.knowledgeFileIds || []).length > 0 || (row.skillsFileIds || []).length > 0;
     return hasFiles;
   }
-  // Human row — reviewer must still be in the room. The step textarea
-  // doubles as the prompt the reviewer sees; no separate remarks field.
-  if (!row.reviewerId) return false;
-  if (!(participants || []).some(p => p.id === row.reviewerId)) return false;
+  // Human row — accept either a picked participant or a typed name.
+  // Cross-room messaging isn't built so a typed name won't actually
+  // notify a human at workflow run time, but for the Capstone
+  // planning artifact a name is enough. The step textarea doubles
+  // as the prompt the reviewer sees.
+  if (!(row.reviewerName || '').trim()) return false;
   return true;
 }
 
@@ -106,10 +108,7 @@ function firstIncompleteReason(rows, participants) {
       const hasFiles = (r.knowledgeFileIds || []).length > 0 || (r.skillsFileIds || []).length > 0;
       if (!hasFiles) return `Step ${num}: attach at least one knowledge or skills file`;
     } else {
-      if (!r.reviewerId) return `Step ${num}: pick a reviewer`;
-      if (!(participants || []).some(p => p.id === r.reviewerId)) {
-        return `Step ${num}: reviewer "${r.reviewerName || ''}" left the room — pick another`;
-      }
+      if (!(r.reviewerName || '').trim()) return `Step ${num}: name a reviewer`;
     }
   }
   return null;
@@ -213,13 +212,26 @@ function FilePicker({ value, onChange, fileTree, folder }) {
 }
 
 // Reviewer picker for human steps — single-select dropdown over the
-// room's humans. Mirrors the FilePicker shell so the row reads as a
-// uniform strip. Shows offline humans too: a workshop where everyone
-// happens to be offline at planning time shouldn't block them from
-// picking a reviewer.
+// room's humans, with free-text fallback for planning purposes.
+//
+// Hybrid combo: text input + suggestions dropdown. The participant
+// can type any reviewer name (useful when they want to plan a step
+// for someone who hasn't joined the workshop yet, or to test the
+// flow solo) and pick a real human from the dropdown when one is
+// in the room. Cross-room messaging isn't built out yet, so a
+// custom-named reviewer won't actually receive notifications at
+// workflow run time — but for the Capstone planning artifact
+// that's an acceptable trade-off.
 function ReviewerPicker({ value, valueName, participants, onChange }) {
   const [open, setOpen] = useState(false);
+  const [text, setText] = useState(valueName || '');
   const containerRef = useRef(null);
+
+  // Sync local text with parent state when it changes externally
+  // (e.g. type flip clears the row).
+  useEffect(() => {
+    setText(valueName || '');
+  }, [valueName]);
 
   useEffect(() => {
     if (!open) return;
@@ -241,38 +253,52 @@ function ReviewerPicker({ value, valueName, participants, onChange }) {
       .map(p => ({ id: p.id, name: p.name, sub: p.online ? 'online' : 'offline' }))
   ), [participants]);
 
-  const selected = options.find(o => o.id === value);
-  const stale = !selected && valueName ? valueName : null;
+  const filtered = useMemo(() => {
+    const t = text.trim().toLowerCase();
+    if (!t) return options;
+    return options.filter(o => o.name.toLowerCase().includes(t));
+  }, [options, text]);
+
+  function commit(name) {
+    setText(name);
+    const trimmed = name.trim();
+    // Try to match an option by exact (case-insensitive) name; otherwise
+    // accept as a free-text reviewer (no participant id).
+    const match = options.find(o => o.name.toLowerCase() === trimmed.toLowerCase());
+    if (match) {
+      onChange({ reviewerId: match.id, reviewerName: match.name });
+    } else {
+      onChange({ reviewerId: '', reviewerName: trimmed });
+    }
+  }
 
   function pick(opt) {
+    setText(opt.name);
     onChange({ reviewerId: opt.id, reviewerName: opt.name });
     setOpen(false);
   }
 
   return (
     <div className="capstone-actorpicker" ref={containerRef}>
-      <button
-        type="button"
-        className={`capstone-actorpicker-btn${selected ? ' has-selection' : ''}`}
-        onClick={() => setOpen(o => !o)}
-      >
-        <span className="capstone-actorpicker-content">
-          {selected ? (
-            <span className="capstone-actorpicker-chip">{selected.name}</span>
-          ) : stale ? (
-            <span className="capstone-actorpicker-chip is-stale">{stale} (left room)</span>
-          ) : (
-            <span className="capstone-actorpicker-placeholder">Pick a reviewer…</span>
-          )}
-        </span>
-        <span className="capstone-actorpicker-caret">{open ? '▴' : '▾'}</span>
-      </button>
+      <input
+        type="text"
+        className="capstone-actorpicker-input"
+        value={text}
+        placeholder="Type a name or pick…"
+        onChange={e => commit(e.target.value)}
+        onFocus={() => setOpen(true)}
+      />
+      <span className="capstone-actorpicker-caret" aria-hidden>{open ? '▴' : '▾'}</span>
       {open && (
         <div className="capstone-actorpicker-menu">
-          {options.length === 0 ? (
-            <div className="capstone-actorpicker-empty">No humans in the workshop yet.</div>
+          {filtered.length === 0 ? (
+            <div className="capstone-actorpicker-empty">
+              {options.length === 0
+                ? 'No humans in the workshop yet — type a name above.'
+                : 'No matches — keep typing to use the name as-is.'}
+            </div>
           ) : (
-            options.map(opt => (
+            filtered.map(opt => (
               <button
                 type="button"
                 key={opt.id}

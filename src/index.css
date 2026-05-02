@@ -7724,6 +7724,34 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
   transition: border-color 0.12s, box-shadow 0.12s;
   font-family: inherit;
 }
+/* Reviewer picker is a free-text input + suggestions dropdown. The
+   input shares the actorpicker shell so layout stays consistent
+   with the (now-unused-for-reviewer-but-still-used-elsewhere)
+   button variant. */
+.capstone-actorpicker-input {
+  width: 100%;
+  padding: 9px 32px 9px 11px;
+  border: 1px solid var(--border-color);
+  background: var(--bg-white);
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  color: var(--text-dark);
+  font-family: inherit;
+  outline: none;
+  transition: border-color 0.12s, box-shadow 0.12s;
+}
+.capstone-actorpicker-input::placeholder {
+  color: var(--text-muted);
+  opacity: 0.55;
+}
+.capstone-actorpicker-input:hover { border-color: var(--text-muted); }
+.capstone-actorpicker-input:focus {
+  border-color: var(--accent-gold, #c8956c);
+  box-shadow: 0 0 0 3px rgba(200, 149, 108, 0.12);
+}
+.capstone-field-row-human .capstone-actorpicker-input {
+  height: 100%;
+}
 .capstone-actorpicker-btn:hover { border-color: var(--text-muted); }
 .capstone-actorpicker-btn:focus {
   outline: none;

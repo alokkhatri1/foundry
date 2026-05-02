@@ -1371,6 +1371,32 @@ export default function ChatPanel({ messages, onSendMessage, onApprovalAction, o
           </div>
         )}
 
+        {/* Files-in-context strip — visible across the top of the thread
+            so the participant always sees what's attached to the current
+            chat. Sidebar checkboxes write into selectedFileIds; this strip
+            reads from it. Hidden in DM mode (DMs don't carry file context). */}
+        {!activeDm && activeContextCount > 0 && (
+          <div className="cl-context-strip">
+            <span className="cl-context-strip-label">Files in context</span>
+            {selectedFileIds.map(id => {
+              const node = findNode(fileTree, id);
+              if (!node) return null;
+              const isSkill = skillFileIds.includes(id);
+              return (
+                <span key={id} className={`cl-context-chip${isSkill ? ' is-skill' : ''}`}>
+                  <span className="cl-context-chip-name">{node.name.replace(/\.md$/, '')}</span>
+                  <button
+                    type="button"
+                    className="cl-context-chip-remove"
+                    onClick={() => handleToggleFile(id)}
+                    aria-label={`Remove ${node.name} from context`}
+                  >{'✕'}</button>
+                </span>
+              );
+            })}
+          </div>
+        )}
+
         {activeDm ? (
           <>
             <div className="dm-messages" ref={messagesRef}>

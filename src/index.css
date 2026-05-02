@@ -8799,6 +8799,60 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
 }
 .cl-app .cl-thread-banner-close:hover { background: var(--cream-soft); color: var(--ink); }
 
+/* Files-in-context strip — sits between the banner and the messages
+   so the participant sees what's attached to the current chat at a
+   glance. Selecting a file in the sidebar adds a chip here; removing
+   from here writes back through handleToggleFile. */
+.cl-app .cl-context-strip {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 28px;
+  background: var(--cream-soft);
+  border-bottom: 1px solid var(--rule-soft);
+  flex-shrink: 0;
+}
+.cl-app .cl-context-strip-label {
+  font-family: var(--mono);
+  font-size: 9.5px;
+  font-weight: 500;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+  margin-right: 4px;
+}
+.cl-app .cl-context-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 4px 4px 12px;
+  background: var(--paper);
+  border: 1px solid var(--rule-soft);
+  border-radius: 999px;
+  font-size: 11.5px;
+  color: var(--ink);
+}
+.cl-app .cl-context-chip.is-skill {
+  border-color: var(--peach);
+  background: var(--peach-soft);
+}
+.cl-app .cl-context-chip-name {
+  font-family: var(--mono);
+  letter-spacing: 0.02em;
+}
+.cl-app .cl-context-chip-remove {
+  background: transparent;
+  border: none;
+  color: var(--ink-muted);
+  width: 18px; height: 18px;
+  border-radius: 50%;
+  display: grid; place-items: center;
+  cursor: pointer;
+  font-size: 11px;
+}
+.cl-app .cl-context-chip-remove:hover { background: var(--cream-deep); color: var(--peach-deep); }
+
 .cl-app .cl-messages {
   flex: 1;
   overflow-y: auto;

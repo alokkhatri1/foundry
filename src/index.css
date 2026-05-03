@@ -11121,15 +11121,6 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
 }
 .fl-page .fl-crumb:hover { background: var(--cream); color: var(--ink); }
 .fl-page .fl-crumb.is-current { color: var(--peach-deep); }
-/* When the root crumb is the only one (we're at the workspace root),
-   pop it as a peach-outlined pill — matches the reference badge for
-   "WORKSPACE" sitting on its own. */
-.fl-page .fl-breadcrumb:has(.fl-crumb-segment:only-child) .fl-crumb.is-current {
-  border: 1px solid var(--peach);
-  border-radius: 6px;
-  padding: 6px 12px;
-  color: var(--peach-deep);
-}
 .fl-page .fl-crumb.drop-target {
   background: var(--peach-soft);
   color: var(--peach-deep);
@@ -11316,11 +11307,11 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
 .fl-page .fl-section-grid,
 .fl-page .fl-flat-grid {
   display: grid;
-  /* Multiple narrow columns — at typical explorer widths the grid
-     fits 3-4 cards across. With 1 card in a section, that card sits
-     in track 1 and the empty tracks reserve horizontal dotted space
-     ("room to grow"), matching the reference layout. */
-  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  /* Single-column stack — each card spans the full panel width. The
+     explorer is narrow enough that one wide card per row reads better
+     than tight multi-column tiles. Long lists scroll within the
+     panel. */
+  grid-template-columns: 1fr;
   gap: 14px;
   align-content: start;
 }
@@ -12005,5 +11996,5 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
   .fl-page .fl-editor { position: static; }
   .fl-page .fl-editor-body { padding: 24px 22px 40px; }
   .fl-page .fl-section-grid,
-  .fl-page .fl-flat-grid { grid-template-columns: repeat(auto-fit, minmax(160px, 220px)); }
+  .fl-page .fl-flat-grid { grid-template-columns: 1fr; }
 }

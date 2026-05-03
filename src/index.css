@@ -11307,11 +11307,11 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
 .fl-page .fl-section-grid,
 .fl-page .fl-flat-grid {
   display: grid;
-  /* Single-column stack — each card spans the full panel width. The
-     explorer is narrow enough that one wide card per row reads better
-     than tight multi-column tiles. Long lists scroll within the
-     panel. */
-  grid-template-columns: 1fr;
+  /* Multi-column auto-fill — cards flow into rows naturally as the
+     section fills up. With 1 card the row is one card tall; with more,
+     it wraps. Sections always stack tightly via the parent .fl-grid's
+     gap so sparse states don't reserve big empty bands. */
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
   gap: 14px;
   align-content: start;
 }
@@ -11996,5 +11996,5 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
   .fl-page .fl-editor { position: static; }
   .fl-page .fl-editor-body { padding: 24px 22px 40px; }
   .fl-page .fl-section-grid,
-  .fl-page .fl-flat-grid { grid-template-columns: 1fr; }
+  .fl-page .fl-flat-grid { grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); }
 }

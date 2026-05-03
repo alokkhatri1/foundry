@@ -118,7 +118,7 @@ function getFolderDescription(name) {
   return null;
 }
 
-export default function FileExplorer({ fileTree, selectedFileId, onSelectFile, onUpdateTree, onSelectDepartment, showEducationalCues, currentStage, userName }) {
+export default function FileExplorer({ fileTree, selectedFileId, onSelectFile, onUpdateTree, onSelectDepartment, showEducationalCues, currentStage, userName, callClaudeAPI }) {
   const confirm = useConfirm();
   const [currentFolderId, setCurrentFolderId] = useState(fileTree.id);
   const [showModal, setShowModal] = useState(false);
@@ -130,6 +130,12 @@ export default function FileExplorer({ fileTree, selectedFileId, onSelectFile, o
   const uploadInputRef = useRef(null);
   const [dragItemId, setDragItemId] = useState(null);
   const [dropTargetId, setDropTargetId] = useState(null);
+  // Create-with-AI modal state
+  const [aiModalOpen, setAiModalOpen] = useState(false);
+  const [aiPrompt, setAiPrompt] = useState('');
+  const [aiName, setAiName] = useState('');
+  const [aiBusy, setAiBusy] = useState(false);
+  const [aiError, setAiError] = useState(null);
 
   const currentFolder = findNode(fileTree, currentFolderId) || fileTree;
   const breadcrumb = buildPath(fileTree, currentFolderId);
@@ -270,6 +276,90 @@ export default function FileExplorer({ fileTree, selectedFileId, onSelectFile, o
     setNewName(mode === 'file' && template ? 'new-file.md' : '');
     setShowModal(true);
     setShowNewMenu(false);
+  }
+
+  // Slugify a free-text prompt into a markdown-friendly filename. Strip
+  // punctuation, lowercase, hyphenate; cap at ~50 chars so very long
+  // prompts don't produce wall-of-text filenames; append .md.
+  function slugifyPrompt(text) {
+    const slug = (text || '')
+      .toLowerCase()
+      .trim()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '')
+      .slice(0, 50);
+    return (slug || 'new-file') + '.md';
+  }
+
+  function openAiCreateModal() {
+    setAiPrompt('');
+    setAiName('');
+    setAiError(null);
+    setAiBusy(false);
+    setAiModalOpen(true);
+    setShowNewMenu(false);
+  }
+
+  // Generate a markdown body via Claude tuned to the folder's flavor
+  // (knowledge = policy/rules style; skills = numbered-step instruction
+  // style). On success, write the file to the current folder and open it
+  // in the editor. On failure, fall back to the static template so the
+  // participant still gets a starting point.
+  async function handleAiGenerate() {
+    const prompt = aiPrompt.trim();
+    if (!prompt || aiBusy) return;
+    if (!callClaudeAPI) {
+      // No AI hookup — quietly use the template path.
+      const template = isKnowledgeFolder ? KNOWLEDGE_TEMPLATE : SKILL_TEMPLATE;
+      finalizeAiCreate(template);
+      return;
+    }
+    setAiBusy(true);
+    setAiError(null);
+
+    const flavor = isKnowledgeFolder ? 'knowledge' : 'skills';
+    const systemPrompt = flavor === 'knowledge'
+      ? `You are a workshop participant drafting a Knowledge file for an AI coworker to read at runtime. Knowledge files contain reference material — policies, rules, thresholds, exceptions, definitions — written as plain markdown. Structure: an H1 title, then concise H2 sections (Purpose / Rules / Exceptions / References or similar). Be specific. Use bullet lists and concrete numbers where applicable. No filler, no preamble. Output ONLY the markdown body.`
+      : `You are a workshop participant drafting a Skills file for an AI coworker to follow as a job aid. Skills files are reusable instructions — what the AI reads, the steps it follows, the output it produces. Structure: H1 title, then H2 sections (Role / Inputs / Steps / Output / Constraints). Steps should be numbered. Be specific and operational. No filler, no preamble. Output ONLY the markdown body.`;
+
+    try {
+      const result = await callClaudeAPI(systemPrompt, prompt, {
+        model: 'claude-haiku-4-5-20251001',
+        segment: 'file_generation',
+      });
+      if (!result || result.success === false) {
+        throw new Error(result?.error || 'Empty response');
+      }
+      const text = (result.content || '').toString().trim();
+      if (!text) throw new Error('Empty response');
+      finalizeAiCreate(text);
+    } catch (err) {
+      setAiError('Generation failed. Inserted the template instead — edit it freely.');
+      const template = isKnowledgeFolder ? KNOWLEDGE_TEMPLATE : SKILL_TEMPLATE;
+      finalizeAiCreate(template);
+    }
+  }
+
+  function finalizeAiCreate(content) {
+    const parent = findNode(fileTree, currentFolderId);
+    if (!parent || parent.type !== 'folder') {
+      setAiBusy(false);
+      return;
+    }
+    const filename = (aiName.trim() || slugifyPrompt(aiPrompt)).endsWith('.md')
+      ? (aiName.trim() || slugifyPrompt(aiPrompt))
+      : (aiName.trim() || slugifyPrompt(aiPrompt)) + '.md';
+    const newNode = {
+      id: genId(),
+      name: filename,
+      type: 'file',
+      content,
+      createdBy: userName,
+    };
+    onUpdateTree(addChildToTree(fileTree, currentFolderId, newNode));
+    setAiBusy(false);
+    setAiModalOpen(false);
+    onSelectFile(newNode.id);
   }
 
   function handleCreate() {
@@ -471,11 +561,11 @@ export default function FileExplorer({ fileTree, selectedFileId, onSelectFile, o
                       <span className="fl-new-option-hint">start blank</span>
                     </span>
                   </button>
-                  <button className="fl-new-option" onClick={() => openCreateModal('file', isKnowledgeFolder ? KNOWLEDGE_TEMPLATE : SKILL_TEMPLATE)}>
-                    <FileIcon />
+                  <button className="fl-new-option fl-new-option-ai" onClick={openAiCreateModal}>
+                    <span className="fl-new-option-spark" aria-hidden>✦</span>
                     <span className="fl-new-option-label">
-                      <span>From template</span>
-                      <span className="fl-new-option-hint">{isKnowledgeFolder ? 'knowledge skeleton' : 'skill skeleton'}</span>
+                      <span>Create with AI</span>
+                      <span className="fl-new-option-hint">{isKnowledgeFolder ? 'draft a knowledge file' : 'draft a skills file'}</span>
                     </span>
                   </button>
                 </>
@@ -517,8 +607,9 @@ export default function FileExplorer({ fileTree, selectedFileId, onSelectFile, o
                 <p className="fl-empty-desc">Add policies, SOPs, or rules that your AI coworker will reference at runtime.</p>
                 <EducationalCue cueId="files-knowledge-base" show={showEducationalCues} />
                 <div className="fl-empty-actions">
-                  <button className="fl-empty-btn" onClick={() => openCreateModal('file', KNOWLEDGE_TEMPLATE)}>
-                    Create from template
+                  <button className="fl-empty-btn" onClick={openAiCreateModal}>
+                    <span className="fl-empty-btn-spark" aria-hidden>✦</span>
+                    Create with AI
                     <span className="fl-empty-btn-arrow" aria-hidden>{'→'}</span>
                   </button>
                   <button className="fl-empty-btn fl-empty-btn-secondary" onClick={() => uploadInputRef.current?.click()}>
@@ -534,8 +625,9 @@ export default function FileExplorer({ fileTree, selectedFileId, onSelectFile, o
                 <p className="fl-empty-desc">Write reusable instructions that shape how the AI works — like a job aid for a new hire.</p>
                 <EducationalCue cueId="files-instructions" show={showEducationalCues} />
                 <div className="fl-empty-actions">
-                  <button className="fl-empty-btn" onClick={() => openCreateModal('file', SKILL_TEMPLATE)}>
-                    Create from template
+                  <button className="fl-empty-btn" onClick={openAiCreateModal}>
+                    <span className="fl-empty-btn-spark" aria-hidden>✦</span>
+                    Create with AI
                     <span className="fl-empty-btn-arrow" aria-hidden>{'→'}</span>
                   </button>
                   <button className="fl-empty-btn fl-empty-btn-secondary" onClick={() => uploadInputRef.current?.click()}>
@@ -699,6 +791,53 @@ export default function FileExplorer({ fileTree, selectedFileId, onSelectFile, o
               <button className="fl-modal-btn fl-modal-btn-primary" onClick={handleCreate} disabled={!newName.trim()}>
                 Create
                 <span className="fl-modal-btn-arrow" aria-hidden>{'→'}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {aiModalOpen && (
+        <div className="fl-modal-overlay" onClick={() => !aiBusy && setAiModalOpen(false)}>
+          <div className="fl-modal fl-modal-ai" onClick={e => e.stopPropagation()}>
+            <div className="fl-modal-eyebrow">
+              <span className="fl-modal-spark" aria-hidden>✦</span>
+              Create with AI · {isKnowledgeFolder ? 'knowledge file' : 'skills file'}
+            </div>
+            <p className="fl-modal-desc">
+              {isKnowledgeFolder
+                ? 'Describe what this knowledge file should cover. Foundry will draft a structured policy/rules document for your coworker to read.'
+                : 'Describe what this skills file should do. Foundry will draft a structured instruction (Role / Inputs / Steps / Output) for your coworker to follow.'}
+            </p>
+            <textarea
+              className="fl-modal-input fl-modal-textarea"
+              placeholder={isKnowledgeFolder
+                ? 'e.g. Our policy on cross-border wire transfers above $50,000'
+                : 'e.g. How an underwriter writes a credit memo from an application'}
+              value={aiPrompt}
+              onChange={e => setAiPrompt(e.target.value)}
+              rows={4}
+              autoFocus
+              disabled={aiBusy}
+            />
+            <input
+              className="fl-modal-input"
+              type="text"
+              placeholder={`Filename (auto: ${slugifyPrompt(aiPrompt)})`}
+              value={aiName}
+              onChange={e => setAiName(e.target.value)}
+              disabled={aiBusy}
+            />
+            {aiError && <p className="fl-modal-error">{aiError}</p>}
+            <div className="fl-modal-actions">
+              <button className="fl-modal-btn fl-modal-btn-cancel" onClick={() => setAiModalOpen(false)} disabled={aiBusy}>Cancel</button>
+              <button
+                className="fl-modal-btn fl-modal-btn-primary"
+                onClick={handleAiGenerate}
+                disabled={!aiPrompt.trim() || aiBusy}
+              >
+                {aiBusy ? 'Drafting…' : 'Generate'}
+                {!aiBusy && <span className="fl-modal-btn-arrow" aria-hidden>✦</span>}
               </button>
             </div>
           </div>

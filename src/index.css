@@ -12026,6 +12026,57 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
 }
 .fl-modal-btn-primary:hover:not(:disabled) .fl-modal-btn-arrow { transform: translateX(2px); }
 
+/* Create-with-AI modal — wider to fit the prompt textarea + filename */
+.fl-modal.fl-modal-ai { max-width: 520px; }
+.fl-modal-ai .fl-modal-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.fl-modal-spark { color: var(--peach-deep); font-size: 13px; }
+.fl-modal-textarea {
+  resize: vertical;
+  min-height: 88px;
+  font-family: var(--serif);
+  font-size: 15px;
+  line-height: 1.5;
+  padding: 14px 16px;
+}
+.fl-modal-textarea::placeholder {
+  font-style: italic;
+  color: var(--ink-faint);
+}
+.fl-modal-error {
+  margin: 4px 0 0;
+  padding: 10px 14px;
+  background: rgba(199, 90, 74, 0.08);
+  border: 1px solid rgba(199, 90, 74, 0.28);
+  border-left: 3px solid var(--red);
+  border-radius: var(--radius-sm);
+  font-family: var(--sans);
+  font-size: 12.5px;
+  color: #8a3a30;
+}
+
+/* New-menu and empty-state AI affordances */
+.fl-new-option-ai .fl-new-option-spark {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--peach-soft);
+  color: var(--peach-deep);
+  font-size: 13px;
+  border: 1px solid var(--peach);
+  flex-shrink: 0;
+}
+.fl-empty-btn-spark {
+  font-size: 13px;
+  color: var(--peach);
+  margin-right: 4px;
+}
+
 /* The tab pane is the bounding viewport. .fl-page fills it. */
 .tab-pane-files { padding: 0; overflow: hidden; }
 

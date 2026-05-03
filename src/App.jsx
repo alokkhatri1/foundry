@@ -3117,7 +3117,7 @@ Answer in ONE sentence. If the user asks "how", a second sentence is allowed —
                 </div>
               </header>
               <div className="fl-shell">
-                <FileExplorer fileTree={fileTree} selectedFileId={selectedFileId} onSelectFile={(id) => { if (id) handleEnsureFileContent(id); setSelectedFileId(id); }} onUpdateTree={handleUpdateTree} onSelectDepartment={setSelectedDeptId} showEducationalCues={showEducationalCues} currentStage={currentStage} userName={userName} />
+                <FileExplorer fileTree={fileTree} selectedFileId={selectedFileId} onSelectFile={(id) => { if (id) handleEnsureFileContent(id); setSelectedFileId(id); }} onUpdateTree={handleUpdateTree} onSelectDepartment={setSelectedDeptId} showEducationalCues={showEducationalCues} currentStage={currentStage} userName={userName} callClaudeAPI={callClaudeAPI} />
                 <FileEditor file={selectedFile} fileTree={fileTree} onUpdateContent={handleUpdateFileContent} onClose={() => setSelectedFileId(null)} />
               </div>
             </div>

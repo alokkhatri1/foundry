@@ -11265,11 +11265,12 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
   font-weight: 600;
 }
 
-/* Grid — fills the explorer below the toolbar; scrolls internally.
-   Solid cream bg (no dotted texture) — the dots were drawing too much
-   attention to the empty area below sparse cards. */
+/* Grid — sized to its content (so the explorer hugs the section
+   stack), shrinks + scrolls when the explorer hits its max-height
+   cap. flex: 1 1 0 collapsed the grid to 0 when the panel itself
+   was content-sized (nothing to grow into). */
 .fl-page .fl-grid {
-  flex: 1 1 0;
+  flex: 0 1 auto;
   min-height: 0;
   overflow-y: auto;
   padding: 20px;
@@ -11826,7 +11827,7 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
 
 /* Body */
 .fl-page .fl-editor-body {
-  flex: 1 1 0;
+  flex: 0 1 auto;
   min-height: 0;
   overflow-y: auto;
   background: var(--paper);

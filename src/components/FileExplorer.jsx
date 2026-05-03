@@ -393,71 +393,90 @@ export default function FileExplorer({ fileTree, selectedFileId, onSelectFile, o
   const isLeafFolder = isKnowledgeFolder || isSkillsFolder;
 
   return (
-    <div className="drive-explorer">
+    <div className="fl-explorer">
       {/* Breadcrumb */}
-      <div className="drive-breadcrumb">
+      <div className="fl-breadcrumb">
         {breadcrumb.map((node, i) => (
-          <span key={node.id} className="drive-breadcrumb-segment">
-            {i > 0 && <span className="drive-breadcrumb-sep">/</span>}
+          <span key={node.id} className="fl-crumb-segment">
+            {i > 0 && <span className="fl-crumb-sep">/</span>}
             <button
-              className={`drive-breadcrumb-btn${i === breadcrumb.length - 1 ? ' current' : ''}${dropTargetId === node.id ? ' drop-target' : ''}`}
+              className={`fl-crumb${i === breadcrumb.length - 1 ? ' is-current' : ''}${dropTargetId === node.id ? ' drop-target' : ''}`}
               onClick={() => navigateTo(node.id)}
               onDragOver={e => handleDragOverBreadcrumb(e, node.id)}
               onDragLeave={() => setDropTargetId(null)}
               onDrop={e => handleDropOnBreadcrumb(e, node.id)}
             >
-              {node.name}
+              {i === 0 ? 'Workspace' : node.name}
             </button>
           </span>
         ))}
         {dragItemId && (
-          <span className="drive-drag-hint">Drop on a folder or breadcrumb to move</span>
+          <span className="fl-drag-hint">Drop on a folder or breadcrumb to move</span>
         )}
       </div>
 
       {/* Toolbar */}
-      <div className="drive-toolbar">
-        <div className="drive-toolbar-left">
-          <span className="drive-item-count">
-            {items.filter(i => i.type === 'folder').length} folders, {items.filter(i => i.type === 'file').length} files
+      <div className="fl-toolbar">
+        <div className="fl-toolbar-left">
+          <span className="fl-item-count">
+            {items.filter(i => i.type === 'folder').length} {items.filter(i => i.type === 'folder').length === 1 ? 'folder' : 'folders'}
+            {' · '}
+            {items.filter(i => i.type === 'file').length} {items.filter(i => i.type === 'file').length === 1 ? 'file' : 'files'}
           </span>
+          {currentStage && <span className="fl-stage-pill">Stage {currentStage}</span>}
           {isKnowledgeFolder && items.length > 0 && <EducationalCue cueId="files-knowledge-base" show={showEducationalCues} />}
           {isSkillsFolder && items.length > 0 && <EducationalCue cueId="files-instructions" show={showEducationalCues} />}
         </div>
-        <div className="drive-toolbar-right" style={{ position: 'relative' }}>
-          <button className="drive-new-btn" onClick={() => setShowNewMenu(!showNewMenu)}>
-            + New
+        <div className="fl-toolbar-right">
+          <button className="fl-new" onClick={() => setShowNewMenu(!showNewMenu)}>
+            New
+            <span className="fl-new-arrow" aria-hidden>+</span>
           </button>
           {showNewMenu && (
-            <div className="drive-new-menu">
+            <div className="fl-new-menu">
               {(isRoot || (!isLeafFolder && !isRoot)) && (
-                <button className="drive-new-option" onClick={() => openCreateModal('folder')}>
-                  <FolderIcon color="#c8956c" />
-                  <span>New Folder</span>
+                <button className="fl-new-option" onClick={() => openCreateModal('folder')}>
+                  <FolderIcon color="#d97757" />
+                  <span className="fl-new-option-label">
+                    <span>{isRoot ? 'New department' : 'New folder'}</span>
+                    <span className="fl-new-option-hint">{isRoot ? 'folder at root' : 'subfolder'}</span>
+                  </span>
                 </button>
               )}
               {canCreateFile && (
                 <>
-                  <button className="drive-new-option" onClick={() => openCreateModal('file')}>
+                  <button className="fl-new-option" onClick={() => openCreateModal('file')}>
                     <FileIcon />
-                    <span>Empty File</span>
+                    <span className="fl-new-option-label">
+                      <span>Empty file</span>
+                      <span className="fl-new-option-hint">start blank</span>
+                    </span>
                   </button>
-                  <button className="drive-new-option" onClick={() => openCreateModal('file', isKnowledgeFolder ? KNOWLEDGE_TEMPLATE : SKILL_TEMPLATE)}>
+                  <button className="fl-new-option" onClick={() => openCreateModal('file', isKnowledgeFolder ? KNOWLEDGE_TEMPLATE : SKILL_TEMPLATE)}>
                     <FileIcon />
-                    <span>From Template</span>
+                    <span className="fl-new-option-label">
+                      <span>From template</span>
+                      <span className="fl-new-option-hint">{isKnowledgeFolder ? 'knowledge skeleton' : 'skill skeleton'}</span>
+                    </span>
                   </button>
                 </>
               )}
               {!isRoot && !canCreateFile && !isLeafFolder && (
-                <button className="drive-new-option" onClick={() => openCreateModal('file')}>
+                <button className="fl-new-option" onClick={() => openCreateModal('file')}>
                   <FileIcon />
-                  <span>New File</span>
+                  <span className="fl-new-option-label">
+                    <span>New file</span>
+                    <span className="fl-new-option-hint">markdown</span>
+                  </span>
                 </button>
               )}
               {!isRoot && (
-                <button className="drive-new-option drive-upload-option" onClick={() => { uploadInputRef.current?.click(); setShowNewMenu(false); }}>
-                  <span className="drive-upload-icon">{'\u2B06\uFE0F'}</span>
-                  <span>{uploading ? 'Uploading...' : 'Upload File'}</span>
+                <button className="fl-new-option fl-upload" onClick={() => { uploadInputRef.current?.click(); setShowNewMenu(false); }}>
+                  <span className="fl-upload-icon" aria-hidden>{'↑'}</span>
+                  <span className="fl-new-option-label">
+                    <span>{uploading ? 'Uploading…' : 'Upload file'}</span>
+                    <span className="fl-new-option-hint">pdf · docx · md</span>
+                  </span>
                 </button>
               )}
             </div>
@@ -469,20 +488,21 @@ export default function FileExplorer({ fileTree, selectedFileId, onSelectFile, o
       </div>
 
       {/* Grid */}
-      <div className="drive-grid" onClick={() => setShowNewMenu(false)}>
+      <div className="fl-grid" onClick={() => setShowNewMenu(false)}>
         {items.length === 0 && (
-          <div className="drive-empty">
+          <div className="fl-empty">
             {isKnowledgeFolder && (
               <>
-                <div className="drive-empty-icon"><FolderIcon color="#5a9e6f" /></div>
-                <p className="drive-empty-title">No knowledge files yet</p>
-                <p className="drive-empty-desc">Add policies, SOPs, or rules that your AI agent will reference.</p>
+                <div className="fl-empty-icon"><FolderIcon color="#5a9e6f" /></div>
+                <p className="fl-empty-title">No knowledge files yet</p>
+                <p className="fl-empty-desc">Add policies, SOPs, or rules that your AI coworker will reference at runtime.</p>
                 <EducationalCue cueId="files-knowledge-base" show={showEducationalCues} />
-                <div className="drive-empty-actions">
-                  <button className="drive-empty-btn" onClick={() => openCreateModal('file', KNOWLEDGE_TEMPLATE)}>
-                    + Create from template
+                <div className="fl-empty-actions">
+                  <button className="fl-empty-btn" onClick={() => openCreateModal('file', KNOWLEDGE_TEMPLATE)}>
+                    Create from template
+                    <span className="fl-empty-btn-arrow" aria-hidden>{'→'}</span>
                   </button>
-                  <button className="drive-empty-btn drive-empty-btn-secondary" onClick={() => uploadInputRef.current?.click()}>
+                  <button className="fl-empty-btn fl-empty-btn-secondary" onClick={() => uploadInputRef.current?.click()}>
                     Upload file
                   </button>
                 </div>
@@ -490,15 +510,16 @@ export default function FileExplorer({ fileTree, selectedFileId, onSelectFile, o
             )}
             {isSkillsFolder && (
               <>
-                <div className="drive-empty-icon"><FolderIcon color="#4a7fb5" /></div>
-                <p className="drive-empty-title">No skill files yet</p>
-                <p className="drive-empty-desc">Write reusable instructions that shape how the AI behaves.</p>
+                <div className="fl-empty-icon"><FolderIcon color="#4a7fb5" /></div>
+                <p className="fl-empty-title">No skill files yet</p>
+                <p className="fl-empty-desc">Write reusable instructions that shape how the AI works — like a job aid for a new hire.</p>
                 <EducationalCue cueId="files-instructions" show={showEducationalCues} />
-                <div className="drive-empty-actions">
-                  <button className="drive-empty-btn" onClick={() => openCreateModal('file', SKILL_TEMPLATE)}>
-                    + Create from template
+                <div className="fl-empty-actions">
+                  <button className="fl-empty-btn" onClick={() => openCreateModal('file', SKILL_TEMPLATE)}>
+                    Create from template
+                    <span className="fl-empty-btn-arrow" aria-hidden>{'→'}</span>
                   </button>
-                  <button className="drive-empty-btn drive-empty-btn-secondary" onClick={() => uploadInputRef.current?.click()}>
+                  <button className="fl-empty-btn fl-empty-btn-secondary" onClick={() => uploadInputRef.current?.click()}>
                     Upload file
                   </button>
                 </div>
@@ -506,38 +527,37 @@ export default function FileExplorer({ fileTree, selectedFileId, onSelectFile, o
             )}
             {isRoot && (
               <>
-                <div className="drive-empty-icon"><FolderIcon /></div>
-                <p className="drive-empty-title">No folders yet</p>
-                <p className="drive-empty-desc">Create a folder to get started.</p>
-                <button className="drive-empty-btn" onClick={() => openCreateModal('folder')}>
-                  + New Folder
+                <div className="fl-empty-icon"><FolderIcon /></div>
+                <p className="fl-empty-title">No departments yet</p>
+                <p className="fl-empty-desc">A department holds knowledge and skills for one team. Compliance, Lending, Research, anything.</p>
+                <button className="fl-empty-btn" onClick={() => openCreateModal('folder')}>
+                  New department
+                  <span className="fl-empty-btn-arrow" aria-hidden>{'→'}</span>
                 </button>
               </>
             )}
             {!isRoot && !isKnowledgeFolder && !isSkillsFolder && (
               <>
-                <div className="drive-empty-icon"><FolderIcon /></div>
-                <p className="drive-empty-title">This folder is empty</p>
+                <div className="fl-empty-icon"><FolderIcon /></div>
+                <p className="fl-empty-title">This folder is empty</p>
               </>
             )}
           </div>
         )}
 
         {(() => {
-          // Root view splits top-level folders into "Built by you" and
-          // "Built by others" — mirrors the Workflow and Coworker lists so
-          // participants can find their own work at a glance without it
-          // getting lost in a shared library. Inside a folder we fall back
-          // to the normal flat list (files + child folders) since ownership
-          // only matters at the dept level for this UI.
           const folderItems = items.filter(i => i.type === 'folder');
           const fileItems = items.filter(i => i.type === 'file');
           const renderFolderCard = (folder) => {
             const isSystem = folder.createdBy === 'System';
+            const flavor = (folder.name === 'knowledge' || folder.name === 'skills') ? folder.name : null;
+            const folderCount = (folder.children || []).filter(c => c.type === 'folder').length;
+            const fileCount   = (folder.children || []).filter(c => c.type === 'file').length;
             return (
               <div
                 key={folder.id}
-                className={`drive-card drive-card-folder${dropTargetId === folder.id ? ' drop-target' : ''}${dragItemId === folder.id ? ' dragging' : ''}${isSystem ? ' drive-card-example' : ''}`}
+                className={`fl-card fl-card-folder${dropTargetId === folder.id ? ' drop-target' : ''}${dragItemId === folder.id ? ' is-dragging' : ''}${isSystem ? ' fl-card-example' : ''}`}
+                data-flavor={flavor || undefined}
                 onClick={() => handleItemClick(folder)}
                 draggable={!isSystem}
                 onDragStart={e => !isSystem && handleDragStart(e, folder.id)}
@@ -546,101 +566,93 @@ export default function FileExplorer({ fileTree, selectedFileId, onSelectFile, o
                 onDrop={e => !isSystem && handleDropOnFolder(e, folder.id)}
                 onDragEnd={handleDragEnd}
               >
-                <div className="drive-card-icon">
+                <div className="fl-card-icon">
                   <FolderIcon color={getFolderColor(folder.name)} />
                 </div>
-                <div className="drive-card-name">{folder.name}</div>
+                <div className="fl-card-name">{folder.name}</div>
                 {getFolderDescription(folder.name) && (
-                  <div className="drive-card-desc">{getFolderDescription(folder.name)}</div>
+                  <div className="fl-card-desc">{getFolderDescription(folder.name)}</div>
                 )}
-                {folder.children && (
-                  <div className="drive-card-meta">
-                    {folder.children.filter(c => c.type === 'folder').length > 0 &&
-                      `${folder.children.filter(c => c.type === 'folder').length} folders`}
-                    {folder.children.filter(c => c.type === 'folder').length > 0 &&
-                      folder.children.filter(c => c.type === 'file').length > 0 && ', '}
-                    {folder.children.filter(c => c.type === 'file').length > 0 &&
-                      `${folder.children.filter(c => c.type === 'file').length} files`}
-                  </div>
-                )}
+                <div className="fl-card-meta">
+                  {folderCount > 0 && `${folderCount} ${folderCount === 1 ? 'folder' : 'folders'}`}
+                  {folderCount > 0 && fileCount > 0 && ' · '}
+                  {fileCount > 0 && `${fileCount} ${fileCount === 1 ? 'file' : 'files'}`}
+                  {folderCount === 0 && fileCount === 0 && 'Empty'}
+                </div>
                 {folder.name !== 'knowledge' && folder.name !== 'skills' && folder.createdBy === userName && (
-                  <button className="drive-card-delete" onClick={e => handleDelete(e, folder.id)} title="Delete">{'\u2715'}</button>
+                  <button className="fl-card-action-delete" onClick={e => handleDelete(e, folder.id)} title="Delete">{'✕'}</button>
                 )}
               </div>
             );
           };
           const renderFileCard = (file) => {
             const isSystem = file.createdBy === 'System';
+            const lines = typeof file.content === 'string'
+              ? (file.content ? file.content.split('\n').length : 0)
+              : null;
+            const authorLabel = file.createdBy && file.createdBy !== 'System'
+              ? (file.createdBy === userName ? 'You' : file.createdBy)
+              : null;
             return (
               <div
                 key={file.id}
-                className={`drive-card drive-card-file${selectedFileId === file.id ? ' selected' : ''}${dragItemId === file.id ? ' dragging' : ''}${isSystem ? ' drive-card-example' : ''}`}
+                className={`fl-card fl-card-file${selectedFileId === file.id ? ' is-selected' : ''}${dragItemId === file.id ? ' is-dragging' : ''}${isSystem ? ' fl-card-example' : ''}`}
                 onClick={() => handleItemClick(file)}
                 draggable={!isSystem}
                 onDragStart={e => !isSystem && handleDragStart(e, file.id)}
                 onDragEnd={handleDragEnd}
               >
-                <div className="drive-card-icon">
+                <div className="fl-card-icon">
                   <FileIcon />
                 </div>
-                <div className="drive-card-name">{file.name}</div>
-                <div className="drive-card-meta">
-                  {/* Only label as Empty when we've actually loaded the body and
-                      it really is empty. While content is still undefined/null
-                      (unhydrated metadata-only row), say nothing — "Empty" was
-                      misleading every card that hadn't been clicked yet. */}
-                  {typeof file.content === 'string'
-                    ? (file.content ? `${file.content.split('\n').length} lines` : 'Empty')
-                    : ''}
+                <div className="fl-card-name">{file.name}</div>
+                <div className="fl-card-meta">
+                  {lines === null ? '' : (lines > 0 ? `${lines} ${lines === 1 ? 'line' : 'lines'}` : 'Empty')}
+                  {authorLabel && (
+                    <span className="fl-card-meta-author">{authorLabel}</span>
+                  )}
                 </div>
+                {isSystem && <span className="fl-card-badge">Example</span>}
                 {isSystem && (
-                  <button className="drive-card-clone" onClick={e => handleCloneFile(e, file)} title="Clone — make my own copy">Clone</button>
+                  <button className="fl-card-action-clone" onClick={e => handleCloneFile(e, file)} title="Clone — make my own copy">Clone</button>
                 )}
                 {file.createdBy === userName && (
-                  <button className="drive-card-delete" onClick={e => handleDelete(e, file.id)} title="Delete">{'\u2715'}</button>
+                  <button className="fl-card-action-delete" onClick={e => handleDelete(e, file.id)} title="Delete">{'✕'}</button>
                 )}
               </div>
             );
           };
 
           if (!isRoot) {
+            if (folderItems.length === 0 && fileItems.length === 0) return null;
             return (
-              <>
+              <div className="fl-flat-grid">
                 {folderItems.map(renderFolderCard)}
                 {fileItems.map(renderFileCard)}
-              </>
+              </div>
             );
           }
 
           const exampleFolders = folderItems.filter(f => f.createdBy === 'System');
           const mineFolders = folderItems.filter(f => f.createdBy && f.createdBy !== 'System' && f.createdBy === userName);
           const othersFolders = folderItems.filter(f => f.createdBy && f.createdBy !== 'System' && f.createdBy !== userName);
+          const sections = [
+            { key: 'examples', label: 'Examples', list: exampleFolders },
+            { key: 'mine',     label: 'Added by you', list: mineFolders },
+            { key: 'others',   label: 'Added by others', list: othersFolders },
+          ].filter(s => s.list.length > 0);
+          if (sections.length === 0) return null;
           return (
             <>
-              {exampleFolders.length > 0 && (
-                <>
-                  <div className="drive-section-title">
-                    Examples <span className="drive-section-count">{exampleFolders.length}</span>
+              {sections.map(s => (
+                <div key={s.key} className="fl-section">
+                  <div className="fl-section-head">
+                    <span className="fl-section-title">{s.label}</span>
+                    <span className="fl-section-count">{s.list.length}</span>
                   </div>
-                  {exampleFolders.map(renderFolderCard)}
-                </>
-              )}
-              {mineFolders.length > 0 && (
-                <>
-                  <div className="drive-section-title">
-                    Added by you <span className="drive-section-count">{mineFolders.length}</span>
-                  </div>
-                  {mineFolders.map(renderFolderCard)}
-                </>
-              )}
-              {othersFolders.length > 0 && (
-                <>
-                  <div className="drive-section-title">
-                    Added by others <span className="drive-section-count">{othersFolders.length}</span>
-                  </div>
-                  {othersFolders.map(renderFolderCard)}
-                </>
-              )}
+                  <div className="fl-section-grid">{s.list.map(renderFolderCard)}</div>
+                </div>
+              ))}
             </>
           );
         })()}
@@ -648,16 +660,17 @@ export default function FileExplorer({ fileTree, selectedFileId, onSelectFile, o
 
       {/* Create modal */}
       {showModal && (
-        <div className="modal-overlay" onClick={() => setShowModal(false)}>
-          <div className="modal-box" onClick={e => e.stopPropagation()}>
-            <h3>{modalMode === 'folder' ? 'New Folder' : 'New File'}</h3>
-            <p>{modalMode === 'folder'
+        <div className="fl-modal-overlay" onClick={() => setShowModal(false)}>
+          <div className="fl-modal" onClick={e => e.stopPropagation()}>
+            <div className="fl-modal-eyebrow">{modalMode === 'folder' ? (isRoot ? 'New department' : 'New folder') : 'New file'}</div>
+            <p className="fl-modal-desc">{modalMode === 'folder'
               ? (skillsRevealed
-                  ? 'Create a folder with knowledge and skills subfolders.'
-                  : 'Create a folder with a knowledge subfolder.')
-              : 'Create a new file in this folder.'
-            }</p>
+                  ? 'Departments hold a knowledge folder (reference material) and a skills folder (instructions). Coworkers read from both.'
+                  : 'Departments hold a knowledge folder for reference material your coworkers can read.')
+              : 'Markdown only. The AI reads what you write here as plain text — formatting matters.'}
+            </p>
             <input
+              className="fl-modal-input"
               type="text"
               placeholder={modalMode === 'folder' ? 'Folder name' : 'filename.md'}
               value={newName}
@@ -665,9 +678,12 @@ export default function FileExplorer({ fileTree, selectedFileId, onSelectFile, o
               onKeyDown={e => e.key === 'Enter' && handleCreate()}
               autoFocus
             />
-            <div className="modal-actions">
-              <button className="modal-btn cancel" onClick={() => setShowModal(false)}>Cancel</button>
-              <button className="modal-btn primary" onClick={handleCreate}>Create</button>
+            <div className="fl-modal-actions">
+              <button className="fl-modal-btn fl-modal-btn-cancel" onClick={() => setShowModal(false)}>Cancel</button>
+              <button className="fl-modal-btn fl-modal-btn-primary" onClick={handleCreate} disabled={!newName.trim()}>
+                Create
+                <span className="fl-modal-btn-arrow" aria-hidden>{'→'}</span>
+              </button>
             </div>
           </div>
         </div>

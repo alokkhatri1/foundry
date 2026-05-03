@@ -3039,17 +3039,28 @@ Answer in ONE sentence. If the user asks "how", a second sentence is allowed —
         )}
         {activeTab === 'files' && (
           <div className="tab-pane tab-pane-files">
-            {selectedFile ? (
-              <div className="files-editor-fullview">
-                <div className="files-editor-topbar">
-                  <button className="files-back-btn" onClick={() => setSelectedFileId(null)}>{'\u2190'} Back to files</button>
-                  <span className="files-editor-filename">{selectedFile.name}</span>
+            <div className="fl-page">
+              <header className="fl-page-head">
+                <div className="fl-page-head-left">
+                  <div className="fl-page-eyebrow">Stage 3 \u2014 4 \u00b7 Files</div>
+                  <h1 className="fl-page-title">A workspace your coworkers <em>read from</em>.</h1>
+                  <p className="fl-page-sub">
+                    Knowledge folders hold the reference material \u2014 policies, rules, context. Skills folders hold the instructions that shape how a coworker actually works. Two folders, one job: making the AI smarter without retraining it.
+                  </p>
                 </div>
-                <FileEditor file={selectedFile} onUpdateContent={handleUpdateFileContent} />
+                <div className="fl-page-legend">
+                  <span className="fl-legend-item"><span className="fl-legend-swatch" style={{ background: '#d97757' }} /> Department</span>
+                  <span className="fl-legend-item"><span className="fl-legend-swatch" style={{ background: '#5a9e6f' }} /> Knowledge</span>
+                  {stageReached(currentStage, '4') && (
+                    <span className="fl-legend-item"><span className="fl-legend-swatch" style={{ background: '#4a7fb5' }} /> Skills</span>
+                  )}
+                </div>
+              </header>
+              <div className="fl-shell">
+                <FileExplorer fileTree={fileTree} selectedFileId={selectedFileId} onSelectFile={(id) => { if (id) handleEnsureFileContent(id); setSelectedFileId(id); }} onUpdateTree={handleUpdateTree} onSelectDepartment={setSelectedDeptId} showEducationalCues={showEducationalCues} currentStage={currentStage} userName={userName} />
+                <FileEditor file={selectedFile} fileTree={fileTree} onUpdateContent={handleUpdateFileContent} onClose={() => setSelectedFileId(null)} />
               </div>
-            ) : (
-              <FileExplorer fileTree={fileTree} selectedFileId={selectedFileId} onSelectFile={(id) => { if (id) handleEnsureFileContent(id); setSelectedFileId(id); }} onUpdateTree={handleUpdateTree} onSelectDepartment={setSelectedDeptId} showEducationalCues={showEducationalCues} currentStage={currentStage} userName={userName} />
-            )}
+            </div>
           </div>
         )}
         {activeTab === 'activity' && (

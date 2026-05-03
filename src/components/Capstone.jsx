@@ -647,16 +647,16 @@ function BlueprintDrawer({ open, onClose, blueprint }) {
         className="cs-drawer"
         onClick={e => e.stopPropagation()}
         role="dialog"
-        aria-label="Workflow blueprint reference"
+        aria-label="Workflow reference"
       >
         <div className="cs-drawer-head">
           <div className="cs-drawer-head-text">
             <div className="cs-eyebrow"><span className="cs-eyebrow-dot" aria-hidden />REFERENCE</div>
             <h3 className="cs-drawer-title">
-              <em>Workflow blueprint</em>
+              <em>Workflow reference</em>
             </h3>
           </div>
-          <button className="cs-drawer-close" onClick={onClose} aria-label="Close blueprint">✕</button>
+          <button className="cs-drawer-close" onClick={onClose} aria-label="Close reference">✕</button>
         </div>
         <div className="cs-drawer-body">
           <div className="cs-drawer-intro">
@@ -840,7 +840,7 @@ export default function Capstone({
             onClick={() => setDrawerOpen(true)}
           >
             <span className="cs-btn-spark" aria-hidden>✦</span>
-            Show blueprint
+            Show reference
           </button>
           {copilotUnlocked && (
             <button

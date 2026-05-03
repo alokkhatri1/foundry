@@ -185,7 +185,7 @@ export const CAPSTONE_BLUEPRINT_REFERENCE = {
   ],
 };
 
-const CAPSTONE_BLUEPRINT = `# Credit Application Review — Workflow Blueprint
+const CAPSTONE_BLUEPRINT = `# Credit Application Review — Workflow Reference
 
 A reference workflow for a credit application review. Use it as a shape.
 The clarity is the slow step. The build is fast.
@@ -334,7 +334,7 @@ export function createExampleFiles(roomId) {
     { ...base, id: EXAMPLE_FOLDER_ID, parent_id: null, name: 'Examples', type: 'folder', sort_order: -1 },
     { ...base, id: EXAMPLE_KNOWLEDGE_FOLDER_ID, parent_id: EXAMPLE_FOLDER_ID, name: 'knowledge', type: 'folder', sort_order: 0 },
     { ...base, id: EXAMPLE_SKILLS_FOLDER_ID, parent_id: EXAMPLE_FOLDER_ID, name: 'skills', type: 'folder', sort_order: 1 },
-    { ...base, id: EXAMPLE_BLUEPRINTS_FOLDER_ID, parent_id: EXAMPLE_FOLDER_ID, name: 'blueprints', type: 'folder', sort_order: 2 },
+    { ...base, id: EXAMPLE_BLUEPRINTS_FOLDER_ID, parent_id: EXAMPLE_FOLDER_ID, name: 'references', type: 'folder', sort_order: 2 },
   ];
   const knowledge = [
     { ...base, id: 'example-file-retail-policy', parent_id: EXAMPLE_KNOWLEDGE_FOLDER_ID, name: 'retail_lending_policy.md', type: 'file', content: RETAIL_LENDING_POLICY, sort_order: 0 },
@@ -345,7 +345,7 @@ export function createExampleFiles(roomId) {
     { ...base, id: 'example-file-compliance-check', parent_id: EXAMPLE_SKILLS_FOLDER_ID, name: 'compliance_check.md', type: 'file', content: COMPLIANCE_CHECK_SKILL, sort_order: 1 },
   ];
   const blueprints = [
-    { ...base, id: EXAMPLE_BLUEPRINT_FILE_ID, parent_id: EXAMPLE_BLUEPRINTS_FOLDER_ID, name: 'blueprint.md', type: 'file', content: CAPSTONE_BLUEPRINT, sort_order: 0 },
+    { ...base, id: EXAMPLE_BLUEPRINT_FILE_ID, parent_id: EXAMPLE_BLUEPRINTS_FOLDER_ID, name: 'reference.md', type: 'file', content: CAPSTONE_BLUEPRINT, sort_order: 0 },
   ];
   return { folders, knowledge, skills, blueprints };
 }

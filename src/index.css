@@ -11072,10 +11072,6 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
   flex-direction: column;
   box-shadow: 0 1px 0 rgba(60, 40, 20, 0.02);
 }
-/* Let the grid size to content. The dotted-bg fills the empty area
-   only when content actually warrants the space — a single card no
-   longer reserves a tall vertical band. */
-.fl-page .fl-grid { flex: 0 1 auto; min-height: 200px; }
 
 /* Breadcrumb */
 .fl-page .fl-breadcrumb {
@@ -11254,10 +11250,12 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
   font-weight: 600;
 }
 
-/* Grid */
+/* Grid — content-sized so the dotted bg only extends as far as cards
+   actually fill. flex: 1 was forcing the grid to stretch into all the
+   remaining vertical room of the explorer column, leaving a tall
+   empty band when sections are sparse. */
 .fl-page .fl-grid {
-  flex: 1;
-  overflow-y: auto;
+  flex: 0 0 auto;
   padding: 20px;
   display: flex;
   flex-direction: column;

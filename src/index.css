@@ -11311,12 +11311,9 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
 .fl-page .fl-section-grid,
 .fl-page .fl-flat-grid {
   display: grid;
-  /* Multi-column auto-fill — cards flow into rows naturally as the
-     section fills up. With 1 card the row is one card tall; with more,
-     it wraps. Sections always stack tightly via the parent .fl-grid's
-     gap so sparse states don't reserve big empty bands. */
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-  gap: 14px;
+  /* Match v2 export: 180px min, 1fr stretch, 12px gap. */
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 12px;
   align-content: start;
 }
 
@@ -11325,24 +11322,17 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
   background: var(--paper);
   border: 1px solid var(--rule-soft);
   border-radius: var(--radius-sm);
-  padding: 22px 22px 18px;
+  padding: 16px 14px 12px;
   cursor: pointer;
   display: flex;
   flex-direction: column;
-  /* Icon sits at top; name + meta fall to the bottom. The empty middle
-     space is intentional — gives the card the substantial editorial
-     proportions from the reference. */
   gap: 6px;
   transition: border-color 0.15s, box-shadow 0.15s, transform 0.12s;
   position: relative;
   text-align: left;
   overflow: hidden;
-  min-height: 200px;
+  min-height: 120px;
 }
-.fl-page .fl-card-folder { min-height: 240px; }
-/* Push the icon to the top, name + meta cluster to the bottom. */
-.fl-page .fl-card .fl-card-icon { margin-bottom: auto; }
-.fl-page .fl-card-name { margin-top: 4px; }
 .fl-page .fl-card::before {
   content: "";
   position: absolute;
@@ -11415,9 +11405,7 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
   letter-spacing: 0.14em;
   text-transform: uppercase;
   color: var(--ink-muted);
-  /* margin-top: auto removed — icon now uses margin-bottom: auto to
-     push everything below it to the bottom, and we want name + meta
-     to cluster together rather than spread apart. */
+  margin-top: auto;
   padding-top: 8px;
   display: flex;
   align-items: center;

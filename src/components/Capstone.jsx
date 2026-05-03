@@ -262,7 +262,7 @@ function ReviewerPicker({ value, valueName, participants, onChange }) {
         value={text}
         placeholder="Type a name or pick…"
         onChange={e => { commit(e.target.value); setOpen(true); }}
-        onClick={() => setOpen(true)}
+        onMouseDown={() => setOpen(true)}
         onKeyDown={e => {
           if (e.key === 'Enter') { e.preventDefault(); setOpen(false); e.target.blur(); }
         }}
@@ -287,7 +287,7 @@ function ReviewerPicker({ value, valueName, participants, onChange }) {
                 type="button"
                 key={opt.id}
                 className={`cs-reviewer-option${opt.id === value ? ' is-selected' : ''}`}
-                onClick={() => pick(opt)}
+                onMouseDown={e => { e.preventDefault(); pick(opt); }}
               >
                 <span className="cs-reviewer-avatar" aria-hidden>{opt.name[0].toUpperCase()}</span>
                 <span className="cs-reviewer-option-body">

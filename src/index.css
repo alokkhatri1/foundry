@@ -10992,8 +10992,10 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
   display: flex;
   flex-direction: column;
   gap: 28px;
-  overflow-y: auto;
-  height: 100%;
+  /* Page sizes to its content. The .tab-pane-files parent owns the
+     scroll. Without this, height: 100% was forcing the page to fill
+     the tab-pane and leaving a tall dotted band below the cards. */
+  min-height: 100%;
 }
 
 /* Page header */
@@ -11071,6 +11073,11 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
   display: flex;
   flex-direction: column;
   box-shadow: 0 1px 0 rgba(60, 40, 20, 0.02);
+  /* Pin to the top of its grid cell + size to content. Belt + braces:
+     align-items: start on the parent should already do this, but some
+     browser/grid contexts still apply align-self: stretch implicitly. */
+  align-self: start;
+  height: fit-content;
 }
 
 /* Breadcrumb */
@@ -11256,6 +11263,7 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
    empty band when sections are sparse. */
 .fl-page .fl-grid {
   flex: 0 0 auto;
+  height: fit-content;
   padding: 20px;
   display: flex;
   flex-direction: column;
@@ -11966,10 +11974,10 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
 }
 .fl-page .fl-modal-btn-primary:hover:not(:disabled) .fl-modal-btn-arrow { transform: translateX(2px); }
 
-/* The Files tab pane is the page's scroll container — let .fl-page own
-   its own scroll instead of inheriting any tab-pane chrome. */
-.tab-pane-files { padding: 0; overflow: hidden; }
-.tab-pane-files > .fl-page { height: 100%; }
+/* The Files tab pane scrolls itself; .fl-page sizes to its content so
+   the dotted-bg grid is bounded by actual cards, not by the tab-pane
+   height. */
+.tab-pane-files { padding: 0; overflow-y: auto; overflow-x: hidden; }
 
 /* Responsive */
 @media (max-width: 980px) {

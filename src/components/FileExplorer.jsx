@@ -438,7 +438,7 @@ export default function FileExplorer({ fileTree, selectedFileId, onSelectFile, o
                 <button className="fl-new-option" onClick={() => openCreateModal('folder')}>
                   <FolderIcon color="#d97757" />
                   <span className="fl-new-option-label">
-                    <span>{isRoot ? 'New department' : 'New folder'}</span>
+                    <span>New folder</span>
                     <span className="fl-new-option-hint">{isRoot ? 'folder at root' : 'subfolder'}</span>
                   </span>
                 </button>
@@ -528,10 +528,10 @@ export default function FileExplorer({ fileTree, selectedFileId, onSelectFile, o
             {isRoot && (
               <>
                 <div className="fl-empty-icon"><FolderIcon /></div>
-                <p className="fl-empty-title">No departments yet</p>
-                <p className="fl-empty-desc">A department holds knowledge and skills for one team. Compliance, Lending, Research, anything.</p>
+                <p className="fl-empty-title">No folders yet</p>
+                <p className="fl-empty-desc">Each folder at root holds a knowledge folder and a skills folder. Compliance, Lending, Research — whatever shape your work takes.</p>
                 <button className="fl-empty-btn" onClick={() => openCreateModal('folder')}>
-                  New department
+                  New folder
                   <span className="fl-empty-btn-arrow" aria-hidden>{'→'}</span>
                 </button>
               </>
@@ -662,11 +662,11 @@ export default function FileExplorer({ fileTree, selectedFileId, onSelectFile, o
       {showModal && (
         <div className="fl-modal-overlay" onClick={() => setShowModal(false)}>
           <div className="fl-modal" onClick={e => e.stopPropagation()}>
-            <div className="fl-modal-eyebrow">{modalMode === 'folder' ? (isRoot ? 'New department' : 'New folder') : 'New file'}</div>
+            <div className="fl-modal-eyebrow">{modalMode === 'folder' ? 'New folder' : 'New file'}</div>
             <p className="fl-modal-desc">{modalMode === 'folder'
               ? (skillsRevealed
-                  ? 'Departments hold a knowledge folder (reference material) and a skills folder (instructions). Coworkers read from both.'
-                  : 'Departments hold a knowledge folder for reference material your coworkers can read.')
+                  ? 'Each folder at root holds a knowledge folder (reference material) and a skills folder (instructions). Coworkers read from both.'
+                  : 'Each folder at root holds a knowledge folder for reference material your coworkers can read.')
               : 'Markdown only. The AI reads what you write here as plain text — formatting matters.'}
             </p>
             <input

@@ -664,7 +664,7 @@ export default function ActivityDashboard({ workflowRuns, onApprovalAction, onCa
           <div className="ob-page-eyebrow">Stage 7 · Observability</div>
           <h1 className="ob-page-title">Everything your mixed team did, <em>on the record</em>.</h1>
           <p className="ob-page-sub">
-            Queryable from here forward — by you, by your coworkers, by your next workflow. Each run is an artifact; each decision is logged.
+            Each run is an artifact; each decision is logged.
           </p>
           <EducationalCue cueId="activity-dashboard" show={showEducationalCues} />
         </div>

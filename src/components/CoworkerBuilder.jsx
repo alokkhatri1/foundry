@@ -762,7 +762,7 @@ export default function CoworkerBuilder({ coworkers, onUpdateCoworkers, fileTree
             AI teammates that&nbsp;<em>read your files</em>.
           </h1>
           <p className="cwb-page-sub">
-            Each coworker pairs a name and a role with a folder of knowledge and a folder of skills. They read what you give them, follow the instructions you write, and produce artifacts the rest of the room can use.
+            AI teammates with a name, a role, and the files they read from.
           </p>
           <EducationalCue cueId="coworkers-overview" show={showEducationalCues} />
         </div>

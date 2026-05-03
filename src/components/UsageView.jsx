@@ -141,7 +141,7 @@ export default function UsageView({ sb, participants, myParticipantId, showEduca
             Look at what the whole&nbsp;<em>room</em>&nbsp;just spent.
           </h2>
           <p className="us-page-sub">
-            Every Claude API call this workshop has made — chat, coworker work, workflow runs, copilot. The number below is real money. The leaderboard tells you where it went.
+            Every Claude API call this room has made — and where it went.
           </p>
           <EducationalCue cueId="usage-stage" show={showEducationalCues} />
         </div>

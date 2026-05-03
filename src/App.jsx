@@ -3105,7 +3105,7 @@ Answer in ONE sentence. If the user asks "how", a second sentence is allowed —
                   <div className="fl-page-eyebrow">Stage 3 — 4 · Files</div>
                   <h1 className="fl-page-title">A workspace your coworkers <em>read from</em>.</h1>
                   <p className="fl-page-sub">
-                    Knowledge folders hold the reference material — policies, rules, context. Skills folders hold the instructions that shape how a coworker actually works. Two folders, one job: making the AI smarter without retraining it.
+                    Knowledge for what the AI reads, skills for how it works.
                   </p>
                 </div>
                 <div className="fl-page-legend">

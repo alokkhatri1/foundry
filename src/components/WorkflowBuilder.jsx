@@ -1548,7 +1548,7 @@ export default function WorkflowBuilder({ workflows, onUpdateWorkflows, fileTree
               Wire your team into a&nbsp;<em>runnable workflow</em>.
             </h1>
             <p className="wf-page-sub">
-              Each step produces; each review gates; the artifact only exists when the team agrees. Coworkers do the work, humans approve, the DAG remembers what happened.
+              Coworkers do the work, humans approve, the DAG remembers what happened.
             </p>
             <EducationalCue cueId="workflow-overview" show={showEducationalCues} />
           </div>

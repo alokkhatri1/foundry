@@ -830,7 +830,7 @@ export default function Capstone({
             Lay out a real workflow,&nbsp;<em>step by step</em>.
           </h2>
           <p className="cs-page-sub">
-            Coworker steps describe what an AI teammate does — on Send, each one becomes a saved coworker, named for you, ready on the canvas. Human steps assign a real reviewer in the room. Clarity is the slow step; building should feel fast.
+            Coworker steps become saved coworkers; human steps become review nodes — on Send.
           </p>
         </div>
         <div className="cs-page-actions">

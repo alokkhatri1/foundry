@@ -261,10 +261,18 @@ function ReviewerPicker({ value, valueName, participants, onChange }) {
         className="cs-reviewer-input"
         value={text}
         placeholder="Type a name or pick…"
-        onChange={e => commit(e.target.value)}
-        onFocus={() => setOpen(true)}
+        onChange={e => { commit(e.target.value); setOpen(true); }}
+        onClick={() => setOpen(true)}
+        onKeyDown={e => {
+          if (e.key === 'Enter') { e.preventDefault(); setOpen(false); e.target.blur(); }
+        }}
       />
-      <span className="cs-reviewer-caret" aria-hidden>{open ? '▴' : '▾'}</span>
+      <button
+        type="button"
+        className="cs-reviewer-caret"
+        onClick={() => setOpen(o => !o)}
+        aria-label={open ? 'Close menu' : 'Open menu'}
+      >{open ? '▴' : '▾'}</button>
       {open && (
         <div className="cs-reviewer-menu">
           {filtered.length === 0 ? (

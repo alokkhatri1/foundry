@@ -9,13 +9,9 @@ import { CAPSTONE_BLUEPRINT_REFERENCE } from '../data/exampleArtifacts';
 // text) that lands in the participant's library and is then referenced
 // by name on the canvas.
 //
-// Human step: pick a real human in the room + remarks describing what
-// they verify. Materializes as a Review node assigned to that human.
-//
-// Stage 5 (Coworkers) teaches the primitive — name, role, knowledge,
-// skills. Stage 8 USES the same primitive at workflow scale: every
-// coworker step IS a coworker spec. The teaching arc is "one coworker,
-// then a team of them, defined the same way."
+// Human step: pick a real human in the room. Materializes as a Review
+// node assigned to that human; the step text doubles as the prompt the
+// reviewer sees.
 //
 // Persistence: per-participant per-room via sb.loadCapstoneDraft /
 // sb.saveCapstoneDraft. No realtime — single-author edits.
@@ -29,7 +25,7 @@ function newRow() {
     skillsFileIds: [],    // coworker-only
     reviewerId: '',       // human-only
     reviewerName: '',     // human-only — cached for stale-handling
-    remarks: '',          // human-only — what they verify
+    remarks: '',          // legacy, kept for back-compat
   };
 }
 
@@ -37,11 +33,8 @@ function newRow() {
 //   { type: 'coworker'|'review', actorId, actorName, fileIds, remarks }
 // where files were a single combined knowledge+skills picker and the
 // actor pointed at a saved coworker (coworker rows) or participant
-// (review rows). We map it forward best-effort: the freeform actor binding
-// no longer applies to coworker rows (the spec replaces it), but for
-// review rows we copy actor → reviewer. Old fileIds get parked into
-// knowledgeFileIds since we can't tell from the row alone which folder
-// they came from; the participant can re-split if it matters.
+// (review rows). Map forward best-effort: review→human, actor→reviewer,
+// fileIds→knowledgeFileIds (folder split is unrecoverable).
 function migrateRow(row) {
   if (!row || typeof row !== 'object') return newRow();
   const next = { ...newRow(), ...row };
@@ -53,7 +46,6 @@ function migrateRow(row) {
   if (Array.isArray(row.fileIds) && row.fileIds.length && !row.knowledgeFileIds && !row.skillsFileIds) {
     next.knowledgeFileIds = row.fileIds;
   }
-  // Drop legacy fields so the saved draft converges on the new shape.
   delete next.actorId;
   delete next.actorName;
   delete next.fileIds;
@@ -61,13 +53,8 @@ function migrateRow(row) {
   return next;
 }
 
-function rowTypeLabel(type) {
-  return type === 'human' ? 'Human review' : 'AI coworker';
-}
-
 // Derive a coworker name from the step text. Takes the first ~5 words,
-// title-cased, capped. The participant sees this preview under the row
-// before they hit Send. Uniqueness against other rows in the same plan
+// title-cased, capped. Uniqueness against other rows in the same plan
 // (and against the existing library) is handled in App.jsx at send time.
 export function deriveCoworkerName(step) {
   const cleaned = (step || '').trim().replace(/\s+/g, ' ');
@@ -77,25 +64,18 @@ export function deriveCoworkerName(step) {
   return titled.replace(/[.,;:!?]+$/, '').slice(0, 60);
 }
 
-function isRowComplete(row, participants) {
+function isRowComplete(row) {
   const step = (row.step || '').trim();
   if (!step) return false;
   if ((row.type || 'coworker') === 'coworker') {
-    // At least one knowledge or skills file backing the spec — the
-    // materialized coworker has nothing to behave from otherwise.
     const hasFiles = (row.knowledgeFileIds || []).length > 0 || (row.skillsFileIds || []).length > 0;
     return hasFiles;
   }
-  // Human row — accept either a picked participant or a typed name.
-  // Cross-room messaging isn't built so a typed name won't actually
-  // notify a human at workflow run time, but for the Capstone
-  // planning artifact a name is enough. The step textarea doubles
-  // as the prompt the reviewer sees.
   if (!(row.reviewerName || '').trim()) return false;
   return true;
 }
 
-function firstIncompleteReason(rows, participants) {
+function firstIncompleteReason(rows) {
   for (let i = 0; i < (rows || []).length; i++) {
     const r = rows[i];
     const num = i + 1;
@@ -114,9 +94,6 @@ function firstIncompleteReason(rows, participants) {
   return null;
 }
 
-// Walk the file tree, returning files inside the named subfolder
-// ('knowledge' or 'skills'). Used by FilePicker; supports the two
-// pickers on a coworker card without leaking files between folders.
 function flattenForPicker(tree, folder) {
   const out = [];
   if (!tree) return out;
@@ -134,6 +111,20 @@ function flattenForPicker(tree, folder) {
 
 function stripExt(name) {
   return (name || '').replace(/\.md$/i, '');
+}
+
+function pad2(n) {
+  return String(n).padStart(2, '0');
+}
+
+function relSavedLabel(now, ts) {
+  if (!ts) return '';
+  const sec = Math.max(0, Math.floor((now - ts) / 1000));
+  if (sec < 5) return 'Saved';
+  if (sec < 60) return `Saved ${sec}s ago`;
+  const min = Math.floor(sec / 60);
+  if (min < 60) return `Saved ${min}m ago`;
+  return 'Saved';
 }
 
 function FilePicker({ value, onChange, fileTree, folder }) {
@@ -172,36 +163,36 @@ function FilePicker({ value, onChange, fileTree, folder }) {
     : 'No knowledge files yet — add one in the Files tab.';
 
   return (
-    <div className="capstone-filepicker" ref={containerRef}>
+    <div className={`cs-filepicker is-${folder}`} ref={containerRef}>
       <button
         type="button"
-        className={`capstone-filepicker-btn${selectedNames.length > 0 ? ' has-selection' : ''}`}
+        className={`cs-filepicker-btn${selectedNames.length > 0 ? ' has-selection' : ''}`}
         onClick={() => setOpen(o => !o)}
       >
-        <span className="capstone-filepicker-content">
+        <span className="cs-filepicker-content">
           {selectedNames.length === 0 ? (
-            <span className="capstone-filepicker-placeholder">{placeholder}</span>
+            <span className="cs-filepicker-placeholder">{placeholder}</span>
           ) : (
             selectedNames.map((name, i) => (
-              <span key={i} className="capstone-filepicker-chip">{name}</span>
+              <span key={i} className={`cs-chip is-${folder}`}>{name}</span>
             ))
           )}
         </span>
-        <span className="capstone-filepicker-caret">{open ? '▴' : '▾'}</span>
+        <span className="cs-filepicker-caret" aria-hidden>{open ? '▴' : '▾'}</span>
       </button>
       {open && (
-        <div className="capstone-filepicker-menu">
+        <div className="cs-filepicker-menu">
           {options.length === 0 ? (
-            <div className="capstone-filepicker-empty">{emptyMsg}</div>
+            <div className="cs-filepicker-empty">{emptyMsg}</div>
           ) : (
             options.map(opt => (
-              <label key={opt.id} className="capstone-filepicker-option">
+              <label key={opt.id} className="cs-filepicker-option">
                 <input
                   type="checkbox"
                   checked={(value || []).includes(opt.id)}
                   onChange={() => toggle(opt.id)}
                 />
-                <span className="capstone-filepicker-option-name">{stripExt(opt.name)}</span>
+                <span className="cs-filepicker-option-name">{stripExt(opt.name)}</span>
               </label>
             ))
           )}
@@ -211,24 +202,11 @@ function FilePicker({ value, onChange, fileTree, folder }) {
   );
 }
 
-// Reviewer picker for human steps — single-select dropdown over the
-// room's humans, with free-text fallback for planning purposes.
-//
-// Hybrid combo: text input + suggestions dropdown. The participant
-// can type any reviewer name (useful when they want to plan a step
-// for someone who hasn't joined the workshop yet, or to test the
-// flow solo) and pick a real human from the dropdown when one is
-// in the room. Cross-room messaging isn't built out yet, so a
-// custom-named reviewer won't actually receive notifications at
-// workflow run time — but for the Capstone planning artifact
-// that's an acceptable trade-off.
 function ReviewerPicker({ value, valueName, participants, onChange }) {
   const [open, setOpen] = useState(false);
   const [text, setText] = useState(valueName || '');
   const containerRef = useRef(null);
 
-  // Sync local text with parent state when it changes externally
-  // (e.g. type flip clears the row).
   useEffect(() => {
     setText(valueName || '');
   }, [valueName]);
@@ -250,7 +228,7 @@ function ReviewerPicker({ value, valueName, participants, onChange }) {
   const options = useMemo(() => (
     (participants || [])
       .filter(p => (p.kind || 'human') === 'human' && (p.name || '').trim())
-      .map(p => ({ id: p.id, name: p.name, sub: p.online ? 'online' : 'offline' }))
+      .map(p => ({ id: p.id, name: p.name, online: !!p.online }))
   ), [participants]);
 
   const filtered = useMemo(() => {
@@ -262,8 +240,6 @@ function ReviewerPicker({ value, valueName, participants, onChange }) {
   function commit(name) {
     setText(name);
     const trimmed = name.trim();
-    // Try to match an option by exact (case-insensitive) name; otherwise
-    // accept as a free-text reviewer (no participant id).
     const match = options.find(o => o.name.toLowerCase() === trimmed.toLowerCase());
     if (match) {
       onChange({ reviewerId: match.id, reviewerName: match.name });
@@ -279,20 +255,20 @@ function ReviewerPicker({ value, valueName, participants, onChange }) {
   }
 
   return (
-    <div className="capstone-actorpicker" ref={containerRef}>
+    <div className="cs-reviewer" ref={containerRef}>
       <input
         type="text"
-        className="capstone-actorpicker-input"
+        className="cs-reviewer-input"
         value={text}
         placeholder="Type a name or pick…"
         onChange={e => commit(e.target.value)}
         onFocus={() => setOpen(true)}
       />
-      <span className="capstone-actorpicker-caret" aria-hidden>{open ? '▴' : '▾'}</span>
+      <span className="cs-reviewer-caret" aria-hidden>{open ? '▴' : '▾'}</span>
       {open && (
-        <div className="capstone-actorpicker-menu">
+        <div className="cs-reviewer-menu">
           {filtered.length === 0 ? (
-            <div className="capstone-actorpicker-empty">
+            <div className="cs-reviewer-empty">
               {options.length === 0
                 ? 'No humans in the workshop yet — type a name above.'
                 : 'No matches — keep typing to use the name as-is.'}
@@ -302,11 +278,16 @@ function ReviewerPicker({ value, valueName, participants, onChange }) {
               <button
                 type="button"
                 key={opt.id}
-                className={`capstone-actorpicker-option${opt.id === value ? ' is-selected' : ''}`}
+                className={`cs-reviewer-option${opt.id === value ? ' is-selected' : ''}`}
                 onClick={() => pick(opt)}
               >
-                <span className="capstone-actorpicker-option-name">{opt.name}</span>
-                {opt.sub && <span className="capstone-actorpicker-option-sub">{opt.sub}</span>}
+                <span className="cs-reviewer-avatar" aria-hidden>{opt.name[0].toUpperCase()}</span>
+                <span className="cs-reviewer-option-body">
+                  <span className="cs-reviewer-option-name">{opt.name}</span>
+                  <span className={`cs-reviewer-option-sub${opt.online ? ' is-online' : ''}`}>
+                    {opt.online ? 'online' : 'offline'}
+                  </span>
+                </span>
               </button>
             ))
           )}
@@ -316,63 +297,170 @@ function ReviewerPicker({ value, valueName, participants, onChange }) {
   );
 }
 
-function StepCard({ row, idx, isLast, isComplete, fileTree, participants, onUpdate, onMove, onDelete, canDelete }) {
+function StepCard({
+  row, idx, total, isLast, isComplete, fileTree, participants,
+  collapsed, onUpdate, onMove, onDelete, onToggleCollapse, canDelete,
+}) {
   const isCoworker = (row.type || 'coworker') !== 'human';
   const derivedName = isCoworker ? deriveCoworkerName(row.step) : '';
+  const reviewerName = (row.reviewerName || '').trim();
+  const reviewerInitial = reviewerName ? reviewerName[0].toUpperCase() : '';
+  const reviewerOnline = useMemo(() => {
+    if (!row.reviewerId) return false;
+    const p = (participants || []).find(p => p.id === row.reviewerId);
+    return Boolean(p?.online);
+  }, [row.reviewerId, participants]);
+
+  const numStr = pad2(idx + 1);
+  const totStr = pad2(total);
+  const typeLabel = isCoworker ? 'COWORKER STEP' : 'HUMAN STEP';
+  const knowledgeCount = (row.knowledgeFileIds || []).length;
+  const skillsCount = (row.skillsFileIds || []).length;
+  const stepText = (row.step || '').trim();
+
+  if (collapsed) {
+    return (
+      <div
+        className={`cs-card cs-card--collapsed${isComplete ? ' is-complete' : ''} type-${isCoworker ? 'coworker' : 'human'}`}
+      >
+        <button
+          type="button"
+          className="cs-collapsed-row"
+          onClick={onToggleCollapse}
+          aria-label="Expand step"
+        >
+          <span className="cs-collapsed-left">
+            <span className="cs-num">{numStr}</span>
+            <span className="cs-num-total">/ {totStr}</span>
+            <span className="cs-divider" aria-hidden>|</span>
+            <span className={`cs-type-pill type-${isCoworker ? 'coworker' : 'human'}`}>
+              <span className="cs-type-dot" aria-hidden /> {typeLabel}
+            </span>
+            <span className="cs-divider" aria-hidden>|</span>
+            <span className={`cs-collapsed-step${stepText ? '' : ' is-empty'}`}>
+              {stepText || '— no step text yet —'}
+            </span>
+          </span>
+          <span className="cs-collapsed-right">
+            {isCoworker && derivedName && (
+              <span className="cs-collapsed-name">{derivedName}</span>
+            )}
+            {isCoworker && (knowledgeCount + skillsCount > 0) && (
+              <span className="cs-collapsed-chips">
+                <span className="cs-mini-chip is-knowledge">{knowledgeCount}</span>
+                <span className="cs-mini-chip-sep" aria-hidden>·</span>
+                <span className="cs-mini-chip is-skills">{skillsCount}</span>
+              </span>
+            )}
+            {!isCoworker && reviewerName && (
+              <span className="cs-collapsed-reviewer">
+                <span className="cs-avatar" aria-hidden>{reviewerInitial}</span>
+                {reviewerName}
+              </span>
+            )}
+            {isComplete && <span className="cs-pill-status is-ready"><span className="cs-pill-dot" aria-hidden />READY</span>}
+            <span className="cs-chevron" aria-hidden>▾</span>
+          </span>
+        </button>
+      </div>
+    );
+  }
 
   return (
-    <div className={`capstone-card${isComplete ? ' is-complete' : ''} type-${isCoworker ? 'coworker' : 'human'}`}>
-      <div className="capstone-card-header">
-        <div className="capstone-card-num">Step {idx + 1}</div>
-        <div className="capstone-type-toggle" role="group" aria-label="Step type">
-          <button
-            type="button"
-            className={`capstone-type-btn${isCoworker ? ' active' : ''}`}
-            onClick={() => {
-              if (isCoworker) return;
-              // Type flip clears the human-only fields. Step text stays;
-              // the participant usually wants to keep the description.
-              onUpdate({ type: 'coworker', reviewerId: '', reviewerName: '', remarks: '' });
-            }}
-          >
-            <span aria-hidden>{'\u{1F916}'}</span> Coworker
-          </button>
-          <button
-            type="button"
-            className={`capstone-type-btn${!isCoworker ? ' active' : ''}`}
-            onClick={() => {
-              if (!isCoworker) return;
-              onUpdate({ type: 'human', knowledgeFileIds: [], skillsFileIds: [] });
-            }}
-          >
-            <span aria-hidden>{'\u{1F464}'}</span> Human
-          </button>
+    <div className={`cs-card${isComplete ? ' is-complete' : ''} type-${isCoworker ? 'coworker' : 'human'}`}>
+      <div className="cs-card-head">
+        <div className="cs-card-head-left">
+          <span className="cs-num">{numStr}</span>
+          <span className="cs-num-total">/ {totStr}</span>
+          <span className="cs-divider" aria-hidden>|</span>
+          <span className={`cs-type-pill type-${isCoworker ? 'coworker' : 'human'}`}>
+            <span className="cs-type-dot" aria-hidden /> {typeLabel}
+          </span>
         </div>
-        <div className="capstone-card-actions">
-          <button type="button" className="capstone-row-btn" onClick={() => onMove(-1)} disabled={idx === 0} title="Move up">{'↑'}</button>
-          <button type="button" className="capstone-row-btn" onClick={() => onMove(1)} disabled={isLast} title="Move down">{'↓'}</button>
-          <button type="button" className="capstone-row-btn capstone-row-delete" onClick={onDelete} disabled={!canDelete} title="Delete step">{'✕'}</button>
+        <div className="cs-card-head-right">
+          {isComplete && (
+            <span className="cs-pill-status is-ready">
+              <span className="cs-pill-dot" aria-hidden />READY
+            </span>
+          )}
+          <div className="cs-type-toggle" role="group" aria-label="Step type">
+            <button
+              type="button"
+              className={`cs-type-toggle-btn type-coworker${isCoworker ? ' is-active' : ''}`}
+              onClick={() => {
+                if (isCoworker) return;
+                onUpdate({ type: 'coworker', reviewerId: '', reviewerName: '', remarks: '' });
+              }}
+            >
+              <span className="cs-toggle-dot type-coworker" aria-hidden />
+              COWORKER
+            </button>
+            <button
+              type="button"
+              className={`cs-type-toggle-btn type-human${!isCoworker ? ' is-active' : ''}`}
+              onClick={() => {
+                if (!isCoworker) return;
+                onUpdate({ type: 'human', knowledgeFileIds: [], skillsFileIds: [] });
+              }}
+            >
+              <span className="cs-toggle-dot type-human" aria-hidden />
+              HUMAN
+            </button>
+          </div>
+          <button
+            type="button"
+            className="cs-icon-btn"
+            onClick={() => onMove(-1)}
+            disabled={idx === 0}
+            title="Move up"
+            aria-label="Move up"
+          >↑</button>
+          <button
+            type="button"
+            className="cs-icon-btn"
+            onClick={() => onMove(1)}
+            disabled={isLast}
+            title="Move down"
+            aria-label="Move down"
+          >↓</button>
+          <button
+            type="button"
+            className="cs-icon-btn cs-icon-btn--danger"
+            onClick={onDelete}
+            disabled={!canDelete}
+            title="Delete step"
+            aria-label="Delete step"
+          >✕</button>
+          <button
+            type="button"
+            className="cs-icon-btn"
+            onClick={onToggleCollapse}
+            title="Collapse"
+            aria-label="Collapse step"
+          >▴</button>
         </div>
       </div>
 
-      <div className="capstone-card-body">
+      <div className="cs-card-body">
         {isCoworker ? (
           <>
-            <label className="capstone-field">
-              <span className="capstone-field-label">
-                What does the coworker do? (becomes the coworker’s role)
-              </span>
+            <label className="cs-field">
+              <span className="cs-field-label">WHAT DOES THE COWORKER DO?</span>
               <textarea
-                className="capstone-field-input"
+                className="cs-textarea"
                 value={row.step}
-                placeholder="e.g. Capture borrower identity, registration, ownership, and guarantor details."
+                placeholder="e.g. Capture borrower identity, registration, ownership, and guarantor details from the application."
                 onChange={e => onUpdate({ step: e.target.value })}
                 rows={3}
               />
             </label>
-            <div className="capstone-field-row">
-              <label className="capstone-field">
-                <span className="capstone-field-label">Knowledge files</span>
+            <div className="cs-field-row">
+              <label className="cs-field">
+                <span className="cs-field-label">
+                  <span className="cs-label-dot is-knowledge" aria-hidden />
+                  KNOWLEDGE FILES
+                  <em className="cs-field-hint">what it reads</em>
+                </span>
                 <FilePicker
                   value={row.knowledgeFileIds || []}
                   onChange={ids => onUpdate({ knowledgeFileIds: ids })}
@@ -380,8 +468,12 @@ function StepCard({ row, idx, isLast, isComplete, fileTree, participants, onUpda
                   folder="knowledge"
                 />
               </label>
-              <label className="capstone-field">
-                <span className="capstone-field-label">Skills files</span>
+              <label className="cs-field">
+                <span className="cs-field-label">
+                  <span className="cs-label-dot is-skills" aria-hidden />
+                  SKILLS FILES
+                  <em className="cs-field-hint">what it produces</em>
+                </span>
                 <FilePicker
                   value={row.skillsFileIds || []}
                   onChange={ids => onUpdate({ skillsFileIds: ids })}
@@ -391,28 +483,31 @@ function StepCard({ row, idx, isLast, isComplete, fileTree, participants, onUpda
               </label>
             </div>
             {derivedName && (
-              <div className="capstone-card-name-preview">
-                Will create coworker: <strong>{derivedName}</strong>
+              <div className="cs-becomes is-coworker">
+                <span className="cs-becomes-label">ON SEND, BECOMES A COWORKER NAMED</span>
+                <span className="cs-becomes-name">{derivedName}</span>
+                <span className="cs-becomes-arrow" aria-hidden>↗</span>
               </div>
             )}
           </>
         ) : (
-          // Human card: single content row — step textarea on the left
-          // (wider) with the reviewer picker on the right. Eliminates the
-          // dead column that appeared when remarks went away.
-          <div className="capstone-field-row capstone-field-row-human">
-            <label className="capstone-field">
-              <span className="capstone-field-label">What does the human verify or approve?</span>
+          <>
+            <label className="cs-field">
+              <span className="cs-field-label">WHAT DOES THE HUMAN VERIFY OR APPROVE?</span>
               <textarea
-                className="capstone-field-input"
+                className="cs-textarea"
                 value={row.step}
                 placeholder="e.g. Risk memo reviewed and approved."
                 onChange={e => onUpdate({ step: e.target.value })}
                 rows={3}
               />
             </label>
-            <label className="capstone-field">
-              <span className="capstone-field-label">Reviewer</span>
+            <label className="cs-field">
+              <span className="cs-field-label">
+                <span className="cs-label-dot is-human" aria-hidden />
+                REVIEWER
+                <em className="cs-field-hint">who signs off</em>
+              </span>
               <ReviewerPicker
                 value={row.reviewerId}
                 valueName={row.reviewerName}
@@ -420,79 +515,113 @@ function StepCard({ row, idx, isLast, isComplete, fileTree, participants, onUpda
                 onChange={patch => onUpdate(patch)}
               />
             </label>
-          </div>
+            {reviewerName && (
+              <div className="cs-becomes is-human">
+                <span className="cs-becomes-label">ON SEND, BECOMES A REVIEW NODE ASSIGNED TO</span>
+                <span className="cs-becomes-avatar" aria-hidden>{reviewerInitial}</span>
+                <span className="cs-becomes-name">{reviewerName}</span>
+                <span className={`cs-becomes-status${reviewerOnline ? ' is-online' : ''}`}>
+                  <span className="cs-pill-dot" aria-hidden />
+                  {reviewerOnline ? 'ONLINE' : 'OFFLINE'}
+                </span>
+                <span className="cs-becomes-arrow" aria-hidden>↗</span>
+              </div>
+            )}
+          </>
         )}
       </div>
     </div>
   );
 }
 
-// Read-only StepCard variant. Renders a blueprint row in the same
-// shape as the editable cards above so the reference *is* the same
-// surface the participant fills in — labels in the same places, file
-// chips where the FilePicker would be, the auto-name preview where
-// the live one shows.
-function BlueprintCard({ row, idx }) {
+function BlueprintChips({ items, flavor }) {
+  if (!items || items.length === 0) {
+    return <p className="cs-blueprint-empty">—</p>;
+  }
+  return (
+    <div className="cs-blueprint-chips">
+      {items.map((name, i) => (
+        <span key={i} className={`cs-chip is-${flavor}`}>{stripExt(name)}</span>
+      ))}
+    </div>
+  );
+}
+
+function BlueprintCard({ row, idx, total }) {
   const isCoworker = row.type !== 'human';
   const derivedName = isCoworker ? deriveCoworkerName(row.step) : '';
+  const reviewerName = (row.reviewerName || row.reviewer || '').trim();
+  const reviewerInitial = reviewerName ? reviewerName[0].toUpperCase() : '';
+  const numStr = pad2(idx + 1);
+  const totStr = pad2(total);
+  const typeLabel = isCoworker ? 'COWORKER STEP' : 'HUMAN STEP';
+
   return (
-    <div className={`capstone-card capstone-card--blueprint type-${isCoworker ? 'coworker' : 'human'}`}>
-      <div className="capstone-card-header">
-        <div className="capstone-card-num">Step {idx + 1}</div>
-        <div className={`capstone-card-type-badge type-${isCoworker ? 'coworker' : 'human'}`}>
-          <span aria-hidden>{isCoworker ? '\u{1F916}' : '\u{1F464}'}</span>
-          {isCoworker ? 'Coworker' : 'Human'}
+    <div className={`cs-card cs-card--blueprint type-${isCoworker ? 'coworker' : 'human'}`}>
+      <div className="cs-card-head">
+        <div className="cs-card-head-left">
+          <span className="cs-num">{numStr}</span>
+          <span className="cs-num-total">/ {totStr}</span>
+          <span className="cs-divider" aria-hidden>|</span>
+          <span className={`cs-type-pill type-${isCoworker ? 'coworker' : 'human'}`}>
+            <span className="cs-type-dot" aria-hidden /> {typeLabel}
+          </span>
         </div>
       </div>
-      <div className="capstone-card-body">
+      <div className="cs-card-body">
         {isCoworker ? (
           <>
-            <div className="capstone-blueprint-field">
-              <span className="capstone-field-label">What does the coworker do</span>
-              <p className="capstone-blueprint-text">{row.step}</p>
+            <div className="cs-field">
+              <span className="cs-field-label">WHAT THE COWORKER DOES</span>
+              <p className="cs-blueprint-text">{row.step}</p>
             </div>
-            <div className="capstone-field-row">
-              <div className="capstone-blueprint-field">
-                <span className="capstone-field-label">Knowledge files</span>
-                <BlueprintChips items={row.knowledgeFiles} />
+            <div className="cs-field-row">
+              <div className="cs-field">
+                <span className="cs-field-label">
+                  <span className="cs-label-dot is-knowledge" aria-hidden />
+                  KNOWLEDGE
+                </span>
+                <BlueprintChips items={row.knowledgeFiles} flavor="knowledge" />
               </div>
-              <div className="capstone-blueprint-field">
-                <span className="capstone-field-label">Skills files</span>
-                <BlueprintChips items={row.skillsFiles} />
+              <div className="cs-field">
+                <span className="cs-field-label">
+                  <span className="cs-label-dot is-skills" aria-hidden />
+                  SKILLS
+                </span>
+                <BlueprintChips items={row.skillsFiles} flavor="skills" />
               </div>
             </div>
             {derivedName && (
-              <div className="capstone-card-name-preview">
-                Will create coworker: <strong>{derivedName}</strong>
+              <div className="cs-becomes is-coworker">
+                <span className="cs-becomes-label">BECOMES A COWORKER NAMED</span>
+                <span className="cs-becomes-name">{derivedName}</span>
+                <span className="cs-becomes-arrow" aria-hidden>↗</span>
               </div>
             )}
           </>
         ) : (
-          <div className="capstone-field-row capstone-field-row-human">
-            <div className="capstone-blueprint-field">
-              <span className="capstone-field-label">What does the human verify</span>
-              <p className="capstone-blueprint-text">{row.step}</p>
+          <>
+            <div className="cs-field">
+              <span className="cs-field-label">WHAT THE HUMAN VERIFIES</span>
+              <p className="cs-blueprint-text">{row.step}</p>
             </div>
-            <div className="capstone-blueprint-field">
-              <span className="capstone-field-label">Reviewer</span>
-              <p className="capstone-blueprint-empty">Pick someone in the room</p>
+            <div className="cs-field">
+              <span className="cs-field-label">
+                <span className="cs-label-dot is-human" aria-hidden />
+                REVIEWER
+              </span>
+              {reviewerName ? (
+                <p className="cs-blueprint-text cs-blueprint-text--reviewer">
+                  <span className="cs-becomes-avatar" aria-hidden>{reviewerInitial}</span>
+                  {reviewerName}
+                </p>
+              ) : (
+                <p className="cs-blueprint-empty">Pick someone in the room</p>
+              )}
             </div>
-          </div>
+          </>
         )}
       </div>
-    </div>
-  );
-}
-
-function BlueprintChips({ items }) {
-  if (!items || items.length === 0) {
-    return <p className="capstone-blueprint-empty">—</p>;
-  }
-  return (
-    <div className="capstone-blueprint-chips">
-      {items.map((name, i) => (
-        <span key={i} className="capstone-filepicker-chip">{name}</span>
-      ))}
     </div>
   );
 }
@@ -500,25 +629,30 @@ function BlueprintChips({ items }) {
 function BlueprintDrawer({ open, onClose, blueprint }) {
   if (!open) return null;
   return (
-    <div className="capstone-drawer-backdrop" onClick={onClose}>
+    <div className="cs-drawer-backdrop" onClick={onClose}>
       <aside
-        className="capstone-drawer capstone-drawer--blueprint"
+        className="cs-drawer"
         onClick={e => e.stopPropagation()}
         role="dialog"
         aria-label="Workflow blueprint reference"
       >
-        <div className="capstone-drawer-header">
-          <h3>Workflow blueprint</h3>
-          <button className="capstone-drawer-close" onClick={onClose} aria-label="Close blueprint">{'✕'}</button>
-        </div>
-        <div className="capstone-drawer-body capstone-drawer-body--blueprint">
-          <div className="capstone-blueprint-intro">
-            <h4 className="capstone-blueprint-title">{blueprint.title}</h4>
-            <p className="capstone-blueprint-sub">{blueprint.intro}</p>
+        <div className="cs-drawer-head">
+          <div className="cs-drawer-head-text">
+            <div className="cs-eyebrow"><span className="cs-eyebrow-dot" aria-hidden />REFERENCE</div>
+            <h3 className="cs-drawer-title">
+              <em>Workflow blueprint</em>
+            </h3>
           </div>
-          <div className="capstone-blueprint-cards">
+          <button className="cs-drawer-close" onClick={onClose} aria-label="Close blueprint">✕</button>
+        </div>
+        <div className="cs-drawer-body">
+          <div className="cs-drawer-intro">
+            <h4 className="cs-drawer-intro-title">{blueprint.title}</h4>
+            <p className="cs-drawer-intro-sub">{blueprint.intro}</p>
+          </div>
+          <div className="cs-drawer-cards">
             {blueprint.rows.map((row, idx) => (
-              <BlueprintCard key={idx} row={row} idx={idx} />
+              <BlueprintCard key={idx} row={row} idx={idx} total={blueprint.rows.length} />
             ))}
           </div>
         </div>
@@ -535,15 +669,20 @@ export default function Capstone({
   copilotUnlocked,
   onSendToCopilot,
 }) {
-  const [rows, setRows] = useState(null); // null = loading
+  const [rows, setRows] = useState(null);
   const [saving, setSaving] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const [savedNotice, setSavedNotice] = useState(false);
+  const [lastSavedAt, setLastSavedAt] = useState(null);
   const [sending, setSending] = useState(false);
+  const [collapsed, setCollapsed] = useState({});
+  const [now, setNow] = useState(() => Date.now());
 
-  // One-shot load. Old drafts use the previous shape ({ actorId, fileIds,
-  // type:'review' }); migrateRow rewrites them on load so the participant
-  // doesn't see broken cards.
+  // Tick once a second so the "Saved Xs ago" relative time keeps moving.
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, []);
+
   useEffect(() => {
     let cancelled = false;
     if (!myParticipantId || !sb) {
@@ -568,7 +707,20 @@ export default function Capstone({
     setRows(prev => [...prev, newRow()]);
   }
   function deleteRow(idx) {
-    setRows(prev => prev.length > 1 ? prev.filter((_, i) => i !== idx) : prev);
+    setRows(prev => {
+      if (prev.length <= 1) return prev;
+      const removed = prev[idx];
+      // Drop the orphan collapsed entry too — keeps the map tidy.
+      if (removed) {
+        setCollapsed(c => {
+          if (!(removed.id in c)) return c;
+          const next = { ...c };
+          delete next[removed.id];
+          return next;
+        });
+      }
+      return prev.filter((_, i) => i !== idx);
+    });
   }
   function moveRow(idx, dir) {
     setRows(prev => {
@@ -579,31 +731,47 @@ export default function Capstone({
       return next;
     });
   }
+  function toggleCollapsed(id) {
+    setCollapsed(prev => ({ ...prev, [id]: !prev[id] }));
+  }
+  function toggleAll() {
+    if (!rows) return;
+    const anyExpanded = rows.some(r => !collapsed[r.id]);
+    if (anyExpanded) {
+      const next = {};
+      rows.forEach(r => { next[r.id] = true; });
+      setCollapsed(next);
+    } else {
+      setCollapsed({});
+    }
+  }
 
-  // Auto-save: debounce 800ms after the last edit. Same pattern as before.
+  // Auto-save: debounce 800ms after the last edit.
   useEffect(() => {
     if (rows === null || !myParticipantId) return;
     const handle = setTimeout(async () => {
       setSaving(true);
       const res = await sb.saveCapstoneDraft(myParticipantId, rows);
       setSaving(false);
-      if (res?.ok) {
-        setSavedNotice(true);
-        setTimeout(() => setSavedNotice(false), 1200);
-      }
+      if (res?.ok) setLastSavedAt(Date.now());
     }, 800);
     return () => clearTimeout(handle);
   }, [rows, sb, myParticipantId]);
 
   const completeCount = useMemo(
-    () => (rows || []).filter(r => isRowComplete(r, participants)).length,
-    [rows, participants],
+    () => (rows || []).filter(r => isRowComplete(r)).length,
+    [rows],
   );
-  const allComplete = rows !== null && rows.length > 0 && rows.every(r => isRowComplete(r, participants));
+  const allComplete = rows !== null && rows.length > 0 && rows.every(r => isRowComplete(r));
   const incompleteReason = useMemo(
-    () => firstIncompleteReason(rows || [], participants),
-    [rows, participants],
+    () => firstIncompleteReason(rows || []),
+    [rows],
   );
+  const coworkerCount = (rows || []).filter(r => (r.type || 'coworker') !== 'human').length;
+  const humanCount = (rows || []).filter(r => (r.type || 'coworker') === 'human').length;
+  const anyExpanded = (rows || []).some(r => !collapsed[r.id]);
+  const pct = rows && rows.length > 0 ? Math.round((completeCount / rows.length) * 100) : 0;
+  const savedLabel = saving ? 'Saving…' : relSavedLabel(now, lastSavedAt);
 
   async function handleSend() {
     if (!allComplete || sending) return;
@@ -617,69 +785,98 @@ export default function Capstone({
 
   if (rows === null) {
     return (
-      <div className="capstone-page">
-        <div className="capstone-loading">Loading your capstone draft&hellip;</div>
+      <div className="cs-page">
+        <div className="cs-loading">Loading your capstone draft…</div>
       </div>
     );
   }
 
   return (
-    <div className="capstone-page">
-      <div className="capstone-header">
-        <div>
-          <h2 className="capstone-title">Capstone</h2>
-          <p className="capstone-sub">
-            Lay out a real workflow step by step. Each Coworker step
-            describes what an AI teammate does — and on Send, that
-            description becomes a coworker in your library, named for
-            you, ready to wire onto the canvas. Human steps assign a
-            real reviewer in the room. Clarity is the slow step;
-            building should feel fast.
+    <div className="cs-page">
+      <header className="cs-page-head">
+        <div className="cs-page-head-text">
+          <div className="cs-eyebrow">
+            <span className="cs-eyebrow-dot" aria-hidden />STAGE 8 · CAPSTONE
+          </div>
+          <h2 className="cs-page-title">
+            Lay out a real workflow,&nbsp;<em>step by step</em>.
+          </h2>
+          <p className="cs-page-sub">
+            Coworker steps describe what an AI teammate does — on Send, each one becomes a saved coworker, named for you, ready on the canvas. Human steps assign a real reviewer in the room. Clarity is the slow step; building should feel fast.
           </p>
         </div>
-        <div className="capstone-actions">
+        <div className="cs-page-actions">
           <button
             type="button"
-            className="capstone-btn-secondary"
+            className="cs-btn-paper"
             onClick={() => setDrawerOpen(true)}
           >
-            <span className="capstone-btn-icon" aria-hidden>{'\u{1F4D8}'}</span>
+            <span className="cs-btn-spark" aria-hidden>✦</span>
             Show blueprint
           </button>
           {copilotUnlocked && (
             <button
               type="button"
-              className="capstone-btn-primary"
+              className="cs-btn-dark"
               onClick={handleSend}
               disabled={!allComplete || sending}
               title={allComplete ? 'Materialize coworkers and send the plan to the copilot' : (incompleteReason || `Fill every step first (${completeCount}/${rows.length} complete)`)}
             >
-              {sending ? 'Sending…' : 'Send to copilot'}
-              <span className="capstone-btn-icon" aria-hidden>↗</span>
+              <span className="cs-btn-dark-text">{sending ? 'Sending…' : 'Send to copilot'}</span>
+              <span className="cs-btn-dark-arrow" aria-hidden>→</span>
             </button>
+          )}
+        </div>
+      </header>
+
+      <div className="cs-status-row">
+        <div className="cs-status-progress">
+          <span className="cs-status-progress-text">
+            <strong>{completeCount}</strong> of {rows.length} step{rows.length === 1 ? '' : 's'} complete
+          </span>
+          <div className="cs-status-bar" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={pct}>
+            <div className="cs-status-bar-fill" style={{ width: `${pct}%` }} />
+          </div>
+        </div>
+        <div className="cs-status-meta">
+          <span className="cs-meta-item">
+            <span className="cs-meta-dot type-coworker" aria-hidden />
+            {coworkerCount} {coworkerCount === 1 ? 'coworker' : 'coworkers'}
+          </span>
+          <span className="cs-meta-sep" aria-hidden>·</span>
+          <span className="cs-meta-item">
+            <span className="cs-meta-dot type-human" aria-hidden />
+            {humanCount} {humanCount === 1 ? 'reviewer' : 'reviewers'}
+          </span>
+          <span className="cs-meta-sep" aria-hidden>·</span>
+          <button type="button" className="cs-meta-link" onClick={toggleAll}>
+            {anyExpanded ? 'Collapse all' : 'Expand all'}
+          </button>
+          {savedLabel && (
+            <>
+              <span className="cs-meta-sep" aria-hidden>·</span>
+              <span className="cs-meta-saved">{savedLabel}</span>
+            </>
           )}
         </div>
       </div>
 
-      <div className="capstone-status">
-        <span>{completeCount} of {rows.length} step{rows.length === 1 ? '' : 's'} complete</span>
-        {saving && <span className="capstone-status-saving">Saving&hellip;</span>}
-        {!saving && savedNotice && <span className="capstone-status-saved">Saved</span>}
-      </div>
-
-      <div className="capstone-cards">
+      <div className="cs-cards">
         {rows.map((row, idx) => (
           <StepCard
             key={row.id}
             row={row}
             idx={idx}
+            total={rows.length}
             isLast={idx === rows.length - 1}
-            isComplete={isRowComplete(row, participants)}
+            isComplete={isRowComplete(row)}
             fileTree={fileTree}
             participants={participants}
+            collapsed={!!collapsed[row.id]}
             onUpdate={patch => update(idx, patch)}
             onMove={dir => moveRow(idx, dir)}
             onDelete={() => deleteRow(idx)}
+            onToggleCollapse={() => toggleCollapsed(row.id)}
             canDelete={rows.length > 1}
           />
         ))}
@@ -687,10 +884,14 @@ export default function Capstone({
 
       <button
         type="button"
-        className="capstone-add-row"
+        className="cs-add-row"
         onClick={addRow}
       >
-        + Add step
+        <span className="cs-add-row-left">
+          <span className="cs-add-row-plus" aria-hidden>+</span>
+          Add step
+        </span>
+        <span className="cs-add-row-hint">COWORKER OR HUMAN — SWITCH AFTER ADDING</span>
       </button>
 
       <BlueprintDrawer

@@ -11070,9 +11070,12 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  min-height: 540px;
   box-shadow: 0 1px 0 rgba(60, 40, 20, 0.02);
 }
+/* Let the grid size to content. The dotted-bg fills the empty area
+   only when content actually warrants the space — a single card no
+   longer reserves a tall vertical band. */
+.fl-page .fl-grid { flex: 0 1 auto; min-height: 200px; }
 
 /* Breadcrumb */
 .fl-page .fl-breadcrumb {
@@ -11296,9 +11299,13 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
 .fl-page .fl-section-grid,
 .fl-page .fl-flat-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  /* auto-fit collapses unused tracks so a section with 1 card doesn't
+     reserve 6 phantom columns of empty space. minmax max caps card
+     width so a single card doesn't stretch absurdly wide either. */
+  grid-template-columns: repeat(auto-fit, minmax(200px, 240px));
   gap: 12px;
   align-content: start;
+  justify-content: start;
 }
 
 /* Card */
@@ -11973,5 +11980,5 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
   .fl-page .fl-editor { position: static; }
   .fl-page .fl-editor-body { padding: 24px 22px 40px; }
   .fl-page .fl-section-grid,
-  .fl-page .fl-flat-grid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
+  .fl-page .fl-flat-grid { grid-template-columns: repeat(auto-fit, minmax(160px, 220px)); }
 }

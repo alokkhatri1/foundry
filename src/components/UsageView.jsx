@@ -1,20 +1,31 @@
-// Stage 8 (Economics) reveal surface — workshop-wide view.
+// Stage 10 (Economics) reveal surface — workshop-wide view.
 //
 // Every participant sees the same numbers: the room's collective LLM spend,
-// broken down by segment (chat, coworker work, workflow runs, copilot),
-// by participant (so everyone can see their own contribution in context),
-// and as a chronological event list. The pedagogy is cohort-first — "look
-// how much the whole mixed-team workshop actually cost" — not individual
-// accountability.
+// shown as a magazine-cover dollar figure, a 2-hour cohort spend strip,
+// and a leaderboard of every human in the room ranked by tokens used.
+// The pedagogy is cohort-first — "look how much the whole mixed-team
+// workshop actually cost" — not individual accountability.
 
 import { useEffect, useMemo, useState } from 'react';
 import { computeCost, formatUsd, formatTokens } from '../utils/llmCost';
 import EducationalCue from './EducationalCue';
 
+const TIMELINE_BUCKETS = 24;
+const BUCKET_MS = 5 * 60 * 1000; // 5 minutes
+const TIMELINE_WINDOW_MS = TIMELINE_BUCKETS * BUCKET_MS; // 2 hours
+
 export default function UsageView({ sb, participants, myParticipantId, showEducationalCues }) {
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  // Tick "now" every 30s so the rolling 2h spend strip drifts forward
+  // without waiting on new rows. Real-time inserts also trigger re-bucketing.
+  const [now, setNow] = useState(() => Date.now());
+
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 30000);
+    return () => clearInterval(id);
+  }, []);
 
   // Seed + subscribe to every llm_usage row in this workshop. Runs for the
   // life of the view; tears down on unmount.
@@ -61,10 +72,25 @@ export default function UsageView({ sb, participants, myParticipantId, showEduca
     return { bySeg, byParticipant, totalCost, totalTokens };
   }, [rows]);
 
-  // Number of humans in the room — used to label the cohort header.
-  // The credit-pool banner that previously consumed this was removed
-  // (the "total available credits" framing wasn't pedagogically useful);
-  // only the participant count remains.
+  // 24-bucket cohort spend timeline over the last 2 hours. Bucket 0 is
+  // oldest (left in display), bucket 23 is newest (right). Re-buckets when
+  // rows or `now` change.
+  const timeline = useMemo(() => {
+    const buckets = new Array(TIMELINE_BUCKETS).fill(0);
+    for (const r of rows) {
+      const t = r.created_at ? new Date(r.created_at).getTime() : 0;
+      if (!t) continue;
+      const ageMs = now - t;
+      if (ageMs < 0 || ageMs > TIMELINE_WINDOW_MS) continue;
+      const idx = (TIMELINE_BUCKETS - 1) - Math.floor(ageMs / BUCKET_MS);
+      if (idx < 0 || idx >= TIMELINE_BUCKETS) continue;
+      buckets[idx] += Number(r.cost_usd || 0);
+    }
+    return buckets;
+  }, [rows, now]);
+  const peakBucket = useMemo(() => Math.max(0, ...timeline), [timeline]);
+
+  // Number of humans in the room — used in the cohort meta panel.
   const humanCount = useMemo(() => (
     (participants || []).filter(p => (p.kind || 'human') === 'human').length
   ), [participants]);
@@ -74,11 +100,8 @@ export default function UsageView({ sb, participants, myParticipantId, showEduca
   //
   // Rogue rows ("Unattributed" for null pids and "Left the workshop" for
   // pids that don't match any current participant) are deliberately
-  // hidden. They were noise from a) llm_usage rows logged without a
-  // participant_id, and b) pre-sync synthetic ids whose owners' real
-  // UUIDs don't match. For a workshop view, "people in the room right
-  // now" is the cleaner story — orphan attribution lives in the cohort
-  // total at the top of the tab if you want the full picture.
+  // hidden — for a workshop view, "people in the room right now" is the
+  // cleaner story; orphan attribution lives in the cohort total above.
   const leaderboard = useMemo(() => {
     const humans = (participants || []).filter(p => (p.kind || 'human') === 'human');
     const humanById = new Map(humans.map(p => [p.id, p]));
@@ -88,7 +111,7 @@ export default function UsageView({ sb, participants, myParticipantId, showEduca
     for (const [pid, v] of Object.entries(agg.byParticipant)) {
       if (v.tokens === 0 && v.cost === 0 && v.calls === 0) continue;
       const p = humanById.get(pid);
-      if (!p) continue; // rogue pid — hide rather than mislabel
+      if (!p) continue;
       out.push({
         pid, name: p.name, color: p.color,
         isYou: p.id === myParticipantId,
@@ -96,8 +119,6 @@ export default function UsageView({ sb, participants, myParticipantId, showEduca
       });
       seen.add(pid);
     }
-    // Then any humans we haven't already added — they have zero usage so
-    // far, but should still appear at the bottom of the leaderboard.
     for (const p of humans) {
       if (seen.has(p.id)) continue;
       out.push({
@@ -109,96 +130,236 @@ export default function UsageView({ sb, participants, myParticipantId, showEduca
     return out.sort((a, b) => b.tokens - a.tokens);
   }, [participants, agg.byParticipant, myParticipantId]);
 
-  const maxTokens = leaderboard[0]?.tokens || 0;
-
   return (
-    <div className="usage-view">
-      <div className="usage-header">
-        <h2 className="usage-title">Workshop Usage</h2>
-        <EducationalCue cueId="usage-stage" show={showEducationalCues} />
-        <p className="usage-sub">
-          Every Claude API call the whole room has made in this workshop — how much it cost,
-          where it went, who spent what.
-        </p>
-      </div>
+    <div className="us-page">
+      <header className="us-page-head">
+        <div className="us-page-head-text">
+          <div className="us-eyebrow">
+            <span className="us-eyebrow-dot" aria-hidden />Stage 10 · Economics
+          </div>
+          <h2 className="us-page-title">
+            Look at what the whole&nbsp;<em>room</em>&nbsp;just spent.
+          </h2>
+          <p className="us-page-sub">
+            Every Claude API call this workshop has made — chat, coworker work, workflow runs, copilot. The number below is real money. The leaderboard tells you where it went.
+          </p>
+          <EducationalCue cueId="usage-stage" show={showEducationalCues} />
+        </div>
+      </header>
 
       {loading ? (
-        <div className="usage-loading">Loading workshop usage…</div>
+        <UsageEmpty
+          title="Loading workshop usage…"
+          body="Pulling every llm_usage row from this room. Should land in a moment."
+        />
       ) : error ? (
-        <div className="usage-empty">
-          <p><strong>Couldn't load usage data.</strong></p>
-          <p className="usage-empty-sub">
-            If the <code>llm_usage</code> table doesn't exist yet, apply migration 016 to this
-            Supabase project and have someone make a chat — rows will start landing in realtime.
-          </p>
-          <p className="usage-empty-sub" style={{ marginTop: 8, opacity: 0.7 }}>{error}</p>
-        </div>
+        <UsageEmpty
+          title="Couldn't load usage data."
+          body={<>If the <code>llm_usage</code> table doesn't exist yet, apply migration 016 to this Supabase project and have someone make a chat — rows will start landing in realtime.</>}
+          hint={error}
+        />
       ) : rows.length === 0 ? (
-        <div className="usage-empty">
-          <p><strong>No spend on record yet.</strong></p>
-          <p className="usage-empty-sub">
-            As soon as anyone chats, builds a coworker, or runs a workflow, numbers will land
-            here in realtime.
-          </p>
-          <p className="usage-empty-sub" style={{ marginTop: 8, opacity: 0.7 }}>
-            (If the whole room's been active and this is still empty, migration 016 likely
-            hasn't been applied to Supabase yet.)
-          </p>
-        </div>
+        <UsageEmpty
+          title="No spend on record yet."
+          body="As soon as anyone chats, builds a coworker, or runs a workflow, numbers will land here in realtime."
+          hint="(If the whole room's been active and this is still empty, migration 016 likely hasn't been applied to Supabase yet.)"
+        />
       ) : (
         <>
-          {/* Cohort spend header — the total dollar figure the room has
-              run through. Reuses the existing usage-totals visual so the
-              top of the tab feels like the previous version. */}
-          <div className="usage-totals">
-            <div>
-              <div className="usage-total-label">Cohort spend</div>
-              <div className="usage-total-cost">{formatUsd(agg.totalCost)}</div>
-            </div>
-            <div className="usage-total-meta">
-              {formatTokens(agg.totalTokens)} tokens across {rows.length} call{rows.length === 1 ? '' : 's'}
-              <br />
-              {humanCount} participant{humanCount === 1 ? '' : 's'} in the room
-            </div>
-          </div>
+          <CohortHeader
+            totalCost={agg.totalCost}
+            totalTokens={agg.totalTokens}
+            totalCalls={rows.length}
+            humanCount={humanCount}
+          />
+          <SpendStrip timeline={timeline} peak={peakBucket} />
+          <Leaderboard leaderboard={leaderboard} totalTokens={agg.totalTokens} />
+        </>
+      )}
+    </div>
+  );
+}
 
-          {/* Leaderboard — every human in the room ranked by
-              tokens used. Reuses the previous usage-participant-row grid
-              with a rank column slotted in front. Leader gets an amber
-              accent; the current user's row gets the existing is-you
-              treatment. */}
-          <div className="usage-bar-section">
-            <div className="usage-bar-label">Leaderboard — most tokens used</div>
-            <div className="usage-participant-list">
-              {leaderboard.map((p, i) => {
-                const rank = i + 1;
-                const pct = maxTokens > 0 ? p.tokens / maxTokens : 0;
-                const isLeader = rank === 1 && p.tokens > 0;
-                return (
-                  <div
-                    key={p.pid}
-                    className={`usage-participant-row usage-leader-grid${p.isYou ? ' is-you' : ''}${isLeader ? ' is-leader' : ''}`}
-                  >
-                    <span className="usage-leader-rank">#{rank}</span>
-                    <span className="usage-participant-dot" style={{ background: p.color }} />
-                    <span className="usage-participant-name">
-                      {p.name}{p.isYou && <span className="usage-participant-you"> · you</span>}
-                    </span>
-                    <div className="usage-participant-bar">
-                      <div className="usage-participant-bar-fill" style={{ width: `${pct * 100}%`, background: p.color }} />
-                    </div>
-                    <span className="usage-participant-cost">{formatTokens(p.tokens)}</span>
-                    <span className="usage-participant-meta">{p.calls} call{p.calls === 1 ? '' : 's'}</span>
-                  </div>
-                );
-              })}
-              {leaderboard.length === 0 && (
-                <div className="usage-leader-empty">No participants in the room yet.</div>
-              )}
-            </div>
+function CohortHeader({ totalCost, totalTokens, totalCalls, humanCount }) {
+  const formatted = formatUsd(totalCost);
+  // Split off `$` and decimal so cents render at smaller size. formatUsd may
+  // return "$0.00", "<$0.01", or "$1234.56". For non-numeric forms ("<$0.01"),
+  // bail out of the split treatment.
+  const isNumeric = formatted.startsWith('$');
+  let dollars = '0';
+  let cents = '00';
+  if (isNumeric) {
+    const stripped = formatted.slice(1);
+    const [d, c] = stripped.split('.');
+    dollars = d || '0';
+    cents = c || '00';
+  }
+
+  return (
+    <section className="us-cohort">
+      <div className="us-cohort-eyebrow">
+        <span className="us-cohort-eyebrow-dot" aria-hidden />
+        Cohort spend · live
+      </div>
+      <div className="us-cohort-figure">
+        <div className="us-cohort-cost">
+          {isNumeric ? (
+            <>
+              <span className="us-cohort-cost-sym">$</span>
+              <span className="us-cohort-cost-int">{dollars}</span>
+              <span className="us-cohort-cost-frac">.{cents}</span>
+            </>
+          ) : (
+            <span className="us-cohort-cost-int">{formatted}</span>
+          )}
+        </div>
+        <div className="us-cohort-meta">
+          <div className="us-cohort-meta-row">
+            <span className="us-cohort-meta-label">Participants</span>
+            <span className="us-cohort-meta-value">{humanCount}</span>
+          </div>
+          <div className="us-cohort-meta-row">
+            <span className="us-cohort-meta-label">Avg / person</span>
+            <span className="us-cohort-meta-value">
+              {formatUsd(humanCount > 0 ? totalCost / humanCount : 0)}
+            </span>
+          </div>
+          <div className="us-cohort-meta-row">
+            <span className="us-cohort-meta-label">Avg / call</span>
+            <span className="us-cohort-meta-value">
+              {formatUsd(totalCalls > 0 ? totalCost / totalCalls : 0)}
+            </span>
+          </div>
+        </div>
+      </div>
+      <div className="us-cohort-sub">
+        <em>{formatTokens(totalTokens)}</em> tokens across <em>{totalCalls}</em>{' '}
+        {totalCalls === 1 ? 'call' : 'calls'} since the workshop opened.
+      </div>
+    </section>
+  );
+}
+
+function SpendStrip({ timeline, peak }) {
+  return (
+    <section className="us-strip">
+      <div className="us-strip-head">
+        <span className="us-strip-eyebrow">Spend over time · last 2h</span>
+        <span className="us-strip-meta">
+          peak <em>{formatUsd(peak)}</em> · 5-min buckets
+        </span>
+      </div>
+      <div className="us-strip-bars">
+        {timeline.map((v, i) => (
+          <div key={i} className="us-strip-cell" title={`bucket ${i + 1}: ${formatUsd(v)}`}>
+            <div
+              className="us-strip-bar"
+              style={{ height: peak > 0 ? `${Math.max(2, (v / peak) * 100)}%` : '2%' }}
+            />
+          </div>
+        ))}
+      </div>
+      <div className="us-strip-axis">
+        <span>2h ago</span>
+        <span>now</span>
+      </div>
+    </section>
+  );
+}
+
+function Leaderboard({ leaderboard, totalTokens }) {
+  const maxTokens = leaderboard[0]?.tokens || 0;
+  return (
+    <section className="us-leaderboard">
+      <header className="us-leaderboard-head">
+        <div>
+          <div className="us-section-eyebrow">Leaderboard</div>
+          <h3 className="us-section-title">
+            Most tokens used,&nbsp;<em>top to bottom</em>
+          </h3>
+        </div>
+        <div className="us-leaderboard-legend">
+          <span className="us-legend-pill is-leader"><span className="us-legend-dot" aria-hidden />leader</span>
+          <span className="us-legend-pill is-you"><span className="us-legend-dot" aria-hidden />you</span>
+        </div>
+      </header>
+      {leaderboard.length === 0 ? (
+        <div className="us-leader-empty">No participants in the room yet.</div>
+      ) : (
+        <>
+          <div className="us-row-headers">
+            <span>#</span>
+            <span>Participant</span>
+            <span>Tokens used</span>
+            <span>Cost · share</span>
+          </div>
+          <div className="us-rows">
+            {leaderboard.map((p, i) => (
+              <LeaderRow
+                key={p.pid}
+                rank={i + 1}
+                p={p}
+                maxTokens={maxTokens}
+                totalTokens={totalTokens}
+              />
+            ))}
           </div>
         </>
       )}
+    </section>
+  );
+}
+
+function LeaderRow({ rank, p, maxTokens, totalTokens }) {
+  const widthPct = maxTokens > 0 ? (p.tokens / maxTokens) * 100 : 0;
+  const sharePct = totalTokens > 0 ? (p.tokens / totalTokens) * 100 : 0;
+  const isLeader = rank === 1 && p.tokens > 0;
+  const isZero = p.tokens === 0;
+
+  return (
+    <div className={`us-row${p.isYou ? ' is-you' : ''}${isLeader ? ' is-leader' : ''}${isZero ? ' is-zero' : ''}`}>
+      <div className="us-row-rank">
+        <span className="us-row-rank-num">{String(rank).padStart(2, '0')}</span>
+        {isLeader && <span className="us-row-rank-tag">leader</span>}
+      </div>
+      <div className="us-row-identity">
+        <span className="us-row-dot" style={{ background: p.color }} aria-hidden />
+        <span className="us-row-name">
+          {p.name}
+          {p.isYou && <span className="us-row-you">· you</span>}
+        </span>
+      </div>
+      <div className="us-row-bar" aria-hidden>
+        <div className="us-row-bar-fill" style={{ width: `${widthPct}%`, background: p.color }} />
+      </div>
+      <div className="us-row-numbers">
+        <span className="us-row-cost">{formatUsd(p.cost)}</span>
+        <span className="us-row-meta-line">
+          <span className="us-row-tokens-num">{formatTokens(p.tokens)}</span>
+          <span className="us-row-tokens-unit">tok</span>
+          <span className="us-row-meta-sep" aria-hidden>·</span>
+          <span>{p.calls} {p.calls === 1 ? 'call' : 'calls'}</span>
+          {p.tokens > 0 && (
+            <>
+              <span className="us-row-meta-sep" aria-hidden>·</span>
+              <span>{sharePct.toFixed(1)}%</span>
+            </>
+          )}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+function UsageEmpty({ title, body, hint }) {
+  return (
+    <div className="us-empty">
+      <div className="us-empty-figure" aria-hidden>
+        <span className="us-empty-figure-dot" />
+      </div>
+      <h3 className="us-empty-title">{title}</h3>
+      <p className="us-empty-body">{body}</p>
+      {hint && <p className="us-empty-hint">{hint}</p>}
     </div>
   );
 }
@@ -246,9 +407,8 @@ export function useWorkshopUsageTotal(sb) {
 
 // Per-participant total — drives the credits budget gate, so correctness
 // matters. Same dedup-by-id discipline as useWorkshopUsageTotal. This hook
-// is now the single source of truth for a user's spend; App.jsx calls it
-// once and passes the result down instead of each display site opening
-// its own load+subscribe pair.
+// is the single source of truth for a user's spend; App.jsx calls it once
+// and passes the result down.
 export function useMyUsageTotal(sb, myParticipantId) {
   const [total, setTotal] = useState(0);
   const [tokenTotal, setTokenTotal] = useState(0);

@@ -243,13 +243,6 @@ export default function FeedbackForm({ onSubmit, submitting, errorMessage, userN
 
   return (
     <div className="sv-page">
-      <div className="sv-progress" aria-live="polite">
-        <span className="sv-progress-num">
-          {pad2(answeredRequired)}<span className="sv-progress-of"> / {pad2(totalRequired)}</span>
-        </span>
-        <span className="sv-progress-label">required</span>
-      </div>
-
       <main className="sv-container">
         <header className="sv-page-head">
           <div className="sv-eyebrow">

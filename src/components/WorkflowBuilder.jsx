@@ -1542,9 +1542,14 @@ export default function WorkflowBuilder({ workflows, onUpdateWorkflows, fileTree
     <div className="panel panel-center wf-page-shell">
       <div className="wf-page">
         <header className="wf-page-head">
-          <div>
-            <h1 className="wf-page-title">Orchestration</h1>
-            <p className="wf-page-sub">Wire AI coworkers and human reviews into a workflow. Each step produces; each review gates; the artifact only exists when the team agrees.</p>
+          <div className="wf-page-head-text">
+            <div className="wf-page-eyebrow">Stage 6 · Orchestration</div>
+            <h1 className="wf-page-title">
+              Wire your team into a&nbsp;<em>runnable workflow</em>.
+            </h1>
+            <p className="wf-page-sub">
+              Each step produces; each review gates; the artifact only exists when the team agrees. Coworkers do the work, humans approve, the DAG remembers what happened.
+            </p>
             <EducationalCue cueId="workflow-overview" show={showEducationalCues} />
           </div>
           <button className="wf-cta" onClick={handleCreateWorkflow}>

@@ -756,9 +756,14 @@ export default function CoworkerBuilder({ coworkers, onUpdateCoworkers, fileTree
   return (
     <div className="cwb-page">
       <header className="cwb-page-head">
-        <div>
-          <h1 className="cwb-page-title">Coworkers</h1>
-          <p className="cwb-page-sub">AI teammates that read your files, follow your skills, and produce artifacts the rest of the room can use.</p>
+        <div className="cwb-page-head-text">
+          <div className="cwb-page-eyebrow">Stage 5 · Coworkers</div>
+          <h1 className="cwb-page-title">
+            AI teammates that&nbsp;<em>read your files</em>.
+          </h1>
+          <p className="cwb-page-sub">
+            Each coworker pairs a name and a role with a folder of knowledge and a folder of skills. They read what you give them, follow the instructions you write, and produce artifacts the rest of the room can use.
+          </p>
           <EducationalCue cueId="coworkers-overview" show={showEducationalCues} />
         </div>
         <div className="cwb-page-actions">

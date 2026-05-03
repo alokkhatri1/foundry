@@ -9300,6 +9300,15 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
   padding-bottom: 22px;
   border-bottom: 1px solid var(--rule-soft);
 }
+.cwb-page-head-text { min-width: 0; flex: 1; }
+.cwb-page-eyebrow {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--peach-deep);
+  margin-bottom: 10px;
+}
 .cwb-page-title {
   font-family: var(--serif);
   font-weight: 400;
@@ -9309,10 +9318,11 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
   margin-bottom: 6px;
   line-height: 1.1;
 }
+.cwb-page-title em { font-style: italic; color: var(--peach-deep); font-weight: 400; }
 .cwb-page-sub {
   font-size: 14.5px;
   color: var(--ink-mid);
-  max-width: 540px;
+  max-width: 620px;
   line-height: 1.55;
 }
 .cwb-page-actions {
@@ -10207,6 +10217,15 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
   padding-bottom: 22px;
   border-bottom: 1px solid var(--rule-soft);
 }
+.wf-page-head-text { min-width: 0; flex: 1; }
+.wf-page-eyebrow {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--peach-deep);
+  margin-bottom: 10px;
+}
 .wf-page-title {
   font-family: var(--serif);
   font-weight: 400;
@@ -10216,10 +10235,11 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
   margin-bottom: 6px;
   line-height: 1.1;
 }
+.wf-page-title em { font-style: italic; color: var(--peach-deep); font-weight: 400; }
 .wf-page-sub {
   font-size: 14.5px;
   color: var(--ink-mid);
-  max-width: 560px;
+  max-width: 620px;
   line-height: 1.55;
 }
 .wf-cta {

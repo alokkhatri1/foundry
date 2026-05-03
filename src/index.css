@@ -11264,11 +11264,13 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
   background: var(--cream);
 }
 
-.fl-section {
+.fl-page .fl-section {
   display: flex;
   flex-direction: column;
   gap: 12px;
   flex: 0 0 auto;
+  padding: 0;
+  position: static;
 }
 .fl-section-grid,
 .fl-flat-grid {

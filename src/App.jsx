@@ -1134,36 +1134,32 @@ function App() {
   }
 
   // Self-heal: the seeded "reference.md" example file (formerly blueprint.md)
-  // sometimes lands in existing rooms with empty content — either because
-  // the room transitioned through Stage 8 before the file got a body, or
-  // because an older migration cleared it. Whenever we detect the file in
-  // flatFiles, lazy-load its content; if it's empty, restore the canonical
-  // CAPSTONE_BLUEPRINT body. Idempotent — after one successful restore the
-  // DB has content and this effect's content check will skip the upsert.
+  // lands in some existing rooms with empty content — either because the
+  // room transitioned through Stage 8 before the file got a body, or
+  // because an older migration cleared it. Once per mount, when we see the
+  // file in flatFiles, unconditionally upsert the canonical body. Safe to
+  // overwrite because the file is System-owned and read-only in the live UI.
   const referenceRestoreAttempted = useRef(false);
   useEffect(() => {
     if (!sb || referenceRestoreAttempted.current) return;
     const exampleFile = (flatFiles || []).find(f => f.id === EXAMPLE_BLUEPRINT_FILE_ID);
     if (!exampleFile) return;
     referenceRestoreAttempted.current = true;
-    sb.loadFileContent(EXAMPLE_BLUEPRINT_FILE_ID).then(content => {
-      if (content && content.trim().length > 0) return;
-      sb.saveFile({
-        id: EXAMPLE_BLUEPRINT_FILE_ID,
-        room_id: sb.getRoomId(),
-        parent_id: EXAMPLE_BLUEPRINTS_FOLDER_ID,
-        name: 'reference.md',
-        type: 'file',
-        sort_order: 0,
-        created_by: 'System',
-        content: CAPSTONE_BLUEPRINT,
-      });
-      // Reflect locally so the next click on the file shows content
-      // without waiting for a refetch.
-      setFlatFiles(prev => prev.map(f => f.id === EXAMPLE_BLUEPRINT_FILE_ID
-        ? { ...f, content: CAPSTONE_BLUEPRINT, name: 'reference.md' }
-        : f));
-    }).catch(() => { /* swallow — best-effort self-heal */ });
+    sb.saveFile({
+      id: EXAMPLE_BLUEPRINT_FILE_ID,
+      room_id: sb.getRoomId(),
+      parent_id: EXAMPLE_BLUEPRINTS_FOLDER_ID,
+      name: 'reference.md',
+      type: 'file',
+      sort_order: 0,
+      created_by: 'System',
+      content: CAPSTONE_BLUEPRINT,
+    });
+    // Reflect locally so the next click on the file shows content without
+    // waiting for a refetch.
+    setFlatFiles(prev => prev.map(f => f.id === EXAMPLE_BLUEPRINT_FILE_ID
+      ? { ...f, content: CAPSTONE_BLUEPRINT, name: 'reference.md' }
+      : f));
   }, [sb, flatFiles]);
 
   // Batch version for AI-consumption paths (chat send, workflow run). Any

@@ -9428,6 +9428,14 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
   display: flex;
   flex-direction: column;
   gap: 18px;
+  /* Override the legacy .cwb-section card chrome (paper bg + border +
+     padding) — list view should match Orchestration's borderless,
+     directly-on-cream layout. The editor still inherits the card
+     treatment via .cwb-editor .cwb-section. */
+  background: transparent;
+  border: none;
+  padding: 0;
+  border-radius: 0;
 }
 .cwb-page .cwb-section-head {
   display: flex;

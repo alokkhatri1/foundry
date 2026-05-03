@@ -25,7 +25,7 @@ export const EXAMPLE_SKILL_FILE_IDS = [
   'example-file-compliance-check',
 ];
 
-const RETAIL_LENDING_POLICY = `# Retail Lending Policy v3.2
+export const RETAIL_LENDING_POLICY = `# Retail Lending Policy v3.2
 
 ## Section 1 — Eligibility
 - 1.1 Borrower must be a registered entity with at least 24 months of operations.
@@ -48,7 +48,7 @@ const RETAIL_LENDING_POLICY = `# Retail Lending Policy v3.2
 - 4.3 Tenor: facilities above 36 months require an additional risk-pricing layer.
 `;
 
-const COMPLIANCE_EXCEPTIONS = `# Compliance Exceptions Register
+export const COMPLIANCE_EXCEPTIONS = `# Compliance Exceptions Register
 
 The exceptions tolerated under the retail lending policy and the conditions under which they apply.
 Reference this document when validating any credit memo.
@@ -76,7 +76,7 @@ Reference this document when validating any credit memo.
 - **Approval level:** N/A
 `;
 
-const CREDIT_REVIEW_SKILL = `# Credit Review
+export const CREDIT_REVIEW_SKILL = `# Credit Review
 
 When given a loan application, return a structured assessment with the sections below. Use bullet points within each section. Cite the section of the retail lending policy that drove every call.
 
@@ -99,7 +99,7 @@ When given a loan application, return a structured assessment with the sections 
 - One-sentence rationale citing the policy section that drove the call
 `;
 
-const COMPLIANCE_CHECK_SKILL = `# Compliance Check
+export const COMPLIANCE_CHECK_SKILL = `# Compliance Check
 
 When given a credit memo, validate it against the Compliance Exceptions register. Return a structured compliance report.
 

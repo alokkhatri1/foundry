@@ -27,7 +27,28 @@ import {
   ensurePrebuiltTools,
   BUILTIN_TOOLS,
 } from './data/starterContent';
-import { EXAMPLE_BLUEPRINT_FILE_ID, EXAMPLE_BLUEPRINTS_FOLDER_ID, CAPSTONE_BLUEPRINT } from './data/exampleArtifacts';
+import {
+  EXAMPLE_BLUEPRINT_FILE_ID,
+  EXAMPLE_BLUEPRINTS_FOLDER_ID,
+  CAPSTONE_BLUEPRINT,
+  RETAIL_LENDING_POLICY,
+  COMPLIANCE_EXCEPTIONS,
+  CREDIT_REVIEW_SKILL,
+  COMPLIANCE_CHECK_SKILL,
+} from './data/exampleArtifacts';
+
+// Canonical content for the System-seeded example files. Used as a fallback
+// when handleEnsureFileContent loads a row whose `content` column is empty
+// in the DB (rooms that passed Stage 8 before content seeding was reliable,
+// or had an old migration clear the body). Lookup by file id; user-created
+// files are not in this map and follow the normal load path unchanged.
+const EXAMPLE_FILE_CONTENT = {
+  'example-file-retail-policy':         RETAIL_LENDING_POLICY,
+  'example-file-compliance-exceptions': COMPLIANCE_EXCEPTIONS,
+  'example-file-credit-review':         CREDIT_REVIEW_SKILL,
+  'example-file-compliance-check':      COMPLIANCE_CHECK_SKILL,
+  [EXAMPLE_BLUEPRINT_FILE_ID]:          CAPSTONE_BLUEPRINT,
+};
 import { executeWorkflowRun } from './utils/runWorkflowAsync';
 import { submitDm, flushOutbox as flushDmOutbox, outboxSnapshot } from './utils/dmOutbox';
 import { executeTool, toolToClaudeSchema, toolFromClaudeName } from './utils/toolExecutor';
@@ -1130,13 +1151,14 @@ function App() {
     if (!existing) return;
     if (typeof existing.content === 'string' && existing.content.trim().length > 0) return;
     let content = await sb.loadFileContent(fileId);
-    // Fallback: the seeded reference.md row sometimes lives in old rooms
-    // with an empty content column. If we get empty back for that specific
-    // example file, swap in the canonical CAPSTONE_BLUEPRINT body locally.
-    // No DB write — RLS may not permit it from a participant context, and
-    // the local fallback is enough for display.
-    if (fileId === EXAMPLE_BLUEPRINT_FILE_ID && (!content || content.trim().length === 0)) {
-      content = CAPSTONE_BLUEPRINT;
+    // Fallback: any System-seeded example file whose DB body lands empty
+    // gets restored from the canonical content shipped in exampleArtifacts.
+    // Some rooms passed through Stage 3-4-8 before content seeding was
+    // reliable, leaving the row with metadata only. No DB write here —
+    // RLS may not allow participants to write System-owned rows, and the
+    // local fallback is enough to display.
+    if ((!content || content.trim().length === 0) && EXAMPLE_FILE_CONTENT[fileId]) {
+      content = EXAMPLE_FILE_CONTENT[fileId];
     }
     setFlatFiles(prev => prev.map(f => f.id === fileId ? { ...f, content: content ?? '' } : f));
   }

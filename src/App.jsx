@@ -1128,8 +1128,16 @@ function App() {
     if (!fileId) return;
     const existing = flatFiles.find(f => f.id === fileId);
     if (!existing) return;
-    if (typeof existing.content === 'string') return;
-    const content = await sb.loadFileContent(fileId);
+    if (typeof existing.content === 'string' && existing.content.trim().length > 0) return;
+    let content = await sb.loadFileContent(fileId);
+    // Fallback: the seeded reference.md row sometimes lives in old rooms
+    // with an empty content column. If we get empty back for that specific
+    // example file, swap in the canonical CAPSTONE_BLUEPRINT body locally.
+    // No DB write — RLS may not permit it from a participant context, and
+    // the local fallback is enough for display.
+    if (fileId === EXAMPLE_BLUEPRINT_FILE_ID && (!content || content.trim().length === 0)) {
+      content = CAPSTONE_BLUEPRINT;
+    }
     setFlatFiles(prev => prev.map(f => f.id === fileId ? { ...f, content: content ?? '' } : f));
   }
 

@@ -12043,21 +12043,25 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
   background: var(--cream) !important;
   border-radius: 0;
   padding: 0;
-  overflow-y: auto;
+  /* Tab pane is the bounding viewport. Inner panels (.ob-detail-dag,
+     .ob-detail-sidebar) handle their own scroll. */
+  overflow: hidden;
 }
 
 /* ── List page shell ──────────────────────────────────────── */
 
 .ob-page {
   width: 100%;
+  height: 100%;
   background: var(--cream);
   font-family: var(--sans);
   color: var(--ink);
-  padding: 36px 40px 64px;
+  padding: 36px 40px 28px;
   display: flex;
   flex-direction: column;
-  gap: 32px;
-  min-height: 100%;
+  gap: 24px;
+  /* Header is content-sized at the top; the page-body scrolls. */
+  min-height: 0;
 }
 .ob-page-head {
   display: flex;
@@ -12124,6 +12128,12 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
   display: flex;
   flex-direction: column;
   gap: 28px;
+  /* Sections live inside this scroll container so the page header
+     stays pinned and only the run-card area scrolls. */
+  flex: 1 1 0;
+  min-height: 0;
+  overflow-y: auto;
+  padding-bottom: 32px;
 }
 
 /* Sections */
@@ -12383,14 +12393,17 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
 
 .ob-detail {
   width: 100%;
+  height: 100%;
   background: var(--cream);
   font-family: var(--sans);
   color: var(--ink);
-  padding: 32px 40px 64px;
+  padding: 28px 40px 28px;
   display: flex;
   flex-direction: column;
-  gap: 20px;
-  min-height: 100%;
+  gap: 18px;
+  /* Header + case input are content-sized at the top; .ob-detail-body
+     fills the rest with each panel scrolling internally. */
+  min-height: 0;
 }
 .ob-detail-head {
   display: flex;
@@ -12480,15 +12493,19 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
   line-height: 1.55;
 }
 
-/* Two-column body */
+/* Two-column body — fills the rest of the detail page; both panels
+   stretch to the full row height and scroll their own bodies. */
 .ob-detail-body {
   display: grid;
   grid-template-columns: minmax(0, 1.1fr) minmax(320px, 1fr);
   gap: 20px;
-  align-items: start;
+  align-items: stretch;
+  flex: 1 1 0;
+  min-height: 0;
 }
 
-/* DAG mirror — vertical chain, dotted-grid bg, peach eyebrow */
+/* DAG mirror — vertical chain, dotted-grid bg, peach eyebrow.
+   Sticks to its column; the inside scrolls when the chain is long. */
 .ob-detail-dag {
   background: var(--paper);
   border: 1px solid var(--rule-soft);
@@ -12500,6 +12517,8 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
   flex-direction: column;
   align-items: center;
   gap: 18px;
+  min-height: 0;
+  overflow-y: auto;
 }
 .ob-dag-eyebrow {
   display: inline-flex;
@@ -12671,7 +12690,8 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
 .ob-dag-status.is-waiting   { color: var(--peach-deep); background: var(--peach-soft); }
 .ob-dag-status.is-error     { color: var(--red);   background: var(--red-soft); }
 
-/* Decision sidebar */
+/* Decision sidebar — sticks to its column, scrolls internally when
+   there are many decision rows. */
 .ob-detail-sidebar {
   background: var(--paper);
   border: 1px solid var(--rule-soft);
@@ -12680,8 +12700,8 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
   display: flex;
   flex-direction: column;
   gap: 14px;
-  position: sticky;
-  top: 24px;
+  min-height: 0;
+  overflow-y: auto;
 }
 .ob-detail-sidebar-title {
   font-family: var(--mono);

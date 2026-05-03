@@ -11254,8 +11254,7 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
 
 /* Grid */
 .fl-grid {
-  flex: 1;
-  overflow-y: auto;
+  flex: 0 1 auto;
   padding: 20px;
   display: flex;
   flex-direction: column;
@@ -11574,7 +11573,6 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  min-height: 540px;
   position: sticky;
   top: 24px;
   box-shadow: 0 1px 0 rgba(60, 40, 20, 0.02);

@@ -185,7 +185,7 @@ export const CAPSTONE_BLUEPRINT_REFERENCE = {
   ],
 };
 
-const CAPSTONE_BLUEPRINT = `# Credit Application Review — Workflow Reference
+export const CAPSTONE_BLUEPRINT = `# Credit Application Review — Workflow Reference
 
 A reference workflow for a credit application review. Use it as a shape.
 The clarity is the slow step. The build is fast.

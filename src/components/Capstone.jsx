@@ -677,6 +677,7 @@ function BlueprintDrawer({ open, onClose, blueprint }) {
 export default function Capstone({
   sb,
   myParticipantId,
+  currentUserName,
   fileTree,
   participants,
   copilotUnlocked,
@@ -789,11 +790,16 @@ export default function Capstone({
   // Reviewer pool is restricted to the current user. We don't have a
   // cross-user notification system, so letting participants assign a
   // human step to someone else would create a binding that never fires
-  // at workflow runtime.
-  const allowedReviewers = useMemo(
-    () => (participants || []).filter(p => p.id === myParticipantId),
-    [participants, myParticipantId],
-  );
+  // at workflow runtime. Match by name first (the local participants
+  // list dedups by name and may carry a locally-minted id that differs
+  // from myParticipantId), then fall back to id.
+  const allowedReviewers = useMemo(() => {
+    const list = participants || [];
+    const byName = currentUserName ? list.find(p => p.name === currentUserName) : null;
+    const byId = myParticipantId ? list.find(p => p.id === myParticipantId) : null;
+    const me = byName || byId;
+    return me ? [me] : [];
+  }, [participants, myParticipantId, currentUserName]);
 
   async function handleSend() {
     if (!allComplete || sending) return;

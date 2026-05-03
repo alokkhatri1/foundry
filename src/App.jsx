@@ -3090,6 +3090,7 @@ Answer in ONE sentence. If the user asks "how", a second sentence is allowed —
             <Capstone
               sb={sb}
               myParticipantId={myParticipantId}
+              currentUserName={userName}
               fileTree={fileTree}
               flatFiles={flatFiles}
               onEnsureFileContent={handleEnsureFileContent}

@@ -32,7 +32,7 @@ export default class ErrorBoundary extends Component {
         <div style={{ maxWidth: 520 }}>
           <h1 style={{ fontSize: 22, fontWeight: 700, marginBottom: 10 }}>Something went wrong.</h1>
           <p style={{ fontSize: 14, color: '#7a6e60', lineHeight: 1.5, marginBottom: 20 }}>
-            A component crashed and took the app with it. Your data is safe on the server — a reload should get you back.
+            A component crashed and took the app with it. Your data is safe on the server. A reload should get you back.
           </p>
           <div style={{ display: 'flex', gap: 10, justifyContent: 'center', marginBottom: 24 }}>
             <button

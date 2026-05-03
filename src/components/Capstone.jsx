@@ -830,7 +830,7 @@ export default function Capstone({
             Lay out a real workflow,&nbsp;<em>step by step</em>.
           </h2>
           <p className="cs-page-sub">
-            Coworker steps become saved coworkers; human steps become review nodes — on Send.
+            Coworker steps become saved coworkers; human steps become review nodes, all on Send.
           </p>
         </div>
         <div className="cs-page-actions">

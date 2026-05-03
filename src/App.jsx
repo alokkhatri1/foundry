@@ -3102,7 +3102,7 @@ Answer in ONE sentence. If the user asks "how", a second sentence is allowed —
             <div className="fl-page">
               <header className="fl-page-head">
                 <div className="fl-page-head-left">
-                  <div className="fl-page-eyebrow">Stage 3 — 4 · Files</div>
+                  <div className="fl-page-eyebrow">Stage 3-4 · Files</div>
                   <h1 className="fl-page-title">A workspace your coworkers <em>read from</em>.</h1>
                   <p className="fl-page-sub">
                     Knowledge for what the AI reads, skills for how it works.

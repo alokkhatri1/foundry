@@ -622,7 +622,7 @@ export default function FileExplorer({ fileTree, selectedFileId, onSelectFile, o
               <>
                 <div className="fl-empty-icon"><FolderIcon color="#4a7fb5" /></div>
                 <p className="fl-empty-title">No skill files yet</p>
-                <p className="fl-empty-desc">Write reusable instructions that shape how the AI works — like a job aid for a new hire.</p>
+                <p className="fl-empty-desc">Write reusable instructions that shape how the AI works, like a job aid for a new hire.</p>
                 <EducationalCue cueId="files-instructions" show={showEducationalCues} />
                 <div className="fl-empty-actions">
                   <button className="fl-empty-btn" onClick={openAiCreateModal}>
@@ -640,7 +640,7 @@ export default function FileExplorer({ fileTree, selectedFileId, onSelectFile, o
               <>
                 <div className="fl-empty-icon"><FolderIcon /></div>
                 <p className="fl-empty-title">No folders yet</p>
-                <p className="fl-empty-desc">Each folder at root holds a knowledge folder and a skills folder. Compliance, Lending, Research — whatever shape your work takes.</p>
+                <p className="fl-empty-desc">Each folder at root holds a knowledge folder and a skills folder. Compliance, Lending, Research, whatever shape your work takes.</p>
                 <button className="fl-empty-btn" onClick={() => openCreateModal('folder')}>
                   New folder
                   <span className="fl-empty-btn-arrow" aria-hidden>{'→'}</span>

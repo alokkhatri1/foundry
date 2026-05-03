@@ -18,7 +18,7 @@ export default function PreferencesEditor({ initialContent, onSave, onClose, wor
       <div className="modal-box" style={{ maxWidth: 640 }} onClick={e => e.stopPropagation()}>
         <h3>My Preferences</h3>
         <p style={{ fontSize: 14, color: 'var(--text-muted, #888)', marginBottom: 16, lineHeight: 1.5 }}>
-          Tell the AI about yourself — your role, how you want responses, what matters to you.
+          Tell the AI about yourself: your role, how you want responses, what matters to you.
           These preferences are applied to every conversation you have, across all workshops.
         </p>
         <StageExamplePanel

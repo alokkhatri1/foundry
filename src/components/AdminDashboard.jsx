@@ -196,7 +196,7 @@ export default function AdminDashboard({ sb, user, onBack, onEnterWorkshop }) {
     while (walker) { remaining.push(walker); walker = nextStage(walker); }
     const ok = await confirm({
       title: 'Reveal all remaining stages',
-      message: `Reveal all ${remaining.length} remaining stages to every participant now? This skips the pacing — use only for dry-runs.`,
+      message: `Reveal all ${remaining.length} remaining stages to every participant now? This skips the pacing. Use only for dry-runs.`,
       confirmLabel: 'Reveal all',
     });
     if (!ok) return;
@@ -395,7 +395,7 @@ export default function AdminDashboard({ sb, user, onBack, onEnterWorkshop }) {
             <div className="admin-main-empty">
               <div className="admin-main-empty-title">Select a workshop</div>
               <div className="admin-main-empty-desc">
-                Pick one from the left — or{' '}
+                Pick one from the left, or{' '}
                 <button className="admin-inline-link" onClick={() => setShowCreate(true)}>create a new one</button>
                 .
               </div>
@@ -508,7 +508,7 @@ export default function AdminDashboard({ sb, user, onBack, onEnterWorkshop }) {
                   />
                   <div className="admin-stage-header">
                     <p className="admin-tab-intro" style={{ margin: 0 }}>
-                      Reveal is monotonic — once a stage is revealed, it stays revealed. Sub-stages reveal in order. Current stage:{' '}
+                      Reveal is monotonic: once a stage is revealed, it stays revealed. Sub-stages reveal in order. Current stage:{' '}
                       <strong>{selected.current_stage || '1'}</strong>
                     </p>
                     {!selected.deprecated_at && nextStage(selected.current_stage || '1') && (
@@ -560,7 +560,7 @@ export default function AdminDashboard({ sb, user, onBack, onEnterWorkshop }) {
                     })}
                   </div>
                   {selected.deprecated_at && (
-                    <p className="admin-tab-note">This workshop is deprecated — stages cannot be revealed further.</p>
+                    <p className="admin-tab-note">This workshop is deprecated. Stages cannot be revealed further.</p>
                   )}
                 </div>
               )}

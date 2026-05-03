@@ -688,7 +688,7 @@ export default function ActivityDashboard({ workflowRuns, onApprovalAction, onCa
         {workflowRuns.length === 0 && (
           <div className="ob-empty">
             <p className="ob-empty-title">No runs yet</p>
-            <p className="ob-empty-desc">Go to Orchestration and click Run on a workflow. Active runs land here — visible to everyone in the room.</p>
+            <p className="ob-empty-desc">Go to Orchestration and click Run on a workflow. Active runs land here, visible to everyone in the room.</p>
           </div>
         )}
 

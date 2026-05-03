@@ -727,7 +727,7 @@ function ContextSidebar({ fileTree, selectedFileIds, onToggleFile, onToggleFolde
           </div>
           <div className="cl-section-body">
             {flatFiles.length === 0 && (
-              <div className="cl-section-empty">No files yet — open the Files tab to add some.</div>
+              <div className="cl-section-empty">No files yet. Open the Files tab to add some.</div>
             )}
             {/* Group files by their parent subfolder (knowledge / skills /
                 blueprints) so the picker reads as a structured list. The
@@ -964,7 +964,7 @@ function OrphanedRunsBanner({ myOrphanedRuns, onCancelOrphanedRun }) {
   return (
     <div style={{ padding: '12px 16px', background: '#fce8e5', borderBottom: '1px solid #f0b8ad' }}>
       <div style={{ fontWeight: 600, marginBottom: 8, color: '#8a2e22', fontSize: 13 }}>
-        {myOrphanedRuns.length} workflow run{myOrphanedRuns.length === 1 ? '' : 's'} interrupted — the executor was lost (refresh / tab closed). Cancel to clean up.
+        {myOrphanedRuns.length} workflow run{myOrphanedRuns.length === 1 ? '' : 's'} interrupted. The executor was lost (refresh / tab closed). Cancel to clean up.
       </div>
       {myOrphanedRuns.map(run => (
         <div key={run.id} style={{ marginBottom: 6, padding: 8, background: '#fff', border: '1px solid #f0b8ad', borderRadius: 6, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -982,7 +982,7 @@ function OutboxIndicator({ count }) {
   if (!count) return null;
   return (
     <div style={{ padding: '6px 16px', background: '#eef4ff', borderBottom: '1px solid #cfd8e8', fontSize: 12, color: '#4a6b96' }}>
-      {count} message{count === 1 ? '' : 's'} pending delivery — will retry automatically.
+      {count} message{count === 1 ? '' : 's'} pending delivery. Will retry automatically.
     </div>
   );
 }
@@ -1297,7 +1297,7 @@ export default function ChatPanel({ messages, onSendMessage, onApprovalAction, o
           const approxTokens = Math.round(totalChars / 4000);
           return (
             <div className="cl-context-warning" title="The AI sees everything you attach. Very large contexts can slow replies or hit the model's context limit.">
-              Heads up — {activeContextCount} file{activeContextCount === 1 ? '' : 's'} attached, roughly {approxTokens}k tokens. Consider unselecting some to keep answers snappy.
+              Heads up: {activeContextCount} file{activeContextCount === 1 ? '' : 's'} attached, roughly {approxTokens}k tokens. Consider unselecting some to keep answers snappy.
             </div>
           );
         })()}

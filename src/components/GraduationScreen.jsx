@@ -201,7 +201,7 @@ function PendingHeader({ userName }) {
         Thanks for participating,&nbsp;<em>{userName}</em>.
       </h1>
       <p className="gr-pending-sub">
-        A quick survey before your scorecard reveals — what worked, what didn't, what to keep. Five minutes.
+        A quick survey before your scorecard reveals. What worked, what didn't, what to keep. Five minutes.
       </p>
     </header>
   );
@@ -323,7 +323,7 @@ function DimensionRow({ dim, index }) {
         {isInfluence && (
           <p className="gr-dim-influence">
             <span className="gr-dim-influence-mark">Influence ·</span>{' '}
-            Your work was used by other participants in the room — not just by you.
+            Your work was used by other participants in the room, not just by you.
           </p>
         )}
       </div>

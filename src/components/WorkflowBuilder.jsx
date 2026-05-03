@@ -478,7 +478,7 @@ function StepCard({ step, index, coworkers, tools, participants, onUpdate, onDel
 
                   <div className="cwb-section">
                     <h3 className="cwb-section-title">Skills</h3>
-                    <p className="cwb-section-desc">How this coworker behaves — its process and output format.</p>
+                    <p className="cwb-section-desc">How this coworker behaves: its process and output format.</p>
                     <FilePicker
                       fileTree={fileTree}
                       selectedIds={cw.instructionFileIds || []}
@@ -490,7 +490,7 @@ function StepCard({ step, index, coworkers, tools, participants, onUpdate, onDel
 
                   <div className="cwb-section">
                     <h3 className="cwb-section-title">Knowledge</h3>
-                    <p className="cwb-section-desc">Reference material — policies, rules, criteria.</p>
+                    <p className="cwb-section-desc">Reference material: policies, rules, criteria.</p>
                     <FilePicker
                       fileTree={fileTree}
                       selectedIds={cw.knowledgeFileIds || []}
@@ -965,7 +965,7 @@ function WorkflowCanvas({ workflow, onUpdateWorkflow, readOnly, fileTree, cowork
               <div className="wf-copilot-body" ref={copilotScrollRef}>
                 {copilotMessages.length === 0 && !copilotBusy && (
                   <div className="wf-copilot-empty">
-                    Describe the workflow you want. I’ll stitch the DAG — add coworker steps, wire reviews, connect the edges.
+                    Describe the workflow you want. I’ll stitch the DAG: add coworker steps, wire reviews, connect the edges.
                     <br /><br />
                     Try: <em>“Ravi drafts a risk memo, Priya reviews, then Legal AI checks exceptions, then I sign off.”</em>
                   </div>
@@ -1163,7 +1163,7 @@ function WorkflowEditor({ workflow, onUpdateWorkflow, readOnly, fileTree, cowork
             disabled={readOnly}
           />
           {readOnly && (
-            <span className="wf-readonly-banner">Read-only — built by {workflow.createdBy || 'another participant'}</span>
+            <span className="wf-readonly-banner">Read-only · built by {workflow.createdBy || 'another participant'}</span>
           )}
         </div>
         <div className="wf-editor-head-right">
@@ -1292,7 +1292,7 @@ function WorkflowCard({ workflow, coworkers, participants, onSelect, onDelete, o
   if (counts.agent)    captionParts.push(`${counts.agent} ${counts.agent === 1 ? 'coworker' : 'coworkers'}`);
   if (counts.approval) captionParts.push(`${counts.approval} ${counts.approval === 1 ? 'review' : 'reviews'}`);
   if (counts.capture)  captionParts.push(`${counts.capture} ${counts.capture === 1 ? 'capture' : 'captures'}`);
-  const caption = captionParts.length ? captionParts.join(' · ') : 'No steps yet — click to start building.';
+  const caption = captionParts.length ? captionParts.join(' · ') : 'No steps yet. Click to start building.';
   return (
     <div className="wf-card" onClick={() => onSelect(workflow.id)}>
       <div className="wf-card-top">
@@ -1559,7 +1559,7 @@ export default function WorkflowBuilder({ workflows, onUpdateWorkflows, fileTree
         </header>
         {workflows.length === 0 ? (
           <div className="wf-page-empty">
-            <p>No workflows yet — spin one up to get started.</p>
+            <p>No workflows yet. Spin one up to get started.</p>
           </div>
         ) : (() => {
           // Three buckets — Examples (System-seeded canonical workflows),

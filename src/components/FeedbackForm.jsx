@@ -260,7 +260,7 @@ export default function FeedbackForm({ onSubmit, submitting, errorMessage, userN
             Before your scorecard,&nbsp;<em>a few words from you</em>.
           </h1>
           <p className="sv-sub">
-            Eighteen short questions about the training, the materials, and the platform. Twelve scales, three yes/no, three optional notes — about five minutes. Your answers shape the next cohort.
+            Eighteen short questions about the training, the materials, and the platform. Twelve scales, three yes/no, three optional notes, about five minutes. Your answers shape the next cohort.
           </p>
           <div className="sv-legend" aria-label="Scale legend">
             <span className="sv-legend-eyebrow">Scale</span>

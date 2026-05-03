@@ -141,7 +141,7 @@ export default function UsageView({ sb, participants, myParticipantId, showEduca
             Look at what the whole&nbsp;<em>room</em>&nbsp;just spent.
           </h2>
           <p className="us-page-sub">
-            Every Claude API call this room has made — and where it went.
+            Every Claude API call this room has made, and where it went.
           </p>
           <EducationalCue cueId="usage-stage" show={showEducationalCues} />
         </div>
@@ -155,7 +155,7 @@ export default function UsageView({ sb, participants, myParticipantId, showEduca
       ) : error ? (
         <UsageEmpty
           title="Couldn't load usage data."
-          body={<>If the <code>llm_usage</code> table doesn't exist yet, apply migration 016 to this Supabase project and have someone make a chat — rows will start landing in realtime.</>}
+          body={<>If the <code>llm_usage</code> table doesn't exist yet, apply migration 016 to this Supabase project and have someone make a chat. Rows will start landing in realtime.</>}
           hint={error}
         />
       ) : rows.length === 0 ? (

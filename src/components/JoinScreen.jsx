@@ -210,7 +210,7 @@ export default function JoinScreen({ user, isAdmin, adminStatus, adminError, onR
                   onClick={onRetryAdminCheck}
                   title={adminError || 'Admin check failed'}
                 >
-                  Admin check failed — Retry
+                  Admin check failed. Retry
                 </button>
               )}
               <button onClick={onSignOut} style={{ marginLeft: 'auto' }}>Sign Out</button>

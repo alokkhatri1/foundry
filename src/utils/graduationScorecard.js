@@ -4,19 +4,28 @@
 // Levels, lowest → highest:
 //   0. Not Started   — no evidence of touching the primitive
 //   1. Awareness     — touched it, saw what it is
-//   2. Application   — used it properly at least once
-//   3. Mastery       — used it well, multiple times, refined
+//   2. Application   — used it properly at least once  (PROGRESSION)
+//   3. Mastery       — produced something complex, not just a count    (COMPLEXITY)
 //   4. Influence     — their artifact was used or acted on by another participant
 //
-// The 6 dimensions mirror the app's tabs: Chat, Files, Coworkers, Orchestration,
-// Collaboration (cross-tab), Observability. Tools and Capture are no longer
-// standalone — they roll into Coworkers and Orchestration respectively, which
-// is where participants actually configure them in the new layout.
+// The rubric measures two axes in parallel:
+//   - Progression — did they touch each stage and apply the primitive once.
+//     This is the 1 → 2 jump (Application).
+//   - Complexity — what's the *depth* of what they produced. This is the
+//     2 → 3 jump (Mastery). Mastery signals are intentionally tightened
+//     to require multi-piece artifacts (e.g., Files Mastery requires
+//     knowledge AND skills folders both populated; Capstone Mastery
+//     requires a mixed coworker+human plan).
+//
+// Dimensions: Chat, Files, Coworkers, Orchestration, Observability, Capstone.
+// Stage 9 (Copilot) and Stage 10 (Economics) are not separate dims — copilot
+// activity rolls into Orchestration, and Economics is read-only with no
+// meaningful gradeable signal.
 //
 // "Influence" requires cross-participant data (someone else used my file,
-// DM'd my coworker, ran my workflow, resolved my review request). We compute
-// what we can with the Supabase data at hand; signals are intentionally
-// conservative — false negatives are fine, false positives are not.
+// DM'd my coworker, ran my workflow, resolved my review request). Signals
+// are intentionally conservative — false negatives are fine, false positives
+// are not.
 
 export const LEVELS = ['Not Started', 'Awareness', 'Application', 'Mastery', 'Influence'];
 export const LEVEL_COLORS = {
@@ -43,6 +52,21 @@ function filesInFolderNamed(tree, folderName) {
   return acc;
 }
 
+// Treat a Capstone row as "complete" by the same rule the live editor uses:
+// step text must be non-empty, and the row must have its type-specific
+// requirements (a coworker row needs at least one knowledge or skills file;
+// a human row needs a reviewer name).
+function isCapstoneRowComplete(row) {
+  if (!row) return false;
+  const step = (row.step || '').trim();
+  if (!step) return false;
+  const type = row.type || 'coworker';
+  if (type === 'coworker') {
+    return (row.knowledgeFileIds || []).length > 0 || (row.skillsFileIds || []).length > 0;
+  }
+  return Boolean((row.reviewerName || '').trim());
+}
+
 export function computeScorecard({
   userName,
   conversations = [],
@@ -55,6 +79,7 @@ export function computeScorecard({
   tools = [],
   fileTree = null,
   userPreferences = '',
+  capstoneRows = null,
 }) {
   // Pull the participant's slice of every entity. "mine" = createdBy === userName,
   // with a permissive fallback for files that were created before createdBy was
@@ -262,6 +287,44 @@ export function computeScorecard({
     evidence: runsInRoom === 0
       ? 'No runs to watch yet.'
       : `${runsInRoom} run${runsInRoom === 1 ? '' : 's'} visible, ${myApprovals.length} decision${myApprovals.length === 1 ? '' : 's'} by you${approvalsOnMyRuns.length ? `, ${approvalsOnMyRuns.length} on your runs` : ''}.`,
+  });
+
+  // 6. Capstone (Capstone tab) — Stage 8, the synthesis. Mastery requires
+  //    a *mixed* plan (coworker + human steps both present, every row
+  //    complete) — that's the actual teaching point of the stage. Influence
+  //    pairs a complete capstone plan with downstream peer activity on the
+  //    user's coworkers/workflows (we can't perfectly attribute peer use to
+  //    capstone-derived artifacts without a per-artifact origin marker, so
+  //    we accept "complete plan AND any peer reuse on what they built").
+  const capRows = Array.isArray(capstoneRows) ? capstoneRows : [];
+  const capRowsCompleted = capRows.filter(isCapstoneRowComplete);
+  const capHasCoworkerStep = capRowsCompleted.some(r => (r.type || 'coworker') === 'coworker');
+  const capHasHumanStep = capRowsCompleted.some(r => r.type === 'human');
+  const capAllComplete = capRows.length > 0 && capRowsCompleted.length === capRows.length;
+  const capPeerReused = (coworkersDmdByOthers > 0)
+    || (myWorkflowsRunByOthers > 0)
+    || (myFilesUsedByOthers.length > 0);
+  dimensions.push({
+    key: 'capstone',
+    label: 'Capstone',
+    hint: 'Laying out a real workflow end-to-end — coworker steps, human reviews, files, all wired together.',
+    level: (() => {
+      if (capRows.length === 0) return 0;
+      if (capAllComplete && capHasCoworkerStep && capHasHumanStep && capPeerReused) return 4;
+      if (capAllComplete && capHasCoworkerStep && capHasHumanStep) return 3;
+      if (capRowsCompleted.length >= 1) return 2;
+      return 1;
+    })(),
+    evidence: (() => {
+      if (capRows.length === 0) return 'No capstone draft yet.';
+      const parts = [`${capRows.length} step${capRows.length === 1 ? '' : 's'} drafted`];
+      if (capRowsCompleted.length) parts.push(`${capRowsCompleted.length} complete`);
+      if (capHasCoworkerStep && capHasHumanStep) parts.push(`mixed coworker + human plan`);
+      else if (capHasCoworkerStep) parts.push(`coworker steps only`);
+      else if (capHasHumanStep) parts.push(`human steps only`);
+      if (capAllComplete && capPeerReused) parts.push(`peers acted on materialized work`);
+      return parts.join(' · ') + '.';
+    })(),
   });
 
   // Overall band — average of the touched dimensions, floored to the band

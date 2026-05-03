@@ -45,6 +45,7 @@ export default function GraduationScreen({
   myParticipantId,
 }) {
   const [approvals, setApprovals] = useState(null);
+  const [capstoneRows, setCapstoneRows] = useState(null);
   // Feedback gate state. 'unknown' until we've checked Supabase, then either
   // 'pending' (show form) or 'submitted' (show rubric). Without sb or a
   // participant id we can't gate, so fall through to 'submitted' silently.
@@ -65,6 +66,22 @@ export default function GraduationScreen({
     return () => { cancelled = true; };
   }, [loadAllRoomApprovals]);
 
+  // Load the participant's Capstone draft so the scorecard's Capstone
+  // dimension can score it. No draft = treated as "Not Started" by the
+  // rubric, which is correct.
+  useEffect(() => {
+    if (!sb || !myParticipantId) {
+      setCapstoneRows([]);
+      return;
+    }
+    let cancelled = false;
+    sb.loadCapstoneDraft(myParticipantId).then(rows => {
+      if (cancelled) return;
+      setCapstoneRows(Array.isArray(rows) ? rows : []);
+    }).catch(() => { if (!cancelled) setCapstoneRows([]); });
+    return () => { cancelled = true; };
+  }, [sb, myParticipantId]);
+
   useEffect(() => {
     if (!canGate) return;
     let cancelled = false;
@@ -81,11 +98,13 @@ export default function GraduationScreen({
 
   const scorecard = useMemo(() => {
     if (approvals === null) return null;
+    if (capstoneRows === null) return null;
     return computeScorecard({
       userName, conversations, coworkers, workflows, workflowRuns,
       flatFiles, participants, approvals, tools, fileTree, userPreferences,
+      capstoneRows,
     });
-  }, [userName, conversations, coworkers, workflows, workflowRuns, flatFiles, participants, approvals, tools, fileTree, userPreferences]);
+  }, [userName, conversations, coworkers, workflows, workflowRuns, flatFiles, participants, approvals, tools, fileTree, userPreferences, capstoneRows]);
 
   async function handleFeedbackSubmit(payload) {
     setFeedbackError(null);

@@ -312,25 +312,6 @@ export default function FileExplorer({ fileTree, selectedFileId, onSelectFile, o
     if (currentFolderId === nodeId) setCurrentFolderId(fileTree.id);
   }
 
-  // Clone a System-seeded example file into the participant's own pool.
-  // Drops it into whichever folder the participant is currently viewing
-  // so the new copy is right where they expect it. Stamps createdBy so
-  // it shows up under "Added by you" and can be freely edited from now.
-  function handleCloneFile(e, file) {
-    e.stopPropagation();
-    const clone = {
-      id: genId(),
-      name: file.name,
-      type: 'file',
-      content: file.content || '',
-      createdBy: userName,
-    };
-    const targetParentId = currentFolderId && currentFolderId !== fileTree.id
-      ? currentFolderId
-      : fileTree.id;
-    onUpdateTree(addChildToTree(fileTree, targetParentId, clone));
-  }
-
   // ===== Drag & Drop: move items into folders =====
   function handleDragStart(e, itemId) {
     setDragItemId(itemId);
@@ -651,9 +632,6 @@ export default function FileExplorer({ fileTree, selectedFileId, onSelectFile, o
                   )}
                 </div>
                 {isSystem && <span className="fl-card-badge">Example</span>}
-                {isSystem && (
-                  <button className="fl-card-action-clone" onClick={e => handleCloneFile(e, file)} title="Clone — make my own copy">Clone</button>
-                )}
                 {file.createdBy === userName && (
                   <button className="fl-card-action-delete" onClick={e => handleDelete(e, file.id)} title="Delete">{'✕'}</button>
                 )}

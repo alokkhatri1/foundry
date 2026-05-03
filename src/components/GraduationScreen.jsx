@@ -2,15 +2,31 @@ import { useEffect, useMemo, useState } from 'react';
 import { computeScorecard, LEVELS, LEVEL_COLORS } from '../utils/graduationScorecard';
 import FeedbackForm from './FeedbackForm';
 
-// Graduation screen — the "Own it" moment at workshop end. Computes a
-// competency scorecard per participant from their actual platform activity
-// and renders per-dimension levels (Awareness → Application → Mastery →
-// Influence) plus an overall band. The rubric lives in
-// src/utils/graduationScorecard.js; this component is display-only.
+// Graduation screen — the "Own it" moment at workshop end. Editorial
+// closing-letter posture: certificate plate (name + level + wax seal),
+// hairline tally strip, letterhead-block dimensions with a 4-dot ladder
+// and one italic line of evidence. Empty rows look complete; a level-4
+// "influence" callout surfaces when the participant's work shaped peers.
 //
-// Before the rubric reveals, every participant must submit the post-workshop
-// feedback survey once. The gate is per (workshop_id, participant_id) and
-// short-circuits if a row already exists in workshop_feedback.
+// Before the rubric reveals, every participant must submit the
+// post-workshop feedback survey once. The gate is per (workshop_id,
+// participant_id) and short-circuits if a row already exists in
+// workshop_feedback.
+
+const OVERALL_HINTS = {
+  0: "you didn't get a chance to use the platform this week.",
+  1: "you've seen the shape of each primitive.",
+  2: 'you put every piece into practice at least once.',
+  3: 'you moved past first-use and started refining.',
+  4: 'your work shaped how others on the team worked.',
+};
+
+function pad2(n) { return String(n).padStart(2, '0'); }
+
+function formatIssuedDate(d) {
+  return d.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+}
+
 export default function GraduationScreen({
   userName,
   conversations,
@@ -37,9 +53,10 @@ export default function GraduationScreen({
   const [submitting, setSubmitting] = useState(false);
   const [feedbackError, setFeedbackError] = useState(null);
 
-  // One-shot load of every approval in the room for accurate cross-participant
-  // scoring (influence = reviews for 2+ peers, etc). Realtime subscription
-  // isn't needed here — graduation is a read-only moment.
+  // Issuance date is the moment the participant first sees the rubric.
+  // Captured once on mount so re-renders don't shift the printed date.
+  const issuedDate = useMemo(() => formatIssuedDate(new Date()), []);
+
   useEffect(() => {
     let cancelled = false;
     loadAllRoomApprovals?.().then(rows => {
@@ -48,7 +65,6 @@ export default function GraduationScreen({
     return () => { cancelled = true; };
   }, [loadAllRoomApprovals]);
 
-  // Has this participant already submitted feedback for this workshop?
   useEffect(() => {
     if (!canGate) return;
     let cancelled = false;
@@ -87,46 +103,40 @@ export default function GraduationScreen({
     }
   }
 
-  // Tally is user-scoped, matching the per-dimension rubric below.
-  // Counting room-wide totals here was misleading: the screen reads as
-  // "your" graduation but the numbers were the cohort's, so an admin
-  // viewing a deprecated workshop would see "132 files" with every
-  // competency below saying "no activity" — same data, two framings.
-  const totalMessages = (conversations || []).reduce(
-    (sum, c) => sum + (c.messages || []).filter(m => m.type === 'user').length,
-    0,
-  );
-  const filesCount = (flatFiles || []).filter(f => f.type === 'file' && f.createdBy === userName).length;
-  const coworkersCount = (coworkers || []).filter(c => c.createdBy === userName).length;
-  const runsCount = (workflowRuns || []).filter(r => r.startedBy === userName).length;
+  // User-scoped tallies. Counting room-wide totals here was misleading:
+  // the screen reads as "your" graduation but the numbers were the
+  // cohort's, so an admin viewing a deprecated workshop would see
+  // "132 files" with every competency below saying "no activity".
+  const tally = {
+    messages: (conversations || []).reduce(
+      (sum, c) => sum + (c.messages || []).filter(m => m.type === 'user').length,
+      0,
+    ),
+    files: (flatFiles || []).filter(f => f.type === 'file' && f.createdBy === userName).length,
+    coworkers: (coworkers || []).filter(c => c.createdBy === userName).length,
+    workflowRuns: (workflowRuns || []).filter(r => r.startedBy === userName).length,
+  };
 
   const overall = scorecard?.overallLevel ?? 0;
-  const overallLabel = LEVELS[overall];
 
-  // Feedback gate — render form before any rubric content. Tally + header
-  // stay in place above the form so it doesn't feel like a different screen.
   if (feedbackStatus === 'unknown') {
     return (
-      <div className={`grad-page${embedded ? ' embedded' : ''}`}>
-        <div className="grad-container">
-          <div className="grad-loading">Loading…</div>
-        </div>
+      <div className={`gr-page${embedded ? ' is-embedded' : ''}`}>
+        <main className="gr-container">
+          <Loading />
+        </main>
       </div>
     );
   }
 
   return (
-    <div className={`grad-page${embedded ? ' embedded' : ''}`}>
-      <div className="grad-container">
-        <div className="grad-header">
-          <div className="grad-eyebrow">Graduation</div>
-          <h1 className="grad-title">Thanks for participating, {userName}.</h1>
-          <p className="grad-subtitle">
-            {feedbackStatus === 'pending'
-              ? 'A few quick questions before your scorecard reveals.'
-              : 'A read of your workshop activity — what you built, reviewed, and shaped. Everything is preserved in the workshop archive.'}
-          </p>
-        </div>
+    <div className={`gr-page${embedded ? ' is-embedded' : ''}`}>
+      <main className="gr-container">
+        {feedbackStatus === 'pending' ? (
+          <PendingHeader userName={userName} issuedDate={issuedDate} />
+        ) : (
+          <CertificatePlate userName={userName} date={issuedDate} level={overall} />
+        )}
 
         {feedbackStatus === 'pending' ? (
           <FeedbackForm
@@ -136,81 +146,16 @@ export default function GraduationScreen({
           />
         ) : (
           <>
-            {/* Quick tally */}
-            <div className="grad-tally">
-              <div className="grad-tally-item">
-                <div className="grad-tally-num">{totalMessages}</div>
-                <div className="grad-tally-label">messages</div>
-              </div>
-              <div className="grad-tally-item">
-                <div className="grad-tally-num">{filesCount}</div>
-                <div className="grad-tally-label">files</div>
-              </div>
-              <div className="grad-tally-item">
-                <div className="grad-tally-num">{coworkersCount}</div>
-                <div className="grad-tally-label">coworkers</div>
-              </div>
-              <div className="grad-tally-item">
-                <div className="grad-tally-num">{runsCount}</div>
-                <div className="grad-tally-label">workflow runs</div>
-              </div>
-            </div>
-
-            {/* Scorecard */}
+            <Tally tally={tally} />
             {scorecard === null ? (
-              <div className="grad-loading">Computing your scorecard&hellip;</div>
+              <Loading />
             ) : (
-              <>
-                <div className="grad-overall">
-                  <div className="grad-overall-label">Overall level</div>
-                  <div className="grad-overall-badge" style={{ background: LEVEL_COLORS[overall] }}>
-                    {overallLabel}
-                  </div>
-                  <div className="grad-overall-hint">
-                    {overall === 0 && 'No activity recorded yet.'}
-                    {overall === 1 && 'You’ve seen the shape of each primitive.'}
-                    {overall === 2 && 'You put every piece into practice at least once.'}
-                    {overall === 3 && 'You moved past first-use and started refining.'}
-                    {overall === 4 && 'Your work influenced how others on the team worked.'}
-                  </div>
-                </div>
-
-                <div className="grad-dimensions">
-                  <div className="grad-dim-head">Competencies</div>
-                  {scorecard.dimensions.map(d => (
-                    <div key={d.key} className="grad-dim-row">
-                      <div className="grad-dim-left">
-                        <div className="grad-dim-label">{d.label}</div>
-                        <div className="grad-dim-hint">{d.hint}</div>
-                      </div>
-                      <div className="grad-dim-ladder">
-                        {[1, 2, 3, 4].map(step => (
-                          <div
-                            key={step}
-                            className={`grad-dim-rung${step <= d.level ? ' on' : ''}${step === d.level ? ' current' : ''}`}
-                            style={step === d.level ? { background: LEVEL_COLORS[d.level], color: '#fff' } : {}}
-                            title={LEVELS[step]}
-                          >
-                            {step === d.level ? LEVELS[step] : ''}
-                          </div>
-                        ))}
-                      </div>
-                      <div className="grad-dim-evidence">{d.evidence}</div>
-                    </div>
-                  ))}
-                </div>
-              </>
+              <Dimensions dimensions={scorecard.dimensions} />
             )}
-
             {!embedded && (
-              <div className="grad-footer">
-                <button className="landing-join-btn grad-signout-btn" onClick={onSignOut}>
-                  Sign out
-                </button>
-              </div>
+              <Footer onSignOut={onSignOut} date={issuedDate} />
             )}
-
-            <div className="grad-attribution">
+            <div className="gr-attribution">
               Foundry by{' '}
               <a href="https://alokkhatri.com" target="_blank" rel="noopener noreferrer">
                 Alok Khatri
@@ -218,7 +163,208 @@ export default function GraduationScreen({
             </div>
           </>
         )}
+      </main>
+    </div>
+  );
+}
+
+function PendingHeader({ userName }) {
+  // Compact header for the feedback-gate state — the certificate plate
+  // is held back until the participant has answered the survey.
+  return (
+    <header className="gr-pending-header">
+      <div className="gr-eyebrow">
+        <span className="gr-eyebrow-dot" aria-hidden />
+        Graduation · A few questions first
       </div>
+      <h1 className="gr-pending-title">
+        Thanks for participating,&nbsp;<em>{userName}</em>.
+      </h1>
+      <p className="gr-pending-sub">
+        A quick survey before your scorecard reveals — what worked, what didn't, what to keep. Five minutes.
+      </p>
+    </header>
+  );
+}
+
+function CertificatePlate({ userName, date, level }) {
+  const word = LEVELS[level];
+  const color = LEVEL_COLORS[level];
+  return (
+    <header className="gr-plate" style={{ '--gr-level-color': color }}>
+      <div className="gr-plate-body">
+        <div className="gr-plate-eyebrow">
+          <span className="gr-eyebrow-dot" aria-hidden />
+          Foundry · Issued {date}
+        </div>
+        <p className="gr-plate-prelude">This certifies that</p>
+        <h1 className="gr-plate-name"><em>{userName}</em></h1>
+        <p className="gr-plate-prelude">completed the workshop and reached the level of</p>
+        <div className="gr-plate-level">
+          <span className="gr-plate-level-dot" aria-hidden />
+          <span className="gr-plate-level-word">{word}</span>
+        </div>
+        <p className="gr-plate-hint"><em>{OVERALL_HINTS[level]}</em></p>
+      </div>
+      <WaxSeal />
+    </header>
+  );
+}
+
+function WaxSeal() {
+  return (
+    <div className="gr-seal" aria-hidden>
+      <svg viewBox="0 0 140 140" className="gr-seal-svg">
+        <defs>
+          <radialGradient id="grSealGrad" cx="38%" cy="32%" r="75%">
+            <stop offset="0%" stopColor="#f4c8a8" />
+            <stop offset="55%" stopColor="#d97757" />
+            <stop offset="100%" stopColor="#a04a30" />
+          </radialGradient>
+          <path id="grSealCircle" d="M 70,70 m -52,0 a 52,52 0 1,1 104,0 a 52,52 0 1,1 -104,0" />
+        </defs>
+        <circle cx="70" cy="70" r="64" fill="none" stroke="#d97757" strokeOpacity="0.35" strokeDasharray="2 4" />
+        <circle cx="70" cy="70" r="58" fill="url(#grSealGrad)" />
+        <circle cx="70" cy="70" r="58" fill="none" stroke="#7a3318" strokeOpacity="0.25" />
+        <text className="gr-seal-mono" fontSize="7.5" letterSpacing="3">
+          <textPath href="#grSealCircle" startOffset="0%">FOUNDRY · GRADUATION · ISSUED</textPath>
+        </text>
+        <text x="70" y="82" textAnchor="middle" className="gr-seal-mono-f">F</text>
+      </svg>
+    </div>
+  );
+}
+
+function Tally({ tally }) {
+  const items = [
+    { key: 'messages',     num: tally.messages,     label: 'messages sent' },
+    { key: 'files',        num: tally.files,        label: 'files created' },
+    { key: 'coworkers',    num: tally.coworkers,    label: 'coworkers built' },
+    { key: 'workflowRuns', num: tally.workflowRuns, label: 'workflow runs' },
+  ];
+  return (
+    <section className="gr-tally" aria-label="Activity tally">
+      {items.map(it => (
+        <div key={it.key} className="gr-tally-cell">
+          <div className="gr-tally-num">{it.num}</div>
+          <div className="gr-tally-label">{it.label}</div>
+        </div>
+      ))}
+    </section>
+  );
+}
+
+function Ladder({ level }) {
+  // Four dots along a track. Track fills up to (level - 1) / 3. Current
+  // dot has a halo; its label floats above. level=0 leaves all dots empty.
+  const fillWidth = level === 0 ? 0 : ((level - 1) / 3) * 100;
+  return (
+    <div className="gr-ladder" role="img" aria-label={`Level ${level}: ${LEVELS[level]}`}>
+      <div className="gr-ladder-track" aria-hidden>
+        <div className="gr-ladder-fill" style={{ width: `${fillWidth}%` }} />
+      </div>
+      {[1, 2, 3, 4].map(step => {
+        const isOn = step <= level;
+        const isCurrent = step === level;
+        return (
+          <div
+            key={step}
+            className={`gr-ladder-step${isOn ? ' is-on' : ''}${isCurrent ? ' is-current' : ''}`}
+            title={LEVELS[step]}
+          >
+            <span className="gr-ladder-dot" aria-hidden />
+            <span className="gr-ladder-step-label">{LEVELS[step]}</span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function DimensionRow({ dim, index }) {
+  const isInfluence = dim.level === 4;
+  const isEmpty = dim.level === 0;
+  return (
+    <article
+      className={`gr-dim level-${dim.level}${isInfluence ? ' is-influence' : ''}${isEmpty ? ' is-empty' : ''}`}
+      style={{ '--gr-level-color': LEVEL_COLORS[dim.level] }}
+    >
+      <div className="gr-dim-index">{pad2(index + 1)}</div>
+      <div className="gr-dim-body">
+        <div className="gr-dim-head">
+          <h3 className="gr-dim-label">{dim.label}</h3>
+          <p className="gr-dim-hint">{dim.hint}</p>
+        </div>
+        <Ladder level={dim.level} />
+        <p className="gr-dim-evidence">
+          <span className="gr-dim-evidence-mark" aria-hidden>“</span>
+          {dim.evidence}
+        </p>
+        {isInfluence && (
+          <p className="gr-dim-influence">
+            <span className="gr-dim-influence-mark">Influence ·</span>{' '}
+            Your work was used by other participants in the room — not just by you.
+          </p>
+        )}
+      </div>
+    </article>
+  );
+}
+
+function Dimensions({ dimensions }) {
+  return (
+    <section className="gr-dimensions">
+      <header className="gr-dimensions-head">
+        <div>
+          <div className="gr-section-eyebrow">Witnessed by your work</div>
+          <h2 className="gr-section-title">
+            Five primitives,&nbsp;<em>five ladders</em>.
+          </h2>
+        </div>
+        <div className="gr-ladder-key" aria-label="Level legend">
+          {[1, 2, 3, 4].map(n => (
+            <span key={n} className="gr-ladder-key-item">
+              <span className="gr-ladder-key-dot" style={{ background: LEVEL_COLORS[n] }} />
+              {LEVELS[n]}
+            </span>
+          ))}
+        </div>
+      </header>
+      <div className="gr-dimensions-list">
+        {dimensions.map((d, i) => <DimensionRow key={d.key} dim={d} index={i} />)}
+      </div>
+    </section>
+  );
+}
+
+function Footer({ onSignOut, date }) {
+  return (
+    <footer className="gr-footer">
+      <button type="button" className="gr-signout" onClick={onSignOut}>
+        Sign out
+      </button>
+      <div className="gr-issuer">
+        <svg className="gr-issuer-mark" viewBox="0 0 80 24" aria-hidden>
+          <path d="M 4 18 C 14 4, 24 22, 34 12 S 54 4, 64 18" stroke="#d97757" strokeWidth="1.5" fill="none" strokeLinecap="round" />
+          <circle cx="68" cy="18" r="1.5" fill="#d97757" />
+        </svg>
+        <div className="gr-issuer-lines">
+          <span className="gr-issuer-line-1">Issued by Foundry</span>
+          <span className="gr-issuer-line-2">{date}</span>
+        </div>
+      </div>
+      <button type="button" className="gr-print" onClick={() => window.print()}>
+        Save as PDF
+      </button>
+    </footer>
+  );
+}
+
+function Loading() {
+  return (
+    <div className="gr-loading">
+      <span className="gr-loading-dot" aria-hidden />
+      <span>Computing your scorecard…</span>
     </div>
   );
 }

@@ -21,10 +21,10 @@
 export const LEVELS = ['Not Started', 'Awareness', 'Application', 'Mastery', 'Influence'];
 export const LEVEL_COLORS = {
   0: '#bdb6aa',
-  1: '#8fa8c5',
-  2: '#5a9e6f',
-  3: '#c8956c',
-  4: '#8b6fb0',
+  1: '#8fa8c5', // soft blue — Awareness
+  2: '#5a9e6f', // green    — Application
+  3: '#d97757', // peach    — Mastery (editorial palette, was #c8956c gold)
+  4: '#8b6fb0', // plum     — Influence
 };
 
 // Walk a file tree looking for files whose ancestor folder chain contains a

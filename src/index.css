@@ -13377,6 +13377,8 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
   border-bottom: 1px solid var(--cream-deep);
   background: var(--paper);
 }
+.cs-card-head.is-clickable { cursor: pointer; }
+.cs-card-head.is-clickable:hover { background: var(--cream-soft); }
 .cs-card.is-complete .cs-card-head { border-bottom-color: var(--green-soft); }
 
 .cs-card-head-left {

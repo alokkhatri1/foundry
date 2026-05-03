@@ -381,7 +381,17 @@ function StepCard({
 
   return (
     <div className={`cs-card${isComplete ? ' is-complete' : ''} type-${isCoworker ? 'coworker' : 'human'}`}>
-      <div className="cs-card-head">
+      <div
+        className="cs-card-head is-clickable"
+        onClick={(e) => {
+          // Bar-level click collapses the card. Clicks that land on (or
+          // inside) a button stay with that button's own handler — type
+          // toggle, up/down, delete, the chevron — none of those should
+          // collapse the card as a side effect.
+          if (e.target.closest('button')) return;
+          onToggleCollapse();
+        }}
+      >
         <div className="cs-card-head-left">
           <span className="cs-num">{numStr}</span>
           <span className="cs-num-total">/ {totStr}</span>

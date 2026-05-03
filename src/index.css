@@ -11116,6 +11116,15 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
 }
 .fl-page .fl-crumb:hover { background: var(--cream); color: var(--ink); }
 .fl-page .fl-crumb.is-current { color: var(--peach-deep); }
+/* When the root crumb is the only one (we're at the workspace root),
+   pop it as a peach-outlined pill — matches the reference badge for
+   "WORKSPACE" sitting on its own. */
+.fl-page .fl-breadcrumb:has(.fl-crumb-segment:only-child) .fl-crumb.is-current {
+  border: 1px solid var(--peach);
+  border-radius: 6px;
+  padding: 6px 12px;
+  color: var(--peach-deep);
+}
 .fl-page .fl-crumb.drop-target {
   background: var(--peach-soft);
   color: var(--peach-deep);
@@ -11305,13 +11314,11 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
 .fl-page .fl-section-grid,
 .fl-page .fl-flat-grid {
   display: grid;
-  /* auto-fill so empty tracks reserve horizontal space (the dotted bg
-     reads as "room to grow"). 1fr lets cards stretch when sparse so a
-     single card fills its track instead of shrinking to its min. The
-     vertical stretch is bounded separately by .fl-grid being flex:
-     0 0 auto, so we get a wide row of cards over a short dotted band
-     instead of a tall empty rectangle. */
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  /* Multiple narrow columns — at typical explorer widths the grid
+     fits 3-4 cards across. With 1 card in a section, that card sits
+     in track 1 and the empty tracks reserve horizontal dotted space
+     ("room to grow"), matching the reference layout. */
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
   gap: 14px;
   align-content: start;
 }
@@ -11325,14 +11332,20 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
   cursor: pointer;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  /* Icon sits at top; name + meta fall to the bottom. The empty middle
+     space is intentional — gives the card the substantial editorial
+     proportions from the reference. */
+  gap: 6px;
   transition: border-color 0.15s, box-shadow 0.15s, transform 0.12s;
   position: relative;
   text-align: left;
   overflow: hidden;
-  min-height: 168px;
+  min-height: 200px;
 }
-.fl-page .fl-card-folder { min-height: 192px; }
+.fl-page .fl-card-folder { min-height: 240px; }
+/* Push the icon to the top, name + meta cluster to the bottom. */
+.fl-page .fl-card .fl-card-icon { margin-bottom: auto; }
+.fl-page .fl-card-name { margin-top: 4px; }
 .fl-page .fl-card::before {
   content: "";
   position: absolute;
@@ -11405,7 +11418,9 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
   letter-spacing: 0.14em;
   text-transform: uppercase;
   color: var(--ink-muted);
-  margin-top: auto;
+  /* margin-top: auto removed — icon now uses margin-bottom: auto to
+     push everything below it to the bottom, and we want name + meta
+     to cluster together rather than spread apart. */
   padding-top: 8px;
   display: flex;
   align-items: center;

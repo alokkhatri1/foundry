@@ -19,6 +19,13 @@
   --radius: 12px;
   --radius-sm: 8px;
   --radius-pill: 50px;
+
+  /* Canonical type system. Per-page wrappers may re-declare these to
+     scope themselves, but every surface should resolve to the same
+     three families. Loaded once in index.html. */
+  --serif: 'Fraunces', Georgia, serif;
+  --sans:  'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  --mono:  'JetBrains Mono', ui-monospace, monospace;
 }
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -30,7 +37,7 @@ html, body, #root {
 }
 
 body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-family: var(--sans);
   background: var(--bg-warm);
   color: var(--text-dark);
   line-height: 1.5;
@@ -69,7 +76,7 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
 .landing-title {
   font-size: 48px; font-weight: 900; line-height: 1.1;
   color: var(--text-dark); letter-spacing: -1.5px; margin-bottom: 20px;
-  font-family: Georgia, 'Times New Roman', serif;
+  font-family: var(--serif);
 }
 .landing-highlight {
   display: inline;
@@ -169,7 +176,7 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
 .admin-workshop-name { font-size: 16px; font-weight: 700; color: var(--text-dark); margin-bottom: 8px; }
 .admin-workshop-code {
   font-size: 18px; font-weight: 800; color: var(--accent-gold);
-  letter-spacing: 2px; font-family: 'SF Mono', monospace; margin-bottom: 8px;
+  letter-spacing: 2px; font-family: var(--mono); margin-bottom: 8px;
 }
 .admin-workshop-date { font-size: 12px; color: var(--text-muted); }
 .admin-empty { font-size: 14px; color: var(--text-muted); }
@@ -185,7 +192,7 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
 .admin-code-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-muted); margin-bottom: 4px; }
 .admin-code-value {
   font-size: 28px; font-weight: 800; color: var(--accent-gold);
-  letter-spacing: 3px; font-family: 'SF Mono', monospace;
+  letter-spacing: 3px; font-family: var(--mono);
 }
 .admin-section { margin-bottom: 24px; }
 .admin-section-title { font-size: 14px; font-weight: 700; color: var(--text-dark); margin-bottom: 12px; }
@@ -226,7 +233,7 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
   background: var(--bg-white);
 }
 .stage-example-artifact-body {
-  margin: 0; padding: 12px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  margin: 0; padding: 12px; font-family: var(--mono);
   font-size: 12px; line-height: 1.55; color: var(--text-dark);
   white-space: pre-wrap; word-break: break-word;
 }
@@ -484,7 +491,7 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
   flex: 1;
 }
 .admin-rail-row-code {
-  font-family: 'SF Mono', monospace;
+  font-family: var(--mono);
   font-size: 11px;
   color: var(--accent-gold, #c8956c);
   letter-spacing: 0.08em;
@@ -579,7 +586,7 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
   flex-wrap: wrap;
 }
 .admin-detail-code {
-  font-family: 'SF Mono', monospace;
+  font-family: var(--mono);
   color: var(--accent-gold, #c8956c);
   background: rgba(200, 149, 108, 0.1);
   padding: 3px 8px;
@@ -751,7 +758,7 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
 .admin-card-top { cursor: pointer; }
 .admin-workshop-code-display {
   font-size: 24px; font-weight: 800; color: var(--accent-gold);
-  letter-spacing: 3px; font-family: 'SF Mono', monospace; margin: 10px 0;
+  letter-spacing: 3px; font-family: var(--mono); margin: 10px 0;
   cursor: pointer; display: flex; align-items: center; gap: 8px;
 }
 .admin-copy-hint { font-size: 11px; font-weight: 400; color: var(--text-muted); letter-spacing: 0; }
@@ -842,7 +849,7 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
   transition: border-color 0.2s;
 }
 .setup-field input:focus { border-color: var(--text-dark); }
-.setup-field input[type="password"] { font-family: monospace; letter-spacing: 1px; }
+.setup-field input[type="password"] { font-family: var(--mono); letter-spacing: 1px; }
 .setup-field-note { font-size: 12px; color: var(--text-muted); margin-top: 4px; display: block; }
 .setup-buttons { display: flex; gap: 12px; margin-top: 8px; }
 .setup-btn-primary {
@@ -1867,7 +1874,7 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
   border: none;
   outline: none;
   resize: none;
-  font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+  font-family: var(--mono);
   font-size: 13px;
   line-height: 1.7;
   background: var(--bg-white);
@@ -3079,7 +3086,7 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
 .rt em { font-style: italic; color: var(--text-body); }
 
 .rt-inline-code {
-  font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+  font-family: var(--mono);
   font-size: 0.88em;
   background: rgba(200, 149, 108, 0.1);
   color: var(--text-dark);
@@ -3095,7 +3102,7 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
   overflow-x: auto;
 }
 .rt-pre code {
-  font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+  font-family: var(--mono);
   font-size: 13px;
   line-height: 1.6;
   color: var(--text-dark);
@@ -3140,7 +3147,7 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
 .rt-table tr:hover td { background: rgba(0, 0, 0, 0.015); }
 
 .cl-mono {
-  font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+  font-family: var(--mono);
   font-size: 13px;
 }
 
@@ -3683,7 +3690,7 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
   padding: 2px 6px;
   border-radius: 4px;
   font-size: 0.92em;
-  font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+  font-family: var(--mono);
 }
 .md-doc pre, .md-doc .rt-pre {
   background: var(--bg-warm);
@@ -4490,7 +4497,7 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
   border: none;
   outline: none;
   resize: none;
-  font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+  font-family: var(--mono);
   font-size: 13px;
   line-height: 1.7;
   background: var(--bg-white);
@@ -4793,7 +4800,7 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
 .activity-log {
   background: #2a2520;
   color: var(--text-muted);
-  font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+  font-family: var(--mono);
   font-size: 13px;
   line-height: 1.8;
   flex: 1;
@@ -5981,7 +5988,7 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
 }
 .ftp-preview-textarea {
   width: 100%; box-sizing: border-box; border: none; outline: none; resize: none;
-  padding: 16px 20px; font-family: var(--font-mono, monospace); font-size: 13px;
+  padding: 16px 20px; font-family: var(--mono); font-size: 13px;
   line-height: 1.6; color: var(--text-body); background: var(--bg-white);
   flex: 1; min-height: 360px;
 }
@@ -6085,7 +6092,7 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
 /* External connectors */
 .tl-card-url {
   font-size: 11px; color: var(--text-muted); margin-top: 6px;
-  font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+  font-family: var(--mono);
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .tl-add-connector-btn {
@@ -6127,7 +6134,7 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
 
 /* Read-only URL in provider editor */
 .tl-readonly-url {
-  font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+  font-family: var(--mono);
   font-size: 12px; color: var(--text-muted); background: var(--bg-warm);
   padding: 8px 12px; border-radius: var(--radius-sm);
   word-break: break-all; line-height: 1.5;
@@ -6173,7 +6180,7 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
   padding: 14px; background: var(--bg-warm); border-radius: var(--radius-sm);
   font-size: 13px; line-height: 1.6; overflow-x: auto;
 }
-.tl-test-output pre { white-space: pre-wrap; margin: 0; font-family: 'SF Mono', monospace; }
+.tl-test-output pre { white-space: pre-wrap; margin: 0; font-family: var(--mono); }
 .tl-test-output.error { background: #fdf0f0; color: var(--accent-error); }
 
 /* ========== TOOL EXECUTION CARD (chat + activity) ========== */
@@ -6392,7 +6399,7 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
   letter-spacing: 8px;
   color: var(--text-dark);
   margin: 16px 0;
-  font-family: 'SF Mono', 'Fira Code', monospace;
+  font-family: var(--mono);
 }
 .room-code-copy {
   padding: 8px 20px;
@@ -6413,7 +6420,7 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
 
 /* Header room code badge */
 .room-code-badge {
-  font-family: 'SF Mono', 'Fira Code', monospace;
+  font-family: var(--mono);
   font-size: 13px;
   font-weight: 700;
   letter-spacing: 2px;
@@ -6937,7 +6944,7 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
   margin-bottom: 18px;
 }
 .reveal-modal-title {
-  font-family: Georgia, 'Times New Roman', serif;
+  font-family: var(--serif);
   font-size: 40px;
   font-weight: 700;
   line-height: 1.1;
@@ -8094,7 +8101,7 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
   font-weight: 700;
   letter-spacing: -1px;
   color: var(--text-dark);
-  font-family: 'Cormorant Garamond', 'Georgia', serif;
+  font-family: var(--serif);
 }
 .landing-wordmark-by {
   font-size: 16px;
@@ -8102,7 +8109,7 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
   color: var(--text-muted);
   letter-spacing: 0.2px;
   font-style: italic;
-  font-family: 'Cormorant Garamond', 'Georgia', serif;
+  font-family: var(--serif);
 }
 .landing-wordmark-by a {
   color: var(--accent-gold, #c8956c);
@@ -8311,8 +8318,8 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
   --green:        #5a9e6f;
   --red:          #c75a4a;
   --gold:         #c8956c;
-  --serif: 'Fraunces', 'Cormorant Garamond', Georgia, serif;
-  --sans:  'Inter', 'Inter Tight', -apple-system, BlinkMacSystemFont, sans-serif;
+  --serif: 'Fraunces', Georgia, serif;
+  --sans:  'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
   --mono:  'JetBrains Mono', ui-monospace, monospace;
 
   display: grid;
@@ -10189,8 +10196,8 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
   --node-agent:   #4a7fb5;
   --node-review:  #d97757;
   --node-capture: #5a9e6f;
-  --serif: 'Fraunces', 'Cormorant Garamond', Georgia, serif;
-  --sans:  'Inter', 'Inter Tight', -apple-system, BlinkMacSystemFont, sans-serif;
+  --serif: 'Fraunces', Georgia, serif;
+  --sans:  'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
   --mono:  'JetBrains Mono', ui-monospace, monospace;
   --radius: 14px;
   --radius-sm: 10px;
@@ -11005,7 +11012,7 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
   --blue:         #4a7fb5;
   --blue-soft:    rgba(74, 127, 181, 0.12);
   --red:          #c75a4a;
-  --serif: 'Fraunces', 'Cormorant Garamond', Georgia, serif;
+  --serif: 'Fraunces', Georgia, serif;
   --sans:  'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
   --mono:  'JetBrains Mono', ui-monospace, monospace;
   --radius: 14px;
@@ -12134,8 +12141,8 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
   --node-review:  #d97757;
   --node-capture: #5a9e6f;
 
-  --serif: 'Fraunces', 'Cormorant Garamond', Georgia, serif;
-  --sans:  'Inter', 'Inter Tight', -apple-system, BlinkMacSystemFont, sans-serif;
+  --serif: 'Fraunces', Georgia, serif;
+  --sans:  'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
   --mono:  'JetBrains Mono', ui-monospace, monospace;
 
   --radius: 14px;
@@ -13116,8 +13123,8 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
   --blue:         #4a7fb5;
   --blue-soft:    rgba(74, 127, 181, 0.12);
   --blue-soft-2:  #e0ebf5;
-  --serif: 'Fraunces', 'Cormorant Garamond', Georgia, serif;
-  --sans:  'Inter', 'Inter Tight', -apple-system, BlinkMacSystemFont, sans-serif;
+  --serif: 'Fraunces', Georgia, serif;
+  --sans:  'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
   --mono:  'JetBrains Mono', ui-monospace, monospace;
   --radius: 14px;
   --radius-sm: 10px;
@@ -14199,7 +14206,7 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
   --green-soft:   rgba(90, 158, 111, 0.12);
   --green-deeper: #4a8a5d;
   --serif: 'Fraunces', Georgia, serif;
-  --sans:  'Inter', 'Inter Tight', -apple-system, BlinkMacSystemFont, sans-serif;
+  --sans:  'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
   --mono:  'JetBrains Mono', ui-monospace, monospace;
   --radius: 14px;
   --radius-sm: 10px;
@@ -14772,7 +14779,7 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
   --plum-soft:    rgba(139, 111, 176, 0.14);
   --plum-deeper:  #76599c;
   --serif: 'Fraunces', Georgia, serif;
-  --sans:  'Inter', 'Inter Tight', -apple-system, BlinkMacSystemFont, sans-serif;
+  --sans:  'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
   --mono:  'JetBrains Mono', ui-monospace, monospace;
   --radius: 14px;
   --radius-sm: 10px;
@@ -15425,7 +15432,7 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
   --green-soft:   rgba(90, 158, 111, 0.12);
   --green-deeper: #4a8a5d;
   --serif: 'Fraunces', Georgia, serif;
-  --sans:  'Inter', 'Inter Tight', -apple-system, BlinkMacSystemFont, sans-serif;
+  --sans:  'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
   --mono:  'JetBrains Mono', ui-monospace, monospace;
   --radius: 14px;
   --radius-sm: 10px;

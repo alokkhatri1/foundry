@@ -8,7 +8,9 @@
    that aren't used elsewhere; if the palette ever lands in the app
    shell, prefix them here. */
 
-@import url("https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;9..144,400;9..144,500;9..144,600;9..144,700;9..144,800&family=Inter+Tight:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap");
+/* Fonts are loaded once at the top of index.html so every page surface
+   gets Fraunces / Inter / JetBrains Mono without depending on whether
+   FoundryLanding.css is in the bundle. */
 
 :root {
   --cream:        #FBF4EE;
@@ -30,7 +32,7 @@
   --dark-card-edge:   #8B6F50;
 
   --serif: "Fraunces", Georgia, serif;
-  --sans:  "Inter Tight", -apple-system, system-ui, sans-serif;
+  --sans:  "Inter", -apple-system, system-ui, sans-serif;
   --mono:  "JetBrains Mono", ui-monospace, monospace;
 }
 

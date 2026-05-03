@@ -10988,14 +10988,17 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
   background: var(--cream);
   font-family: var(--sans);
   color: var(--ink);
-  padding: 36px 40px 64px;
+  padding: 36px 40px 28px;
   display: flex;
   flex-direction: column;
-  gap: 28px;
-  /* Page sizes to its content. The .tab-pane-files parent owns the
-     scroll. Without this, height: 100% was forcing the page to fill
-     the tab-pane and leaving a tall dotted band below the cards. */
-  min-height: 100%;
+  gap: 24px;
+  /* The page fills the tab-pane height. Header is content-sized at
+     the top; the .fl-shell area below takes the remaining space and
+     the two panels inside each scroll independently. No page-level
+     scroll — this matches how Chat / Coworkers / Orchestration each
+     own their viewport. */
+  flex: 1;
+  min-height: 0;
 }
 
 /* Page header */
@@ -11055,12 +11058,17 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
   border-radius: 2px;
 }
 
-/* Two-column shell */
+/* Two-column shell — each panel is its own scrollable card. The shell
+   fills the rest of the page after the header; align-items: stretch
+   so panels grow to the full row height, then each one scrolls its
+   internal body. */
 .fl-shell {
   display: grid;
   grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr);
   gap: 24px;
-  align-items: start;
+  align-items: stretch;
+  flex: 1;
+  min-height: 0;
 }
 
 /* ── Explorer ─────────────────────────────────────────────── */
@@ -11073,11 +11081,8 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
   display: flex;
   flex-direction: column;
   box-shadow: 0 1px 0 rgba(60, 40, 20, 0.02);
-  /* Pin to the top of its grid cell + size to content. Belt + braces:
-     align-items: start on the parent should already do this, but some
-     browser/grid contexts still apply align-self: stretch implicitly. */
-  align-self: start;
-  height: fit-content;
+  /* Fills its grid cell; internal .fl-grid scrolls. */
+  min-height: 0;
 }
 
 /* Breadcrumb */
@@ -11266,13 +11271,13 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
   font-weight: 600;
 }
 
-/* Grid — content-sized so the dotted bg only extends as far as cards
-   actually fill. flex: 1 was forcing the grid to stretch into all the
-   remaining vertical room of the explorer column, leaving a tall
-   empty band when sections are sparse. */
+/* Grid — fills the explorer below the toolbar; scrolls internally so
+   the dotted bg follows actual content but the panel itself stays
+   anchored. */
 .fl-page .fl-grid {
-  flex: 0 0 auto;
-  height: fit-content;
+  flex: 1 1 0;
+  min-height: 0;
+  overflow-y: auto;
   padding: 20px;
   display: flex;
   flex-direction: column;
@@ -11587,9 +11592,8 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  min-height: 540px;
-  position: sticky;
-  top: 24px;
+  /* Fills its grid cell; the body scrolls internally. */
+  min-height: 0;
   box-shadow: 0 1px 0 rgba(60, 40, 20, 0.02);
 }
 .fl-page .fl-editor-empty {
@@ -11829,7 +11833,8 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
 
 /* Body */
 .fl-page .fl-editor-body {
-  flex: 1;
+  flex: 1 1 0;
+  min-height: 0;
   overflow-y: auto;
   background: var(--paper);
   padding: 32px 36px 56px;
@@ -11989,10 +11994,9 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
 }
 .fl-page .fl-modal-btn-primary:hover:not(:disabled) .fl-modal-btn-arrow { transform: translateX(2px); }
 
-/* The Files tab pane scrolls itself; .fl-page sizes to its content so
-   the dotted-bg grid is bounded by actual cards, not by the tab-pane
-   height. */
-.tab-pane-files { padding: 0; overflow-y: auto; overflow-x: hidden; }
+/* The tab pane is the bounding viewport. .fl-page fills it; the two
+   panels inside the shell each scroll their own content. */
+.tab-pane-files { padding: 0; overflow: hidden; }
 
 /* Responsive */
 @media (max-width: 980px) {

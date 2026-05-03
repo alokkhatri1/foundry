@@ -148,48 +148,49 @@ export default function GraduationScreen({
     );
   }
 
+  // Survey gate: render the new FeedbackForm at the top level — it owns its
+  // own .sv-page surface, no .gr-container wrapping. Keeps the survey from
+  // inheriting graduation's certificate layout.
+  if (feedbackStatus === 'pending') {
+    return (
+      <FeedbackForm
+        userName={userName}
+        onSubmit={handleFeedbackSubmit}
+        submitting={submitting}
+        errorMessage={feedbackError}
+      />
+    );
+  }
+
   return (
     <div className={`gr-page${embedded ? ' is-embedded' : ''}`}>
       <main className="gr-container">
-        {feedbackStatus === 'pending' ? (
-          <PendingHeader userName={userName} issuedDate={issuedDate} />
+        <CertificatePlate userName={userName} date={issuedDate} level={overall} />
+        <Tally tally={tally} />
+        {scorecard === null ? (
+          <Loading />
         ) : (
-          <CertificatePlate userName={userName} date={issuedDate} level={overall} />
+          <Dimensions dimensions={scorecard.dimensions} />
         )}
-
-        {feedbackStatus === 'pending' ? (
-          <FeedbackForm
-            onSubmit={handleFeedbackSubmit}
-            submitting={submitting}
-            errorMessage={feedbackError}
-          />
-        ) : (
-          <>
-            <Tally tally={tally} />
-            {scorecard === null ? (
-              <Loading />
-            ) : (
-              <Dimensions dimensions={scorecard.dimensions} />
-            )}
-            {!embedded && (
-              <Footer onSignOut={onSignOut} date={issuedDate} />
-            )}
-            <div className="gr-attribution">
-              Foundry by{' '}
-              <a href="https://alokkhatri.com" target="_blank" rel="noopener noreferrer">
-                Alok Khatri
-              </a>
-            </div>
-          </>
+        {!embedded && (
+          <Footer onSignOut={onSignOut} date={issuedDate} />
         )}
+        <div className="gr-attribution">
+          Foundry by{' '}
+          <a href="https://alokkhatri.com" target="_blank" rel="noopener noreferrer">
+            Alok Khatri
+          </a>
+        </div>
       </main>
     </div>
   );
 }
 
+// (PendingHeader was a compact header used when the feedback survey was
+// nested inside the graduation page. The new survey owns its own .sv-page
+// surface so this header is no longer rendered, but kept as dead code in
+// case we want to revert the routing.)
 function PendingHeader({ userName }) {
-  // Compact header for the feedback-gate state — the certificate plate
-  // is held back until the participant has answered the survey.
   return (
     <header className="gr-pending-header">
       <div className="gr-eyebrow">

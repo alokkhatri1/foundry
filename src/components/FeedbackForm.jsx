@@ -1,106 +1,224 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 
-// Post-workshop feedback survey. Mandatory gate before the graduation rubric
-// is shown. Scaled and yes/no questions are required; free-text fields are
-// optional. The platform_rating question (Section F) is the one extra
-// question that scopes how the app itself worked, separate from trainer
-// and content.
+// Pre-graduation feedback survey. Editorial layout — all 18 questions on
+// one page, grouped into 6 sections (A-F). Required = every scale + yes/no
+// question (12 total); optional = the three free-text fields in section D.
+//
+// Payload keys match the workshop_feedback DB columns one-for-one so
+// sb.saveFeedback receives the exact shape it always has. Yes/no controls
+// store 'yes'/'no' strings locally for easier toggling, then convert to
+// booleans at submit time for the DB.
 
-const SCALE_QUESTIONS_A = [
-  { key: 'satisfaction',       label: 'Overall satisfaction with the training session' },
-  { key: 'relevance',          label: 'Relevance of the training content to your role/work' },
-  { key: 'clarity',            label: 'Clarity and organization of the training content' },
-  { key: 'trainer_knowledge',  label: "Trainer’s knowledge of the subject matter" },
-  { key: 'trainer_delivery',   label: "Trainer’s effectiveness in delivering the content" },
-  { key: 'trainer_engagement', label: "Trainer’s ability to engage and interact with participants" },
+const SCALE_LEGEND = [
+  { v: 1, label: 'Strongly disagree' },
+  { v: 2, label: 'Disagree' },
+  { v: 3, label: 'Neutral' },
+  { v: 4, label: 'Agree' },
+  { v: 5, label: 'Strongly agree' },
 ];
 
-const SCALE_QUESTIONS_B_C = [
-  { key: 'materials_quality',  label: 'Quality and usefulness of the slides and reference content' },
-  { key: 'theory_practice',    label: 'Balance between guided explanation and hands-on practice on the platform' },
-  { key: 'improved_skills',    label: 'The training improved my knowledge / skills' },
-  { key: 'can_apply',          label: 'I can apply what I learned in my work' },
+// Section + question schema. `id` matches the DB payload key.
+const SECTIONS = [
+  {
+    id: 'A',
+    eyebrow: 'Section A',
+    title: 'Training evaluation',
+    sub: 'A read of the session itself — content, trainer, delivery.',
+    questions: [
+      { id: 'satisfaction',       type: 'scale', text: 'Overall satisfaction with the training session.' },
+      { id: 'relevance',          type: 'scale', text: 'Relevance of the training content to your role and work.' },
+      { id: 'clarity',            type: 'scale', text: 'Clarity and organization of the training content.' },
+      { id: 'trainer_knowledge',  type: 'scale', text: "Trainer's knowledge of the subject matter." },
+      { id: 'trainer_delivery',   type: 'scale', text: "Trainer's effectiveness in delivering the content." },
+      { id: 'trainer_engagement', type: 'scale', text: "Trainer's ability to engage and interact with participants." },
+    ],
+  },
+  {
+    id: 'B',
+    eyebrow: 'Section B',
+    title: 'Design & materials',
+    sub: 'Slides, pacing, time on the platform.',
+    questions: [
+      { id: 'materials_quality',    type: 'scale', text: 'Quality and usefulness of the slides and reference content.' },
+      { id: 'duration_appropriate', type: 'yesno', text: 'Was the training duration appropriate?' },
+      { id: 'theory_practice',      type: 'scale', text: 'Balance between guided explanation and hands-on practice on the platform.' },
+    ],
+  },
+  {
+    id: 'C',
+    eyebrow: 'Section C',
+    title: 'Learning impact',
+    sub: 'What you take with you.',
+    questions: [
+      { id: 'improved_skills', type: 'scale', text: 'The training improved my knowledge and skills.' },
+      { id: 'can_apply',       type: 'scale', text: 'I can apply what I learned in my work.' },
+    ],
+  },
+  {
+    id: 'D',
+    eyebrow: 'Section D',
+    title: 'Open feedback',
+    sub: 'In your own words. All three are optional.',
+    questions: [
+      { id: 'most_valuable',     type: 'text', text: 'What aspects of the training did you find most valuable?', placeholder: 'A method, a moment, a mental model that clicked…' },
+      { id: 'future_topics',     type: 'text', text: 'What topics would you like to see in future trainings?',   placeholder: 'A skill, a tool, an unanswered question…' },
+      { id: 'improvement_notes', type: 'text', text: 'Any suggestions to improve future training sessions?',     placeholder: 'Anything you would change, drop, or add.' },
+    ],
+  },
+  {
+    id: 'E',
+    eyebrow: 'Section E',
+    title: 'Recommendation',
+    sub: 'Would you send a colleague?',
+    questions: [
+      { id: 'would_recommend', type: 'yesno', text: 'Would you recommend this training to others?' },
+    ],
+  },
+  {
+    id: 'F',
+    eyebrow: 'Section F',
+    title: 'The platform',
+    sub: 'How Foundry held up while you were learning.',
+    questions: [
+      { id: 'platform_rating',       type: 'scale', text: 'Ease of using the Foundry platform — intuitive, easy to navigate.' },
+      { id: 'platform_reliability',  type: 'scale', text: 'Reliability during the workshop — no lag, errors, or sync issues.' },
+      { id: 'platform_support',      type: 'scale', text: 'How well the platform supported what you were trying to learn.' },
+    ],
+  },
 ];
 
-// Section F (Platform) was originally a single question. Since the training
-// itself is delivered through the platform, one rating wasn't enough signal —
-// expanded to three so the trainer can see ease, reliability, and pedagogical
-// fit independently.
-const PLATFORM_QUESTIONS = [
-  { key: 'platform_rating',       label: 'Ease of using the Foundry platform (intuitive, easy to navigate)' },
-  { key: 'platform_reliability',  label: 'Reliability during the workshop (no lag, errors, or sync issues)' },
-  { key: 'platform_support',      label: 'How well the platform supported what you were trying to learn' },
-];
+const REQUIRED_IDS = SECTIONS.flatMap(s => s.questions)
+  .filter(q => q.type !== 'text').map(q => q.id);
 
-const SCALE_LABELS = ['Strongly disagree', 'Disagree', 'Neutral', 'Agree', 'Strongly agree'];
+function pad2(n) { return String(n).padStart(2, '0'); }
 
-function ScaleRow({ value, onChange, disabled }) {
+function ScaleControl({ value, onChange, name }) {
   return (
-    <div className="fb-scale-wrap">
-      <div className="fb-scale">
-        {[1, 2, 3, 4, 5].map(n => (
+    <div className="sv-scale" role="radiogroup" aria-label={name}>
+      {SCALE_LEGEND.map(opt => {
+        const sel = value === opt.v;
+        return (
           <button
+            key={opt.v}
             type="button"
-            key={n}
-            className={`fb-scale-btn${value === n ? ' active' : ''}`}
-            onClick={() => onChange(n)}
-            disabled={disabled}
-            title={SCALE_LABELS[n - 1]}
+            role="radio"
+            aria-checked={sel}
+            className={`sv-scale-btn${sel ? ' is-selected' : ''}`}
+            onClick={() => onChange(opt.v)}
+            title={opt.label}
           >
-            {n}
+            {opt.v}
           </button>
+        );
+      })}
+      <div className="sv-scale-legend" aria-hidden>
+        <span>Strongly disagree</span>
+        <span>Strongly agree</span>
+      </div>
+    </div>
+  );
+}
+
+function YesNoControl({ value, onChange, name }) {
+  return (
+    <div className="sv-yesno" role="radiogroup" aria-label={name}>
+      {['yes', 'no'].map(v => {
+        const sel = value === v;
+        return (
+          <button
+            key={v}
+            type="button"
+            role="radio"
+            aria-checked={sel}
+            className={`sv-yesno-btn${sel ? ' is-selected' : ''} is-${v}`}
+            onClick={() => onChange(v)}
+          >
+            {v.charAt(0).toUpperCase() + v.slice(1)}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function TextControl({ value, onChange, placeholder }) {
+  return (
+    <textarea
+      className="sv-text"
+      value={value || ''}
+      onChange={e => onChange(e.target.value)}
+      placeholder={placeholder}
+      rows={3}
+    />
+  );
+}
+
+function Question({ q, index, value, onChange, isRequired }) {
+  const answered = value !== undefined && value !== null && value !== '';
+  return (
+    <div className={`sv-q${answered ? ' is-answered' : ''}`}>
+      <div className="sv-q-meta">
+        <span className="sv-q-num">{pad2(index)}</span>
+        {isRequired && <span className="sv-q-req">required</span>}
+      </div>
+      <div className="sv-q-body">
+        <p className="sv-q-text">{q.text}</p>
+        {q.type === 'scale' && <ScaleControl value={value} onChange={onChange} name={q.text} />}
+        {q.type === 'yesno' && <YesNoControl value={value} onChange={onChange} name={q.text} />}
+        {q.type === 'text'  && <TextControl  value={value} onChange={onChange} placeholder={q.placeholder} />}
+      </div>
+    </div>
+  );
+}
+
+function Section({ section, startIndex, answers, setAnswer }) {
+  return (
+    <section className="sv-section">
+      <header className="sv-section-head">
+        <div className="sv-section-eyebrow">{section.eyebrow}</div>
+        <h2 className="sv-section-title">{section.title}</h2>
+        <p className="sv-section-sub">{section.sub}</p>
+      </header>
+      <div className="sv-questions">
+        {section.questions.map((q, i) => (
+          <Question
+            key={q.id}
+            q={q}
+            index={startIndex + i + 1}
+            value={answers[q.id]}
+            onChange={v => setAnswer(q.id, v)}
+            isRequired={q.type !== 'text'}
+          />
         ))}
       </div>
-      <div className="fb-scale-legend">
-        <span>1 — {SCALE_LABELS[0]}</span>
-        <span>5 — {SCALE_LABELS[4]}</span>
-      </div>
-    </div>
+    </section>
   );
 }
 
-function YesNoRow({ value, onChange, disabled }) {
-  return (
-    <div className="fb-yesno">
-      <button
-        type="button"
-        className={`fb-yesno-btn${value === true ? ' active' : ''}`}
-        onClick={() => onChange(true)}
-        disabled={disabled}
-      >Yes</button>
-      <button
-        type="button"
-        className={`fb-yesno-btn${value === false ? ' active' : ''}`}
-        onClick={() => onChange(false)}
-        disabled={disabled}
-      >No</button>
-    </div>
-  );
-}
-
-export default function FeedbackForm({ onSubmit, submitting, errorMessage }) {
+export default function FeedbackForm({ onSubmit, submitting, errorMessage, userName }) {
   const [answers, setAnswers] = useState({});
-  const [touched, setTouched] = useState(false);
+  const setAnswer = (id, v) => setAnswers(a => ({ ...a, [id]: v }));
 
-  function update(key, value) {
-    setAnswers(prev => ({ ...prev, [key]: value }));
-  }
+  const answeredRequired = useMemo(
+    () => REQUIRED_IDS.filter(id => answers[id] !== undefined && answers[id] !== null && answers[id] !== '').length,
+    [answers],
+  );
+  const totalRequired = REQUIRED_IDS.length;
+  const ready = answeredRequired === totalRequired;
 
-  // Required keys: every scaled and yes/no question (free text is optional).
-  const requiredScaleKeys = [
-    ...SCALE_QUESTIONS_A.map(q => q.key),
-    ...SCALE_QUESTIONS_B_C.map(q => q.key),
-    ...PLATFORM_QUESTIONS.map(q => q.key),
-  ];
-  const missingScale = requiredScaleKeys.filter(k => !answers[k]);
-  const missingYesNo = ['duration_appropriate', 'would_recommend'].filter(k => answers[k] === undefined);
-  const isComplete = missingScale.length === 0 && missingYesNo.length === 0;
+  // Section start indices (1-based question numbering across the page)
+  let cursor = 0;
+  const startIndices = SECTIONS.map(s => {
+    const start = cursor;
+    cursor += s.questions.length;
+    return start;
+  });
 
-  function handleSubmit(e) {
-    e.preventDefault();
-    setTouched(true);
-    if (!isComplete) return;
-    onSubmit({
+  function handleSubmit() {
+    if (!ready || submitting) return;
+    // DB expects yes/no questions as booleans, free-text as nullable strings.
+    // Send only the keys the existing schema defined; extras would fail.
+    const payload = {
       satisfaction:         answers.satisfaction,
       relevance:            answers.relevance,
       clarity:              answers.clarity,
@@ -108,139 +226,100 @@ export default function FeedbackForm({ onSubmit, submitting, errorMessage }) {
       trainer_delivery:     answers.trainer_delivery,
       trainer_engagement:   answers.trainer_engagement,
       materials_quality:    answers.materials_quality,
-      duration_appropriate: answers.duration_appropriate,
+      duration_appropriate: answers.duration_appropriate === 'yes',
       theory_practice:      answers.theory_practice,
       improved_skills:      answers.improved_skills,
       can_apply:            answers.can_apply,
       most_valuable:        (answers.most_valuable || '').trim() || null,
       future_topics:        (answers.future_topics || '').trim() || null,
       improvement_notes:    (answers.improvement_notes || '').trim() || null,
-      would_recommend:      answers.would_recommend,
+      would_recommend:      answers.would_recommend === 'yes',
       platform_rating:      answers.platform_rating,
       platform_reliability: answers.platform_reliability,
       platform_support:     answers.platform_support,
-    });
-  }
-
-  function fieldError(key) {
-    if (!touched) return false;
-    if (key === 'duration_appropriate' || key === 'would_recommend') return answers[key] === undefined;
-    return !answers[key];
+    };
+    onSubmit(payload);
   }
 
   return (
-    <form className="feedback-form" onSubmit={handleSubmit}>
-      <div className="fb-header">
-        <h2>Workshop feedback</h2>
-        <p className="fb-sub">
-          Quick survey before your graduation summary. All scale and yes/no questions are required;
-          open-ended ones are optional. Takes about 2 minutes.
-        </p>
+    <div className="sv-page">
+      <div className="sv-progress" aria-live="polite">
+        <span className="sv-progress-num">
+          {pad2(answeredRequired)}<span className="sv-progress-of"> / {pad2(totalRequired)}</span>
+        </span>
+        <span className="sv-progress-label">required</span>
       </div>
 
-      <section className="fb-section">
-        <h3 className="fb-section-title">A. Training evaluation</h3>
-        {SCALE_QUESTIONS_A.map((q, i) => (
-          <div key={q.key} className={`fb-row${fieldError(q.key) ? ' has-error' : ''}`}>
-            <label className="fb-label"><span className="fb-num">{i + 1}.</span> {q.label}</label>
-            <ScaleRow value={answers[q.key]} onChange={v => update(q.key, v)} disabled={submitting} />
+      <main className="sv-container">
+        <header className="sv-page-head">
+          <div className="sv-eyebrow">
+            <span className="sv-eyebrow-dot" aria-hidden />
+            Workshop close{userName ? ` · ${userName}` : ''}
           </div>
-        ))}
-      </section>
-
-      <section className="fb-section">
-        <h3 className="fb-section-title">B. Training design &amp; materials</h3>
-        <div className={`fb-row${fieldError('materials_quality') ? ' has-error' : ''}`}>
-          <label className="fb-label"><span className="fb-num">7.</span> {SCALE_QUESTIONS_B_C[0].label}</label>
-          <ScaleRow value={answers.materials_quality} onChange={v => update('materials_quality', v)} disabled={submitting} />
-        </div>
-        <div className={`fb-row${fieldError('duration_appropriate') ? ' has-error' : ''}`}>
-          <label className="fb-label"><span className="fb-num">8.</span> Was the training duration appropriate?</label>
-          <YesNoRow value={answers.duration_appropriate} onChange={v => update('duration_appropriate', v)} disabled={submitting} />
-        </div>
-        <div className={`fb-row${fieldError('theory_practice') ? ' has-error' : ''}`}>
-          <label className="fb-label"><span className="fb-num">9.</span> {SCALE_QUESTIONS_B_C[1].label}</label>
-          <ScaleRow value={answers.theory_practice} onChange={v => update('theory_practice', v)} disabled={submitting} />
-        </div>
-      </section>
-
-      <section className="fb-section">
-        <h3 className="fb-section-title">C. Learning impact</h3>
-        <div className={`fb-row${fieldError('improved_skills') ? ' has-error' : ''}`}>
-          <label className="fb-label"><span className="fb-num">10.</span> {SCALE_QUESTIONS_B_C[2].label}</label>
-          <ScaleRow value={answers.improved_skills} onChange={v => update('improved_skills', v)} disabled={submitting} />
-        </div>
-        <div className={`fb-row${fieldError('can_apply') ? ' has-error' : ''}`}>
-          <label className="fb-label"><span className="fb-num">11.</span> {SCALE_QUESTIONS_B_C[3].label}</label>
-          <ScaleRow value={answers.can_apply} onChange={v => update('can_apply', v)} disabled={submitting} />
-        </div>
-      </section>
-
-      <section className="fb-section">
-        <h3 className="fb-section-title">D. Open feedback <span className="fb-optional">optional</span></h3>
-        <div className="fb-row">
-          <label className="fb-label"><span className="fb-num">12.</span> What aspects of the training did you find most valuable?</label>
-          <textarea
-            className="fb-textarea"
-            value={answers.most_valuable || ''}
-            onChange={e => update('most_valuable', e.target.value)}
-            disabled={submitting}
-            rows={3}
-            placeholder="Open response"
-          />
-        </div>
-        <div className="fb-row">
-          <label className="fb-label"><span className="fb-num">13.</span> What topics would you like to see in future trainings?</label>
-          <textarea
-            className="fb-textarea"
-            value={answers.future_topics || ''}
-            onChange={e => update('future_topics', e.target.value)}
-            disabled={submitting}
-            rows={3}
-            placeholder="Open response"
-          />
-        </div>
-        <div className="fb-row">
-          <label className="fb-label"><span className="fb-num">14.</span> Any suggestions to improve future training sessions?</label>
-          <textarea
-            className="fb-textarea"
-            value={answers.improvement_notes || ''}
-            onChange={e => update('improvement_notes', e.target.value)}
-            disabled={submitting}
-            rows={3}
-            placeholder="Open response"
-          />
-        </div>
-      </section>
-
-      <section className="fb-section">
-        <h3 className="fb-section-title">E. Recommendation</h3>
-        <div className={`fb-row${fieldError('would_recommend') ? ' has-error' : ''}`}>
-          <label className="fb-label"><span className="fb-num">15.</span> Would you recommend this training to others?</label>
-          <YesNoRow value={answers.would_recommend} onChange={v => update('would_recommend', v)} disabled={submitting} />
-        </div>
-      </section>
-
-      <section className="fb-section">
-        <h3 className="fb-section-title">F. Platform</h3>
-        {PLATFORM_QUESTIONS.map((q, i) => (
-          <div key={q.key} className={`fb-row${fieldError(q.key) ? ' has-error' : ''}`}>
-            <label className="fb-label"><span className="fb-num">{16 + i}.</span> {q.label}</label>
-            <ScaleRow value={answers[q.key]} onChange={v => update(q.key, v)} disabled={submitting} />
+          <h1 className="sv-title">
+            Before your scorecard,&nbsp;<em>a few words from you</em>.
+          </h1>
+          <p className="sv-sub">
+            Eighteen short questions about the training, the materials, and the platform. Twelve scales, three yes/no, three optional notes — about five minutes. Your answers shape the next cohort.
+          </p>
+          <div className="sv-legend" aria-label="Scale legend">
+            <span className="sv-legend-eyebrow">Scale</span>
+            <span className="sv-legend-row">
+              {SCALE_LEGEND.map(opt => (
+                <span key={opt.v} className="sv-legend-item">
+                  <span className="sv-legend-num">{opt.v}</span>
+                  {opt.label}
+                </span>
+              ))}
+            </span>
           </div>
+        </header>
+
+        {SECTIONS.map((s, i) => (
+          <Section
+            key={s.id}
+            section={s}
+            startIndex={startIndices[i]}
+            answers={answers}
+            setAnswer={setAnswer}
+          />
         ))}
-      </section>
 
-      {errorMessage && <div className="fb-error">{errorMessage}</div>}
-      {touched && !isComplete && (
-        <div className="fb-error">Please answer all required questions before submitting.</div>
-      )}
+        {errorMessage && <div className="sv-error">{errorMessage}</div>}
 
-      <div className="fb-actions">
-        <button type="submit" className="fb-submit" disabled={submitting}>
-          {submitting ? 'Submitting…' : 'Submit and continue'}
-        </button>
+        <footer className="sv-footer">
+          <div className="sv-footer-meta">
+            {ready ? (
+              <span className="sv-footer-ready">
+                <span className="sv-footer-ready-dot" aria-hidden />
+                All required questions answered. Optional notes are still open.
+              </span>
+            ) : (
+              <span className="sv-footer-pending">
+                <em>{totalRequired - answeredRequired}</em> required {totalRequired - answeredRequired === 1 ? 'question' : 'questions'} left to answer.
+              </span>
+            )}
+          </div>
+          <button
+            type="button"
+            className={`sv-submit${ready ? ' is-ready' : ''}`}
+            disabled={!ready || submitting}
+            onClick={handleSubmit}
+          >
+            {submitting ? 'Submitting…' : 'Submit & reveal scorecard'}
+            <span aria-hidden>→</span>
+          </button>
+        </footer>
+      </main>
+
+      <div className="sv-stickybar" aria-hidden>
+        <div className="sv-stickybar-track">
+          <div
+            className="sv-stickybar-fill"
+            style={{ width: `${(answeredRequired / totalRequired) * 100}%` }}
+          />
+        </div>
       </div>
-    </form>
+    </div>
   );
 }

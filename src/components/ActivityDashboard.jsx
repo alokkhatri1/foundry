@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 
 // Forces a re-render every `ms` so any relative-time rendering in the
 // subtree (timeAgo cards, etc.) advances without the underlying run
@@ -12,7 +12,6 @@ function useTick(ms = 60_000) {
 }
 import EducationalCue from './EducationalCue';
 import { CoworkerGlyph } from './Icon';
-import RunDagView from './RunDagView';
 import RichText from './RichText';
 import { stageReached } from './RevealAt';
 
@@ -63,50 +62,86 @@ const STEP_STATUS_ICON = {
 };
 
 // ===== Run Card =====
+// Maps the executor status -> the tone class on the new pill.
+const STATUS_TONE = {
+  running:          'is-running',
+  waiting_approval: 'is-waiting',
+  completed:        'is-completed',
+  rerouted:         'is-waiting',
+  rejected:         'is-rejected',
+  error:            'is-rejected',
+  cancelled:        'is-muted',
+  interrupted:      'is-muted',
+};
+
 function RunCard({ run, onClick, onNudge, showEducationalCues }) {
-  const cfg = STATUS_CONFIG[effectiveRunStatus(run)] || STATUS_CONFIG.running;
+  const eff = effectiveRunStatus(run);
+  const cfg = STATUS_CONFIG[eff] || STATUS_CONFIG.running;
+  const tone = STATUS_TONE[eff] || 'is-running';
   const stepResults = run.stepResults || [];
   const completedSteps = stepResults.filter(s => s.status === 'completed').length;
   const totalSteps = stepResults.length;
   const waitingStep = stepResults.find(s => s.status === 'waiting');
 
   return (
-    <div className="rcard" onClick={() => onClick(run.id)}>
-      <div className="rcard-top">
-        <span className="rcard-name">{run.workflowName}</span>
-        <span className="rcard-status" style={{ color: cfg.color, background: cfg.bg }}>{cfg.label}</span>
+    <button className={`ob-card ${tone}`} onClick={() => onClick(run.id)} type="button">
+      <div className="ob-card-top">
+        <span className="ob-card-name">{run.workflowName}</span>
+        <span className={`ob-card-status ${tone}`}>
+          {tone === 'is-running' && <span className="ob-card-status-dot is-pulse" />}
+          {cfg.label}
+        </span>
       </div>
 
-      {/* Progress bar */}
-      <div className="rcard-progress">
-        {stepResults.map((step, i) => (
-          <div key={i} className="rcard-progress-item">
-            {i > 0 && <span className="rcard-progress-line" style={{ background: step.status === 'completed' ? cfg.color : 'var(--border-color)' }}></span>}
-            <span className={`rcard-progress-dot ${step.status}`} style={step.status === 'completed' || step.status === 'running' ? { background: cfg.color } : {}}>
-              {isIconOrImage(step.coworkerAvatar)
-                ? <CoworkerGlyph avatar={step.coworkerAvatar} size={10} color="#ffffff" />
-                : (step.coworkerAvatar || STEP_STATUS_ICON[step.status] || '\u25CB')}
+      {/* Mini DAG flow chip — one tile per step coloured by completion + type */}
+      <div className="ob-card-flow">
+        {stepResults.map((step, i) => {
+          const isCompleted = step.status === 'completed';
+          const isActive = step.status === 'running' || step.status === 'waiting';
+          const stateClass = isCompleted ? 'is-completed'
+            : step.status === 'running' ? 'is-running'
+            : step.status === 'waiting' ? 'is-waiting'
+            : step.status === 'error' ? 'is-error'
+            : 'is-pending';
+          return (
+            <span key={i} className="ob-card-flow-item">
+              {i > 0 && <span className={`ob-card-flow-line${isCompleted ? ' is-completed' : ''}`} />}
+              <span className={`ob-card-flow-dot ${stateClass}`}>
+                {isCompleted ? '✓' :
+                 isActive ? <span className="ob-card-flow-pulse" /> :
+                 step.type === 'trigger' ? '▶' :
+                 step.type === 'approval' ? '◷' :
+                 step.type === 'capture' ? '✦' :
+                 '·'}
+              </span>
             </span>
-          </div>
-        ))}
-        <span className="rcard-progress-label">{completedSteps}/{totalSteps}</span>
+          );
+        })}
+        <span className="ob-card-flow-count">{completedSteps}/{totalSteps}</span>
       </div>
 
-      <div className="rcard-meta">
-        <span>Started by {run.startedBy}</span>
+      {run.caseInput && (
+        <p className="ob-card-case">{run.caseInput}</p>
+      )}
+
+      <div className="ob-card-meta">
+        <span>Started by <em>{run.startedBy}</em></span>
+        <span className="ob-card-meta-sep">·</span>
         <span>{timeAgo(run.startedAt)}</span>
       </div>
 
       {waitingStep && (
-        <>
-          <div className="rcard-waiting">
-            <span>Waiting on {waitingStep.assigneeName || 'reviewer'}</span>
-            <button className="rcard-nudge" onClick={e => { e.stopPropagation(); onNudge(run.id); }}>Nudge</button>
-          </div>
-          <EducationalCue cueId="activity-nudge" show={showEducationalCues} />
-        </>
+        <div className="ob-card-waiting">
+          <span className="ob-card-waiting-text">Waiting on <em>{waitingStep.assigneeName || 'reviewer'}</em></span>
+          <button
+            className="ob-card-waiting-nudge"
+            onClick={e => { e.stopPropagation(); onNudge(run.id); }}
+          >Nudge →</button>
+        </div>
       )}
-    </div>
+
+      <EducationalCue cueId="activity-nudge" show={showEducationalCues && !!waitingStep} />
+    </button>
   );
 }
 
@@ -184,47 +219,68 @@ function RunDetailView({ run, onBack, onApprovalAction, onCancelRun, onNudge, sh
     return (approvals || []).filter(a => a.step_id === stepId);
   }
 
+  // Status tone for the title pill on the detail view (mirrors the card).
+  const eff = effectiveRunStatus(run);
+  const tone = STATUS_TONE[eff] || 'is-running';
+
   return (
-    <div className="rdetail-v2">
-      <div className="rdetail-header">
-        <button className="files-back-btn" onClick={onBack}>{'\u2190'} Dashboard</button>
-        <div className="rdetail-title">
-          <span className="rdetail-name">{run.workflowName}</span>
-          <span className="rcard-status" style={{ color: cfg.color, background: cfg.bg }}>{cfg.label}</span>
-        </div>
-        <div className="rdetail-meta">
-          Started by {run.startedBy} {'\u00B7'} {timeAgo(run.startedAt)}
-          {run.completedAt && <> {'\u00B7'} Finished {timeAgo(run.completedAt)}</>}
+    <div className="ob-detail">
+      <header className="ob-detail-head">
+        <div className="ob-detail-head-left">
+          <button className="ob-back" onClick={onBack}>{'←'} Dashboard</button>
+          <div className="ob-detail-title">
+            <span className="ob-detail-name">{run.workflowName}</span>
+            <span className={`ob-card-status ${tone}`}>
+              {tone === 'is-running' && <span className="ob-card-status-dot is-pulse" />}
+              {cfg.label}
+            </span>
+          </div>
+          <div className="ob-detail-meta">
+            Started by <em>{run.startedBy}</em> {'·'} {timeAgo(run.startedAt)}
+            {run.completedAt && <> {'·'} finished {timeAgo(run.completedAt)}</>}
+          </div>
+          <EducationalCue cueId="activity-run-status" show={showEducationalCues} />
         </div>
         {isOwner && (run.status === 'running' || run.status === 'waiting_approval') && onCancelRun && (
           <button
-            className="run-btn run-btn-stop"
-            style={{ marginLeft: 'auto' }}
+            className="ob-detail-stop"
             onClick={() => onCancelRun(run.id)}
             title="Stop this run"
-          >Stop</button>
+          >Stop run</button>
         )}
-        <EducationalCue cueId="activity-run-status" show={showEducationalCues} />
-      </div>
+      </header>
 
-      <div className="rdetail-v2-case">
-        <span className="rdetail-case-label">Case Input</span>
-        <span className="rdetail-case-text">{run.caseInput}</span>
-      </div>
+      {run.caseInput && (
+        <div className="ob-detail-case">
+          <span className="ob-detail-case-label">Case input</span>
+          <span className="ob-detail-case-text">{run.caseInput}</span>
+        </div>
+      )}
 
-      <div className="rdetail-v2-body">
-        <div className="rdetail-v2-dag">
-          <RunDagView
-            workflow={workflow}
-            run={runWithApprovals}
-            selectedStepId={selectedStepId}
-            onSelectStep={(id) => setSelectedStepId(curr => curr === id ? null : id)}
-            costByStepId={showCost ? costByStepId : null}
-          />
+      <div className="ob-detail-body">
+        {/* DAG mirror — vertical chain matching the orchestration node language */}
+        <div className="ob-detail-dag">
+          <div className="ob-dag-eyebrow">
+            <span className="ob-dag-dot" />
+            DAG {'·'} {(run.stepResults || []).length} nodes {'·'} {cfg.label.toLowerCase()}
+          </div>
+          <div className="ob-dag-flow">
+            {(run.stepResults || []).map((step, i) => (
+              <React.Fragment key={step.stepId}>
+                {i > 0 && <div className="ob-dag-edge" />}
+                <DagNode
+                  step={step}
+                  selected={step.stepId === selectedStepId}
+                  onClick={() => setSelectedStepId(curr => curr === step.stepId ? null : step.stepId)}
+                  cost={showCost ? costByStepId[step.stepId] : null}
+                />
+              </React.Fragment>
+            ))}
+          </div>
         </div>
 
-        <aside className="rdetail-v2-sidebar">
-          <div className="rdetail-v2-sidebar-title">Decisions</div>
+        <aside className="ob-detail-sidebar">
+          <div className="ob-detail-sidebar-title">Decisions</div>
           <DecisionList
             run={run}
             selectedStepId={selectedStepId}
@@ -238,6 +294,71 @@ function RunDetailView({ run, onBack, onApprovalAction, onCancelRun, onNudge, sh
       </div>
     </div>
   );
+}
+
+// ===== DAG node card =====
+// Vertical-chain replacement for the React Flow run view. Same node-type
+// stripe colours as the orchestration canvas so participants who learned
+// the encoding building the DAG keep reading it the same way at run time.
+function DagNode({ step, selected, onClick, cost }) {
+  const cls = [
+    'ob-dag-node',
+    `is-${step.type || 'agent'}`,
+    `state-${step.status || 'pending'}`,
+    selected && 'is-selected',
+  ].filter(Boolean).join(' ');
+  const label =
+    step.type === 'trigger'  ? 'TRIGGER' :
+    step.type === 'approval' ? 'REVIEW'  :
+    step.type === 'capture'  ? 'CAPTURE' :
+                               'COWORKER';
+  const icon =
+    step.type === 'trigger'  ? '▶' :
+    step.type === 'approval' ? '◷' :
+    step.type === 'capture'  ? '✦' :
+                               '●';
+  const sub =
+    step.type === 'agent'    ? (step.coworkerName || step.stepName) :
+    step.type === 'approval' ? step.assigneeName :
+    step.type === 'capture'  ? 'Compounding into knowledge' :
+    null;
+  const subLabel =
+    step.type === 'agent'    ? 'Coworker' :
+    step.type === 'approval' ? 'Reviewer' :
+    step.type === 'capture'  ? 'Target' :
+    null;
+  return (
+    <button className={cls} onClick={onClick} type="button">
+      <div className="ob-dag-node-row">
+        <span className="ob-dag-node-icon">{icon}</span>
+        <div className="ob-dag-node-text">
+          <div className="ob-dag-node-label">{label}</div>
+          <div className="ob-dag-node-name">{step.stepName || label}</div>
+        </div>
+        <DagStatusBadge status={step.status} />
+      </div>
+      {sub && (
+        <div className="ob-dag-node-sub">
+          <span className="ob-dag-node-sub-label">{subLabel}</span>
+          <span className="ob-dag-node-sub-value">{sub}</span>
+        </div>
+      )}
+      {cost != null && cost > 0 && (
+        <div className="ob-dag-node-sub">
+          <span className="ob-dag-node-sub-label">Cost</span>
+          <span className="ob-dag-node-sub-value">${cost.toFixed(4)}</span>
+        </div>
+      )}
+    </button>
+  );
+}
+
+function DagStatusBadge({ status }) {
+  if (status === 'completed') return <span className="ob-dag-status is-completed">Done</span>;
+  if (status === 'running')   return <span className="ob-dag-status is-running"><span className="ob-card-status-dot is-pulse" />Running</span>;
+  if (status === 'waiting')   return <span className="ob-dag-status is-waiting">Waiting</span>;
+  if (status === 'error')     return <span className="ob-dag-status is-error">Error</span>;
+  return null;
 }
 
 // ===== Decision-first sidebar =====
@@ -262,7 +383,7 @@ function DecisionList({ run, selectedStepId, onSelectStep, approvalsForStep, isO
   }, [run.stepResults]);
 
   return (
-    <div className="rdetail-v2-decisions">
+    <div className="ob-detail-decisions">
       {ordered.map(step => (
         <DecisionRow
           key={step.stepId}
@@ -297,7 +418,7 @@ function DecisionRow({ step, run, isSelected, onSelect, approvalsForStep, isOwne
   let headline;
   let subject;
   if (isTrigger) {
-    headline = 'Case started';
+    headline = 'started the case';
     subject = run.startedBy || 'someone';
   } else if (isReview) {
     if (state === 'completed' && latestApproval) {
@@ -348,88 +469,85 @@ function DecisionRow({ step, run, isSelected, onSelect, approvalsForStep, isOwne
   }
 
   return (
-    <div className={`rdetail-v2-row status-${state}${isSelected ? ' selected' : ''}`} onClick={onSelect}>
-      <div className="rdetail-v2-row-main">
-        <span className={`rdetail-v2-row-dot status-${state}`} />
-        <div className="rdetail-v2-row-text">
-          <div className="rdetail-v2-row-headline">
-            <span className="rdetail-v2-row-subject">{subject}</span>
-            <span className="rdetail-v2-row-verb"> {headline}</span>
+    <div className={`ob-row state-${state || 'pending'}${isSelected ? ' is-selected' : ''}`} onClick={onSelect}>
+      <div className="ob-row-main">
+        <span className={`ob-row-dot state-${state || 'pending'}`} />
+        <div className="ob-row-text">
+          <div className="ob-row-headline">
+            <span className="ob-row-subject">{subject}</span>
+            <span className="ob-row-verb"> {headline}</span>
           </div>
           {(metaBits.length > 0 || latestApproval?.comment) && (
-            <div className="rdetail-v2-row-meta">
-              {metaBits.join(' \u00B7 ')}
-              {latestApproval?.comment && <> {metaBits.length > 0 && '\u00B7'} &ldquo;{latestApproval.comment}&rdquo;</>}
+            <div className="ob-row-meta">
+              {metaBits.join(' · ')}
+              {latestApproval?.comment && <> {metaBits.length > 0 && '·'} “{latestApproval.comment}”</>}
             </div>
           )}
         </div>
       </div>
 
       {isSelected && (
-        <div className="rdetail-v2-row-expand" onClick={e => e.stopPropagation()}>
+        <div className="ob-row-expand" onClick={e => e.stopPropagation()}>
           {/* Trigger — show the case input the run started with */}
           {isTrigger && step.output && (
-            <div className="rdetail-step-output md-doc"><RichText content={String(step.output)} /></div>
+            <div className="ob-step-output md-doc"><RichText content={String(step.output)} /></div>
           )}
           {isTrigger && !step.output && (
-            <div className="rdetail-step-empty">No case input captured.</div>
+            <div className="ob-step-empty">No case input captured.</div>
           )}
 
           {/* Coworker — output rendered as markdown so headings/lists read
               cleanly, plus status placeholders for non-terminal states. */}
           {!isReview && !isTrigger && step.type !== 'capture' && state === 'completed' && step.output && (
-            <div className="rdetail-step-output md-doc"><RichText content={String(step.output)} /></div>
+            <div className="ob-step-output md-doc"><RichText content={String(step.output)} /></div>
           )}
           {!isReview && !isTrigger && step.type !== 'capture' && state === 'running' && (
-            <div className="rdetail-step-running">
-              <div className="cl-loading"><span></span><span></span><span></span></div>
-              <span>Processing\u2026</span>
+            <div className="ob-step-running">
+              <span className="ob-loading"><span></span><span></span><span></span></span>
+              <span>Processing…</span>
             </div>
           )}
           {!isReview && !isTrigger && step.type !== 'capture' && state === 'error' && (
-            <div className="rdetail-step-error">
+            <div className="ob-step-error">
               {step.output ? String(step.output) : 'Step errored with no detail.'}
             </div>
           )}
           {!isReview && !isTrigger && step.type !== 'capture' && (state === 'pending' || !state) && (
-            <div className="rdetail-step-empty">Hasn't run yet.</div>
+            <div className="ob-step-empty">Hasn\'t run yet.</div>
           )}
           {!isReview && !isTrigger && step.type !== 'capture' && state === 'skipped' && (
-            <div className="rdetail-step-empty">Skipped during this run.</div>
+            <div className="ob-step-empty">Skipped during this run.</div>
           )}
 
-          {/* Capture — what compounded into which file. The runtime writes a
-              short summary to step.output, so we lean on that rather than
-              threading the workflow config down here. */}
+          {/* Capture — what compounded into which file. */}
           {step.type === 'capture' && state === 'completed' && (
-            <div className="rdetail-step-output">{step.output || 'Captured.'}</div>
+            <div className="ob-step-output">{step.output || 'Captured.'}</div>
           )}
           {step.type === 'capture' && state !== 'completed' && (
-            <div className="rdetail-step-empty">
-              {state === 'skipped' ? 'Skipped.' : state === 'running' ? 'Capturing\u2026' : 'Hasn\'t run yet.'}
+            <div className="ob-step-empty">
+              {state === 'skipped' ? 'Skipped.' : state === 'running' ? 'Capturing…' : 'Hasn\'t run yet.'}
             </div>
           )}
 
-          {/* Review — decision log of past resolutions. Shown regardless of
-              current state so participants can see the history. */}
+          {/* Review — decision log of past resolutions. */}
           {isReview && stepApprovals.length > 0 && (
-            <div className="rdetail-decisionlog">
-              <div className="rdetail-decisionlog-title">Decision log</div>
+            <div className="ob-decisionlog">
+              <div className="ob-decisionlog-title">Decision log</div>
               {stepApprovals.map(a => {
-                const actionKind = a.action === 'Approve' ? 'approve'
+                const kind = a.action === 'Approve' ? 'approve'
                   : a.action === 'Reject' ? 'reject'
                   : a.action === 'Request Correction' ? 'correction'
                   : a.action === 'Escalate' ? 'escalate'
                   : 'reject';
                 return (
-                <div key={a.id} className={`rdetail-decisionlog-entry ${actionKind}`}>
-                  <div className="rdetail-decisionlog-head">
-                    <span className={`rdetail-decisionlog-action ${actionKind}`}>{a.action}</span>
-                    <span className="rdetail-decisionlog-who">by {a.resolved_by || 'unknown'}</span>
-                    <span className="rdetail-decisionlog-when">{timeAgo(new Date(a.resolved_at).getTime())}</span>
+                  <div key={a.id} className={`ob-decisionlog-entry is-${kind}`}>
+                    <div className="ob-decisionlog-head">
+                      <span className={`ob-decisionlog-action is-${kind}`}>{a.action}</span>
+                      <span className="ob-decisionlog-who">by {a.resolved_by || 'unknown'}</span>
+                      <span className="ob-decisionlog-when">{timeAgo(new Date(a.resolved_at).getTime())}</span>
+                    </div>
+                    {a.comment && <div className="ob-decisionlog-comment">“{a.comment}”</div>}
                   </div>
-                  {a.comment && <div className="rdetail-decisionlog-comment">&ldquo;{a.comment}&rdquo;</div>}
-                </div>
                 );
               })}
             </div>
@@ -437,48 +555,52 @@ function DecisionRow({ step, run, isSelected, onSelect, approvalsForStep, isOwne
 
           {/* Approval form for the run owner when this review is waiting */}
           {isReview && state === 'waiting' && isOwner && (
-            <div className="rdetail-step-approval">
-              <div className="rdetail-step-approval-prompt">
-                Waiting for {step.assigneeName || 'reviewer'} to take action.
+            <div className="ob-approval">
+              <div className="ob-approval-prompt">
+                Waiting for <em>{step.assigneeName || 'a reviewer'}</em> to take action.
               </div>
               <textarea
-                className="cl-approval-comment"
-                placeholder="Add a comment (optional)..."
+                className="ob-approval-comment"
+                placeholder="Add a comment (optional)…"
                 value={comment}
                 onChange={e => setComment(e.target.value)}
                 rows={2}
               />
-              <div className="cl-approval-actions">
+              <div className="ob-approval-actions">
                 {['Approve', 'Reject', 'Request Correction', 'Escalate'].map(action => {
-                  const cls = action === 'Approve' ? 'approve' : action === 'Reject' ? 'reject' : action === 'Request Correction' ? 'correction' : 'escalate';
+                  const kind = action === 'Approve' ? 'approve' : action === 'Reject' ? 'reject' : action === 'Request Correction' ? 'correction' : 'escalate';
                   return (
-                    <button key={action} className={`cl-approval-btn ${cls}`} onClick={() => onApprovalAction(run.id, null, action, comment)}>
+                    <button
+                      key={action}
+                      className={`ob-approval-btn is-${kind}`}
+                      onClick={() => onApprovalAction(run.id, null, action, comment)}
+                    >
                       {action}
                     </button>
                   );
                 })}
               </div>
-              <button className="rcard-nudge" style={{ marginTop: 8 }} onClick={() => onNudge(run.id)}>
+              <button className="ob-approval-nudge" onClick={() => onNudge(run.id)}>
                 Nudge {step.assigneeName || 'reviewer'}
               </button>
             </div>
           )}
 
-          {/* Waiting on someone else — show a friendly note with nudge. */}
+          {/* Waiting on someone else — small note + nudge. */}
           {isReview && state === 'waiting' && !isOwner && (
-            <div className="rdetail-step-approval">
-              <div className="rdetail-step-approval-prompt" style={{ color: 'var(--text-muted)' }}>
-                Waiting on {step.assigneeName || 'a reviewer'}. {run.startedBy ? `Only ${run.startedBy} can resolve this here.` : ''}
+            <div className="ob-approval">
+              <div className="ob-approval-prompt ob-approval-prompt-muted">
+                Waiting on <em>{step.assigneeName || 'a reviewer'}</em>. {run.startedBy ? `Only ${run.startedBy} can resolve this here.` : ''}
               </div>
-              <button className="rcard-nudge" style={{ marginTop: 8 }} onClick={() => onNudge(run.id)}>
+              <button className="ob-approval-nudge" onClick={() => onNudge(run.id)}>
                 Nudge {step.assigneeName || 'reviewer'}
               </button>
             </div>
           )}
 
-          {/* Review that hasn't been reached yet in this run */}
+          {/* Review not yet reached */}
           {isReview && state !== 'waiting' && stepApprovals.length === 0 && (
-            <div className="rdetail-step-empty">
+            <div className="ob-step-empty">
               {state === 'skipped' ? 'Skipped.' : state === 'pending' || !state ? 'Hasn\'t been reached yet.' : 'No decision recorded.'}
             </div>
           )}
@@ -536,34 +658,47 @@ export default function ActivityDashboard({ workflowRuns, onApprovalAction, onCa
   }
 
   return (
-    <div className="adash">
-      <div className="adash-header">
-        <div className="adash-header-left">
-          <h2 className="adash-title">Observability</h2>
-          <p className="adash-subtitle">
-            Everything your mixed team did, on the record. Queryable from here forward — by you, by your coworkers, by your next workflow.
+    <div className="ob-page">
+      <header className="ob-page-head">
+        <div className="ob-page-head-left">
+          <div className="ob-page-eyebrow">Stage 7 · Observability</div>
+          <h1 className="ob-page-title">Everything your mixed team did, <em>on the record</em>.</h1>
+          <p className="ob-page-sub">
+            Queryable from here forward — by you, by your coworkers, by your next workflow. Each run is an artifact; each decision is logged.
           </p>
-        </div>
-        <div className="adash-summary">
           <EducationalCue cueId="activity-dashboard" show={showEducationalCues} />
-          {activeRuns.length > 0 && <span className="adash-stat running">{activeRuns.length} active</span>}
-          {pendingReviewCount > 0 && <span className="adash-stat waiting">{pendingReviewCount} awaiting review</span>}
-          {recentRuns.length > 0 && <span className="adash-stat completed">{recentRuns.length} recent</span>}
         </div>
-      </div>
+        <div className="ob-page-stats">
+          {activeRuns.length > 0 && (
+            <span className="ob-stat is-running">
+              <span className="ob-card-status-dot is-pulse" />
+              {activeRuns.length} active
+            </span>
+          )}
+          {pendingReviewCount > 0 && (
+            <span className="ob-stat is-waiting">{pendingReviewCount} awaiting review</span>
+          )}
+          {recentRuns.length > 0 && (
+            <span className="ob-stat is-completed">{recentRuns.length} recent</span>
+          )}
+        </div>
+      </header>
 
-      <div className="adash-body">
+      <div className="ob-page-body">
         {workflowRuns.length === 0 && (
-          <div className="adash-empty">
-            <p className="adash-empty-title">No orchestration runs yet</p>
-            <p className="adash-empty-desc">Go to the Orchestration tab and click Run to start one. Active runs will appear here — everyone in the workshop can see them.</p>
+          <div className="ob-empty">
+            <p className="ob-empty-title">No runs yet</p>
+            <p className="ob-empty-desc">Go to Orchestration and click Run on a workflow. Active runs land here — visible to everyone in the room.</p>
           </div>
         )}
 
         {activeRuns.length > 0 && (
-          <div className="adash-section">
-            <div className="adash-section-title adash-section-active">Active ({activeRuns.length})</div>
-            <div className="adash-grid">
+          <div className="ob-section">
+            <div className="ob-section-head">
+              <span className="ob-section-title">Active</span>
+              <span className="ob-section-count">{activeRuns.length}</span>
+            </div>
+            <div className="ob-grid">
               {activeRuns.map(run => (
                 <RunCard key={run.id} run={run} onClick={setSelectedRunId} onNudge={onNudge} showEducationalCues={showEducationalCues} />
               ))}
@@ -572,13 +707,18 @@ export default function ActivityDashboard({ workflowRuns, onApprovalAction, onCa
         )}
 
         {recentRuns.length > 0 && (
-          <div className="adash-section">
-            <div className="adash-section-title adash-section-completed" onClick={() => setShowRecent(!showRecent)} style={{ cursor: 'pointer' }}>
-              {showRecent ? '\u25BE' : '\u25B8'} Recent ({recentRuns.length})
+          <div className="ob-section">
+            <div
+              className="ob-section-head"
+              onClick={() => setShowRecent(!showRecent)}
+              style={{ cursor: 'pointer' }}
+            >
+              <span className="ob-section-title">{showRecent ? '▾' : '▸'} Recent</span>
+              <span className="ob-section-count">{recentRuns.length}</span>
             </div>
             {showRecent && (
               <>
-                <div className="adash-grid">
+                <div className="ob-grid">
                   {visibleRecent.map(run => (
                     <RunCard key={run.id} run={run} onClick={setSelectedRunId} onNudge={onNudge} showEducationalCues={showEducationalCues} />
                   ))}
@@ -587,7 +727,18 @@ export default function ActivityDashboard({ workflowRuns, onApprovalAction, onCa
                   <div style={{ textAlign: 'center', padding: '12px 0' }}>
                     <button
                       onClick={() => setRecentLimit(n => n + RECENT_PAGE_SIZE)}
-                      style={{ background: 'transparent', border: '1px solid #ddd', borderRadius: 4, padding: '6px 16px', fontSize: 13, color: '#666', cursor: 'pointer' }}
+                      style={{
+                        background: 'var(--paper, #fffdf9)',
+                        border: '1px solid var(--rule-soft, #e6dcc6)',
+                        borderRadius: 999,
+                        padding: '6px 16px',
+                        fontSize: 12,
+                        fontFamily: 'var(--mono, monospace)',
+                        letterSpacing: '0.12em',
+                        textTransform: 'uppercase',
+                        color: 'var(--ink-muted, #8a7a64)',
+                        cursor: 'pointer',
+                      }}
                     >
                       Show older runs ({recentRuns.length - recentLimit} more)
                     </button>

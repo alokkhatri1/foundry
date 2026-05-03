@@ -9283,6 +9283,12 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
    list view. The legacy classes still exist on the markup but the
    .cwb-page wrapper takes precedence on layout. */
 .cwb-page {
+  /* Override FoundryLanding's lighter peach (--peach-deep #E89954)
+     with the editorial dark-orange (#d97757) used by every other
+     redesigned tab so the title em + peach accents read consistently. */
+  --peach:        #f4c8a8;
+  --peach-deep:   #d97757;
+  --peach-soft:   #fbe5d2;
   width: 100%;
   margin: 0;
   padding: 36px 40px 64px;

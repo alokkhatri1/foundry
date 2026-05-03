@@ -14182,12 +14182,13 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
   50%      { box-shadow: 0 0 0 9px rgba(90, 158, 111, 0.04); }
 }
 .us-cohort-figure {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-end;
-  gap: 36px;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: end;
+  gap: 12px 48px;
 }
+.us-cohort-figure > .us-cohort-cost { justify-self: start; }
+.us-cohort-figure > .us-cohort-meta { justify-self: end; align-self: end; }
 .us-cohort-cost {
   font-family: var(--serif);
   font-weight: 300;
@@ -14216,12 +14217,11 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
 
 .us-cohort-meta {
   display: grid;
-  grid-template-columns: repeat(3, minmax(140px, auto));
+  grid-template-columns: repeat(3, minmax(120px, auto));
   gap: 0;
   border-top: 1px solid var(--rule-soft);
   border-bottom: 1px solid var(--rule-soft);
   padding: 14px 0;
-  align-self: flex-end;
 }
 .us-cohort-meta-row {
   display: flex;
@@ -14602,15 +14602,17 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
   letter-spacing: 0.02em;
 }
 
-/* Responsive */
-@media (max-width: 980px) {
+/* Responsive — breakpoint at 760px so the leaderboard's 4-column grid
+   stays intact at typical pane widths. */
+@media (max-width: 760px) {
   .us-page { padding: 28px 20px 40px; }
   .us-page-head { flex-direction: column; align-items: flex-start; gap: 16px; }
   .us-page-title { font-size: 30px; }
   .us-cohort-cost-int { font-size: 80px; }
   .us-cohort-cost-sym, .us-cohort-cost-frac { font-size: 36px; margin-top: 10px; }
-  .us-cohort-figure { gap: 18px; }
-  .us-cohort-meta { grid-template-columns: 1fr; align-self: stretch; }
+  .us-cohort-figure { grid-template-columns: 1fr; gap: 18px; }
+  .us-cohort-figure > .us-cohort-meta { justify-self: stretch; align-self: stretch; }
+  .us-cohort-meta { grid-template-columns: 1fr; }
   .us-cohort-meta-row {
     padding: 8px 0;
     border-right: none;

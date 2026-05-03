@@ -10206,6 +10206,7 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
   display: flex;
   flex-direction: column;
   gap: 32px;
+  background: var(--cream);
   font-family: var(--sans);
   color: var(--ink);
 }

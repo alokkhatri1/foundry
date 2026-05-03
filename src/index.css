@@ -11254,15 +11254,27 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
 
 /* Grid */
 .fl-grid {
-  flex: 0 1 auto;
+  flex: 0 0 auto;
   padding: 20px;
   display: flex;
   flex-direction: column;
+  justify-content: flex-start;
+  align-content: flex-start;
   gap: 22px;
   background: var(--cream);
 }
 
-.fl-section { display: flex; flex-direction: column; gap: 12px; }
+.fl-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  flex: 0 0 auto;
+}
+.fl-section-grid,
+.fl-flat-grid {
+  align-content: start;
+  grid-auto-rows: min-content;
+}
 .fl-section-head {
   display: flex;
   align-items: baseline;

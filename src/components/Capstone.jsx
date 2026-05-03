@@ -240,11 +240,16 @@ function ReviewerPicker({ value, valueName, participants, onChange }) {
   function commit(name) {
     setText(name);
     const trimmed = name.trim();
+    if (!trimmed) {
+      onChange({ reviewerId: '', reviewerName: '' });
+      return;
+    }
+    // Only commit when the typed text exactly matches a real participant.
+    // Cross-user assignment isn't supported (no notification system), so
+    // free-text reviewer names would create a fake binding.
     const match = options.find(o => o.name.toLowerCase() === trimmed.toLowerCase());
     if (match) {
       onChange({ reviewerId: match.id, reviewerName: match.name });
-    } else {
-      onChange({ reviewerId: '', reviewerName: trimmed });
     }
   }
 
@@ -260,7 +265,7 @@ function ReviewerPicker({ value, valueName, participants, onChange }) {
         type="text"
         className="cs-reviewer-input"
         value={text}
-        placeholder="Type a name or pick…"
+        placeholder="Pick the reviewer…"
         onChange={e => { commit(e.target.value); setOpen(true); }}
         onMouseDown={() => setOpen(true)}
         onKeyDown={e => {
@@ -278,8 +283,8 @@ function ReviewerPicker({ value, valueName, participants, onChange }) {
           {filtered.length === 0 ? (
             <div className="cs-reviewer-empty">
               {options.length === 0
-                ? 'No humans in the workshop yet — type a name above.'
-                : 'No matches — keep typing to use the name as-is.'}
+                ? 'No reviewer available yet.'
+                : 'No matches — clear the field and pick from the list.'}
             </div>
           ) : (
             filtered.map(opt => (
@@ -781,6 +786,15 @@ export default function Capstone({
   const pct = rows && rows.length > 0 ? Math.round((completeCount / rows.length) * 100) : 0;
   const savedLabel = saving ? 'Saving…' : relSavedLabel(now, lastSavedAt);
 
+  // Reviewer pool is restricted to the current user. We don't have a
+  // cross-user notification system, so letting participants assign a
+  // human step to someone else would create a binding that never fires
+  // at workflow runtime.
+  const allowedReviewers = useMemo(
+    () => (participants || []).filter(p => p.id === myParticipantId),
+    [participants, myParticipantId],
+  );
+
   async function handleSend() {
     if (!allComplete || sending) return;
     setSending(true);
@@ -879,7 +893,7 @@ export default function Capstone({
             isLast={idx === rows.length - 1}
             isComplete={isRowComplete(row)}
             fileTree={fileTree}
-            participants={participants}
+            participants={allowedReviewers}
             collapsed={!!collapsed[row.id]}
             onUpdate={patch => update(idx, patch)}
             onMove={dir => moveRow(idx, dir)}

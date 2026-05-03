@@ -135,6 +135,10 @@ export default function FileExplorer({ fileTree, selectedFileId, onSelectFile, o
   const breadcrumb = buildPath(fileTree, currentFolderId);
   const rawItems = currentFolder.children || [];
   const skillsRevealed = stageReached(currentStage, '4');
+  // Blueprints are example workflow references — only reveal them once the
+  // copilot is unlocked at Stage 9 (after Capstone has been completed).
+  // Hidden before that even if they exist in the data.
+  const blueprintsRevealed = stageReached(currentStage, '9');
 
   // One-time migration: any top-level "Knowledge" / "Instructions" folder
   // (capitalised — signature of the removed ensureStageFolder auto-creator)
@@ -187,6 +191,22 @@ export default function FileExplorer({ fileTree, selectedFileId, onSelectFile, o
 
     if (dirty) onUpdateTree(updated);
   }, [skillsRevealed, fileTree, onUpdateTree]);
+
+  // If a stage gate hides the folder the user is currently inside (e.g.
+  // they were viewing blueprints when an admin pushed the stage back), fall
+  // back to root so they don't get stranded with no breadcrumb back out.
+  useEffect(() => {
+    const path = buildPath(fileTree, currentFolderId);
+    const insideHidden = path.some(n =>
+      (!blueprintsRevealed && n.type === 'folder' && n.name === 'blueprints')
+      || (!skillsRevealed && n.type === 'folder' && n.name === 'skills'),
+    );
+    if (insideHidden) {
+      setCurrentFolderId(fileTree.id);
+      onSelectFile(null);
+    }
+  }, [fileTree, currentFolderId, blueprintsRevealed, skillsRevealed, onSelectFile]);
+
   const isRoot = currentFolder.id === fileTree.id;
   // Stage 4 reveals the skills subfolder. Before that, hide it even if present
   // in the data — the reveal is additive: at stage 3 each dept shows only its
@@ -198,6 +218,7 @@ export default function FileExplorer({ fileTree, selectedFileId, onSelectFile, o
   // data is ever lost silently.
   const items = rawItems.filter(c => {
     if (!skillsRevealed && c.type === 'folder' && c.name === 'skills') return false;
+    if (!blueprintsRevealed && c.type === 'folder' && c.name === 'blueprints') return false;
     if (isRoot && c.type === 'folder'
         && (c.name === 'Knowledge' || c.name === 'Instructions')
         && (!c.children || c.children.length === 0)) return false;

@@ -11271,9 +11271,9 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
   font-weight: 600;
 }
 
-/* Grid — fills the explorer below the toolbar; scrolls internally so
-   the dotted bg follows actual content but the panel itself stays
-   anchored. */
+/* Grid — fills the explorer below the toolbar; scrolls internally.
+   Solid cream bg (no dotted texture) — the dots were drawing too much
+   attention to the empty area below sparse cards. */
 .fl-page .fl-grid {
   flex: 1 1 0;
   min-height: 0;
@@ -11283,9 +11283,6 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
   flex-direction: column;
   gap: 22px;
   background: var(--cream);
-  background-image: radial-gradient(circle, var(--rule-soft) 1px, transparent 1px);
-  background-size: 22px 22px;
-  background-position: 0 0;
 }
 .fl-page .fl-section {
   display: flex;

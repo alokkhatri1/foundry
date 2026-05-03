@@ -8294,10 +8294,10 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
    palette via FoundryLanding.css's :root).
    ================================================================== */
 .cl-app {
-  --paper:        #fffdf9;
-  --cream:        #f5ede0;
-  --cream-soft:   #ede1cf;
-  --cream-deep:   #e1d3bc;
+  --paper:        #FFFFFF;
+  --cream:        #FBF4EE;
+  --cream-soft:   #F9F0E8;
+  --cream-deep:   #F0E4D3;
   --cream-deeper: #d4c2a4;
   --ink:          #1d1611;
   --ink-mid:      #4a3f33;
@@ -10163,10 +10163,10 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
 
 .wf-page,
 .wf-editor {
-  --paper:        #fffdf9;
-  --cream:        #f5ede0;
-  --cream-soft:   #ede1cf;
-  --cream-deep:   #e1d3bc;
+  --paper:        #FFFFFF;
+  --cream:        #FBF4EE;
+  --cream-soft:   #F9F0E8;
+  --cream-deep:   #F0E4D3;
   --ink:          #1d1611;
   --ink-mid:      #4a3f33;
   --ink-muted:    #8a7a64;
@@ -10981,10 +10981,10 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
    ================================================================ */
 
 .fl-page {
-  --paper:        #fffdf9;
-  --cream:        #f5ede0;
-  --cream-soft:   #ede1cf;
-  --cream-deep:   #e1d3bc;
+  --paper:        #FFFFFF;
+  --cream:        #FBF4EE;
+  --cream-soft:   #F9F0E8;
+  --cream-deep:   #F0E4D3;
   --ink:          #1d1611;
   --ink-mid:      #4a3f33;
   --ink-muted:    #8a7a64;
@@ -12052,10 +12052,10 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
 
 .ob-page,
 .ob-detail {
-  --paper:        #fffdf9;
-  --cream:        #f5ede0;
-  --cream-soft:   #ede1cf;
-  --cream-deep:   #e1d3bc;
+  --paper:        #FFFFFF;
+  --cream:        #FBF4EE;
+  --cream-soft:   #F9F0E8;
+  --cream-deep:   #F0E4D3;
   --ink:          #1d1611;
   --ink-mid:      #4a3f33;
   --ink-muted:    #8a7a64;
@@ -13039,10 +13039,10 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
    ================================================================ */
 
 .cs-page {
-  --paper:        #fffdf9;
-  --cream:        #f5ede0;
-  --cream-soft:   #ede1cf;
-  --cream-deep:   #e1d3bc;
+  --paper:        #FFFFFF;
+  --cream:        #FBF4EE;
+  --cream-soft:   #F9F0E8;
+  --cream-deep:   #F0E4D3;
   --ink:          #1d1611;
   --ink-mid:      #4a3f33;
   --ink-muted:    #8a7a64;
@@ -14122,10 +14122,10 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
    ================================================================ */
 
 .us-page {
-  --paper:        #fffdf9;
-  --cream:        #f5ede0;
-  --cream-soft:   #ede1cf;
-  --cream-deep:   #e1d3bc;
+  --paper:        #FFFFFF;
+  --cream:        #FBF4EE;
+  --cream-soft:   #F9F0E8;
+  --cream-deep:   #F0E4D3;
   --cream-deeper: #d4c2a4;
   --ink:          #1d1611;
   --ink-mid:      #4a3f33;
@@ -14689,10 +14689,10 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
    ================================================================ */
 
 .gr-page {
-  --paper:        #fffdf9;
-  --cream:        #f5ede0;
-  --cream-soft:   #ede1cf;
-  --cream-deep:   #e1d3bc;
+  --paper:        #FFFFFF;
+  --cream:        #FBF4EE;
+  --cream-soft:   #F9F0E8;
+  --cream-deep:   #F0E4D3;
   --cream-deeper: #d4c2a4;
   --ink:          #1d1611;
   --ink-mid:      #4a3f33;

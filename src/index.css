@@ -10991,14 +10991,14 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
   color: var(--ink);
   flex: 1;
   min-height: 0;
-  overflow-y: auto;
-  padding: 36px 32px 64px;
+  padding: 36px 32px 32px;
   display: flex;
   flex-direction: column;
   gap: 28px;
+  overflow: hidden;
 }
 
-/* Page head */
+/* Page head — content-sized at the top, never scrolls */
 .fl-page-head {
   display: flex;
   justify-content: space-between;
@@ -11006,6 +11006,7 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
   gap: 28px;
   padding-bottom: 22px;
   border-bottom: 1px solid var(--rule-soft);
+  flex-shrink: 0;
 }
 .fl-page-head-left { min-width: 0; flex: 1; }
 .fl-page-eyebrow {
@@ -11056,12 +11057,14 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
   border-radius: 2px;
 }
 
-/* Two-column shell — explorer left, editor right */
+/* Two-column shell — explorer left, editor right. Fills the
+   remaining height; cells stretch and each scrolls internally. */
 .fl-shell {
   display: grid;
   grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr);
   gap: 24px;
-  align-items: start;
+  flex: 1;
+  min-height: 0;
 }
 
 /* ── Explorer ─────────────────────────────────────────────── */
@@ -11073,7 +11076,7 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  align-self: start;
+  min-height: 0;
   box-shadow: 0 1px 0 rgba(60, 40, 20, 0.02);
 }
 
@@ -11085,6 +11088,7 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
   padding: 14px 18px 12px;
   background: var(--paper);
   border-bottom: 1px solid var(--rule-soft);
+  flex-shrink: 0;
 }
 .fl-crumb-segment {
   display: inline-flex;
@@ -11132,6 +11136,7 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
   background: var(--paper);
   position: relative;
   gap: 12px;
+  flex-shrink: 0;
 }
 .fl-toolbar-left { min-width: 0; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .fl-toolbar-right { position: relative; flex-shrink: 0; display: flex; gap: 8px; align-items: center; }
@@ -11253,8 +11258,12 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
 }
 
 /* Grid */
+/* Grid fills the remaining space inside the explorer card and
+   scrolls internally when there are too many sections / files. */
 .fl-grid {
-  flex: 0 0 auto;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
   padding: 20px;
   display: flex;
   flex-direction: column;
@@ -11584,8 +11593,7 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  position: sticky;
-  top: 24px;
+  min-height: 0;
   box-shadow: 0 1px 0 rgba(60, 40, 20, 0.02);
 }
 
@@ -11659,6 +11667,7 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
   background: var(--paper);
   border-bottom: 1px solid var(--rule-soft);
   gap: 12px;
+  flex-shrink: 0;
 }
 .fl-editor-head-left {
   display: flex;
@@ -11800,6 +11809,7 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
   padding: 8px 18px;
   border-bottom: 1px solid var(--rule-soft);
   background: var(--cream);
+  flex-shrink: 0;
 }
 .fl-editor-meta-path {
   font-family: var(--mono);
@@ -11831,6 +11841,7 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
 /* Body */
 .fl-editor-body {
   flex: 1;
+  min-height: 0;
   overflow-y: auto;
   background: var(--paper);
   padding: 32px 36px 56px;

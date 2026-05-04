@@ -336,29 +336,6 @@ function SettingsMenu({ userName, orgName, currentStage, sb, myParticipantId, cr
   );
 }
 
-// Stage progress meter that sits inside the masthead area. Defined in
-// the v2 redesign but the redesign forgot to render it; wired here so
-// participants see "I'm at stage X of 11" beside the wordmark.
-function StageMeter({ currentStage }) {
-  const order = ['1','2','3','4','5','6','7','8','9','10','11'];
-  const idx = order.indexOf(currentStage);
-  if (idx < 0) return null;
-  const total = order.length;
-  const num = String(idx + 1).padStart(2, '0');
-  const totalStr = String(total).padStart(2, '0');
-  const pct = ((idx + 1) / total) * 100;
-  return (
-    <div className="app-stage-meter" title={`Stage ${num} of ${totalStr}`}>
-      <div className="app-stage-meter-num">
-        {num}<span> / {totalStr}</span>
-      </div>
-      <div className="app-stage-meter-bar">
-        <div className="app-stage-meter-fill" style={{ width: `${pct}%` }} />
-      </div>
-    </div>
-  );
-}
-
 // Compact credits pill — mounted in the header post-7b. Before that, the
 // credits live only in the settings menu. The pill clicks through to the
 // Economics tab so participants can see where the balance went.
@@ -2945,7 +2922,6 @@ Answer in ONE sentence. If the user asks "how", a second sentence is allowed —
           <div className="app-masthead">
             <h1>Foundry</h1>
           </div>
-          <StageMeter currentStage={currentStage} />
         </div>
         <nav className="tab-nav">
           <button className={`tab-nav-item${activeTab === 'chat' ? ' active' : ''}`} onClick={() => { setActiveTab('chat'); setChatBadge(false); }}>

@@ -956,7 +956,7 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
    so they're available here without re-declaration. */
 .app-header {
   display: grid;
-  grid-template-columns: minmax(220px, auto) 1fr auto;
+  grid-template-columns: 1fr auto 1fr;
   align-items: center;
   gap: 32px;
   padding: 14px 32px;
@@ -971,6 +971,7 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
   align-items: center;
   gap: 14px;
   cursor: pointer;
+  justify-self: start;
 }
 .app-logo {
   width: 38px;

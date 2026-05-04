@@ -3090,12 +3090,16 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
   margin-bottom: 8px;
 }
 .cl-status span {
+  display: inline-block;
+  max-width: min(640px, 90%);
   font-size: 12px;
+  line-height: 1.5;
   color: var(--text-muted);
   background: var(--bg-white);
-  padding: 4px 14px;
-  border-radius: var(--radius-pill);
+  padding: 6px 14px;
+  border-radius: 14px;
   border: 1px solid var(--border-color);
+  text-wrap: balance;
 }
 
 /* Approval gate */

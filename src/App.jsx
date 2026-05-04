@@ -336,26 +336,6 @@ function SettingsMenu({ userName, orgName, currentStage, sb, myParticipantId, cr
   );
 }
 
-// Compact credits pill — mounted in the header post-7b. Before that, the
-// credits live only in the settings menu. The pill clicks through to the
-// Economics tab so participants can see where the balance went.
-function CreditsChip({ creditsLeft, creditsTotal, onClick }) {
-  if (creditsLeft == null) return null;
-  const low = creditsLeft <= CREDITS_WARN_THRESHOLD;
-  const value = Math.max(0, creditsLeft);
-  return (
-    <span
-      className={`header-credits-chip${low ? ' low' : ''}`}
-      onClick={onClick}
-      title={`${value.toLocaleString()} of ${creditsTotal.toLocaleString()} credits left. ~10 credits = a typical chat. ~50 credits = a workflow run.`}
-    >
-      <span className="header-credits-chip-star" aria-hidden>✦</span>
-      <span className="header-credits-chip-value">{value.toLocaleString()}</span>
-      <span className="header-credits-chip-label">credits</span>
-    </span>
-  );
-}
-
 function App() {
   const saved = loadState();
   const sb = useSupabase();
@@ -2964,13 +2944,6 @@ Answer in ONE sentence. If the user asks "how", a second sentence is allowed —
           </RevealAt>
         </nav>
         <div className="app-header-right">
-          <RevealAt stage="10" currentStage={currentStage}>
-            <CreditsChip
-              creditsLeft={creditsLeft}
-              creditsTotal={creditsTotal}
-              onClick={() => setActiveTab('usage')}
-            />
-          </RevealAt>
           <SettingsMenu
             userName={userName}
             orgName={orgName}

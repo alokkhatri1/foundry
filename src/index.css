@@ -23,9 +23,9 @@
   /* Canonical type system. Per-page wrappers may re-declare these to
      scope themselves, but every surface should resolve to the same
      three families. Loaded once in index.html. */
-  --serif: 'Fraunces', Georgia, serif;
-  --sans:  'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-  --mono:  'JetBrains Mono', ui-monospace, monospace;
+  --serif: 'IBM Plex Serif', Georgia, serif;
+  --sans:  'IBM Plex Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+  --mono:  'IBM Plex Mono', ui-monospace, monospace;
 }
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -8318,9 +8318,9 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
   --green:        #5a9e6f;
   --red:          #c75a4a;
   --gold:         #c8956c;
-  --serif: 'Fraunces', Georgia, serif;
-  --sans:  'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-  --mono:  'JetBrains Mono', ui-monospace, monospace;
+  --serif: 'IBM Plex Serif', Georgia, serif;
+  --sans:  'IBM Plex Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+  --mono:  'IBM Plex Mono', ui-monospace, monospace;
 
   display: grid;
   grid-template-columns: 280px 1fr;
@@ -10196,9 +10196,9 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
   --node-agent:   #4a7fb5;
   --node-review:  #d97757;
   --node-capture: #5a9e6f;
-  --serif: 'Fraunces', Georgia, serif;
-  --sans:  'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-  --mono:  'JetBrains Mono', ui-monospace, monospace;
+  --serif: 'IBM Plex Serif', Georgia, serif;
+  --sans:  'IBM Plex Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+  --mono:  'IBM Plex Mono', ui-monospace, monospace;
   --radius: 14px;
   --radius-sm: 10px;
   --radius-pill: 999px;
@@ -11012,9 +11012,9 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
   --blue:         #4a7fb5;
   --blue-soft:    rgba(74, 127, 181, 0.12);
   --red:          #c75a4a;
-  --serif: 'Fraunces', Georgia, serif;
-  --sans:  'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-  --mono:  'JetBrains Mono', ui-monospace, monospace;
+  --serif: 'IBM Plex Serif', Georgia, serif;
+  --sans:  'IBM Plex Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+  --mono:  'IBM Plex Mono', ui-monospace, monospace;
   --radius: 14px;
   --radius-sm: 10px;
   --radius-pill: 999px;
@@ -12141,9 +12141,9 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
   --node-review:  #d97757;
   --node-capture: #5a9e6f;
 
-  --serif: 'Fraunces', Georgia, serif;
-  --sans:  'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-  --mono:  'JetBrains Mono', ui-monospace, monospace;
+  --serif: 'IBM Plex Serif', Georgia, serif;
+  --sans:  'IBM Plex Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+  --mono:  'IBM Plex Mono', ui-monospace, monospace;
 
   --radius: 14px;
   --radius-sm: 10px;
@@ -13123,9 +13123,9 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
   --blue:         #4a7fb5;
   --blue-soft:    rgba(74, 127, 181, 0.12);
   --blue-soft-2:  #e0ebf5;
-  --serif: 'Fraunces', Georgia, serif;
-  --sans:  'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-  --mono:  'JetBrains Mono', ui-monospace, monospace;
+  --serif: 'IBM Plex Serif', Georgia, serif;
+  --sans:  'IBM Plex Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+  --mono:  'IBM Plex Mono', ui-monospace, monospace;
   --radius: 14px;
   --radius-sm: 10px;
   --radius-pill: 999px;
@@ -14205,9 +14205,9 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
   --green:        #5a9e6f;
   --green-soft:   rgba(90, 158, 111, 0.12);
   --green-deeper: #4a8a5d;
-  --serif: 'Fraunces', Georgia, serif;
-  --sans:  'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-  --mono:  'JetBrains Mono', ui-monospace, monospace;
+  --serif: 'IBM Plex Serif', Georgia, serif;
+  --sans:  'IBM Plex Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+  --mono:  'IBM Plex Mono', ui-monospace, monospace;
   --radius: 14px;
   --radius-sm: 10px;
   --radius-pill: 999px;
@@ -14778,9 +14778,9 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
   --plum:         #8b6fb0;
   --plum-soft:    rgba(139, 111, 176, 0.14);
   --plum-deeper:  #76599c;
-  --serif: 'Fraunces', Georgia, serif;
-  --sans:  'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-  --mono:  'JetBrains Mono', ui-monospace, monospace;
+  --serif: 'IBM Plex Serif', Georgia, serif;
+  --sans:  'IBM Plex Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+  --mono:  'IBM Plex Mono', ui-monospace, monospace;
   --radius: 14px;
   --radius-sm: 10px;
   --radius-pill: 999px;
@@ -15431,9 +15431,9 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
   --green:        #5a9e6f;
   --green-soft:   rgba(90, 158, 111, 0.12);
   --green-deeper: #4a8a5d;
-  --serif: 'Fraunces', Georgia, serif;
-  --sans:  'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-  --mono:  'JetBrains Mono', ui-monospace, monospace;
+  --serif: 'IBM Plex Serif', Georgia, serif;
+  --sans:  'IBM Plex Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+  --mono:  'IBM Plex Mono', ui-monospace, monospace;
   --radius: 14px;
   --radius-sm: 10px;
   --radius-pill: 999px;

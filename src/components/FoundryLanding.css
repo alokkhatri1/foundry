@@ -31,9 +31,9 @@
   --dark-card-light:  #6B5239;
   --dark-card-edge:   #8B6F50;
 
-  --serif: "Fraunces", Georgia, serif;
-  --sans:  "Inter", -apple-system, system-ui, sans-serif;
-  --mono:  "JetBrains Mono", ui-monospace, monospace;
+  --serif: "IBM Plex Serif", Georgia, serif;
+  --sans:  "IBM Plex Sans", -apple-system, system-ui, sans-serif;
+  --mono:  "IBM Plex Mono", ui-monospace, monospace;
 }
 
 /* Wrapping rules apply only inside .foundry-landing instead of html/body

@@ -101,6 +101,7 @@ export default function AdminDashboard({ sb, user, onBack, onEnterWorkshop }) {
   const [feedback, setFeedback] = useState([]);
   const [usage, setUsage] = useState([]);
   const [scorecardData, setScorecardData] = useState(null);
+  const [expandedPid, setExpandedPid] = useState(null);
   const [detailTab, setDetailTab] = useState('stages');
   const [copied, setCopied] = useState(null);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -253,6 +254,7 @@ export default function AdminDashboard({ sb, user, onBack, onEnterWorkshop }) {
     setMenuOpen(false);
     setScorecardData(null);
     setUsage([]);
+    setExpandedPid(null);
     const requestedId = workshop.id;
     selectionTokenRef.current = requestedId;
     const [p, c, a, sc, fb, uz] = await Promise.all([
@@ -382,6 +384,29 @@ export default function AdminDashboard({ sb, user, onBack, onEnterWorkshop }) {
     }
     return sum;
   };
+
+  // Leaderboard sort: rated participants first, by average score desc,
+  // tiebreaker by tokens used desc, then alphabetical. Unrated rows go
+  // to the bottom sorted by tokens — they still rank by engagement so
+  // the facilitator can spot heavy users who skipped the survey.
+  const sortedPeople = useMemo(() => {
+    const enriched = humanParticipants.map(p => {
+      const fb = feedbackByName.get(p.name);
+      const tk = tokensByPid[p.id] || { tokens: 0, cost: 0 };
+      const totalScore = totalScoreFor(fb);
+      const avgScore = totalScore !== null ? totalScore / SCORE_FIELDS.length : null;
+      return { p, fb, tk, totalScore, avgScore };
+    });
+    enriched.sort((a, b) => {
+      const aRated = a.avgScore !== null;
+      const bRated = b.avgScore !== null;
+      if (aRated !== bRated) return aRated ? -1 : 1;
+      if (aRated && a.avgScore !== b.avgScore) return b.avgScore - a.avgScore;
+      if (a.tk.tokens !== b.tk.tokens) return b.tk.tokens - a.tk.tokens;
+      return (a.p.name || '').localeCompare(b.p.name || '');
+    });
+    return enriched;
+  }, [humanParticipants, feedbackByName, tokensByPid]);
 
   // Per-participant engagement counters — what they actually built and
   // sent during the workshop. Lives next to the level + feedback on the
@@ -656,16 +681,20 @@ export default function AdminDashboard({ sb, user, onBack, onEnterWorkshop }) {
                   {humanParticipants.length === 0 ? (
                     <p className="admin-empty">No participants yet. Share the code to get started.</p>
                   ) : (
-                    <div className="admin-people">
-                      {humanParticipants.map(p => {
+                    <div className="admin-leaderboard">
+                      {sortedPeople.map(({ p, fb, tk, totalScore, avgScore }, idx) => {
                         const lvl = participantLevels[p.id];
                         const eng = engagementByName[p.name] || {};
-                        const fb = feedbackByName.get(p.name);
-                        const tk = tokensByPid[p.id] || { tokens: 0, cost: 0 };
-                        const totalScore = totalScoreFor(fb);
+                        const isOpen = expandedPid === p.id;
                         return (
-                          <div key={p.id} className="admin-person-card">
-                            <div className="admin-person-head">
+                          <div key={p.id} className={`admin-person-card${isOpen ? ' is-open' : ''}`}>
+                            <button
+                              type="button"
+                              className="admin-person-row"
+                              onClick={() => setExpandedPid(isOpen ? null : p.id)}
+                              aria-expanded={isOpen}
+                            >
+                              <span className="admin-person-rank">{idx + 1}</span>
                               <span className="admin-participant-dot" style={{ background: onlineNames.has(p.name) ? 'var(--accent-system)' : 'var(--border-color)' }} />
                               <div className="admin-participant-ident">
                                 <span className="admin-participant-name">{p.name}</span>
@@ -680,62 +709,84 @@ export default function AdminDashboard({ sb, user, onBack, onEnterWorkshop }) {
                                   {LEVELS[lvl]}
                                 </span>
                               )}
-                              <span className="admin-participant-status">{onlineNames.has(p.name) ? 'Online' : 'Offline'}</span>
-                              <span className="admin-participant-time">Joined {new Date(p.joined_at).toLocaleDateString()}</span>
-                            </div>
-
-                            <div className="admin-person-headline">
-                              <div className="admin-person-headline-stat">
-                                <span className="l">Total score</span>
-                                <span className="v">
-                                  {totalScore !== null ? `${totalScore} / ${FEEDBACK_MAX}` : '—'}
-                                </span>
-                              </div>
-                              <div className="admin-person-headline-stat">
-                                <span className="l">Tokens used</span>
+                              <span className="admin-person-row-stat">
+                                <span className="l">Avg</span>
+                                <span className="v">{avgScore !== null ? avgScore.toFixed(1) : '—'}</span>
+                              </span>
+                              <span className="admin-person-row-stat">
+                                <span className="l">Tokens</span>
                                 <span className="v">{tk.tokens.toLocaleString()}</span>
-                                {tk.cost > 0 && (
-                                  <span className="sub">${tk.cost.toFixed(2)}</span>
-                                )}
-                              </div>
-                            </div>
+                              </span>
+                              <span className="admin-person-row-chevron" aria-hidden>{isOpen ? '▾' : '▸'}</span>
+                            </button>
 
-                            <div className="admin-person-section">
-                              <div className="admin-person-section-label">Engagement</div>
-                              <div className="admin-person-stats">
-                                <div className="admin-person-stat"><span className="v">{eng.messages || 0}</span><span className="l">messages</span></div>
-                                <div className="admin-person-stat"><span className="v">{eng.coworkers || 0}</span><span className="l">coworkers</span></div>
-                                <div className="admin-person-stat"><span className="v">{eng.files || 0}</span><span className="l">files</span></div>
-                                <div className="admin-person-stat"><span className="v">{eng.workflows || 0}</span><span className="l">workflows</span></div>
-                                <div className="admin-person-stat"><span className="v">{eng.runs || 0}</span><span className="l">runs</span></div>
-                              </div>
-                            </div>
-
-                            <div className="admin-person-section">
-                              <div className="admin-person-section-label">Feedback</div>
-                              {fb ? (
-                                <div className="admin-person-feedback">
-                                  <div className="admin-person-scores">
-                                    {SCORE_FIELDS.map(f => (
-                                      <div key={f.key} className="admin-person-score">
-                                        <span className="l">{f.label}</span>
-                                        <span className="v">{fb[f.key] ?? '—'}</span>
-                                      </div>
-                                    ))}
+                            {isOpen && (
+                              <div className="admin-person-detail">
+                                <div className="admin-person-headline">
+                                  <div className="admin-person-headline-stat">
+                                    <span className="l">Total score</span>
+                                    <span className="v">
+                                      {totalScore !== null ? `${totalScore} / ${FEEDBACK_MAX}` : '—'}
+                                    </span>
+                                    {avgScore !== null && (
+                                      <span className="sub">avg {avgScore.toFixed(1)} / 5</span>
+                                    )}
                                   </div>
-                                  <div className="admin-person-binary">
-                                    Recommend: <strong>{fb.would_recommend === true ? 'Yes' : fb.would_recommend === false ? 'No' : '—'}</strong>
-                                    {' · '}
-                                    Duration ok: <strong>{fb.duration_appropriate === true ? 'Yes' : fb.duration_appropriate === false ? 'No' : '—'}</strong>
+                                  <div className="admin-person-headline-stat">
+                                    <span className="l">Tokens used</span>
+                                    <span className="v">{tk.tokens.toLocaleString()}</span>
+                                    {tk.cost > 0 && (
+                                      <span className="sub">${tk.cost.toFixed(2)}</span>
+                                    )}
                                   </div>
-                                  {fb.most_valuable && (<div className="admin-person-text"><span className="l">Most valuable</span><div>{fb.most_valuable}</div></div>)}
-                                  {fb.future_topics && (<div className="admin-person-text"><span className="l">Future topics</span><div>{fb.future_topics}</div></div>)}
-                                  {fb.improvement_notes && (<div className="admin-person-text"><span className="l">Suggestions</span><div>{fb.improvement_notes}</div></div>)}
+                                  <div className="admin-person-headline-stat">
+                                    <span className="l">Status</span>
+                                    <span className="v">{onlineNames.has(p.name) ? 'Online' : 'Offline'}</span>
+                                  </div>
+                                  <div className="admin-person-headline-stat">
+                                    <span className="l">Joined</span>
+                                    <span className="v">{new Date(p.joined_at).toLocaleDateString()}</span>
+                                  </div>
                                 </div>
-                              ) : (
-                                <div className="admin-person-feedback-empty">Hasn't submitted feedback yet.</div>
-                              )}
-                            </div>
+
+                                <div className="admin-person-section">
+                                  <div className="admin-person-section-label">Engagement</div>
+                                  <div className="admin-person-stats">
+                                    <div className="admin-person-stat"><span className="v">{eng.messages || 0}</span><span className="l">messages</span></div>
+                                    <div className="admin-person-stat"><span className="v">{eng.coworkers || 0}</span><span className="l">coworkers</span></div>
+                                    <div className="admin-person-stat"><span className="v">{eng.files || 0}</span><span className="l">files</span></div>
+                                    <div className="admin-person-stat"><span className="v">{eng.workflows || 0}</span><span className="l">workflows</span></div>
+                                    <div className="admin-person-stat"><span className="v">{eng.runs || 0}</span><span className="l">runs</span></div>
+                                  </div>
+                                </div>
+
+                                <div className="admin-person-section">
+                                  <div className="admin-person-section-label">Feedback</div>
+                                  {fb ? (
+                                    <div className="admin-person-feedback">
+                                      <div className="admin-person-scores">
+                                        {SCORE_FIELDS.map(f => (
+                                          <div key={f.key} className="admin-person-score">
+                                            <span className="l">{f.label}</span>
+                                            <span className="v">{fb[f.key] ?? '—'}</span>
+                                          </div>
+                                        ))}
+                                      </div>
+                                      <div className="admin-person-binary">
+                                        Recommend: <strong>{fb.would_recommend === true ? 'Yes' : fb.would_recommend === false ? 'No' : '—'}</strong>
+                                        {' · '}
+                                        Duration ok: <strong>{fb.duration_appropriate === true ? 'Yes' : fb.duration_appropriate === false ? 'No' : '—'}</strong>
+                                      </div>
+                                      {fb.most_valuable && (<div className="admin-person-text"><span className="l">Most valuable</span><div>{fb.most_valuable}</div></div>)}
+                                      {fb.future_topics && (<div className="admin-person-text"><span className="l">Future topics</span><div>{fb.future_topics}</div></div>)}
+                                      {fb.improvement_notes && (<div className="admin-person-text"><span className="l">Suggestions</span><div>{fb.improvement_notes}</div></div>)}
+                                    </div>
+                                  ) : (
+                                    <div className="admin-person-feedback-empty">Hasn't submitted feedback yet.</div>
+                                  )}
+                                </div>
+                              </div>
+                            )}
                           </div>
                         );
                       })}

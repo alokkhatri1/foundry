@@ -15424,36 +15424,27 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
   justify-self: end;
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  padding: 12px 24px;
+  gap: 10px;
+  padding: 10px 20px;
   background: var(--peach-deep);
   color: #fff;
   border: 1px solid var(--peach-deep);
-  border-radius: var(--radius-pill);
+  border-radius: 8px;
   font-family: var(--sans);
-  font-size: 14px;
-  font-weight: 600;
-  letter-spacing: 0.01em;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08), 0 4px 14px rgba(217, 119, 87, 0.22);
-  transition: background 0.12s, transform 0.12s, box-shadow 0.12s;
+  font-size: 13.5px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  transition: background 0.12s, border-color 0.12s;
   cursor: pointer;
 }
 .gr-print:hover {
   background: var(--orange, #d97757);
   border-color: var(--orange, #d97757);
-  transform: translateY(-1px);
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1), 0 6px 18px rgba(217, 119, 87, 0.32);
-}
-.gr-print:active {
-  transform: translateY(0);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08), 0 2px 8px rgba(217, 119, 87, 0.18);
 }
 .gr-print:disabled {
   background: var(--cream-deep);
   border-color: var(--cream-deep);
   color: var(--ink-muted);
-  box-shadow: none;
-  transform: none;
   cursor: wait;
 }
 

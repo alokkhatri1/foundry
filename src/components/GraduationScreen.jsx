@@ -173,7 +173,7 @@ export default function GraduationScreen({
           <Dimensions dimensions={scorecard.dimensions} />
         )}
         {!embedded && (
-          <Footer onSignOut={onSignOut} date={issuedDate} />
+          <Footer onSignOut={onSignOut} date={issuedDate} userName={userName} />
         )}
         <div className="gr-attribution">
           Foundry by{' '}
@@ -357,7 +357,44 @@ function Dimensions({ dimensions }) {
   );
 }
 
-function Footer({ onSignOut, date }) {
+function Footer({ onSignOut, date, userName }) {
+  const [downloading, setDownloading] = useState(false);
+
+  // Lazy-import jspdf + html2canvas only when the user actually clicks
+  // download. Both libs together are ~400KB; loading them upfront would
+  // bloat every participant's bundle for a button most won't click.
+  async function handleDownload() {
+    if (downloading) return;
+    setDownloading(true);
+    try {
+      const [{ default: html2canvas }, { jsPDF }] = await Promise.all([
+        import('html2canvas'),
+        import('jspdf'),
+      ]);
+      const el = document.querySelector('.gr-plate');
+      if (!el) return;
+      const canvas = await html2canvas(el, { scale: 2, backgroundColor: '#FBF4EE', useCORS: true });
+      const imgData = canvas.toDataURL('image/png');
+      const pdf = new jsPDF({ orientation: 'landscape', unit: 'pt', format: 'a4' });
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
+      const imgRatio = canvas.width / canvas.height;
+      const margin = 36;
+      const maxW = pageWidth - margin * 2;
+      const maxH = pageHeight - margin * 2;
+      let w = maxW;
+      let h = w / imgRatio;
+      if (h > maxH) { h = maxH; w = h * imgRatio; }
+      const x = (pageWidth - w) / 2;
+      const y = (pageHeight - h) / 2;
+      pdf.addImage(imgData, 'PNG', x, y, w, h);
+      const safeName = (userName || 'Participant').replace(/[^a-zA-Z0-9_-]+/g, '_');
+      pdf.save(`${safeName}_Foundry.pdf`);
+    } finally {
+      setDownloading(false);
+    }
+  }
+
   return (
     <footer className="gr-footer">
       <button type="button" className="gr-signout" onClick={onSignOut}>
@@ -373,8 +410,8 @@ function Footer({ onSignOut, date }) {
           <span className="gr-issuer-line-2">{date}</span>
         </div>
       </div>
-      <button type="button" className="gr-print" onClick={() => window.print()}>
-        Save as PDF
+      <button type="button" className="gr-print" onClick={handleDownload} disabled={downloading}>
+        {downloading ? 'Preparing…' : 'Download certificate'}
       </button>
     </footer>
   );

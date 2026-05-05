@@ -10122,6 +10122,26 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
   border-radius: 14px;
   overflow: hidden;
 }
+.cwb-editor .cwb-picker-toggle {
+  display: flex; align-items: center; justify-content: space-between;
+  width: 100%;
+  padding: 12px 16px;
+  background: transparent; border: none;
+  text-align: left; cursor: pointer;
+  font: inherit; color: inherit;
+  transition: background 0.12s;
+}
+.cwb-editor .cwb-picker-toggle:hover { background: var(--cream); }
+.cwb-editor .cwb-picker.is-open .cwb-picker-toggle {
+  border-bottom: 1px solid var(--rule-soft);
+}
+.cwb-editor .cwb-picker-toggle-label {
+  font-size: 13px; color: var(--ink-soft);
+  font-variant-numeric: tabular-nums;
+}
+.cwb-editor .cwb-picker-toggle-chevron {
+  font-size: 12px; color: var(--ink-muted);
+}
 .cwb-editor .cwb-picker-row {
   display: grid;
   grid-template-columns: auto 1fr auto;

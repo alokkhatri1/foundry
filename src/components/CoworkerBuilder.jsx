@@ -361,14 +361,30 @@ function FilePicker({ fileTree, selectedIds, onChange, folderName, onUpdateConte
     setCollapsedDepts(prev => ({ ...prev, [dept]: !prev[dept] }));
   }
 
-  // v2 picker \u2014 always-expanded flat list. Each row is a checkbox row;
-  // clicking the file name opens the preview modal (legacy behavior
-  // preserved). Drops the chip-and-Browse toggle in favor of seeing
-  // every available file at a glance, matching the v2 redesign.
+  // Picker is collapsed by default \u2014 the header strip shows the
+  // selected/total counts and acts as the toggle. Once expanded, each
+  // row is a checkbox; clicking the file name opens the preview modal.
+  // Collapsed-by-default keeps the coworker form readable when a room
+  // has accumulated dozens of knowledge / skills files.
   const allFiles = groups.flatMap(g => g.files);
+  const total = allFiles.length;
+  const selectedCount = selectedIds.filter(id => allFiles.some(f => f.id === id)).length;
   return (
-    <div className="cwb-picker">
-      {allFiles.length === 0 ? (
+    <div className={`cwb-picker${open ? ' is-open' : ''}`}>
+      <button
+        type="button"
+        className="cwb-picker-toggle"
+        onClick={() => setOpen(o => !o)}
+        aria-expanded={open}
+      >
+        <span className="cwb-picker-toggle-label">
+          {total === 0
+            ? `No ${folderName || ''} files yet`
+            : `${selectedCount} of ${total} ${folderName || 'file'}${total === 1 ? '' : 's'} selected`}
+        </span>
+        <span className="cwb-picker-toggle-chevron" aria-hidden>{open ? '\u25be' : '\u25b8'}</span>
+      </button>
+      {open && (total === 0 ? (
         <div className="cwb-picker-empty">No {folderName || ''} files yet. Create them in the Files tab.</div>
       ) : allFiles.map(f => {
         const isSelected = selectedIds.includes(f.id);
@@ -396,7 +412,7 @@ function FilePicker({ fileTree, selectedIds, onChange, folderName, onUpdateConte
             <span className="cwb-picker-ext">.md</span>
           </div>
         );
-      })}
+      }))}
       {previewFile && createPortal(
         <div className="ftp-preview-overlay" onClick={tryClosePreview}>
           <div className="ftp-preview-modal" onClick={e => e.stopPropagation()}>

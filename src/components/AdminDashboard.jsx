@@ -67,6 +67,24 @@ function WorkshopRow({ w, selected, onSelect, copied, onCopy, stats, dim }) {
   );
 }
 
+// Scaled feedback questions, shared between the per-cohort summary
+// (FeedbackResponses) and the per-participant card on the participants tab.
+const SCORE_FIELDS = [
+  { key: 'satisfaction',         label: 'Satisfaction' },
+  { key: 'relevance',            label: 'Relevance' },
+  { key: 'clarity',              label: 'Clarity' },
+  { key: 'trainer_knowledge',    label: 'Trainer knowledge' },
+  { key: 'trainer_delivery',     label: 'Trainer delivery' },
+  { key: 'trainer_engagement',   label: 'Trainer engagement' },
+  { key: 'materials_quality',    label: 'Slides & content' },
+  { key: 'theory_practice',      label: 'Explain / practice mix' },
+  { key: 'improved_skills',      label: 'Improved skills' },
+  { key: 'can_apply',            label: 'Can apply' },
+  { key: 'platform_rating',      label: 'Platform ease' },
+  { key: 'platform_reliability', label: 'Platform reliability' },
+  { key: 'platform_support',     label: 'Platform support' },
+];
+
 export default function AdminDashboard({ sb, user, onBack, onEnterWorkshop }) {
   const confirm = useConfirm();
   const [workshops, setWorkshops] = useState([]);
@@ -319,6 +337,38 @@ export default function AdminDashboard({ sb, user, onBack, onEnterWorkshop }) {
     return out;
   }, [scorecardData]);
 
+  // Index feedback rows by participant_name so each per-person card can
+  // pull its submitter's responses (or display a "not submitted" note).
+  const feedbackByName = useMemo(() => {
+    const map = new Map();
+    for (const f of (feedback || [])) {
+      if (f.participant_name) map.set(f.participant_name, f);
+    }
+    return map;
+  }, [feedback]);
+
+  // Per-participant engagement counters — what they actually built and
+  // sent during the workshop. Lives next to the level + feedback on the
+  // participants tab so the facilitator sees the whole person at a glance.
+  const engagementByName = useMemo(() => {
+    const out = {};
+    const files = content.files || [];
+    const cws = content.coworkers || [];
+    const wfs = content.workflows || [];
+    const runs = scorecardData?.workflowRuns || [];
+    const msgCounts = scorecardData?.messageCounts || {};
+    for (const p of humanParticipants) {
+      out[p.name] = {
+        messages: msgCounts[p.name] || 0,
+        coworkers: cws.filter(c => c.created_by === p.name).length,
+        files: files.filter(f => f.type === 'file' && f.created_by === p.name).length,
+        workflows: wfs.filter(w => w.created_by === p.name).length,
+        runs: runs.filter(r => r.startedBy === p.name).length,
+      };
+    }
+    return out;
+  }, [humanParticipants, content, scorecardData]);
+
   return (
     <div className="admin-shell">
       {/* Top bar */}
@@ -570,27 +620,68 @@ export default function AdminDashboard({ sb, user, onBack, onEnterWorkshop }) {
                   {humanParticipants.length === 0 ? (
                     <p className="admin-empty">No participants yet. Share the code to get started.</p>
                   ) : (
-                    <div className="admin-participants">
+                    <div className="admin-people">
                       {humanParticipants.map(p => {
                         const lvl = participantLevels[p.id];
+                        const eng = engagementByName[p.name] || {};
+                        const fb = feedbackByName.get(p.name);
                         return (
-                          <div key={p.id} className="admin-participant">
-                            <span className="admin-participant-dot" style={{ background: onlineNames.has(p.name) ? 'var(--accent-system)' : 'var(--border-color)' }} />
-                            <div className="admin-participant-ident">
-                              <span className="admin-participant-name">{p.name}</span>
-                              {p.email && <span className="admin-participant-email">{p.email}</span>}
+                          <div key={p.id} className="admin-person-card">
+                            <div className="admin-person-head">
+                              <span className="admin-participant-dot" style={{ background: onlineNames.has(p.name) ? 'var(--accent-system)' : 'var(--border-color)' }} />
+                              <div className="admin-participant-ident">
+                                <span className="admin-participant-name">{p.name}</span>
+                                {p.email && <span className="admin-participant-email">{p.email}</span>}
+                              </div>
+                              {scorecardData && typeof lvl === 'number' && (
+                                <span
+                                  className="admin-participant-grade"
+                                  style={{ background: LEVEL_COLORS[lvl], color: lvl === 0 ? 'var(--text-muted)' : '#fff' }}
+                                  title="Graduation scorecard — overall level"
+                                >
+                                  {LEVELS[lvl]}
+                                </span>
+                              )}
+                              <span className="admin-participant-status">{onlineNames.has(p.name) ? 'Online' : 'Offline'}</span>
+                              <span className="admin-participant-time">Joined {new Date(p.joined_at).toLocaleDateString()}</span>
                             </div>
-                            {scorecardData && typeof lvl === 'number' && (
-                              <span
-                                className="admin-participant-grade"
-                                style={{ background: LEVEL_COLORS[lvl], color: lvl === 0 ? 'var(--text-muted)' : '#fff' }}
-                                title="Graduation scorecard — overall level"
-                              >
-                                {LEVELS[lvl]}
-                              </span>
-                            )}
-                            <span className="admin-participant-status">{onlineNames.has(p.name) ? 'Online' : 'Offline'}</span>
-                            <span className="admin-participant-time">Joined {new Date(p.joined_at).toLocaleDateString()}</span>
+
+                            <div className="admin-person-section">
+                              <div className="admin-person-section-label">Engagement</div>
+                              <div className="admin-person-stats">
+                                <div className="admin-person-stat"><span className="v">{eng.messages || 0}</span><span className="l">messages</span></div>
+                                <div className="admin-person-stat"><span className="v">{eng.coworkers || 0}</span><span className="l">coworkers</span></div>
+                                <div className="admin-person-stat"><span className="v">{eng.files || 0}</span><span className="l">files</span></div>
+                                <div className="admin-person-stat"><span className="v">{eng.workflows || 0}</span><span className="l">workflows</span></div>
+                                <div className="admin-person-stat"><span className="v">{eng.runs || 0}</span><span className="l">runs</span></div>
+                              </div>
+                            </div>
+
+                            <div className="admin-person-section">
+                              <div className="admin-person-section-label">Feedback</div>
+                              {fb ? (
+                                <div className="admin-person-feedback">
+                                  <div className="admin-person-scores">
+                                    {SCORE_FIELDS.map(f => (
+                                      <div key={f.key} className="admin-person-score">
+                                        <span className="l">{f.label}</span>
+                                        <span className="v">{fb[f.key] ?? '—'}</span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                  <div className="admin-person-binary">
+                                    Recommend: <strong>{fb.would_recommend === true ? 'Yes' : fb.would_recommend === false ? 'No' : '—'}</strong>
+                                    {' · '}
+                                    Duration ok: <strong>{fb.duration_appropriate === true ? 'Yes' : fb.duration_appropriate === false ? 'No' : '—'}</strong>
+                                  </div>
+                                  {fb.most_valuable && (<div className="admin-person-text"><span className="l">Most valuable</span><div>{fb.most_valuable}</div></div>)}
+                                  {fb.future_topics && (<div className="admin-person-text"><span className="l">Future topics</span><div>{fb.future_topics}</div></div>)}
+                                  {fb.improvement_notes && (<div className="admin-person-text"><span className="l">Suggestions</span><div>{fb.improvement_notes}</div></div>)}
+                                </div>
+                              ) : (
+                                <div className="admin-person-feedback-empty">Hasn't submitted feedback yet.</div>
+                              )}
+                            </div>
                           </div>
                         );
                       })}
@@ -707,22 +798,8 @@ export default function AdminDashboard({ sb, user, onBack, onEnterWorkshop }) {
 // and average score per scaled question, then a list of individual rows
 // (most recent first) including any free-text answers. Anonymous-feeling but
 // still attributable so the trainer can reach out on specific responses.
-const SCORE_FIELDS = [
-  { key: 'satisfaction',         label: 'Satisfaction' },
-  { key: 'relevance',            label: 'Relevance' },
-  { key: 'clarity',              label: 'Clarity' },
-  { key: 'trainer_knowledge',    label: 'Trainer knowledge' },
-  { key: 'trainer_delivery',     label: 'Trainer delivery' },
-  { key: 'trainer_engagement',   label: 'Trainer engagement' },
-  { key: 'materials_quality',    label: 'Slides & content' },
-  { key: 'theory_practice',      label: 'Explain / practice mix' },
-  { key: 'improved_skills',      label: 'Improved skills' },
-  { key: 'can_apply',            label: 'Can apply' },
-  { key: 'platform_rating',      label: 'Platform ease' },
-  { key: 'platform_reliability', label: 'Platform reliability' },
-  { key: 'platform_support',     label: 'Platform support' },
-];
-
+// SCORE_FIELDS is declared at module scope above so the per-participant
+// card on the participants tab can pull from the same list.
 function FeedbackResponses({ rows }) {
   if (!rows || rows.length === 0) {
     return <p className="admin-feedback-empty">No feedback submitted yet.</p>;

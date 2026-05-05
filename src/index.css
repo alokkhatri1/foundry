@@ -210,6 +210,65 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
   letter-spacing: 0.2px; flex-shrink: 0;
 }
 
+/* Per-person card — identity + engagement counters + feedback rollup,
+   shown one card per human participant on the Participants tab. */
+.admin-people { display: flex; flex-direction: column; gap: 14px; }
+.admin-person-card {
+  background: var(--bg-white);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.admin-person-head {
+  display: flex; align-items: center; gap: 10px;
+}
+.admin-person-section { display: flex; flex-direction: column; gap: 8px; }
+.admin-person-section-label {
+  font-size: 10px; font-weight: 600; text-transform: uppercase;
+  letter-spacing: 0.12em; color: var(--text-muted);
+}
+.admin-person-stats {
+  display: flex; flex-wrap: wrap; gap: 16px 22px;
+}
+.admin-person-stat {
+  display: flex; align-items: baseline; gap: 6px;
+}
+.admin-person-stat .v {
+  font-size: 16px; font-weight: 600; color: var(--text-dark);
+  font-variant-numeric: tabular-nums;
+}
+.admin-person-stat .l {
+  font-size: 11px; color: var(--text-muted);
+  text-transform: uppercase; letter-spacing: 0.08em;
+}
+.admin-person-feedback { display: flex; flex-direction: column; gap: 10px; }
+.admin-person-scores {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 6px 14px;
+}
+.admin-person-score {
+  display: flex; justify-content: space-between; align-items: baseline;
+  font-size: 12.5px;
+}
+.admin-person-score .l { color: var(--text-muted); }
+.admin-person-score .v { font-weight: 600; color: var(--text-dark); font-variant-numeric: tabular-nums; }
+.admin-person-binary { font-size: 12.5px; color: var(--text-muted); }
+.admin-person-binary strong { color: var(--text-dark); font-weight: 600; }
+.admin-person-text { font-size: 12.5px; }
+.admin-person-text .l {
+  display: block;
+  font-size: 10px; font-weight: 600; text-transform: uppercase;
+  letter-spacing: 0.1em; color: var(--text-muted); margin-bottom: 2px;
+}
+.admin-person-text > div:not(.l) { color: var(--text-dark); white-space: pre-wrap; }
+.admin-person-feedback-empty {
+  font-size: 12.5px; color: var(--text-muted); font-style: italic;
+}
+
 /* Per-stage "see how this looks" example panel — see StageExamplePanel.jsx */
 .stage-example-panel {
   background: var(--bg-white); border: 1px solid var(--border-color);

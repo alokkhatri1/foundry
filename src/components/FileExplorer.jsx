@@ -142,6 +142,11 @@ export default function FileExplorer({ fileTree, selectedFileId, onSelectFile, o
   const currentFolder = findNode(fileTree, currentFolderId) || fileTree;
   const breadcrumb = buildPath(fileTree, currentFolderId);
   const rawItems = currentFolder.children || [];
+  // Example folders (createdBy === 'System') and anything inside them are
+  // read-only for participants — they're seeded reference material, not
+  // a workspace. Block creation, upload, and AI-draft entry points when
+  // any ancestor in the breadcrumb is system-owned.
+  const insideExample = breadcrumb.some(n => n.createdBy === 'System');
   const skillsRevealed = stageReached(currentStage, '4');
   // The example references folder (a canonical workflow file) is only
   // revealed once the copilot is unlocked at Stage 9 (after Capstone).
@@ -344,7 +349,7 @@ export default function FileExplorer({ fileTree, selectedFileId, onSelectFile, o
 
   function finalizeAiCreate(content) {
     const parent = findNode(fileTree, currentFolderId);
-    if (!parent || parent.type !== 'folder') {
+    if (!parent || parent.type !== 'folder' || insideExample) {
       setAiBusy(false);
       return;
     }
@@ -366,6 +371,7 @@ export default function FileExplorer({ fileTree, selectedFileId, onSelectFile, o
 
   function handleCreate() {
     if (!newName.trim()) return;
+    if (insideExample) return;
     const parent = findNode(fileTree, currentFolderId);
     if (!parent || parent.type !== 'folder') return;
 
@@ -498,6 +504,7 @@ export default function FileExplorer({ fileTree, selectedFileId, onSelectFile, o
   async function handleUploadFiles(e) {
     const files = Array.from(e.target.files);
     if (files.length === 0) return;
+    if (insideExample) { e.target.value = ''; return; }
     setUploading(true);
     setShowNewMenu(false);
 
@@ -562,11 +569,16 @@ export default function FileExplorer({ fileTree, selectedFileId, onSelectFile, o
           {isSkillsFolder && items.length > 0 && <EducationalCue cueId="files-instructions" show={showEducationalCues} />}
         </div>
         <div className="fl-toolbar-right">
-          <button className="fl-new" onClick={() => setShowNewMenu(!showNewMenu)}>
-            New
-            <span className="fl-new-arrow" aria-hidden>+</span>
-          </button>
-          {showNewMenu && (
+          {insideExample && (
+            <span className="fl-readonly-pill" title="Example content is read-only. Clone or create your own folder to add files.">Example · read-only</span>
+          )}
+          {!insideExample && (
+            <button className="fl-new" onClick={() => setShowNewMenu(!showNewMenu)}>
+              New
+              <span className="fl-new-arrow" aria-hidden>+</span>
+            </button>
+          )}
+          {!insideExample && showNewMenu && (
             <div className="fl-new-menu">
               {(isRoot || (!isLeafFolder && !isRoot)) && (
                 <button className="fl-new-option" onClick={() => openCreateModal('folder')}>

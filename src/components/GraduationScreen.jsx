@@ -373,7 +373,20 @@ function Footer({ onSignOut, date, userName }) {
       ]);
       const el = document.querySelector('.gr-plate');
       if (!el) return;
-      const canvas = await html2canvas(el, { scale: 2, backgroundColor: '#FBF4EE', useCORS: true });
+      const canvas = await html2canvas(el, {
+        scale: 2,
+        backgroundColor: '#FBF4EE',
+        useCORS: true,
+        // html2canvas@1.4.x can't parse color-mix() / oklab / oklch and
+        // throws when it hits one. The graduation level dot uses
+        // color-mix(in oklab, …) for its halo — strip those properties
+        // on the cloned DOM that html2canvas actually rasterises so the
+        // live page's halo stays intact while the PDF capture succeeds.
+        onclone: (clonedDoc) => {
+          const dots = clonedDoc.querySelectorAll('.gr-plate-level-dot');
+          dots.forEach(d => { d.style.boxShadow = 'none'; });
+        },
+      });
       const imgData = canvas.toDataURL('image/png');
       const pdf = new jsPDF({ orientation: 'landscape', unit: 'pt', format: 'a4' });
       const pageWidth = pdf.internal.pageSize.getWidth();
@@ -390,6 +403,9 @@ function Footer({ onSignOut, date, userName }) {
       pdf.addImage(imgData, 'PNG', x, y, w, h);
       const safeName = (userName || 'Participant').replace(/[^a-zA-Z0-9_-]+/g, '_');
       pdf.save(`${safeName}_Foundry.pdf`);
+    } catch (err) {
+      console.error('[graduation] certificate download failed:', err);
+      alert('Could not generate the certificate PDF. Please try again, or take a screenshot of this page.');
     } finally {
       setDownloading(false);
     }

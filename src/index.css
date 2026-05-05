@@ -225,6 +225,27 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
 .admin-person-head {
   display: flex; align-items: center; gap: 10px;
 }
+.admin-person-headline {
+  display: flex; flex-wrap: wrap; gap: 18px 32px;
+  padding: 10px 12px;
+  background: var(--bg-cream, var(--bg-white));
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+}
+.admin-person-headline-stat {
+  display: flex; flex-direction: column; gap: 2px;
+}
+.admin-person-headline-stat .l {
+  font-size: 10px; font-weight: 600; text-transform: uppercase;
+  letter-spacing: 0.12em; color: var(--text-muted);
+}
+.admin-person-headline-stat .v {
+  font-size: 20px; font-weight: 600; color: var(--text-dark);
+  font-variant-numeric: tabular-nums;
+}
+.admin-person-headline-stat .sub {
+  font-size: 11px; color: var(--text-muted); font-variant-numeric: tabular-nums;
+}
 .admin-person-section { display: flex; flex-direction: column; gap: 8px; }
 .admin-person-section-label {
   font-size: 10px; font-weight: 600; text-transform: uppercase;

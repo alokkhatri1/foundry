@@ -99,6 +99,7 @@ export default function AdminDashboard({ sb, user, onBack, onEnterWorkshop }) {
   const [content, setContent] = useState({});
   const [activity, setActivity] = useState([]);
   const [feedback, setFeedback] = useState([]);
+  const [usage, setUsage] = useState([]);
   const [scorecardData, setScorecardData] = useState(null);
   const [detailTab, setDetailTab] = useState('stages');
   const [copied, setCopied] = useState(null);
@@ -251,14 +252,16 @@ export default function AdminDashboard({ sb, user, onBack, onEnterWorkshop }) {
     setDetailTab('stages');
     setMenuOpen(false);
     setScorecardData(null);
+    setUsage([]);
     const requestedId = workshop.id;
     selectionTokenRef.current = requestedId;
-    const [p, c, a, sc, fb] = await Promise.all([
+    const [p, c, a, sc, fb, uz] = await Promise.all([
       sb.loadWorkshopParticipants(workshop.id),
       sb.loadWorkshopContent(workshop.id),
       sb.loadWorkshopActivity(workshop.id),
       sb.loadAdminScorecardData(workshop.id),
       sb.loadAllFeedback(workshop.id),
+      sb.loadAdminWorkshopUsage(workshop.id),
     ]);
     // Guard against rapid-fire clicks: if the admin clicked a different
     // workshop while these loads were in flight, the selection token has
@@ -271,6 +274,7 @@ export default function AdminDashboard({ sb, user, onBack, onEnterWorkshop }) {
     setActivity(a);
     setScorecardData(sc);
     setFeedback(fb || []);
+    setUsage(uz || []);
     const unsub = sb.subscribeToWorkshopPresence(workshop.id, setOnlineUsers);
     return unsub;
   }
@@ -346,6 +350,38 @@ export default function AdminDashboard({ sb, user, onBack, onEnterWorkshop }) {
     }
     return map;
   }, [feedback]);
+
+  // Sum input + output + cache tokens per participant id. Cost is summed
+  // alongside so the card can show both raw token volume and dollar spend.
+  const tokensByPid = useMemo(() => {
+    const out = {};
+    for (const r of (usage || [])) {
+      const pid = r.participant_id;
+      if (!pid) continue;
+      const tokens = (r.input_tokens || 0) + (r.output_tokens || 0)
+        + (r.cache_creation_input_tokens || 0) + (r.cache_read_input_tokens || 0);
+      if (!out[pid]) out[pid] = { tokens: 0, cost: 0 };
+      out[pid].tokens += tokens;
+      out[pid].cost += Number(r.cost_usd) || 0;
+    }
+    return out;
+  }, [usage]);
+
+  // Sum a participant's 13 scaled feedback scores into a single
+  // out-of-65 total. Returns null when the participant hasn't submitted
+  // (any null/undefined score collapses the total to "—" so a partial
+  // row doesn't get shown as a misleading low number).
+  const FEEDBACK_MAX = SCORE_FIELDS.length * 5;
+  const totalScoreFor = (fb) => {
+    if (!fb) return null;
+    let sum = 0;
+    for (const f of SCORE_FIELDS) {
+      const v = Number(fb[f.key]);
+      if (!Number.isFinite(v)) return null;
+      sum += v;
+    }
+    return sum;
+  };
 
   // Per-participant engagement counters — what they actually built and
   // sent during the workshop. Lives next to the level + feedback on the
@@ -625,6 +661,8 @@ export default function AdminDashboard({ sb, user, onBack, onEnterWorkshop }) {
                         const lvl = participantLevels[p.id];
                         const eng = engagementByName[p.name] || {};
                         const fb = feedbackByName.get(p.name);
+                        const tk = tokensByPid[p.id] || { tokens: 0, cost: 0 };
+                        const totalScore = totalScoreFor(fb);
                         return (
                           <div key={p.id} className="admin-person-card">
                             <div className="admin-person-head">
@@ -644,6 +682,22 @@ export default function AdminDashboard({ sb, user, onBack, onEnterWorkshop }) {
                               )}
                               <span className="admin-participant-status">{onlineNames.has(p.name) ? 'Online' : 'Offline'}</span>
                               <span className="admin-participant-time">Joined {new Date(p.joined_at).toLocaleDateString()}</span>
+                            </div>
+
+                            <div className="admin-person-headline">
+                              <div className="admin-person-headline-stat">
+                                <span className="l">Total score</span>
+                                <span className="v">
+                                  {totalScore !== null ? `${totalScore} / ${FEEDBACK_MAX}` : '—'}
+                                </span>
+                              </div>
+                              <div className="admin-person-headline-stat">
+                                <span className="l">Tokens used</span>
+                                <span className="v">{tk.tokens.toLocaleString()}</span>
+                                {tk.cost > 0 && (
+                                  <span className="sub">${tk.cost.toFixed(2)}</span>
+                                )}
+                              </div>
                             </div>
 
                             <div className="admin-person-section">

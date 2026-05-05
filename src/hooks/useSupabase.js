@@ -1100,6 +1100,20 @@ export default function useSupabase() {
     return data || [];
   }, []);
 
+  // Admin variant of loadWorkshopUsage — takes an explicit workshopId
+  // since the admin viewing a room isn't joined as a participant
+  // (roomIdRef is empty in that flow). Returns the columns the per-person
+  // rollup on the Participants tab needs to sum tokens + cost.
+  const loadAdminWorkshopUsage = useCallback(async (workshopId) => {
+    if (!isSupabaseConfigured || !workshopId) return [];
+    const { data, error } = await supabase
+      .from('llm_usage')
+      .select('participant_id, input_tokens, output_tokens, cache_creation_input_tokens, cache_read_input_tokens, cost_usd')
+      .eq('workshop_id', workshopId);
+    if (error) { console.warn('loadAdminWorkshopUsage:', error.message); return []; }
+    return data || [];
+  }, []);
+
   const loadMyUsage = useCallback(async (participantId) => {
     if (!isSupabaseConfigured || !roomIdRef.current || !participantId) return [];
     const { data, error } = await supabase
@@ -1354,7 +1368,7 @@ export default function useSupabase() {
     loadWorkflows, saveWorkflow, deleteWorkflow,
     saveMessage, saveWorkflowRun, loadWorkflowRuns, loadApprovals, loadAllRoomApprovals, logToolCall, logApproval,
     logLlmUsage, loadMyUsage, subscribeToMyUsage,
-    loadWorkshopUsage, subscribeToWorkshopUsage, loadRunUsage,
+    loadWorkshopUsage, subscribeToWorkshopUsage, loadRunUsage, loadAdminWorkshopUsage,
     subscribeToRoom, trackPresence, leavePresence,
     loadMyFeedback, saveFeedback, loadAllFeedback,
     loadCapstoneDraft, saveCapstoneDraft,

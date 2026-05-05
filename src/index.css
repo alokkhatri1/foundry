@@ -10754,7 +10754,7 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
   overflow: hidden;
   background: var(--cream);
 }
-.wf-editor .wf-editor-canvas-wrap.copilot-open { grid-template-columns: 1fr 380px; }
+.wf-editor .wf-editor-canvas-wrap.copilot-open { grid-template-columns: 1fr 520px; }
 .wf-editor .wf-editor-canvas-wrap.copilot-hidden { grid-template-columns: 1fr; }
 .wf-editor .wf-editor-canvas-wrap > .wf-editor-canvas {
   position: relative;
@@ -10872,11 +10872,13 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
 .wf-editor .wf-copilot-body {
   flex: 1;
   overflow-y: auto;
-  padding: 18px;
+  padding: 22px 24px;
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 16px;
   min-height: 0;
+  font-size: 14px;
+  line-height: 1.65;
 }
 .wf-editor .wf-copilot-empty {
   font-size: 13px;
@@ -10892,8 +10894,8 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
   font-style: italic;
 }
 .wf-editor .wf-copilot-msg {
-  font-size: 13px;
-  line-height: 1.6;
+  font-size: 14px;
+  line-height: 1.65;
   background: transparent;
   border: none;
   padding: 0;

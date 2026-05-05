@@ -671,7 +671,21 @@ function App() {
           const mapped = mapFileRow(row);
           setFlatFiles(prev => {
             const idx = prev.findIndex(f => f.id === mapped.id);
-            return idx >= 0 ? prev.map(f => f.id === mapped.id ? mapped : f) : [...prev, mapped];
+            if (idx < 0) return [...prev, mapped];
+            return prev.map(f => {
+              if (f.id !== mapped.id) return f;
+              // Realtime can deliver content as null/undefined for larger
+              // rows (parsed PDFs, AI-drafted knowledge files) when the
+              // payload exceeds Supabase's per-message cap. Replacing the
+              // local row wholesale would erase the body until a refetch.
+              // Keep the local string when the incoming payload doesn't
+              // carry one — same content-preservation rule used by
+              // flattenTree and saveFile.
+              if (typeof mapped.content !== 'string' && typeof f.content === 'string') {
+                return { ...mapped, content: f.content };
+              }
+              return mapped;
+            });
           });
         }
       },

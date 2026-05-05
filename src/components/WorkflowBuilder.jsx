@@ -1336,9 +1336,28 @@ function WorkflowCard({ workflow, coworkers, participants, onSelect, onDelete, o
 }
 
 // ===== Main Export =====
+// Persist which workflow the participant has open so a refresh — common
+// when they advance into the copilot stage — drops them back into the
+// editor instead of bouncing them to the workflow list. The actual
+// workflow data is already saved to Supabase on every edit; this just
+// remembers the navigation state.
+const SELECTED_WF_KEY = 'foundry:wf-editor-selected';
+
 export default function WorkflowBuilder({ workflows, onUpdateWorkflows, fileTree, coworkers, tools, onRun, onCancelRun, onCancelAllRuns, workflowRuns = [], participants, currentUserName, showEducationalCues, callClaudeAPI, onSaveCoworkerToLibrary, onUpdateFileContent, onCopilotUsage, copilotEnabled = true, capstoneSendoff = null, onConsumeCapstoneSendoff }) {
   const confirm = useConfirm();
-  const [selectedWorkflowId, setSelectedWorkflowId] = useState(null);
+  const [selectedWorkflowId, setSelectedWorkflowId] = useState(() => {
+    try { return localStorage.getItem(SELECTED_WF_KEY) || null; } catch { return null; }
+  });
+  // Mirror selection to localStorage so a refresh restores the editor
+  // for the same workflow. Cleared explicitly on Back; a stale id from
+  // another room is harmless because the editor falls back to the list
+  // when the id no longer matches any loaded workflow.
+  useEffect(() => {
+    try {
+      if (selectedWorkflowId) localStorage.setItem(SELECTED_WF_KEY, selectedWorkflowId);
+      else localStorage.removeItem(SELECTED_WF_KEY);
+    } catch {}
+  }, [selectedWorkflowId]);
   // Copilot transcript state lives up here so it survives closing the panel,
   // navigating back to the list, and switching between workflows. History is
   // a ref per workflow because it only needs to be readable by the async

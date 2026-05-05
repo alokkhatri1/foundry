@@ -338,7 +338,7 @@ function Dimensions({ dimensions }) {
         <div>
           <div className="gr-section-eyebrow">Witnessed by your work</div>
           <h2 className="gr-section-title">
-            Five primitives,&nbsp;<em>five ladders</em>.
+            Six primitives,&nbsp;<em>six ladders</em>.
           </h2>
         </div>
         <div className="gr-ladder-key" aria-label="Level legend">

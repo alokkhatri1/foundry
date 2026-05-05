@@ -674,14 +674,18 @@ function App() {
             if (idx < 0) return [...prev, mapped];
             return prev.map(f => {
               if (f.id !== mapped.id) return f;
-              // Realtime can deliver content as null/undefined for larger
-              // rows (parsed PDFs, AI-drafted knowledge files) when the
-              // payload exceeds Supabase's per-message cap. Replacing the
-              // local row wholesale would erase the body until a refetch.
-              // Keep the local string when the incoming payload doesn't
-              // carry one — same content-preservation rule used by
-              // flattenTree and saveFile.
-              if (typeof mapped.content !== 'string' && typeof f.content === 'string') {
+              // Realtime can deliver content as null / undefined / empty
+              // for larger rows (parsed PDFs, AI-drafted knowledge files)
+              // when the payload exceeds Supabase's per-message cap, or
+              // when an UPDATE event omits the body. Replacing the local
+              // row wholesale would erase the body until a refetch and —
+              // worse — the next tree-wide save would write the empty
+              // payload back to the DB, cementing the loss. Keep the
+              // local body whenever the incoming payload doesn't bring a
+              // real one. Mirrors flattenTree / saveFile's typeof check.
+              const incomingHasBody = typeof mapped.content === 'string' && mapped.content.length > 0;
+              const localHasBody = typeof f.content === 'string' && f.content.length > 0;
+              if (!incomingHasBody && localHasBody) {
                 return { ...mapped, content: f.content };
               }
               return mapped;
@@ -1131,7 +1135,16 @@ function App() {
     if ((!content || content.trim().length === 0) && EXAMPLE_FILE_CONTENT[fileId]) {
       content = EXAMPLE_FILE_CONTENT[fileId];
     }
-    setFlatFiles(prev => prev.map(f => f.id === fileId ? { ...f, content: content ?? '' } : f));
+    // Only cache a non-empty string. If the DB returned null / empty and
+    // there's no example fallback, leave the row's content as null — that
+    // way flattenTree (which only carries content when typeof === 'string')
+    // won't propagate an empty string forward on the next tree-wide save
+    // and overwrite a real DB body that may arrive shortly after via a
+    // realtime echo. The earlier `content ?? ''` was cementing empty into
+    // the DB the moment any other tree-touching action ran (e.g. a stage
+    // transition firing the FileExplorer migration effect).
+    const next = (typeof content === 'string' && content.length > 0) ? content : null;
+    setFlatFiles(prev => prev.map(f => f.id === fileId ? { ...f, content: next } : f));
   }
 
   // Self-heal: the seeded "reference.md" example file (formerly blueprint.md)

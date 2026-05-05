@@ -4,7 +4,7 @@ import { parseFile, getFileIcon, getFileCategory } from '../utils/fileParser';
 import EducationalCue from './EducationalCue';
 import { stageReached } from './RevealAt';
 import { useConfirm } from './ConfirmDialog';
-import { addChildToTree, removeNodeFromTree, moveNodeInTree } from '../utils/treeUtils';
+import { addChildToTree, removeNodeFromTree, moveNodeInTree, updateNodeInTree } from '../utils/treeUtils';
 
 const SKILL_TEMPLATE = INSTRUCTION_TEMPLATE;
 
@@ -130,6 +130,8 @@ export default function FileExplorer({ fileTree, selectedFileId, onSelectFile, o
   const uploadInputRef = useRef(null);
   const [dragItemId, setDragItemId] = useState(null);
   const [dropTargetId, setDropTargetId] = useState(null);
+  const [renamingId, setRenamingId] = useState(null);
+  const [renameDraft, setRenameDraft] = useState('');
   // Create-with-AI modal state
   const [aiModalOpen, setAiModalOpen] = useState(false);
   const [aiPrompt, setAiPrompt] = useState('');
@@ -400,6 +402,29 @@ export default function FileExplorer({ fileTree, selectedFileId, onSelectFile, o
     onUpdateTree(removeNodeFromTree(fileTree, nodeId));
     if (selectedFileId === nodeId) onSelectFile(null);
     if (currentFolderId === nodeId) setCurrentFolderId(fileTree.id);
+  }
+
+  function startRename(e, node) {
+    e.stopPropagation();
+    setRenamingId(node.id);
+    setRenameDraft(node.name);
+  }
+
+  function commitRename(node) {
+    const trimmed = renameDraft.trim();
+    if (!trimmed || trimmed === node.name) {
+      setRenamingId(null);
+      return;
+    }
+    let nextName = trimmed;
+    if (node.type === 'file' && !nextName.endsWith('.md')) nextName += '.md';
+    onUpdateTree(updateNodeInTree(fileTree, node.id, n => ({ ...n, name: nextName })));
+    setRenamingId(null);
+  }
+
+  function cancelRename() {
+    setRenamingId(null);
+    setRenameDraft('');
   }
 
   // ===== Drag & Drop: move items into folders =====
@@ -680,7 +705,22 @@ export default function FileExplorer({ fileTree, selectedFileId, onSelectFile, o
                 <div className="fl-card-icon">
                   <FolderIcon color={getFolderColor(folder.name)} />
                 </div>
-                <div className="fl-card-name">{folder.name}</div>
+                {renamingId === folder.id ? (
+                  <input
+                    autoFocus
+                    className="fl-card-name fl-card-name-input"
+                    value={renameDraft}
+                    onClick={e => e.stopPropagation()}
+                    onChange={e => setRenameDraft(e.target.value)}
+                    onKeyDown={e => {
+                      if (e.key === 'Enter') { e.preventDefault(); commitRename(folder); }
+                      if (e.key === 'Escape') { e.preventDefault(); cancelRename(); }
+                    }}
+                    onBlur={() => commitRename(folder)}
+                  />
+                ) : (
+                  <div className="fl-card-name">{folder.name}</div>
+                )}
                 {getFolderDescription(folder.name) && (
                   <div className="fl-card-desc">{getFolderDescription(folder.name)}</div>
                 )}
@@ -691,7 +731,10 @@ export default function FileExplorer({ fileTree, selectedFileId, onSelectFile, o
                   {folderCount === 0 && fileCount === 0 && 'Empty'}
                 </div>
                 {folder.name !== 'knowledge' && folder.name !== 'skills' && folder.createdBy === userName && (
-                  <button className="fl-card-action-delete" onClick={e => handleDelete(e, folder.id)} title="Delete">{'✕'}</button>
+                  <>
+                    <button className="fl-card-action-rename" onClick={e => startRename(e, folder)} title="Rename">{'✎'}</button>
+                    <button className="fl-card-action-delete" onClick={e => handleDelete(e, folder.id)} title="Delete">{'✕'}</button>
+                  </>
                 )}
               </div>
             );
@@ -716,7 +759,22 @@ export default function FileExplorer({ fileTree, selectedFileId, onSelectFile, o
                 <div className="fl-card-icon">
                   <FileIcon />
                 </div>
-                <div className="fl-card-name">{file.name}</div>
+                {renamingId === file.id ? (
+                  <input
+                    autoFocus
+                    className="fl-card-name fl-card-name-input"
+                    value={renameDraft}
+                    onClick={e => e.stopPropagation()}
+                    onChange={e => setRenameDraft(e.target.value)}
+                    onKeyDown={e => {
+                      if (e.key === 'Enter') { e.preventDefault(); commitRename(file); }
+                      if (e.key === 'Escape') { e.preventDefault(); cancelRename(); }
+                    }}
+                    onBlur={() => commitRename(file)}
+                  />
+                ) : (
+                  <div className="fl-card-name">{file.name}</div>
+                )}
                 <div className="fl-card-meta">
                   {lines === null ? '' : (lines > 0 ? `${lines} ${lines === 1 ? 'line' : 'lines'}` : 'Empty')}
                   {authorLabel && (
@@ -725,7 +783,10 @@ export default function FileExplorer({ fileTree, selectedFileId, onSelectFile, o
                 </div>
                 {isSystem && <span className="fl-card-badge">Example</span>}
                 {file.createdBy === userName && (
-                  <button className="fl-card-action-delete" onClick={e => handleDelete(e, file.id)} title="Delete">{'✕'}</button>
+                  <>
+                    <button className="fl-card-action-rename" onClick={e => startRename(e, file)} title="Rename">{'✎'}</button>
+                    <button className="fl-card-action-delete" onClick={e => handleDelete(e, file.id)} title="Delete">{'✕'}</button>
+                  </>
                 )}
               </div>
             );

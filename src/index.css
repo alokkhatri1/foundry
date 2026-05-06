@@ -437,6 +437,74 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
 .admin-stat-num { font-size: 24px; font-weight: 800; color: var(--text-dark); }
 .admin-stat-label { font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-top: 2px; }
 
+/* Workshop Recap — five-stat headline strip above the detail tabs.
+   Compresses how the room landed (NPS, satisfaction, learning, trainer,
+   response rate) into one glance. */
+.admin-recap {
+  background: var(--bg-white);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  padding: 16px 20px;
+  margin-bottom: 14px;
+}
+.admin-recap-eyebrow {
+  font-size: 10px; font-weight: 600; text-transform: uppercase;
+  letter-spacing: 0.14em; color: var(--text-muted);
+  display: block; margin-bottom: 12px;
+}
+.admin-recap-stats {
+  display: flex; gap: 18px 28px; flex-wrap: wrap;
+}
+.admin-recap-stat {
+  display: flex; flex-direction: column; gap: 2px;
+  min-width: 100px;
+}
+.admin-recap-stat-label {
+  font-size: 10px; font-weight: 600; text-transform: uppercase;
+  letter-spacing: 0.1em; color: var(--text-muted);
+}
+.admin-recap-stat-value {
+  font-size: 26px; font-weight: 600; color: var(--text-dark);
+  font-variant-numeric: tabular-nums; line-height: 1.1;
+}
+.admin-recap-stat.is-headline .admin-recap-stat-value { color: var(--peach-deep, #d97757); }
+.admin-recap-stat-hint {
+  font-size: 11px; color: var(--text-muted); font-variant-numeric: tabular-nums;
+}
+
+/* Engagement curve — sorted token-usage bars across the cohort. */
+.admin-engagement {
+  background: var(--bg-white);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  padding: 16px 20px;
+  margin-bottom: 20px;
+}
+.admin-engagement-head {
+  display: flex; flex-direction: column; gap: 4px;
+  margin-bottom: 12px;
+}
+.admin-engagement-meta {
+  font-size: 12px; color: var(--text-muted);
+}
+.admin-engagement-meta strong {
+  color: var(--text-dark); font-weight: 600;
+}
+.admin-engagement-bars {
+  display: flex; align-items: flex-end; gap: 2px;
+  height: 80px;
+  padding: 4px 0;
+}
+.admin-engagement-bar {
+  flex: 1;
+  min-width: 4px;
+  background: var(--peach-deep, #d97757);
+  border-radius: 2px 2px 0 0;
+  opacity: 0.78;
+  transition: opacity 0.12s;
+}
+.admin-engagement-bar:hover { opacity: 1; }
+
 /* Admin tabs */
 .admin-tabs { display: flex; gap: 0; border-bottom: 1px solid var(--border-color); margin-bottom: 20px; }
 .admin-tab {

@@ -596,6 +596,16 @@ export default function AdminDashboard({ sb, user, onBack, onEnterWorkshop }) {
                 </div>
               </div>
 
+              {/* Workshop-level signal: how the room landed */}
+              <WorkshopRecap
+                feedback={feedback}
+                humanParticipants={humanParticipants}
+              />
+              <EngagementCurve
+                humanParticipants={humanParticipants}
+                tokensByPid={tokensByPid}
+              />
+
               {/* Sub-tabs */}
               <div className="admin-tabs">
                 {['stages', 'participants', 'content', 'activity', 'feedback'].map(tab => (
@@ -895,6 +905,122 @@ export default function AdminDashboard({ sb, user, onBack, onEnterWorkshop }) {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+// Workshop Recap — five headline numbers compressing "how the room landed"
+// into one strip. NPS is a -100..+100 collapse of would_recommend (no
+// passives — this isn't a 0-10 scale, just promoter % minus detractor %).
+// Trainer is a composite of the three trainer-specific scores so it reads
+// as a single brand metric.
+function WorkshopRecap({ feedback, humanParticipants }) {
+  const responseCount = feedback.length;
+  const totalCount = humanParticipants.length;
+  const responseRate = totalCount > 0 ? Math.round((responseCount / totalCount) * 100) : 0;
+
+  let promoters = 0, detractors = 0, recommendRows = 0;
+  for (const f of feedback) {
+    if (f.would_recommend === true) { promoters++; recommendRows++; }
+    else if (f.would_recommend === false) { detractors++; recommendRows++; }
+  }
+  const nps = recommendRows > 0
+    ? Math.round((promoters / recommendRows) * 100 - (detractors / recommendRows) * 100)
+    : null;
+
+  const avgOf = (field) => {
+    const vals = feedback.map(r => Number(r[field])).filter(v => Number.isFinite(v));
+    return vals.length > 0 ? vals.reduce((a, b) => a + b, 0) / vals.length : null;
+  };
+  const avgSatisfaction = avgOf('satisfaction');
+  const avgImproved = avgOf('improved_skills');
+  const trainerComposite = (() => {
+    const parts = ['trainer_knowledge', 'trainer_delivery', 'trainer_engagement'].map(avgOf).filter(v => v !== null);
+    if (parts.length === 0) return null;
+    return parts.reduce((a, b) => a + b, 0) / parts.length;
+  })();
+
+  const fmtScore = (v) => v === null ? '—' : v.toFixed(1);
+  const fmtNps = (v) => v === null ? '—' : (v > 0 ? `+${v}` : `${v}`);
+
+  return (
+    <div className="admin-recap">
+      <div className="admin-recap-eyebrow">Workshop recap</div>
+      <div className="admin-recap-stats">
+        <div className="admin-recap-stat is-headline">
+          <span className="admin-recap-stat-label">NPS</span>
+          <span className="admin-recap-stat-value">{fmtNps(nps)}</span>
+          <span className="admin-recap-stat-hint">{recommendRows ? `${recommendRows} responded` : 'No responses yet'}</span>
+        </div>
+        <div className="admin-recap-stat">
+          <span className="admin-recap-stat-label">Satisfaction</span>
+          <span className="admin-recap-stat-value">{fmtScore(avgSatisfaction)}</span>
+          <span className="admin-recap-stat-hint">of 5</span>
+        </div>
+        <div className="admin-recap-stat">
+          <span className="admin-recap-stat-label">Improved skills</span>
+          <span className="admin-recap-stat-value">{fmtScore(avgImproved)}</span>
+          <span className="admin-recap-stat-hint">of 5</span>
+        </div>
+        <div className="admin-recap-stat">
+          <span className="admin-recap-stat-label">Trainer</span>
+          <span className="admin-recap-stat-value">{fmtScore(trainerComposite)}</span>
+          <span className="admin-recap-stat-hint">composite of 5</span>
+        </div>
+        <div className="admin-recap-stat">
+          <span className="admin-recap-stat-label">Response rate</span>
+          <span className="admin-recap-stat-value">{`${responseRate}%`}</span>
+          <span className="admin-recap-stat-hint">{`${responseCount} of ${totalCount}`}</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Engagement curve — sorted token usage across the cohort. Tells you at
+// a glance whether 5 power users carried the room or it moved together.
+// The eyebrow line summarises the gap explicitly so the bars are
+// supporting evidence, not the only signal.
+function EngagementCurve({ humanParticipants, tokensByPid }) {
+  const list = humanParticipants.map(p => ({
+    name: p.name,
+    tokens: (tokensByPid[p.id] || { tokens: 0 }).tokens,
+  }));
+  list.sort((a, b) => b.tokens - a.tokens);
+
+  const total = list.reduce((a, b) => a + b.tokens, 0);
+  const max = list.length > 0 ? list[0].tokens : 0;
+  if (list.length === 0 || max === 0) return null;
+
+  const mid = Math.floor(list.length / 2);
+  const median = list.length % 2 === 0 && list.length > 0
+    ? (list[mid - 1].tokens + list[mid].tokens) / 2
+    : list[mid].tokens;
+
+  const top20Count = Math.max(1, Math.floor(list.length * 0.2));
+  const top20 = list.slice(0, top20Count).reduce((a, b) => a + b.tokens, 0);
+  const bottom20 = list.slice(-top20Count).reduce((a, b) => a + b.tokens, 0);
+  const top20Pct = total > 0 ? Math.round((top20 / total) * 100) : 0;
+  const bottom20Pct = total > 0 ? Math.round((bottom20 / total) * 100) : 0;
+
+  return (
+    <div className="admin-engagement">
+      <div className="admin-engagement-head">
+        <span className="admin-recap-eyebrow">Engagement curve</span>
+        <span className="admin-engagement-meta">
+          Top 20% used <strong>{top20Pct}%</strong> of tokens · Bottom 20% used <strong>{bottom20Pct}%</strong> · Median <strong>{Math.round(median).toLocaleString()}</strong>
+        </span>
+      </div>
+      <div className="admin-engagement-bars" role="img" aria-label={`${list.length} participants ranked by token usage`}>
+        {list.map((s, i) => (
+          <div
+            key={`${s.name}-${i}`}
+            className="admin-engagement-bar"
+            style={{ height: `${Math.max(2, (s.tokens / max) * 100)}%` }}
+            title={`${s.name}: ${s.tokens.toLocaleString()} tokens`}
+          />
+        ))}
+      </div>
     </div>
   );
 }

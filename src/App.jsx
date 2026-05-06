@@ -413,11 +413,15 @@ function App() {
   // full participant UI for browsing. Cleared on leave.
   const [bypassDeprecation, setBypassDeprecation] = useState(false);
   const [currentStage, setCurrentStage] = useState('6');
-  // Per-stage reflection prompt — fires when the user advances OUT of a
-  // primitive-teaching stage (3-10). Holds the *previous* stage to ask
-  // about; cleared on submit / skip. The transition is detected in the
-  // existing previousStageRef effect below.
-  const [pendingReflectionStage, setPendingReflectionStage] = useState(null);
+  // Per-stage reflection state. Tracks which stages this participant has
+  // already submitted a reflection for; the pending stage is *derived*
+  // from currentStage minus the submitted set. That way: live transitions,
+  // refreshes, late joiners, and any prompts missed during the schema-
+  // cache outage all surface the same way — the modal shows the lowest
+  // unsubmitted reflection stage that the participant has advanced past.
+  // null sentinel = "still loading from DB", which prevents a flash of
+  // the modal before we know what's already submitted.
+  const [submittedReflections, setSubmittedReflections] = useState(null);
   // Credit budget: allocation is per-room (admin-configurable), bonus is
   // per-participant (admin-grantable). Used-credits is derived live from
   // the workshop's llm_usage rows in the settings menu's credits hook.
@@ -463,17 +467,10 @@ function App() {
     previousStageRef.current = currentStage;
     if (prev !== null && prev !== currentStage && currentStage !== '1') {
       setJustRevealed(currentStage);
-      // Per-stage reflection: the participant just advanced OUT of `prev`,
-      // so ask them to reflect on that stage while it's fresh. Only fire
-      // for forward advances out of primitive-teaching stages (3-10);
-      // intros and the graduation-final transition skip this.
-      if (REFLECTION_STAGES.has(prev)) {
-        const prevIdx = STAGE_ORDER.indexOf(prev);
-        const newIdx = STAGE_ORDER.indexOf(currentStage);
-        if (prevIdx >= 0 && newIdx > prevIdx) {
-          setPendingReflectionStage(prev);
-        }
-      }
+      // Per-stage reflection prompts are now driven by the
+      // submittedReflections memo below, not by transition events —
+      // so a refresh, late join, or schema-cache hiccup all still
+      // surface any unanswered prompt the next render.
       // Graduation — the whole-room moment. Snap every participant
       // to the graduation tab so they see their scorecard together. Later
       // navigation away is fine; this only fires on the transition.
@@ -494,6 +491,45 @@ function App() {
       setActiveTab('chat');
     }
   }, [currentStage, activeTab]);
+
+  // Load the participant's existing reflections once we know who they
+  // are. The set seeds the modal-driver memo below so a refresh, late
+  // join, or post-outage retry all see any unanswered prompts they
+  // would have got via a live transition.
+  useEffect(() => {
+    if (!myParticipantId || !sb) return;
+    let cancelled = false;
+    sb.loadMyStageReflections(myParticipantId).then(rows => {
+      if (cancelled) return;
+      setSubmittedReflections(new Set((rows || []).map(r => String(r.stage))));
+    }).catch(() => {
+      if (!cancelled) setSubmittedReflections(new Set());
+    });
+    return () => { cancelled = true; };
+  }, [myParticipantId, sb]);
+
+  // Reflection stages, ordered. Memoised once because both inputs are
+  // stable module-level constants.
+  const reflectionStageList = useMemo(
+    () => STAGE_ORDER.filter(s => REFLECTION_STAGES.has(s)),
+    [],
+  );
+
+  // The lowest unsubmitted reflection stage the participant has already
+  // advanced past. Drives the modal in JSX. Returns null while loading
+  // (sentinel) or when nothing's pending.
+  const pendingReflectionStage = useMemo(() => {
+    if (!submittedReflections) return null;
+    const currentIdx = STAGE_ORDER.indexOf(currentStage);
+    if (currentIdx < 0) return null;
+    for (const stage of reflectionStageList) {
+      const stageIdx = STAGE_ORDER.indexOf(stage);
+      if (stageIdx < currentIdx && !submittedReflections.has(stage)) {
+        return stage;
+      }
+    }
+    return null;
+  }, [submittedReflections, currentStage, reflectionStageList]);
 
   const approvalResolversRef = useRef(new Map());
   // runId → true while an in-memory executor is alive for that run. Used by
@@ -2944,19 +2980,27 @@ Answer in ONE sentence. If the user asks "how", a second sentence is allowed —
       {pendingReflectionStage && (
         <StageReflection
           stage={pendingReflectionStage}
-          onSubmit={async ({ confidence, note, habit }) => {
+          onSubmit={async ({ confidence, note }) => {
             if (!myParticipantId) {
-              // Edge case: not yet bound to a participant row. Drop the
-              // gate so the participant isn't trapped — but they shouldn't
-              // be advancing stages without a participant id anyway.
-              setPendingReflectionStage(null);
+              // Edge case: not yet bound to a participant row. Optimistically
+              // mark this stage submitted locally so the participant isn't
+              // trapped behind a gate they can't satisfy.
+              setSubmittedReflections(prev => {
+                const next = new Set(prev || []);
+                next.add(pendingReflectionStage);
+                return next;
+              });
               return;
             }
-            const res = await sb.saveStageReflection(myParticipantId, pendingReflectionStage, { confidence, note, habit });
+            const res = await sb.saveStageReflection(myParticipantId, pendingReflectionStage, { confidence, note });
             if (!res?.ok) {
               throw new Error(res?.error || 'Could not save your reflection. Please try again.');
             }
-            setPendingReflectionStage(null);
+            setSubmittedReflections(prev => {
+              const next = new Set(prev || []);
+              next.add(pendingReflectionStage);
+              return next;
+            });
           }}
         />
       )}

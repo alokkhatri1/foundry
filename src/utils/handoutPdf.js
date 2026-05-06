@@ -112,9 +112,19 @@ export async function buildHandoutPdf({ userName, captureSelector = '.gr-takeawa
   let cardsPosPx = 0;
   let pageIndex = 0;
 
+  // Paint the page cream before stamping the cover / cards / closer
+  // layers. Otherwise any uncovered area (e.g. when a card-aware
+  // break ends the cards body short of the closer) reveals jsPDF's
+  // default white page background as a band.
+  function paintPageBg() {
+    pdf.setFillColor(251, 244, 238); // var(--cream) #FBF4EE
+    pdf.rect(0, 0, pageW, pageH, 'F');
+  }
+
   // If there are no cards (participant didn't reflect on anything), the
   // PDF is just a one-page cover + closer.
   if (cardsCanvas.height <= 0 || cardsAvailHeightPx <= 0) {
+    paintPageBg();
     pdf.addImage(coverCanvas, 'PNG', 0, 0, pageW, coverHeightPt);
     pdf.addImage(closerCanvas, 'PNG', 0, pageH - closerHeightPt, pageW, closerHeightPt);
     return { doc: pdf, filename: `${safeName(userName)}_Foundry_Takeaway.pdf` };
@@ -145,6 +155,7 @@ export async function buildHandoutPdf({ userName, captureSelector = '.gr-takeawa
     const cardsSliceHeightPt = cardsSlice.height / pxPerPt;
 
     if (pageIndex > 0) pdf.addPage();
+    paintPageBg();
     pdf.addImage(coverCanvas, 'PNG', 0, 0, pageW, coverHeightPt);
     pdf.addImage(cardsSlice, 'PNG', 0, cardsTopPt, pageW, cardsSliceHeightPt);
     pdf.addImage(closerCanvas, 'PNG', 0, pageH - closerHeightPt, pageW, closerHeightPt);

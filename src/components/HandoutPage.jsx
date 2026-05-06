@@ -46,7 +46,7 @@ export default function HandoutPage({
           FOUNDRY · YOUR REFLECTIONS
         </div>
         <h1 className="gr-takeaway-title">
-          Six primitives,&nbsp;<em>in your own words</em>.
+          You rehearse&nbsp;<em>to become AI native</em>.
         </h1>
         <div className="gr-takeaway-meta">
           {metaParts.map((p, i) => (

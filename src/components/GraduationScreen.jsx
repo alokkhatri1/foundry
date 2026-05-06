@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { computeScorecard, LEVELS, LEVEL_COLORS } from '../utils/graduationScorecard';
-import { buildHandoutMarkdown } from '../utils/handoutMarkdown';
+import { buildHandoutPdf } from '../utils/handoutPdf';
 import FeedbackForm from './FeedbackForm';
 
 // Graduation screen — the "Own it" moment at workshop end. Editorial
@@ -181,32 +181,35 @@ export default function GraduationScreen({
     );
   }
 
-  // Build and download the participant's takeaway handout as a markdown
-  // file. Pulled together at click-time from the same data the rest of
-  // the page already has loaded — no extra fetch.
-  function handleDownloadHandout() {
-    const orgName = (participants || []).find(p => p.name === userName)?.org_name || '';
-    const { content, filename } = buildHandoutMarkdown({
-      userName,
-      orgName,
-      level: overall,
-      scorecard,
-      reflections: myReflections,
-      capstoneRows,
-      coworkers,
-      workflows,
-      flatFiles,
-      participants,
-    });
-    const blob = new Blob([content], { type: 'text/markdown;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+  // Build and download the participant's takeaway as a real text-based
+  // PDF — searchable, copy-pasteable, multi-page with auto-pagination.
+  // Pulled together at click-time from the same data the rest of the
+  // page already has loaded; jsPDF is lazy-imported inside the builder.
+  const [handoutBusy, setHandoutBusy] = useState(false);
+  async function handleDownloadHandout() {
+    if (handoutBusy) return;
+    setHandoutBusy(true);
+    try {
+      const orgName = (participants || []).find(p => p.name === userName)?.org_name || '';
+      const { doc, filename } = await buildHandoutPdf({
+        userName,
+        orgName,
+        level: overall,
+        scorecard,
+        reflections: myReflections,
+        capstoneRows,
+        coworkers,
+        workflows,
+        flatFiles,
+        participants,
+      });
+      doc.save(filename);
+    } catch (err) {
+      console.error('[graduation] handout download failed:', err);
+      alert('Could not generate the takeaway PDF. Please try again.');
+    } finally {
+      setHandoutBusy(false);
+    }
   }
 
   return (
@@ -220,13 +223,14 @@ export default function GraduationScreen({
           <Dimensions dimensions={scorecard.dimensions} />
         )}
         {embedded ? (
-          <ActionsRow onDownloadHandout={handleDownloadHandout} userName={userName} />
+          <ActionsRow onDownloadHandout={handleDownloadHandout} handoutBusy={handoutBusy} userName={userName} />
         ) : (
           <Footer
             onSignOut={onSignOut}
             date={issuedDate}
             userName={userName}
             onDownloadHandout={handleDownloadHandout}
+            handoutBusy={handoutBusy}
           />
         )}
         <div className="gr-attribution">
@@ -475,13 +479,13 @@ function useCertificateDownload(userName) {
 // in-app graduation tab (embedded), since the standard Footer is
 // suppressed in that mode. Surfaces the two takeaway artefacts the
 // participant should be able to grab from anywhere they see the rubric.
-function ActionsRow({ onDownloadHandout, userName }) {
+function ActionsRow({ onDownloadHandout, handoutBusy, userName }) {
   const { handleDownload, downloading } = useCertificateDownload(userName);
   return (
     <div className="gr-actions-row">
       {onDownloadHandout && (
-        <button type="button" className="gr-handout" onClick={onDownloadHandout}>
-          Export takeaway
+        <button type="button" className="gr-handout" onClick={onDownloadHandout} disabled={handoutBusy}>
+          {handoutBusy ? 'Preparing…' : 'Export takeaway'}
         </button>
       )}
       <button type="button" className="gr-print" onClick={handleDownload} disabled={downloading}>
@@ -491,7 +495,7 @@ function ActionsRow({ onDownloadHandout, userName }) {
   );
 }
 
-function Footer({ onSignOut, date, userName, onDownloadHandout }) {
+function Footer({ onSignOut, date, userName, onDownloadHandout, handoutBusy }) {
   const { handleDownload, downloading } = useCertificateDownload(userName);
 
   return (
@@ -511,8 +515,8 @@ function Footer({ onSignOut, date, userName, onDownloadHandout }) {
       </div>
       <div className="gr-footer-actions">
         {onDownloadHandout && (
-          <button type="button" className="gr-handout" onClick={onDownloadHandout}>
-            Export takeaway
+          <button type="button" className="gr-handout" onClick={onDownloadHandout} disabled={handoutBusy}>
+            {handoutBusy ? 'Preparing…' : 'Export takeaway'}
           </button>
         )}
         <button type="button" className="gr-print" onClick={handleDownload} disabled={downloading}>

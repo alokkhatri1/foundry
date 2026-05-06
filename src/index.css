@@ -15690,6 +15690,14 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
   align-items: center;
   justify-self: end;
 }
+.gr-actions-row {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 24px;
+  padding-top: 24px;
+  border-top: 1px solid var(--rule-soft);
+}
 .gr-handout {
   padding: 10px 18px;
   background: transparent;

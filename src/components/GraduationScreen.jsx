@@ -219,7 +219,9 @@ export default function GraduationScreen({
         ) : (
           <Dimensions dimensions={scorecard.dimensions} />
         )}
-        {!embedded && (
+        {embedded ? (
+          <ActionsRow onDownloadHandout={handleDownloadHandout} userName={userName} />
+        ) : (
           <Footer
             onSignOut={onSignOut}
             date={issuedDate}
@@ -409,7 +411,10 @@ function Dimensions({ dimensions }) {
   );
 }
 
-function Footer({ onSignOut, date, userName, onDownloadHandout }) {
+// Shared hook for the certificate PDF download. Used by Footer (full
+// graduation route) and ActionsRow (embedded-as-tab route) so both
+// surfaces ship the same button behaviour.
+function useCertificateDownload(userName) {
   const [downloading, setDownloading] = useState(false);
 
   // Lazy-import jspdf + html2canvas only when the user actually clicks
@@ -462,6 +467,32 @@ function Footer({ onSignOut, date, userName, onDownloadHandout }) {
       setDownloading(false);
     }
   }
+
+  return { handleDownload, downloading };
+}
+
+// Inline action row — shown when GraduationScreen is rendered as the
+// in-app graduation tab (embedded), since the standard Footer is
+// suppressed in that mode. Surfaces the two takeaway artefacts the
+// participant should be able to grab from anywhere they see the rubric.
+function ActionsRow({ onDownloadHandout, userName }) {
+  const { handleDownload, downloading } = useCertificateDownload(userName);
+  return (
+    <div className="gr-actions-row">
+      {onDownloadHandout && (
+        <button type="button" className="gr-handout" onClick={onDownloadHandout}>
+          Export takeaway
+        </button>
+      )}
+      <button type="button" className="gr-print" onClick={handleDownload} disabled={downloading}>
+        {downloading ? 'Preparing…' : 'Download certificate'}
+      </button>
+    </div>
+  );
+}
+
+function Footer({ onSignOut, date, userName, onDownloadHandout }) {
+  const { handleDownload, downloading } = useCertificateDownload(userName);
 
   return (
     <footer className="gr-footer">

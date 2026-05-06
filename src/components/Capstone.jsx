@@ -117,6 +117,29 @@ function pad2(n) {
   return String(n).padStart(2, '0');
 }
 
+// localStorage fallback so a refresh always restores something even if
+// Supabase is unreachable, the capstone_drafts table isn't migrated yet,
+// or RLS denies the write. Per-participant key. The DB stays authoritative
+// when available; this is just a safety net the participant can't lose.
+function localCapstoneKey(participantId) {
+  return participantId ? `foundry:capstone-draft:${participantId}` : null;
+}
+function loadLocalCapstoneDraft(participantId) {
+  const key = localCapstoneKey(participantId);
+  if (!key) return null;
+  try {
+    const raw = localStorage.getItem(key);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : null;
+  } catch { return null; }
+}
+function saveLocalCapstoneDraft(participantId, rows) {
+  const key = localCapstoneKey(participantId);
+  if (!key) return;
+  try { localStorage.setItem(key, JSON.stringify(rows)); } catch {}
+}
+
 function relSavedLabel(now, ts) {
   if (!ts) return '';
   const sec = Math.max(0, Math.floor((now - ts) / 1000));
@@ -713,14 +736,25 @@ export default function Capstone({
       setRows([newRow()]);
       return;
     }
+    // DB is the source of truth when reachable, but always check
+    // localStorage second so a missing capstone_drafts table or an
+    // offline session still restores the participant's last draft.
+    const restoreFromLocal = () => {
+      const local = loadLocalCapstoneDraft(myParticipantId);
+      if (Array.isArray(local) && local.length > 0) {
+        setRows(local.map(migrateRow));
+      } else {
+        setRows([newRow()]);
+      }
+    };
     sb.loadCapstoneDraft(myParticipantId).then(serverRows => {
       if (cancelled) return;
       if (Array.isArray(serverRows) && serverRows.length > 0) {
         setRows(serverRows.map(migrateRow));
       } else {
-        setRows([newRow()]);
+        restoreFromLocal();
       }
-    }).catch(() => { if (!cancelled) setRows([newRow()]); });
+    }).catch(() => { if (!cancelled) restoreFromLocal(); });
     return () => { cancelled = true; };
   }, [sb, myParticipantId]);
 
@@ -771,8 +805,12 @@ export default function Capstone({
   }
 
   // Auto-save: debounce 800ms after the last edit.
+  // localStorage is written immediately on every edit so a refresh
+  // never loses keystrokes even if Supabase is down or the network
+  // is flaky. The DB write is debounced as before.
   useEffect(() => {
     if (rows === null || !myParticipantId) return;
+    saveLocalCapstoneDraft(myParticipantId, rows);
     const handle = setTimeout(async () => {
       setSaving(true);
       const res = await sb.saveCapstoneDraft(myParticipantId, rows);
@@ -844,6 +882,12 @@ export default function Capstone({
           </p>
         </div>
         <div className="cs-page-actions">
+          {savedLabel && (
+            <span className={`cs-save-status${saving ? ' is-saving' : ''}`} aria-live="polite">
+              <span className="cs-save-status-dot" aria-hidden />
+              {savedLabel}
+            </span>
+          )}
           <button
             type="button"
             className="cs-btn-paper"
@@ -890,12 +934,6 @@ export default function Capstone({
           <button type="button" className="cs-meta-link" onClick={toggleAll}>
             {anyExpanded ? 'Collapse all' : 'Expand all'}
           </button>
-          {savedLabel && (
-            <>
-              <span className="cs-meta-sep" aria-hidden>·</span>
-              <span className="cs-meta-saved">{savedLabel}</span>
-            </>
-          )}
         </div>
       </div>
 

@@ -13303,6 +13303,34 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
   flex-shrink: 0;
   align-items: center;
 }
+.cs-save-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  color: var(--ink-mid);
+  background: var(--cream);
+  border: 1px solid var(--rule-soft);
+  border-radius: var(--radius-pill);
+}
+.cs-save-status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--green, #5a9e6f);
+  flex-shrink: 0;
+}
+.cs-save-status.is-saving .cs-save-status-dot {
+  background: var(--peach-deep);
+  animation: cs-save-pulse 1s ease-in-out infinite;
+}
+@keyframes cs-save-pulse {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 1; }
+}
 .cs-btn-paper {
   display: inline-flex;
   align-items: center;

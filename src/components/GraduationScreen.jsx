@@ -158,6 +158,19 @@ export default function GraduationScreen({
 
   const overall = scorecard?.overallLevel ?? 0;
 
+  // Hooks MUST run on every render in the same order — keep the takeaway
+  // state above the early returns below or React will see a changing
+  // hook count between the survey-pending render and the rubric render
+  // and crash with "too many re-renders" / hook count mismatch.
+  const [handoutBusy, setHandoutBusy] = useState(false);
+  const [handoutMounted, setHandoutMounted] = useState(false);
+  // Resolve participant org from the participants table when present;
+  // falls back to empty so the cover header just lists name + date.
+  const handoutOrgName = useMemo(
+    () => (participants || []).find(p => p.name === userName)?.org_name || '',
+    [participants, userName],
+  );
+
   if (feedbackStatus === 'unknown') {
     return (
       <div className={`gr-page${embedded ? ' is-embedded' : ''}`}>
@@ -187,8 +200,6 @@ export default function GraduationScreen({
   // fonts settle, capture via html2canvas, slice into A4 pages, embed
   // in jsPDF, save. Same image-based-PDF approach as the certificate —
   // not text-searchable, but renders exactly as designed.
-  const [handoutBusy, setHandoutBusy] = useState(false);
-  const [handoutMounted, setHandoutMounted] = useState(false);
   async function handleDownloadHandout() {
     if (handoutBusy) return;
     setHandoutBusy(true);
@@ -210,13 +221,6 @@ export default function GraduationScreen({
       setHandoutBusy(false);
     }
   }
-
-  // Resolve participant org from the participants table when present;
-  // falls back to empty so the cover header just lists name + date.
-  const handoutOrgName = useMemo(
-    () => (participants || []).find(p => p.name === userName)?.org_name || '',
-    [participants, userName],
-  );
 
   return (
     <div className={`gr-page${embedded ? ' is-embedded' : ''}`}>

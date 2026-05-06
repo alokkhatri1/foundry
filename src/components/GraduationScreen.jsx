@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { computeScorecard, LEVELS, LEVEL_COLORS } from '../utils/graduationScorecard';
+import { buildHandoutMarkdown } from '../utils/handoutMarkdown';
 import FeedbackForm from './FeedbackForm';
 
 // Graduation screen — the "Own it" moment at workshop end. Editorial
@@ -46,6 +47,11 @@ export default function GraduationScreen({
 }) {
   const [approvals, setApprovals] = useState(null);
   const [capstoneRows, setCapstoneRows] = useState(null);
+  // Per-stage reflections — loaded so the takeaway handout can quote
+  // the participant's own writing back to them. Defaults to [] when
+  // unavailable (no participant id yet, table missing, etc.) so the
+  // handout still generates with the rest of the data.
+  const [myReflections, setMyReflections] = useState([]);
   // Feedback gate state. 'unknown' until we've checked Supabase, then either
   // 'pending' (show form) or 'submitted' (show rubric). Without sb or a
   // participant id we can't gate, so fall through to 'submitted' silently.
@@ -79,6 +85,19 @@ export default function GraduationScreen({
       if (cancelled) return;
       setCapstoneRows(Array.isArray(rows) ? rows : []);
     }).catch(() => { if (!cancelled) setCapstoneRows([]); });
+    return () => { cancelled = true; };
+  }, [sb, myParticipantId]);
+
+  // Load this participant's reflections for the takeaway handout.
+  // Best-effort — if the table isn't there or the load fails, the
+  // handout simply omits the "What you learned" section.
+  useEffect(() => {
+    if (!sb || !myParticipantId || !sb.loadMyStageReflections) return;
+    let cancelled = false;
+    sb.loadMyStageReflections(myParticipantId).then(rows => {
+      if (cancelled) return;
+      setMyReflections(Array.isArray(rows) ? rows : []);
+    }).catch(() => { if (!cancelled) setMyReflections([]); });
     return () => { cancelled = true; };
   }, [sb, myParticipantId]);
 
@@ -162,6 +181,34 @@ export default function GraduationScreen({
     );
   }
 
+  // Build and download the participant's takeaway handout as a markdown
+  // file. Pulled together at click-time from the same data the rest of
+  // the page already has loaded — no extra fetch.
+  function handleDownloadHandout() {
+    const orgName = (participants || []).find(p => p.name === userName)?.org_name || '';
+    const { content, filename } = buildHandoutMarkdown({
+      userName,
+      orgName,
+      level: overall,
+      scorecard,
+      reflections: myReflections,
+      capstoneRows,
+      coworkers,
+      workflows,
+      flatFiles,
+      participants,
+    });
+    const blob = new Blob([content], { type: 'text/markdown;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
   return (
     <div className={`gr-page${embedded ? ' is-embedded' : ''}`}>
       <main className="gr-container">
@@ -173,7 +220,12 @@ export default function GraduationScreen({
           <Dimensions dimensions={scorecard.dimensions} />
         )}
         {!embedded && (
-          <Footer onSignOut={onSignOut} date={issuedDate} userName={userName} />
+          <Footer
+            onSignOut={onSignOut}
+            date={issuedDate}
+            userName={userName}
+            onDownloadHandout={handleDownloadHandout}
+          />
         )}
         <div className="gr-attribution">
           Foundry by{' '}
@@ -357,7 +409,7 @@ function Dimensions({ dimensions }) {
   );
 }
 
-function Footer({ onSignOut, date, userName }) {
+function Footer({ onSignOut, date, userName, onDownloadHandout }) {
   const [downloading, setDownloading] = useState(false);
 
   // Lazy-import jspdf + html2canvas only when the user actually clicks
@@ -426,9 +478,16 @@ function Footer({ onSignOut, date, userName }) {
           <span className="gr-issuer-line-2">{date}</span>
         </div>
       </div>
-      <button type="button" className="gr-print" onClick={handleDownload} disabled={downloading}>
-        {downloading ? 'Preparing…' : 'Download certificate'}
-      </button>
+      <div className="gr-footer-actions">
+        {onDownloadHandout && (
+          <button type="button" className="gr-handout" onClick={onDownloadHandout}>
+            Export takeaway
+          </button>
+        )}
+        <button type="button" className="gr-print" onClick={handleDownload} disabled={downloading}>
+          {downloading ? 'Preparing…' : 'Download certificate'}
+        </button>
+      </div>
     </footer>
   );
 }

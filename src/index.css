@@ -15889,6 +15889,14 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
   color: var(--ink-muted, #8A7A68);
   font-style: italic;
 }
+.gr-takeaway-closer-credit {
+  margin-top: 8px;
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--peach-deep, #d97757);
+}
 .gr-handout {
   padding: 10px 18px;
   background: transparent;

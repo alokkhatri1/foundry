@@ -2,29 +2,38 @@ import { useState } from 'react';
 import { REFLECTION_PROMPTS } from '../data/reflectionPrompts';
 
 // Per-stage reflection sheet. Fires when the participant advances out of
-// a primitive-teaching stage. Two fields, both optional in spirit (the
-// scaled is required to "Save", but Skip closes the sheet without saving).
-// Skip writes nothing — there's no penalty, and re-prompting on the same
-// transition won't happen because stages only advance forward.
-export default function StageReflection({ stage, onSubmit, onSkip }) {
+// a primitive-teaching stage. All three fields are required — the
+// confidence rating, the open reflection, and the habit-forming
+// implementation intention. There is no Skip; the prompt is a hard gate
+// designed to make the learning land before the next stage takes over.
+//
+// Save errors keep the modal open with the entered values intact so a
+// transient network failure can be retried without losing the writing.
+export default function StageReflection({ stage, onSubmit }) {
   const prompt = REFLECTION_PROMPTS[stage];
   const [confidence, setConfidence] = useState(null);
   const [note, setNote] = useState('');
+  const [habit, setHabit] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState(null);
 
   if (!prompt) return null;
 
+  const noteOk = note.trim().length > 0;
+  const habitOk = habit.trim().length > 0;
+  const canSave = confidence !== null && noteOk && habitOk && !submitting;
+
   async function handleSave() {
-    if (submitting) return;
+    if (!canSave) return;
     setSubmitting(true);
+    setError(null);
     try {
-      await onSubmit({ confidence, note: note.trim() || null });
-    } finally {
+      await onSubmit({ confidence, note: note.trim(), habit: habit.trim() });
+    } catch (err) {
+      setError(err?.message || 'Something went wrong saving. Try again.');
       setSubmitting(false);
     }
   }
-
-  const canSave = confidence !== null && !submitting;
 
   return (
     <div className="sr-overlay" role="dialog" aria-modal="true" aria-labelledby="sr-title">
@@ -58,9 +67,7 @@ export default function StageReflection({ stage, onSubmit, onSkip }) {
         </div>
 
         <div className="sr-question">
-          <label className="sr-question-label" htmlFor="sr-note">
-            {prompt.note} <span className="sr-optional">(optional)</span>
-          </label>
+          <label className="sr-question-label" htmlFor="sr-note">{prompt.note}</label>
           <textarea
             id="sr-note"
             className="sr-note"
@@ -71,12 +78,23 @@ export default function StageReflection({ stage, onSubmit, onSkip }) {
           />
         </div>
 
+        <div className="sr-question">
+          <label className="sr-question-label" htmlFor="sr-habit">{prompt.habit}</label>
+          <textarea
+            id="sr-habit"
+            className="sr-note sr-habit"
+            value={habit}
+            onChange={e => setHabit(e.target.value)}
+            placeholder="Be specific — what document, which task, when, who."
+            rows={3}
+          />
+        </div>
+
+        {error && <div className="sr-error">{error}</div>}
+
         <div className="sr-actions">
-          <button type="button" className="sr-skip" onClick={onSkip} disabled={submitting}>
-            Skip for now
-          </button>
           <button type="button" className="sr-save" onClick={handleSave} disabled={!canSave}>
-            {submitting ? 'Saving…' : 'Save reflection'}
+            {submitting ? 'Saving…' : 'Save and continue'}
           </button>
         </div>
       </div>

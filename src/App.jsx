@@ -2944,13 +2944,20 @@ Answer in ONE sentence. If the user asks "how", a second sentence is allowed —
       {pendingReflectionStage && (
         <StageReflection
           stage={pendingReflectionStage}
-          onSubmit={async ({ confidence, note }) => {
-            if (myParticipantId) {
-              await sb.saveStageReflection(myParticipantId, pendingReflectionStage, { confidence, note });
+          onSubmit={async ({ confidence, note, habit }) => {
+            if (!myParticipantId) {
+              // Edge case: not yet bound to a participant row. Drop the
+              // gate so the participant isn't trapped — but they shouldn't
+              // be advancing stages without a participant id anyway.
+              setPendingReflectionStage(null);
+              return;
+            }
+            const res = await sb.saveStageReflection(myParticipantId, pendingReflectionStage, { confidence, note, habit });
+            if (!res?.ok) {
+              throw new Error(res?.error || 'Could not save your reflection. Please try again.');
             }
             setPendingReflectionStage(null);
           }}
-          onSkip={() => setPendingReflectionStage(null)}
         />
       )}
       <header className="app-header">

@@ -1251,6 +1251,7 @@ export default function useSupabase() {
       stage: String(stage),
       confidence: payload?.confidence ?? null,
       note: payload?.note ?? null,
+      habit: payload?.habit ?? null,
       updated_at: new Date().toISOString(),
     };
     const { error } = await supabase

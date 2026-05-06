@@ -2980,7 +2980,7 @@ Answer in ONE sentence. If the user asks "how", a second sentence is allowed —
       {pendingReflectionStage && (
         <StageReflection
           stage={pendingReflectionStage}
-          onSubmit={async ({ confidence, note }) => {
+          onSubmit={async ({ confidence, note, habit }) => {
             if (!myParticipantId) {
               // Edge case: not yet bound to a participant row. Optimistically
               // mark this stage submitted locally so the participant isn't
@@ -2992,7 +2992,7 @@ Answer in ONE sentence. If the user asks "how", a second sentence is allowed —
               });
               return;
             }
-            const res = await sb.saveStageReflection(myParticipantId, pendingReflectionStage, { confidence, note });
+            const res = await sb.saveStageReflection(myParticipantId, pendingReflectionStage, { confidence, note, habit });
             if (!res?.ok) {
               throw new Error(res?.error || 'Could not save your reflection. Please try again.');
             }

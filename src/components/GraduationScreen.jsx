@@ -227,13 +227,7 @@ export default function GraduationScreen({
             orgName={handoutOrgName}
             level={overall}
             date={issuedDate}
-            scorecard={scorecard}
             reflections={myReflections}
-            capstoneRows={capstoneRows}
-            coworkers={coworkers}
-            workflows={workflows}
-            flatFiles={flatFiles}
-            participants={participants}
           />
         </div>
       )}

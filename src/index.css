@@ -15699,32 +15699,38 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
   border-top: 1px solid var(--rule-soft);
 }
 
-/* ───── Takeaway handout (designed PDF source) ───────────────────────
+/* ───── Takeaway handout — one-page synthesis (designed PDF source) ──
    Rendered offscreen during the export click, captured by html2canvas,
-   embedded as image pages in jsPDF. NOT visible to the participant in
-   the live UI — only its rasterised version is. */
+   embedded as a single A4 portrait page in jsPDF. The layout is
+   deliberately sized to fit one page; if the participant didn't
+   reflect on every stage the page just gets quieter. */
 .gr-handout-stage {
   position: fixed;
   left: -10000px;
   top: 0;
   pointer-events: none;
   /* Width matches A4 portrait at ~96dpi so the capture's aspect ratio
-     resolves correctly when sliced into PDF pages. */
+     resolves correctly. */
   width: 794px;
 }
 .gr-handout {
   width: 794px;
+  /* min-height so a sparsely-filled handout still feels like a page,
+     not a sliver. The ladder + footer pin the bottom. */
+  min-height: 1123px;
   background: var(--cream, #FBF4EE);
   font-family: var(--sans, 'Inter', system-ui, sans-serif);
   color: var(--ink, #1A1410);
-  padding: 72px 64px 64px;
+  padding: 56px 56px 48px;
   box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
 }
 
 /* Cover */
 .gr-handout-cover {
-  margin-bottom: 56px;
-  padding-bottom: 32px;
+  padding-bottom: 18px;
   border-bottom: 1px solid var(--rule, #E2D3BD);
 }
 .gr-handout-eyebrow {
@@ -15732,10 +15738,10 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
   align-items: center;
   gap: 8px;
   font-family: var(--mono);
-  font-size: 11px;
+  font-size: 10px;
   letter-spacing: 0.18em;
   color: var(--peach-deep, #d97757);
-  margin-bottom: 18px;
+  margin-bottom: 14px;
 }
 .gr-handout-eyebrow-dot {
   width: 6px; height: 6px;
@@ -15744,11 +15750,11 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
 }
 .gr-handout-title {
   font-family: var(--serif, 'Fraunces', Georgia, serif);
-  font-size: 46px;
+  font-size: 36px;
   font-weight: 500;
   letter-spacing: -0.01em;
-  line-height: 1.05;
-  margin: 0 0 26px;
+  line-height: 1.08;
+  margin: 0 0 14px;
   color: var(--ink, #1A1410);
 }
 .gr-handout-title em {
@@ -15758,271 +15764,205 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
 .gr-handout-meta {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px 0;
   font-family: var(--mono);
-  font-size: 11.5px;
+  font-size: 10.5px;
   letter-spacing: 0.06em;
   color: var(--ink-mid, #4A3A2C);
 }
-.gr-handout-meta-bit { display: inline-flex; }
 .gr-handout-meta-bit:not(:last-child)::after {
   content: '·';
-  margin: 0 14px;
+  margin: 0 12px;
   color: var(--ink-muted, #8A7A68);
 }
 
-/* Section */
-.gr-handout-section {
-  margin-bottom: 56px;
-}
+/* Section eyebrows shared across sections */
 .gr-handout-section-eyebrow {
   font-family: var(--mono);
-  font-size: 10px;
+  font-size: 9.5px;
   letter-spacing: 0.2em;
   color: var(--ink-muted, #8A7A68);
-  margin-bottom: 8px;
-}
-.gr-handout-section-title {
-  font-family: var(--serif, 'Fraunces', Georgia, serif);
-  font-size: 32px;
-  font-weight: 500;
-  letter-spacing: -0.01em;
-  line-height: 1.15;
-  margin: 0 0 12px;
-  color: var(--ink, #1A1410);
-}
-.gr-handout-section-title em {
-  font-style: italic;
-  color: var(--peach-deep, #d97757);
-}
-.gr-handout-section-sub {
-  font-size: 13px;
-  line-height: 1.5;
-  color: var(--ink-mid, #4A3A2C);
-  margin: 0 0 28px;
-  max-width: 540px;
+  margin-bottom: 10px;
 }
 
-/* Reflections */
-.gr-handout-reflections {
-  display: flex;
-  flex-direction: column;
-  gap: 28px;
+/* Hero quote — pulled-out reflection */
+.gr-handout-hero {
+  padding: 8px 0;
 }
-.gr-handout-reflection {
-  padding-bottom: 24px;
-  border-bottom: 1px solid var(--rule-soft, #EDE0CC);
-}
-.gr-handout-reflection:last-child { border-bottom: none; padding-bottom: 0; }
-.gr-handout-reflection-head {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 12px;
-}
-.gr-handout-reflection-stage {
+.gr-handout-hero-eyebrow {
   font-family: var(--mono);
-  font-size: 11px;
-  letter-spacing: 0.16em;
+  font-size: 9.5px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
   color: var(--peach-deep, #d97757);
-  flex-shrink: 0;
+  margin-bottom: 10px;
 }
-.gr-handout-reflection-rule {
-  flex: 1;
-  height: 1px;
-  background: var(--rule, #E2D3BD);
-}
-.gr-handout-reflection-label {
-  font-family: var(--serif, 'Fraunces', Georgia, serif);
-  font-size: 22px;
-  font-weight: 500;
-  letter-spacing: -0.005em;
-  color: var(--ink, #1A1410);
-  flex-shrink: 0;
-}
-.gr-handout-reflection-confidence {
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
-  margin-bottom: 16px;
-  font-family: var(--mono);
-  font-size: 11px;
-  letter-spacing: 0.1em;
-  color: var(--ink-muted, #8A7A68);
-}
-.gr-handout-reflection-confidence-l { text-transform: uppercase; }
-.gr-handout-reflection-confidence-v {
-  font-family: var(--serif, 'Fraunces', Georgia, serif);
-  font-size: 24px;
-  font-weight: 500;
-  letter-spacing: 0;
-  color: var(--peach-deep, #d97757);
-}
-.gr-handout-reflection-confidence-of {
-  font-size: 11px;
-  color: var(--ink-muted, #8A7A68);
-}
-.gr-handout-quote {
-  margin: 0;
+.gr-handout-hero-quote {
+  margin: 0 0 8px;
   padding: 4px 0 4px 18px;
   border-left: 3px solid var(--peach-deep, #d97757);
   font-family: var(--serif, 'Fraunces', Georgia, serif);
   font-style: italic;
-  font-size: 16px;
-  line-height: 1.6;
-  color: var(--ink-mid, #4A3A2C);
+  font-size: 19px;
+  line-height: 1.5;
+  color: var(--ink, #1A1410);
   white-space: pre-wrap;
 }
+.gr-handout-hero-attr {
+  padding-left: 21px;
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  color: var(--ink-muted, #8A7A68);
+}
 
-/* Capstone steps */
-.gr-handout-steps {
+/* Confidence ladder */
+.gr-handout-ladder-section { padding: 4px 0; }
+.gr-handout-ladder {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 8px;
 }
-.gr-handout-step {
-  background: var(--paper, #FFFFFF);
-  border: 1px solid var(--rule-soft, #EDE0CC);
-  border-left: 3px solid var(--peach-deep, #d97757);
-  border-radius: 8px;
-  padding: 20px 24px;
-}
-.gr-handout-step.is-human {
-  border-left-color: var(--ink-mid, #4A3A2C);
-}
-.gr-handout-step-head {
-  display: flex;
+.gr-handout-ladder-row {
+  display: grid;
+  grid-template-columns: 60px 1fr 84px 24px;
   align-items: center;
-  gap: 14px;
-  margin-bottom: 8px;
+  gap: 12px;
+  padding: 4px 0;
 }
-.gr-handout-step-num {
+.gr-handout-ladder-stage {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  color: var(--ink-muted, #8A7A68);
+}
+.gr-handout-ladder-name {
+  font-family: var(--serif, 'Fraunces', Georgia, serif);
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--ink, #1A1410);
+}
+.gr-handout-ladder-dots {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+}
+.gr-handout-ladder-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--cream-deep, #F0E4D3);
+  border: 1px solid var(--rule, #E2D3BD);
+}
+.gr-handout-ladder-dot.is-on {
+  background: var(--peach-deep, #d97757);
+  border-color: var(--peach-deep, #d97757);
+}
+.gr-handout-ladder-num {
   font-family: var(--mono);
   font-size: 11px;
-  letter-spacing: 0.16em;
+  font-weight: 600;
   color: var(--peach-deep, #d97757);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
 }
-.gr-handout-step.is-human .gr-handout-step-num { color: var(--ink-mid, #4A3A2C); }
-.gr-handout-step-type {
-  font-family: var(--mono);
-  font-size: 9.5px;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-  color: var(--ink-muted, #8A7A68);
-  padding: 2px 8px;
-  border: 1px solid var(--rule, #E2D3BD);
-  border-radius: 999px;
-}
-.gr-handout-step-name {
+
+/* Practice plan */
+.gr-handout-practice { padding: 4px 0; }
+.gr-handout-practice-title {
   font-family: var(--serif, 'Fraunces', Georgia, serif);
-  font-size: 19px;
+  font-size: 22px;
   font-weight: 500;
+  letter-spacing: -0.01em;
   margin: 0 0 14px;
   color: var(--ink, #1A1410);
 }
-.gr-handout-step-fields {
-  display: grid;
-  grid-template-columns: 100px 1fr;
-  gap: 6px 16px;
-  margin: 0;
-  font-size: 13px;
-  line-height: 1.5;
+.gr-handout-practice-title em {
+  font-style: italic;
+  color: var(--peach-deep, #d97757);
 }
-.gr-handout-step-fields dt {
+.gr-handout-practice-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  counter-reset: practice;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px 22px;
+}
+.gr-handout-practice-item {
+  counter-increment: practice;
+  position: relative;
+  padding: 8px 0 8px 28px;
+  border-top: 1px solid var(--rule-soft, #EDE0CC);
+}
+.gr-handout-practice-item::before {
+  content: counter(practice, decimal-leading-zero);
+  position: absolute;
+  left: 0;
+  top: 8px;
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  color: var(--peach-deep, #d97757);
+  font-weight: 600;
+}
+.gr-handout-practice-stage {
   font-family: var(--mono);
   font-size: 9.5px;
   letter-spacing: 0.14em;
   text-transform: uppercase;
   color: var(--ink-muted, #8A7A68);
-  padding-top: 2px;
+  margin-bottom: 3px;
 }
-.gr-handout-step-fields dd {
+.gr-handout-practice-text {
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--ink, #1A1410);
+}
+
+/* Carry forward */
+.gr-handout-carry { padding: 4px 0; }
+.gr-handout-carry-list {
+  list-style: none;
   margin: 0;
-  color: var(--ink, #1A1410);
-}
-
-/* Collections (coworkers / workflows) */
-.gr-handout-collection {
-  margin-bottom: 24px;
-}
-.gr-handout-collection:last-child { margin-bottom: 0; }
-.gr-handout-collection-head {
-  font-family: var(--mono);
-  font-size: 10.5px;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-  color: var(--ink-muted, #8A7A68);
-  margin-bottom: 12px;
-}
-.gr-handout-collection-head span {
-  color: var(--peach-deep, #d97757);
-}
-.gr-handout-collection-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  gap: 16px;
-  padding: 12px 0;
-  border-bottom: 1px solid var(--rule-soft, #EDE0CC);
-}
-.gr-handout-collection-row:last-child { border-bottom: none; }
-.gr-handout-collection-name {
-  font-family: var(--serif, 'Fraunces', Georgia, serif);
-  font-size: 16px;
-  font-weight: 500;
-  color: var(--ink, #1A1410);
-}
-.gr-handout-collection-meta {
-  font-size: 12px;
-  color: var(--ink-mid, #4A3A2C);
-  text-align: right;
-}
-
-/* Scorecard */
-.gr-handout-scorecard {
+  padding: 0;
+  counter-reset: carry;
   display: flex;
   flex-direction: column;
+  gap: 6px;
 }
-.gr-handout-score-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  padding: 14px 0;
-  border-bottom: 1px solid var(--rule-soft, #EDE0CC);
-}
-.gr-handout-score-row:last-child { border-bottom: none; }
-.gr-handout-score-name {
+.gr-handout-carry-item {
+  counter-increment: carry;
+  position: relative;
+  padding-left: 28px;
   font-family: var(--serif, 'Fraunces', Georgia, serif);
-  font-size: 17px;
-  font-weight: 500;
-  color: var(--ink, #1A1410);
+  font-style: italic;
+  font-size: 14.5px;
+  line-height: 1.5;
+  color: var(--ink-mid, #4A3A2C);
 }
-.gr-handout-score-level {
+.gr-handout-carry-item::before {
+  content: counter(carry) '.';
+  position: absolute;
+  left: 0;
+  top: 0;
   font-family: var(--mono);
+  font-style: normal;
   font-size: 11px;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
+  font-weight: 600;
   color: var(--peach-deep, #d97757);
 }
 
 /* Closer */
 .gr-handout-closer {
-  margin-top: 24px;
-  padding-top: 32px;
+  margin-top: auto;
+  padding-top: 14px;
   border-top: 1px solid var(--rule, #E2D3BD);
   text-align: center;
 }
 .gr-handout-closer-mark svg {
-  width: 80px;
-  height: 24px;
-  margin-bottom: 12px;
-}
-.gr-handout-closer-text {
-  font-family: var(--mono);
-  font-size: 10.5px;
-  letter-spacing: 0.06em;
-  color: var(--ink-muted, #8A7A68);
-  font-style: italic;
+  width: 70px;
+  height: 22px;
 }
 .gr-handout {
   padding: 10px 18px;

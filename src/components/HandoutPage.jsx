@@ -1,24 +1,44 @@
 import { REFLECTION_PROMPTS } from '../data/reflectionPrompts';
 import { LEVELS } from '../utils/graduationScorecard';
 
-// Designed takeaway page. Rendered offscreen, captured by html2canvas,
-// embedded into jsPDF (image-based PDF, not text-based — same approach
-// the certificate uses, accepts a file-size hit in exchange for the
-// editorial typography and brand styling). Multi-page slicing happens
-// in handoutPdf.js after the capture.
+// One-page synthesis takeaway. Rendered offscreen, captured by
+// html2canvas, embedded into a single A4-portrait jsPDF page. The doc
+// is meant to *help the participant reflect*, not enumerate everything
+// they did — so it picks one signal from each piece of data they
+// generated:
 //
-// Empty sections render nothing so a participant who didn't reach
-// capstone (or didn't fill reflections) doesn't get hollow headers.
+//   - their voice         → hero quote pulled from their longest note
+//   - their progress      → confidence ladder across the eight primitives
+//   - their commitments   → their accumulated habit answers as a practice plan
+//   - their next move     → three carry-forward prompts authored by us
+//
+// Sized to fit a single A4 portrait page; if a participant didn't
+// reflect on every stage, the page just gets quieter, not longer.
 
-function fileLookup(flatFiles) {
-  const map = new Map();
-  for (const f of (flatFiles || [])) map.set(f.id, f);
-  return map;
-}
-function nameForFile(byId, id) { const f = byId.get(id); return f ? f.name.replace(/\.md$/, '') : id; }
-function nameForParticipant(participants, id) {
-  const p = (participants || []).find(x => x.id === id);
-  return p ? p.name : id;
+const REFLECTION_STAGES_ORDERED = ['3', '4', '5', '6', '7', '8', '9', '10'];
+
+// Three prompts for the participant to sit with after the workshop.
+// Authored, not collected — the per-stage habit answers above are the
+// "what to do tomorrow"; these are the "what to think about beyond it".
+const CARRY_FORWARD = [
+  'Which primitive felt easiest, and which still feels fuzzy?',
+  'What’s the first real workflow at work where you’ll start applying this?',
+  'Who on your team would benefit most from learning this with you?',
+];
+
+function pickHeroQuote(reflections) {
+  // Pull the longest non-empty reflection note as the hero. Length is a
+  // proxy for "they had the most to say there" — better than picking
+  // the first or last, both of which are positional accidents.
+  let best = null;
+  for (const r of (reflections || [])) {
+    const text = (r.note || '').trim();
+    if (!text) continue;
+    if (!best || text.length > best.text.length) {
+      best = { text, stage: String(r.stage) };
+    }
+  }
+  return best;
 }
 
 export default function HandoutPage({
@@ -26,34 +46,35 @@ export default function HandoutPage({
   orgName,
   level,
   date,
-  scorecard,
   reflections,
-  capstoneRows,
-  coworkers,
-  workflows,
-  flatFiles,
-  participants,
 }) {
-  const orderedReflectionStages = ['3', '4', '5', '6', '7', '8', '9', '10'];
-  const reflectionRows = (reflections || [])
-    .filter(r => orderedReflectionStages.includes(String(r.stage)))
-    .sort((a, b) => Number(a.stage) - Number(b.stage));
-
-  const filledCapstone = (capstoneRows || []).filter(row => {
-    const step = (row.step || '').trim();
-    const node = (row.node || '').trim();
-    return step.length > 0 || node.length > 0;
-  });
-
-  const myCoworkers = (coworkers || []).filter(c => (c.createdBy || c.created_by) === userName);
-  const myWorkflows = (workflows || []).filter(w => (w.createdBy || w.created_by) === userName);
-  const fileById = fileLookup(flatFiles);
+  const reflectionsByStage = new Map();
+  for (const r of (reflections || [])) {
+    reflectionsByStage.set(String(r.stage), r);
+  }
 
   const levelWord = (typeof level === 'number' && LEVELS[level]) ? LEVELS[level] : null;
   const metaParts = [userName || 'Participant'];
   if (orgName) metaParts.push(orgName);
   metaParts.push(`Issued ${date}`);
   if (levelWord) metaParts.push(`Level: ${levelWord}`);
+
+  const hero = pickHeroQuote(reflections);
+  const heroLabel = hero ? (REFLECTION_PROMPTS[hero.stage]?.label || `Stage ${hero.stage}`) : null;
+
+  // Practice plan: each habit the participant wrote, paired with its stage.
+  const practicePlan = REFLECTION_STAGES_ORDERED
+    .map(stage => {
+      const r = reflectionsByStage.get(stage);
+      const habit = r?.habit?.trim();
+      if (!habit) return null;
+      return {
+        stage,
+        label: REFLECTION_PROMPTS[stage]?.label || `Stage ${stage}`,
+        habit,
+      };
+    })
+    .filter(Boolean);
 
   return (
     <div className="gr-handout">
@@ -64,7 +85,7 @@ export default function HandoutPage({
           FOUNDRY · WORKSHOP TAKEAWAY
         </div>
         <h1 className="gr-handout-title">
-          What you built,&nbsp;<em>what you learned</em>.
+          What you learned,&nbsp;<em>what to try next</em>.
         </h1>
         <div className="gr-handout-meta">
           {metaParts.map((p, i) => (
@@ -73,158 +94,80 @@ export default function HandoutPage({
         </div>
       </header>
 
-      {/* Reflections */}
-      {reflectionRows.length > 0 && (
-        <section className="gr-handout-section">
-          <div className="gr-handout-section-eyebrow">SECTION ONE</div>
-          <h2 className="gr-handout-section-title">
-            Six primitives,&nbsp;<em>in your own words</em>.
-          </h2>
-          <p className="gr-handout-section-sub">Your understanding rating and your reflection on each stage of the workshop.</p>
-          <div className="gr-handout-reflections">
-            {reflectionRows.map(r => {
-              const prompt = REFLECTION_PROMPTS[String(r.stage)];
-              const label = prompt ? prompt.label : `Stage ${r.stage}`;
-              return (
-                <div key={r.stage} className="gr-handout-reflection">
-                  <div className="gr-handout-reflection-head">
-                    <span className="gr-handout-reflection-stage">Stage {r.stage}</span>
-                    <span className="gr-handout-reflection-rule" aria-hidden />
-                    <span className="gr-handout-reflection-label">{label}</span>
-                  </div>
-                  {typeof r.confidence === 'number' && (
-                    <div className="gr-handout-reflection-confidence">
-                      <span className="gr-handout-reflection-confidence-l">Understanding</span>
-                      <span className="gr-handout-reflection-confidence-v">{r.confidence}</span>
-                      <span className="gr-handout-reflection-confidence-of">/ 5</span>
-                    </div>
-                  )}
-                  {r.note && r.note.trim() && (
-                    <blockquote className="gr-handout-quote">
-                      {r.note.trim()}
-                    </blockquote>
-                  )}
-                </div>
-              );
-            })}
-          </div>
+      {/* Hero quote — their voice, pulled from their longest reflection */}
+      {hero && (
+        <section className="gr-handout-hero">
+          <div className="gr-handout-hero-eyebrow">In your own words</div>
+          <blockquote className="gr-handout-hero-quote">
+            {hero.text}
+          </blockquote>
+          <div className="gr-handout-hero-attr">— Stage {hero.stage} · {heroLabel}</div>
         </section>
       )}
 
-      {/* Capstone */}
-      {filledCapstone.length > 0 && (
-        <section className="gr-handout-section">
-          <div className="gr-handout-section-eyebrow">SECTION TWO</div>
-          <h2 className="gr-handout-section-title">
-            Your capstone,&nbsp;<em>step by step</em>.
+      {/* Confidence ladder — visual snapshot of their progress */}
+      <section className="gr-handout-ladder-section">
+        <div className="gr-handout-section-eyebrow">THE ARC OF YOUR UNDERSTANDING</div>
+        <div className="gr-handout-ladder">
+          {REFLECTION_STAGES_ORDERED.map(stage => {
+            const r = reflectionsByStage.get(stage);
+            const confidence = typeof r?.confidence === 'number' ? r.confidence : 0;
+            const label = REFLECTION_PROMPTS[stage]?.label || `Stage ${stage}`;
+            return (
+              <div key={stage} className="gr-handout-ladder-row">
+                <span className="gr-handout-ladder-stage">Stage {stage}</span>
+                <span className="gr-handout-ladder-name">{label}</span>
+                <span className="gr-handout-ladder-dots" aria-label={`${confidence} of 5`}>
+                  {[1, 2, 3, 4, 5].map(n => (
+                    <span
+                      key={n}
+                      className={`gr-handout-ladder-dot${n <= confidence ? ' is-on' : ''}`}
+                      aria-hidden
+                    />
+                  ))}
+                </span>
+                <span className="gr-handout-ladder-num">{confidence || '—'}</span>
+              </div>
+            );
+          })}
+        </div>
+      </section>
+
+      {/* Practice plan — their accumulated habit answers */}
+      {practicePlan.length > 0 && (
+        <section className="gr-handout-practice">
+          <div className="gr-handout-section-eyebrow">YOUR PRACTICE PLAN</div>
+          <h2 className="gr-handout-practice-title">
+            Eight small habits,&nbsp;<em>in your own hand</em>.
           </h2>
-          <p className="gr-handout-section-sub">The end-to-end workflow you laid out at the close of the workshop.</p>
-          <div className="gr-handout-steps">
-            {filledCapstone.map((row, i) => {
-              const num = String(i + 1).padStart(2, '0');
-              const type = (row.type || 'coworker') === 'human' ? 'Human' : 'Coworker';
-              const heading = (row.step || '').trim() || `Step ${i + 1}`;
-              const knowledgeNames = (row.knowledgeFileIds || []).map(id => nameForFile(fileById, id)).filter(Boolean);
-              const skillsNames = (row.skillsFileIds || []).map(id => nameForFile(fileById, id)).filter(Boolean);
-              return (
-                <div key={i} className={`gr-handout-step is-${type.toLowerCase()}`}>
-                  <div className="gr-handout-step-head">
-                    <span className="gr-handout-step-num">{num}</span>
-                    <span className="gr-handout-step-type">{type}</span>
-                  </div>
-                  <h3 className="gr-handout-step-name">{heading}</h3>
-                  <dl className="gr-handout-step-fields">
-                    {row.node && row.node.trim() && (
-                      <><dt>Role</dt><dd>{row.node.trim()}</dd></>
-                    )}
-                    {knowledgeNames.length > 0 && (
-                      <><dt>Reads</dt><dd>{knowledgeNames.join(', ')}</dd></>
-                    )}
-                    {skillsNames.length > 0 && (
-                      <><dt>Produces</dt><dd>{skillsNames.join(', ')}</dd></>
-                    )}
-                    {row.reviewerId && (
-                      <><dt>Reviewer</dt><dd>{nameForParticipant(participants, row.reviewerId)}</dd></>
-                    )}
-                    {row.remarks && row.remarks.trim() && (
-                      <><dt>Notes</dt><dd>{row.remarks.trim()}</dd></>
-                    )}
-                  </dl>
-                </div>
-              );
-            })}
-          </div>
+          <ol className="gr-handout-practice-list">
+            {practicePlan.map(item => (
+              <li key={item.stage} className="gr-handout-practice-item">
+                <div className="gr-handout-practice-stage">{item.label}</div>
+                <div className="gr-handout-practice-text">{item.habit}</div>
+              </li>
+            ))}
+          </ol>
         </section>
       )}
 
-      {/* What you built */}
-      {(myCoworkers.length > 0 || myWorkflows.length > 0) && (
-        <section className="gr-handout-section">
-          <div className="gr-handout-section-eyebrow">SECTION THREE</div>
-          <h2 className="gr-handout-section-title">
-            What you built,&nbsp;<em>by your own hand</em>.
-          </h2>
-          <p className="gr-handout-section-sub">Coworkers and workflows credited to you in the room.</p>
-          {myCoworkers.length > 0 && (
-            <div className="gr-handout-collection">
-              <div className="gr-handout-collection-head">Coworkers <span>({myCoworkers.length})</span></div>
-              {myCoworkers.map(c => (
-                <div key={c.id} className="gr-handout-collection-row">
-                  <span className="gr-handout-collection-name">{c.name}</span>
-                  <span className="gr-handout-collection-meta">{(c.role || '').slice(0, 80) || '—'}</span>
-                </div>
-              ))}
-            </div>
-          )}
-          {myWorkflows.length > 0 && (
-            <div className="gr-handout-collection">
-              <div className="gr-handout-collection-head">Workflows <span>({myWorkflows.length})</span></div>
-              {myWorkflows.map(w => {
-                const stepCount = Array.isArray(w.steps) ? w.steps.length : 0;
-                return (
-                  <div key={w.id} className="gr-handout-collection-row">
-                    <span className="gr-handout-collection-name">{w.name}</span>
-                    <span className="gr-handout-collection-meta">{stepCount} step{stepCount === 1 ? '' : 's'}</span>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </section>
-      )}
+      {/* Carry forward — authored prompts for after the workshop */}
+      <section className="gr-handout-carry">
+        <div className="gr-handout-section-eyebrow">CARRY FORWARD</div>
+        <ol className="gr-handout-carry-list">
+          {CARRY_FORWARD.map((q, i) => (
+            <li key={i} className="gr-handout-carry-item">{q}</li>
+          ))}
+        </ol>
+      </section>
 
-      {/* Scorecard */}
-      {scorecard && Array.isArray(scorecard.dimensions) && scorecard.dimensions.length > 0 && (
-        <section className="gr-handout-section">
-          <div className="gr-handout-section-eyebrow">SECTION FOUR</div>
-          <h2 className="gr-handout-section-title">
-            Six ladders,&nbsp;<em>your read on each</em>.
-          </h2>
-          <p className="gr-handout-section-sub">A snapshot of where you landed across the primitives.</p>
-          <div className="gr-handout-scorecard">
-            {scorecard.dimensions.map(d => {
-              const word = LEVELS[d.level] || '—';
-              return (
-                <div key={d.key} className="gr-handout-score-row">
-                  <span className="gr-handout-score-name">{d.title || d.key}</span>
-                  <span className="gr-handout-score-level">{word}</span>
-                </div>
-              );
-            })}
-          </div>
-        </section>
-      )}
-
-      {/* Closing */}
+      {/* Closer */}
       <footer className="gr-handout-closer">
         <div className="gr-handout-closer-mark">
           <svg viewBox="0 0 80 24" aria-hidden>
             <path d="M 4 18 C 14 4, 24 22, 34 12 S 54 4, 64 18" stroke="#d97757" strokeWidth="1.5" fill="none" strokeLinecap="round" />
             <circle cx="68" cy="18" r="1.5" fill="#d97757" />
           </svg>
-        </div>
-        <div className="gr-handout-closer-text">
-          Generated by Foundry. Save this somewhere you’ll see it when you next sit down to build.
         </div>
       </footer>
     </div>

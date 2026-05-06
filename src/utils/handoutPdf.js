@@ -1,21 +1,18 @@
-// Build the takeaway as a designed, brand-styled PDF by capturing a
+// Build the takeaway as a designed, single-page PDF by capturing a
 // React-rendered <HandoutPage> via html2canvas and embedding it into
-// jsPDF. Multi-page slicing happens here: render the full handout at
-// A4 portrait width, capture, then carve the resulting canvas into
-// page-height slices that each become a PDF page.
+// jsPDF. The handout layout is sized to fit one A4 portrait page; if
+// a participant's content exceeds that (very long reflections), the
+// PDF stays a single page — overflow is cropped rather than spilling
+// into a second page, because the takeaway is meant to be a one-page
+// keepsake.
 //
-// Same image-based-PDF tradeoff as the certificate: the document is
-// not text-searchable, but the typography, colour, blockquote rules,
-// step cards, etc. all render exactly as styled. For a workshop
-// keepsake that prioritises visual polish, this is the right call.
+// Same image-based-PDF tradeoff as the certificate: not text-searchable,
+// but renders exactly as styled.
 
 function safeName(s) {
   return (s || 'Participant').replace(/[^a-zA-Z0-9_-]+/g, '_');
 }
 
-// A4 portrait at 72dpi (jsPDF unit: pt). We render the DOM at a wider
-// pixel size for crispness and let html2canvas's internal scale + the
-// PDF's 595pt page width do the resampling.
 const A4_PORTRAIT_W_PT = 595;
 const A4_PORTRAIT_H_PT = 842;
 
@@ -28,14 +25,14 @@ export async function buildHandoutPdf({ userName, captureSelector = '.gr-handout
     import('jspdf'),
   ]);
 
-  // Capture the whole handout at 2x for crisp rendering at A4 size.
   const canvas = await html2canvas(el, {
     scale: 2,
     backgroundColor: '#FBF4EE',
     useCORS: true,
-    // Same fix as the certificate path — html2canvas@1.4.x throws on
-    // color-mix() / oklab. Strip box-shadows on cloned DOM before render.
     onclone: (clonedDoc) => {
+      // html2canvas@1.4.x can't parse color-mix() / oklab and throws if
+      // it hits one. The graduation level dot uses color-mix for its
+      // halo — strip its box-shadow on the clone before render.
       const dots = clonedDoc.querySelectorAll('.gr-plate-level-dot');
       dots.forEach(d => { d.style.boxShadow = 'none'; });
     },
@@ -45,36 +42,26 @@ export async function buildHandoutPdf({ userName, captureSelector = '.gr-handout
   const pageW = A4_PORTRAIT_W_PT;
   const pageH = A4_PORTRAIT_H_PT;
 
-  // Scale factor: how many canvas pixels equal one PDF point.
-  // canvas.width pixels span pageW points → 1 pt = canvas.width / pageW px.
+  // Embed the captured canvas into a single A4 page. If the captured
+  // canvas's aspect ratio is taller than A4, crop it to one page worth
+  // (top of the canvas — the cover, hero, ladder are the load-bearing
+  // sections). If shorter, embed at scale so it sits in the upper
+  // portion of the page with cream below.
   const pxPerPt = canvas.width / pageW;
-  const sliceHeightPx = Math.floor(pageH * pxPerPt);
+  const onePagePx = Math.floor(pageH * pxPerPt);
 
-  let posPx = 0;
-  let pageIndex = 0;
-  while (posPx < canvas.height) {
-    const remainingPx = canvas.height - posPx;
-    const thisSlicePx = Math.min(sliceHeightPx, remainingPx);
-
-    // Carve a slice of the source canvas into a temp canvas.
+  if (canvas.height <= onePagePx) {
+    const heightPt = canvas.height / pxPerPt;
+    pdf.addImage(canvas, 'PNG', 0, 0, pageW, heightPt);
+  } else {
     const slice = document.createElement('canvas');
     slice.width = canvas.width;
-    slice.height = thisSlicePx;
+    slice.height = onePagePx;
     const ctx = slice.getContext('2d');
-    // Fill with the cream background so any sub-pixel artifacts at the
-    // bottom of the last slice don't show as white.
     ctx.fillStyle = '#FBF4EE';
     ctx.fillRect(0, 0, slice.width, slice.height);
-    ctx.drawImage(canvas, 0, -posPx);
-
-    const dataUrl = slice.toDataURL('image/png');
-    const sliceHeightPt = thisSlicePx / pxPerPt;
-
-    if (pageIndex > 0) pdf.addPage();
-    pdf.addImage(dataUrl, 'PNG', 0, 0, pageW, sliceHeightPt);
-
-    posPx += thisSlicePx;
-    pageIndex++;
+    ctx.drawImage(canvas, 0, 0);
+    pdf.addImage(slice, 'PNG', 0, 0, pageW, pageH);
   }
 
   return { doc: pdf, filename: `${safeName(userName)}_Foundry_Takeaway.pdf` };

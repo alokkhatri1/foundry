@@ -1,11 +1,14 @@
-// Build the takeaway as a designed PDF by capturing a React-rendered
-// <HandoutPage> via html2canvas and embedding the result into jsPDF.
-// Card-aware multi-page slicing: instead of cutting the canvas at
-// fixed page-height intervals, we measure each reflection card's
-// position and break pages just before a card that would otherwise
-// straddle the seam. css `page-break-inside: avoid` doesn't help
-// because html2canvas produces a single bitmap — we have to honour
-// breakpoints manually.
+// Build the takeaway as a designed PDF. The cover (eyebrow + title +
+// meta) stamps the top of every page, and the closer (brand mark +
+// generated-by line) stamps the bottom of every page. The reflection
+// cards fill the variable middle, paginating with card-aware breaks
+// so a single card never splits across the seam.
+//
+// Implementation: capture the whole .gr-takeaway DOM once, then carve
+// the resulting canvas into three regions — cover, cards, closer —
+// using the elements' measured top/bottom positions. The cards region
+// is sub-sliced per PDF page; cover and closer are addImage'd at the
+// same coords on every page.
 
 function safeName(s) {
   return (s || 'Participant').replace(/[^a-zA-Z0-9_-]+/g, '_');
@@ -14,21 +17,47 @@ function safeName(s) {
 const A4_PORTRAIT_W_PT = 595;
 const A4_PORTRAIT_H_PT = 842;
 
+// Carve a sub-canvas from a source canvas at [fromY, toY) in canvas px.
+// Backfills cream so any sub-pixel artifact reads as page bg, not white.
+function subCanvas(src, fromY, toY) {
+  const out = document.createElement('canvas');
+  out.width = src.width;
+  out.height = Math.max(1, Math.floor(toY - fromY));
+  const ctx = out.getContext('2d');
+  ctx.fillStyle = '#FBF4EE';
+  ctx.fillRect(0, 0, out.width, out.height);
+  ctx.drawImage(src, 0, -fromY);
+  return out;
+}
+
 export async function buildHandoutPdf({ userName, captureSelector = '.gr-takeaway' }) {
   const el = document.querySelector(captureSelector);
   if (!el) throw new Error(`Handout DOM "${captureSelector}" not found — make sure HandoutPage is mounted before calling.`);
 
-  // Measure card top/bottom in CSS pixels relative to the container,
-  // BEFORE running html2canvas (the captured canvas no longer has a
-  // DOM to query). The slicer scales these to canvas pixels using
-  // canvas.height / el.offsetHeight.
-  const cssHeight = el.offsetHeight;
-  const containerTop = el.getBoundingClientRect().top;
+  const coverEl = el.querySelector('.gr-takeaway-cover');
+  const cardsEl = el.querySelector('.gr-takeaway-cards');
+  const closerEl = el.querySelector('.gr-takeaway-closer');
   const cardEls = Array.from(el.querySelectorAll('.gr-takeaway-card'));
-  const cardCssBounds = cardEls.map(c => {
-    const r = c.getBoundingClientRect();
-    return { top: r.top - containerTop, bottom: r.bottom - containerTop };
-  });
+
+  // Measure CSS boundaries before capture (the captured canvas has no
+  // DOM to query). All measurements are relative to the parent
+  // .gr-takeaway so they line up with the canvas top.
+  const elRect = el.getBoundingClientRect();
+  const elTop = elRect.top;
+  const cssTotalHeight = el.offsetHeight;
+
+  const coverBottomCss = coverEl ? coverEl.getBoundingClientRect().bottom - elTop : 0;
+  const cardsRect = cardsEl ? cardsEl.getBoundingClientRect() : null;
+  const cardsTopCss = cardsRect ? cardsRect.top - elTop : coverBottomCss;
+  const cardsBottomCss = cardsRect ? cardsRect.bottom - elTop : cardsTopCss;
+  const closerTopCss = closerEl ? closerEl.getBoundingClientRect().top - elTop : cardsBottomCss;
+
+  const cardCssBounds = cardsRect
+    ? cardEls.map(c => {
+        const r = c.getBoundingClientRect();
+        return { top: r.top - cardsRect.top, bottom: r.bottom - cardsRect.top };
+      })
+    : [];
 
   const [{ default: html2canvas }, { jsPDF }] = await Promise.all([
     import('html2canvas'),
@@ -40,75 +69,87 @@ export async function buildHandoutPdf({ userName, captureSelector = '.gr-takeawa
     backgroundColor: '#FBF4EE',
     useCORS: true,
     onclone: (clonedDoc) => {
-      // html2canvas@1.4.x can't parse color-mix() / oklab — strip the
-      // graduation level dot's halo on the clone before render.
       const dots = clonedDoc.querySelectorAll('.gr-plate-level-dot');
       dots.forEach(d => { d.style.boxShadow = 'none'; });
     },
   });
 
-  const pdf = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'a4' });
-  const pageW = A4_PORTRAIT_W_PT;
-  const pageH = A4_PORTRAIT_H_PT;
+  const cssToCanvas = canvas.height / cssTotalHeight;
+  const coverBottomPx = coverBottomCss * cssToCanvas;
+  const cardsTopPx = cardsTopCss * cssToCanvas;
+  const cardsBottomPx = cardsBottomCss * cssToCanvas;
+  const closerTopPx = closerTopCss * cssToCanvas;
 
-  // Map CSS pixels → canvas pixels. The capture is at scale 2 but we
-  // shouldn't assume — divide measured DOM height into canvas height.
-  const cssToCanvas = canvas.height / cssHeight;
+  // Pre-baked cover and closer images, stamped on every page.
+  const coverCanvas = subCanvas(canvas, 0, coverBottomPx);
+  const closerCanvas = subCanvas(canvas, closerTopPx, canvas.height);
+  const cardsCanvas = subCanvas(canvas, cardsTopPx, cardsBottomPx);
+
+  // Card boundaries relative to the cards canvas top, in canvas px.
   const cardBounds = cardCssBounds.map(b => ({
     top: b.top * cssToCanvas,
     bottom: b.bottom * cssToCanvas,
   }));
 
-  // Canvas pixels per PDF page.
+  const pdf = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'a4' });
+  const pageW = A4_PORTRAIT_W_PT;
+  const pageH = A4_PORTRAIT_H_PT;
   const pxPerPt = canvas.width / pageW;
-  const fullPagePx = Math.floor(pageH * pxPerPt);
-  // If a "natural" cut would leave less than 15% of a page filled, we'd
-  // rather pack tighter than honour the card break. Otherwise the
-  // break can sacrifice up to that much space to keep the card whole.
-  const minPageFill = fullPagePx * 0.15;
 
-  let posPx = 0;
+  const coverHeightPt = coverCanvas.height / pxPerPt;
+  const closerHeightPt = closerCanvas.height / pxPerPt;
+  // Visual gap between cover and cards, and between cards and closer,
+  // so the cards body breathes a little inside the page frame.
+  const gapPt = 16;
+  const cardsTopPt = coverHeightPt + gapPt;
+  const cardsAvailHeightPt = pageH - cardsTopPt - closerHeightPt - gapPt;
+  const cardsAvailHeightPx = cardsAvailHeightPt * pxPerPt;
+  // Card-aware break only honours a card boundary if it leaves at
+  // least 25% of the cards body filled — otherwise we'd ship pages
+  // that are almost empty in the middle.
+  const minPageFillPx = cardsAvailHeightPx * 0.25;
+
+  let cardsPosPx = 0;
   let pageIndex = 0;
-  while (posPx < canvas.height) {
-    const remainingPx = canvas.height - posPx;
-    let endPx = Math.min(posPx + fullPagePx, canvas.height);
 
-    // If endPx falls inside a card, back the cut up to that card's top.
-    // Pick the LOWEST top that satisfies "would be cut by endPx" — the
-    // last card before the cut.
+  // If there are no cards (participant didn't reflect on anything), the
+  // PDF is just a one-page cover + closer.
+  if (cardsCanvas.height <= 0 || cardsAvailHeightPx <= 0) {
+    pdf.addImage(coverCanvas, 'PNG', 0, 0, pageW, coverHeightPt);
+    pdf.addImage(closerCanvas, 'PNG', 0, pageH - closerHeightPt, pageW, closerHeightPt);
+    return { doc: pdf, filename: `${safeName(userName)}_Foundry_Takeaway.pdf` };
+  }
+
+  while (cardsPosPx < cardsCanvas.height) {
+    const remainingPx = cardsCanvas.height - cardsPosPx;
+    let endPx = Math.min(cardsPosPx + cardsAvailHeightPx, cardsCanvas.height);
+
+    // Avoid cutting through a card: if the page edge falls inside one,
+    // back the cut up to that card's top.
     let breakAt = null;
     for (const b of cardBounds) {
-      const startsBeforeEnd = b.top > posPx + 1 && b.top < endPx;
-      const endsAfterEnd = b.bottom > endPx;
-      if (startsBeforeEnd && endsAfterEnd) {
+      const startsInRange = b.top > cardsPosPx + 1 && b.top < endPx;
+      const extendsBeyond = b.bottom > endPx;
+      if (startsInRange && extendsBeyond) {
         if (breakAt === null || b.top < breakAt) breakAt = b.top;
       }
     }
-    if (breakAt !== null && breakAt - posPx >= minPageFill) {
+    if (breakAt !== null && breakAt - cardsPosPx >= minPageFillPx) {
       endPx = breakAt;
     }
-    // Don't cut into less than minPageFill on the last page either —
-    // pack everything that's left into the final page if it'd be tiny.
-    if (remainingPx <= fullPagePx) {
-      endPx = canvas.height;
+    if (remainingPx <= cardsAvailHeightPx) {
+      endPx = cardsCanvas.height;
     }
 
-    const thisSlicePx = endPx - posPx;
-    const slice = document.createElement('canvas');
-    slice.width = canvas.width;
-    slice.height = thisSlicePx;
-    const ctx = slice.getContext('2d');
-    ctx.fillStyle = '#FBF4EE';
-    ctx.fillRect(0, 0, slice.width, slice.height);
-    ctx.drawImage(canvas, 0, -posPx);
-
-    const dataUrl = slice.toDataURL('image/png');
-    const sliceHeightPt = thisSlicePx / pxPerPt;
+    const cardsSlice = subCanvas(cardsCanvas, cardsPosPx, endPx);
+    const cardsSliceHeightPt = cardsSlice.height / pxPerPt;
 
     if (pageIndex > 0) pdf.addPage();
-    pdf.addImage(dataUrl, 'PNG', 0, 0, pageW, sliceHeightPt);
+    pdf.addImage(coverCanvas, 'PNG', 0, 0, pageW, coverHeightPt);
+    pdf.addImage(cardsSlice, 'PNG', 0, cardsTopPt, pageW, cardsSliceHeightPt);
+    pdf.addImage(closerCanvas, 'PNG', 0, pageH - closerHeightPt, pageW, closerHeightPt);
 
-    posPx = endPx;
+    cardsPosPx = endPx;
     pageIndex++;
   }
 

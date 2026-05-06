@@ -2979,6 +2979,7 @@ Answer in ONE sentence. If the user asks "how", a second sentence is allowed —
       )}
       {pendingReflectionStage && (
         <StageReflection
+          key={pendingReflectionStage}
           stage={pendingReflectionStage}
           onSubmit={async ({ confidence, note, habit }) => {
             if (!myParticipantId) {

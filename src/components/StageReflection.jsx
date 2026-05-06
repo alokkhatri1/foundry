@@ -31,6 +31,10 @@ export default function StageReflection({ stage, onSubmit }) {
     setError(null);
     try {
       await onSubmit({ confidence, note: note.trim(), habit: habit.trim() });
+      // Reset on success too — if the parent leaves us mounted (e.g.
+      // it re-renders for the next stage), the button shouldn't stay
+      // stuck on "Saving…" with stale state from the previous click.
+      setSubmitting(false);
     } catch (err) {
       setError(err?.message || 'Something went wrong saving. Try again.');
       setSubmitting(false);

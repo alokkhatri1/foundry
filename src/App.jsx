@@ -2,6 +2,8 @@ import { useState, useRef, useEffect, useMemo } from 'react';
 import './App.css';
 import AuthGate, { useAuth } from './components/AuthGate';
 import GraduationScreen from './components/GraduationScreen';
+import StageReflection from './components/StageReflection';
+import { REFLECTION_STAGES } from './data/reflectionPrompts';
 import Capstone, { deriveCoworkerName } from './components/Capstone';
 import { COWORKER_ICONS } from './components/Icon';
 import FileExplorer from './components/FileExplorer';
@@ -12,7 +14,7 @@ import ChatPanel from './components/ChatPanel';
 import ActivityDashboard from './components/ActivityDashboard';
 import UsageView, { useMyUsageTotal, useWorkshopUsageTotal } from './components/UsageView';
 import { formatUsd, formatTokens } from './utils/llmCost';
-import RevealAt, { STAGE_META, stageReached, normalizeStage } from './components/RevealAt';
+import RevealAt, { STAGE_META, STAGE_ORDER, stageReached, normalizeStage } from './components/RevealAt';
 import { computeCost, costToCredits, DEFAULT_CREDIT_ALLOCATION, CREDITS_WARN_THRESHOLD } from './utils/llmCost';
 import { buildStageGuidance } from './data/stageGuidance';
 import PreferencesEditor from './components/PreferencesEditor';
@@ -411,6 +413,11 @@ function App() {
   // full participant UI for browsing. Cleared on leave.
   const [bypassDeprecation, setBypassDeprecation] = useState(false);
   const [currentStage, setCurrentStage] = useState('6');
+  // Per-stage reflection prompt — fires when the user advances OUT of a
+  // primitive-teaching stage (3-10). Holds the *previous* stage to ask
+  // about; cleared on submit / skip. The transition is detected in the
+  // existing previousStageRef effect below.
+  const [pendingReflectionStage, setPendingReflectionStage] = useState(null);
   // Credit budget: allocation is per-room (admin-configurable), bonus is
   // per-participant (admin-grantable). Used-credits is derived live from
   // the workshop's llm_usage rows in the settings menu's credits hook.
@@ -456,6 +463,17 @@ function App() {
     previousStageRef.current = currentStage;
     if (prev !== null && prev !== currentStage && currentStage !== '1') {
       setJustRevealed(currentStage);
+      // Per-stage reflection: the participant just advanced OUT of `prev`,
+      // so ask them to reflect on that stage while it's fresh. Only fire
+      // for forward advances out of primitive-teaching stages (3-10);
+      // intros and the graduation-final transition skip this.
+      if (REFLECTION_STAGES.has(prev)) {
+        const prevIdx = STAGE_ORDER.indexOf(prev);
+        const newIdx = STAGE_ORDER.indexOf(currentStage);
+        if (prevIdx >= 0 && newIdx > prevIdx) {
+          setPendingReflectionStage(prev);
+        }
+      }
       // Graduation — the whole-room moment. Snap every participant
       // to the graduation tab so they see their scorecard together. Later
       // navigation away is fine; this only fires on the transition.
@@ -2922,6 +2940,18 @@ Answer in ONE sentence. If the user asks "how", a second sentence is allowed —
             <button className="reveal-modal-btn" onClick={() => setJustRevealed(null)}>Got it</button>
           </div>
         </div>
+      )}
+      {pendingReflectionStage && (
+        <StageReflection
+          stage={pendingReflectionStage}
+          onSubmit={async ({ confidence, note }) => {
+            if (myParticipantId) {
+              await sb.saveStageReflection(myParticipantId, pendingReflectionStage, { confidence, note });
+            }
+            setPendingReflectionStage(null);
+          }}
+          onSkip={() => setPendingReflectionStage(null)}
+        />
       )}
       <header className="app-header">
         <div className="app-header-left" onClick={() => { setActiveTab('chat'); setChatBadge(false); }}>

@@ -1227,6 +1227,52 @@ export default function useSupabase() {
     return { ok: true };
   }, []);
 
+  // ===== Stage reflections (Stage 3-10 micro-surveys) =====
+  // One row per (workshop, participant, stage). Both fields nullable so a
+  // skipped row could still be persisted as a "we already asked" flag —
+  // we don't write skipped rows today, but the schema allows it.
+  const loadMyStageReflections = useCallback(async (participantId) => {
+    if (!isSupabaseConfigured || !roomIdRef.current || !participantId) return [];
+    const { data, error } = await supabase
+      .from('stage_reflections')
+      .select('stage, confidence, note, updated_at')
+      .eq('workshop_id', roomIdRef.current)
+      .eq('participant_id', participantId);
+    if (error) { console.error('[sb] loadMyStageReflections:', error.message); return []; }
+    return data || [];
+  }, []);
+
+  const saveStageReflection = useCallback(async (participantId, stage, payload) => {
+    if (!isSupabaseConfigured || !roomIdRef.current) return { ok: false, error: 'Not connected' };
+    if (!participantId || !stage) return { ok: false, error: 'Missing participant_id or stage' };
+    const row = {
+      workshop_id: roomIdRef.current,
+      participant_id: participantId,
+      stage: String(stage),
+      confidence: payload?.confidence ?? null,
+      note: payload?.note ?? null,
+      updated_at: new Date().toISOString(),
+    };
+    const { error } = await supabase
+      .from('stage_reflections')
+      .upsert(row, { onConflict: 'workshop_id,participant_id,stage' });
+    if (error) { console.error('[sb] saveStageReflection:', error.message); return { ok: false, error: error.message }; }
+    return { ok: true };
+  }, []);
+
+  // Admin variant — pulls every reflection in a workshop for cohort
+  // rollups. Filters by passed-in workshopId, not roomIdRef, since the
+  // admin browsing rooms isn't joined as a participant.
+  const loadAllStageReflections = useCallback(async (workshopId) => {
+    if (!isSupabaseConfigured || !workshopId) return [];
+    const { data, error } = await supabase
+      .from('stage_reflections')
+      .select('participant_id, stage, confidence, note, updated_at')
+      .eq('workshop_id', workshopId);
+    if (error) { console.error('[sb] loadAllStageReflections:', error.message); return []; }
+    return data || [];
+  }, []);
+
   // ===== Realtime: subscribe to all entity tables =====
   // handlers.onReconnect (optional): fires whenever the channel re-enters the
   // SUBSCRIBED state after previously leaving it (CHANNEL_ERROR, TIMED_OUT,
@@ -1372,5 +1418,6 @@ export default function useSupabase() {
     subscribeToRoom, trackPresence, leavePresence,
     loadMyFeedback, saveFeedback, loadAllFeedback,
     loadCapstoneDraft, saveCapstoneDraft,
+    loadMyStageReflections, saveStageReflection, loadAllStageReflections,
   }), []);
 }

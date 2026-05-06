@@ -505,6 +505,179 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
 }
 .admin-engagement-bar:hover { opacity: 1; }
 
+/* Stage Reflection — per-stage micro-survey shown when participant
+   advances out of a primitive-teaching stage. Modal-style overlay
+   with a backdrop, but the card breathes (not cramped) so the
+   anchor sentence reads as a calm consolidation moment, not a quiz. */
+.sr-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(26, 20, 16, 0.5);
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  z-index: 1000;
+  animation: sr-fade 0.18s ease-out;
+}
+@keyframes sr-fade { from { opacity: 0; } to { opacity: 1; } }
+.sr-card {
+  background: var(--paper, #fff);
+  border-radius: 14px;
+  border: 1px solid var(--rule-soft, #ede0cc);
+  padding: 32px 36px 28px;
+  max-width: 560px;
+  width: 100%;
+  max-height: 90vh;
+  overflow-y: auto;
+  font-family: var(--sans);
+  color: var(--ink, #1A1410);
+  box-shadow: 0 20px 60px rgba(0,0,0,0.18);
+}
+.sr-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  color: var(--ink-muted, #8A7A68);
+  margin-bottom: 12px;
+}
+.sr-eyebrow-dot {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--peach-deep, #d97757);
+}
+.sr-title {
+  font-family: var(--serif);
+  font-weight: 500;
+  font-size: 28px;
+  letter-spacing: -0.01em;
+  margin: 0 0 12px;
+  color: var(--ink, #1A1410);
+}
+.sr-anchor {
+  font-family: var(--serif);
+  font-size: 15px;
+  line-height: 1.6;
+  color: var(--ink-mid, #4A3A2C);
+  margin: 0 0 24px;
+}
+.sr-anchor em {
+  font-style: italic;
+}
+.sr-question {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 22px;
+}
+.sr-question-label {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--ink, #1A1410);
+  line-height: 1.45;
+}
+.sr-optional {
+  font-size: 12px;
+  color: var(--ink-muted, #8A7A68);
+  font-weight: 400;
+}
+.sr-scale {
+  display: flex;
+  gap: 6px;
+}
+.sr-scale-btn {
+  flex: 1;
+  padding: 12px 0;
+  background: var(--paper, #fff);
+  border: 1px solid var(--rule, #E2D3BD);
+  border-radius: 8px;
+  font-family: var(--mono);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink-mid, #4A3A2C);
+  cursor: pointer;
+  transition: background 0.12s, border-color 0.12s, color 0.12s;
+}
+.sr-scale-btn:hover {
+  border-color: var(--peach-deep, #d97757);
+  color: var(--peach-deep, #d97757);
+}
+.sr-scale-btn.is-selected {
+  background: var(--peach-deep, #d97757);
+  border-color: var(--peach-deep, #d97757);
+  color: #fff;
+}
+.sr-scale-legend {
+  display: flex;
+  justify-content: space-between;
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  color: var(--ink-muted, #8A7A68);
+  text-transform: uppercase;
+}
+.sr-note {
+  width: 100%;
+  padding: 10px 12px;
+  background: var(--paper, #fff);
+  border: 1px solid var(--rule, #E2D3BD);
+  border-radius: 8px;
+  font-family: var(--sans);
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--ink, #1A1410);
+  resize: vertical;
+  min-height: 70px;
+  outline: none;
+  transition: border-color 0.12s;
+}
+.sr-note:focus {
+  border-color: var(--peach-deep, #d97757);
+}
+.sr-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 8px;
+}
+.sr-skip {
+  padding: 10px 18px;
+  background: transparent;
+  border: 1px solid var(--rule, #E2D3BD);
+  border-radius: 8px;
+  color: var(--ink-mid, #4A3A2C);
+  font-family: var(--sans);
+  font-size: 13.5px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.12s, border-color 0.12s;
+}
+.sr-skip:hover {
+  background: var(--cream, #FBF4EE);
+}
+.sr-save {
+  padding: 10px 22px;
+  background: var(--peach-deep, #d97757);
+  border: 1px solid var(--peach-deep, #d97757);
+  border-radius: 8px;
+  color: #fff;
+  font-family: var(--sans);
+  font-size: 13.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.12s, border-color 0.12s;
+}
+.sr-save:hover:not(:disabled) {
+  background: #c66845;
+  border-color: #c66845;
+}
+.sr-save:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
 /* Admin tabs */
 .admin-tabs { display: flex; gap: 0; border-bottom: 1px solid var(--border-color); margin-bottom: 20px; }
 .admin-tab {

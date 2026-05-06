@@ -16,7 +16,7 @@ function safeName(s) {
 const A4_PORTRAIT_W_PT = 595;
 const A4_PORTRAIT_H_PT = 842;
 
-export async function buildHandoutPdf({ userName, captureSelector = '.gr-handout' }) {
+export async function buildHandoutPdf({ userName, captureSelector = '.gr-takeaway' }) {
   const el = document.querySelector(captureSelector);
   if (!el) throw new Error(`Handout DOM "${captureSelector}" not found — make sure HandoutPage is mounted before calling.`);
 

@@ -77,7 +77,7 @@ export default function HandoutPage({
     .filter(Boolean);
 
   return (
-    <div className="gr-handout">
+    <div className="gr-takeaway">
       {/* Cover */}
       <header className="gr-handout-cover">
         <div className="gr-handout-eyebrow">

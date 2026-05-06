@@ -1138,14 +1138,16 @@ function App() {
     setLogs([]);
     setWorkflowRuns([]);
     setTools(ensurePrebuiltTools(null));
-    localStorage.removeItem('sandbox:conversations');
+    const resetKey = convoKey(workshopCode);
+    if (resetKey) localStorage.removeItem(resetKey);
   }
 
   function handleLeave() {
     sb.leavePresence();
     sb.signOut();
     localStorage.removeItem(STORAGE_KEY);
-    localStorage.removeItem('sandbox:conversations');
+    const leaveKey = convoKey(workshopCode);
+    if (leaveKey) localStorage.removeItem(leaveKey);
     setIsJoined(false);
     setUserName('');
     setWorkshopCode('');
@@ -1554,8 +1556,10 @@ function App() {
   }
 
   function persistConversations(convos) {
+    const key = convoKey(workshopCode);
+    if (!key) return;
     try {
-      localStorage.setItem('sandbox:conversations', JSON.stringify(convos));
+      localStorage.setItem(key, JSON.stringify(convos));
     } catch {}
   }
 

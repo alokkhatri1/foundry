@@ -385,10 +385,10 @@ export default function AdminDashboard({ sb, user, onBack, onEnterWorkshop }) {
     return sum;
   };
 
-  // Leaderboard sort: rated participants first, by average score desc,
-  // tiebreaker by tokens used desc, then alphabetical. Unrated rows go
-  // to the bottom sorted by tokens — they still rank by engagement so
-  // the facilitator can spot heavy users who skipped the survey.
+  // Leaderboard sort: tokens used desc as the primary axis — engagement
+  // is the headline signal facilitators look at first. Ties break by
+  // rated-first → avg score desc → alphabetical, so heavy users with
+  // strong feedback bubble above heavy users with no feedback.
   const sortedPeople = useMemo(() => {
     const enriched = humanParticipants.map(p => {
       const fb = feedbackByName.get(p.name);
@@ -398,11 +398,11 @@ export default function AdminDashboard({ sb, user, onBack, onEnterWorkshop }) {
       return { p, fb, tk, totalScore, avgScore };
     });
     enriched.sort((a, b) => {
+      if (a.tk.tokens !== b.tk.tokens) return b.tk.tokens - a.tk.tokens;
       const aRated = a.avgScore !== null;
       const bRated = b.avgScore !== null;
       if (aRated !== bRated) return aRated ? -1 : 1;
       if (aRated && a.avgScore !== b.avgScore) return b.avgScore - a.avgScore;
-      if (a.tk.tokens !== b.tk.tokens) return b.tk.tokens - a.tk.tokens;
       return (a.p.name || '').localeCompare(b.p.name || '');
     });
     return enriched;

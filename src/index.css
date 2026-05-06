@@ -15713,7 +15713,7 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
      resolves correctly. */
   width: 794px;
 }
-.gr-takeaway {
+.gr-handout {
   width: 794px;
   /* min-height so a sparsely-filled handout still feels like a page,
      not a sliver. The ladder + footer pin the bottom. */

@@ -15698,6 +15698,332 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
   padding-top: 24px;
   border-top: 1px solid var(--rule-soft);
 }
+
+/* ───── Takeaway handout (designed PDF source) ───────────────────────
+   Rendered offscreen during the export click, captured by html2canvas,
+   embedded as image pages in jsPDF. NOT visible to the participant in
+   the live UI — only its rasterised version is. */
+.gr-handout-stage {
+  position: fixed;
+  left: -10000px;
+  top: 0;
+  pointer-events: none;
+  /* Width matches A4 portrait at ~96dpi so the capture's aspect ratio
+     resolves correctly when sliced into PDF pages. */
+  width: 794px;
+}
+.gr-handout {
+  width: 794px;
+  background: var(--cream, #FBF4EE);
+  font-family: var(--sans, 'Inter', system-ui, sans-serif);
+  color: var(--ink, #1A1410);
+  padding: 72px 64px 64px;
+  box-sizing: border-box;
+}
+
+/* Cover */
+.gr-handout-cover {
+  margin-bottom: 56px;
+  padding-bottom: 32px;
+  border-bottom: 1px solid var(--rule, #E2D3BD);
+}
+.gr-handout-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  color: var(--peach-deep, #d97757);
+  margin-bottom: 18px;
+}
+.gr-handout-eyebrow-dot {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--peach-deep, #d97757);
+}
+.gr-handout-title {
+  font-family: var(--serif, 'Fraunces', Georgia, serif);
+  font-size: 46px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  line-height: 1.05;
+  margin: 0 0 26px;
+  color: var(--ink, #1A1410);
+}
+.gr-handout-title em {
+  font-style: italic;
+  color: var(--peach-deep, #d97757);
+}
+.gr-handout-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 0;
+  font-family: var(--mono);
+  font-size: 11.5px;
+  letter-spacing: 0.06em;
+  color: var(--ink-mid, #4A3A2C);
+}
+.gr-handout-meta-bit { display: inline-flex; }
+.gr-handout-meta-bit:not(:last-child)::after {
+  content: '·';
+  margin: 0 14px;
+  color: var(--ink-muted, #8A7A68);
+}
+
+/* Section */
+.gr-handout-section {
+  margin-bottom: 56px;
+}
+.gr-handout-section-eyebrow {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.2em;
+  color: var(--ink-muted, #8A7A68);
+  margin-bottom: 8px;
+}
+.gr-handout-section-title {
+  font-family: var(--serif, 'Fraunces', Georgia, serif);
+  font-size: 32px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  line-height: 1.15;
+  margin: 0 0 12px;
+  color: var(--ink, #1A1410);
+}
+.gr-handout-section-title em {
+  font-style: italic;
+  color: var(--peach-deep, #d97757);
+}
+.gr-handout-section-sub {
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--ink-mid, #4A3A2C);
+  margin: 0 0 28px;
+  max-width: 540px;
+}
+
+/* Reflections */
+.gr-handout-reflections {
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+}
+.gr-handout-reflection {
+  padding-bottom: 24px;
+  border-bottom: 1px solid var(--rule-soft, #EDE0CC);
+}
+.gr-handout-reflection:last-child { border-bottom: none; padding-bottom: 0; }
+.gr-handout-reflection-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.gr-handout-reflection-stage {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.16em;
+  color: var(--peach-deep, #d97757);
+  flex-shrink: 0;
+}
+.gr-handout-reflection-rule {
+  flex: 1;
+  height: 1px;
+  background: var(--rule, #E2D3BD);
+}
+.gr-handout-reflection-label {
+  font-family: var(--serif, 'Fraunces', Georgia, serif);
+  font-size: 22px;
+  font-weight: 500;
+  letter-spacing: -0.005em;
+  color: var(--ink, #1A1410);
+  flex-shrink: 0;
+}
+.gr-handout-reflection-confidence {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 16px;
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  color: var(--ink-muted, #8A7A68);
+}
+.gr-handout-reflection-confidence-l { text-transform: uppercase; }
+.gr-handout-reflection-confidence-v {
+  font-family: var(--serif, 'Fraunces', Georgia, serif);
+  font-size: 24px;
+  font-weight: 500;
+  letter-spacing: 0;
+  color: var(--peach-deep, #d97757);
+}
+.gr-handout-reflection-confidence-of {
+  font-size: 11px;
+  color: var(--ink-muted, #8A7A68);
+}
+.gr-handout-quote {
+  margin: 0;
+  padding: 4px 0 4px 18px;
+  border-left: 3px solid var(--peach-deep, #d97757);
+  font-family: var(--serif, 'Fraunces', Georgia, serif);
+  font-style: italic;
+  font-size: 16px;
+  line-height: 1.6;
+  color: var(--ink-mid, #4A3A2C);
+  white-space: pre-wrap;
+}
+
+/* Capstone steps */
+.gr-handout-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.gr-handout-step {
+  background: var(--paper, #FFFFFF);
+  border: 1px solid var(--rule-soft, #EDE0CC);
+  border-left: 3px solid var(--peach-deep, #d97757);
+  border-radius: 8px;
+  padding: 20px 24px;
+}
+.gr-handout-step.is-human {
+  border-left-color: var(--ink-mid, #4A3A2C);
+}
+.gr-handout-step-head {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 8px;
+}
+.gr-handout-step-num {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.16em;
+  color: var(--peach-deep, #d97757);
+}
+.gr-handout-step.is-human .gr-handout-step-num { color: var(--ink-mid, #4A3A2C); }
+.gr-handout-step-type {
+  font-family: var(--mono);
+  font-size: 9.5px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--ink-muted, #8A7A68);
+  padding: 2px 8px;
+  border: 1px solid var(--rule, #E2D3BD);
+  border-radius: 999px;
+}
+.gr-handout-step-name {
+  font-family: var(--serif, 'Fraunces', Georgia, serif);
+  font-size: 19px;
+  font-weight: 500;
+  margin: 0 0 14px;
+  color: var(--ink, #1A1410);
+}
+.gr-handout-step-fields {
+  display: grid;
+  grid-template-columns: 100px 1fr;
+  gap: 6px 16px;
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+}
+.gr-handout-step-fields dt {
+  font-family: var(--mono);
+  font-size: 9.5px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-muted, #8A7A68);
+  padding-top: 2px;
+}
+.gr-handout-step-fields dd {
+  margin: 0;
+  color: var(--ink, #1A1410);
+}
+
+/* Collections (coworkers / workflows) */
+.gr-handout-collection {
+  margin-bottom: 24px;
+}
+.gr-handout-collection:last-child { margin-bottom: 0; }
+.gr-handout-collection-head {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--ink-muted, #8A7A68);
+  margin-bottom: 12px;
+}
+.gr-handout-collection-head span {
+  color: var(--peach-deep, #d97757);
+}
+.gr-handout-collection-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 16px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--rule-soft, #EDE0CC);
+}
+.gr-handout-collection-row:last-child { border-bottom: none; }
+.gr-handout-collection-name {
+  font-family: var(--serif, 'Fraunces', Georgia, serif);
+  font-size: 16px;
+  font-weight: 500;
+  color: var(--ink, #1A1410);
+}
+.gr-handout-collection-meta {
+  font-size: 12px;
+  color: var(--ink-mid, #4A3A2C);
+  text-align: right;
+}
+
+/* Scorecard */
+.gr-handout-scorecard {
+  display: flex;
+  flex-direction: column;
+}
+.gr-handout-score-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--rule-soft, #EDE0CC);
+}
+.gr-handout-score-row:last-child { border-bottom: none; }
+.gr-handout-score-name {
+  font-family: var(--serif, 'Fraunces', Georgia, serif);
+  font-size: 17px;
+  font-weight: 500;
+  color: var(--ink, #1A1410);
+}
+.gr-handout-score-level {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--peach-deep, #d97757);
+}
+
+/* Closer */
+.gr-handout-closer {
+  margin-top: 24px;
+  padding-top: 32px;
+  border-top: 1px solid var(--rule, #E2D3BD);
+  text-align: center;
+}
+.gr-handout-closer-mark svg {
+  width: 80px;
+  height: 24px;
+  margin-bottom: 12px;
+}
+.gr-handout-closer-text {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: 0.06em;
+  color: var(--ink-muted, #8A7A68);
+  font-style: italic;
+}
 .gr-handout {
   padding: 10px 18px;
   background: transparent;

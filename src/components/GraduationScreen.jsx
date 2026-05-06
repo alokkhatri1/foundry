@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { computeScorecard, LEVELS, LEVEL_COLORS } from '../utils/graduationScorecard';
 import { buildHandoutPdf } from '../utils/handoutPdf';
+import HandoutPage from './HandoutPage';
 import FeedbackForm from './FeedbackForm';
 
 // Graduation screen — the "Own it" moment at workshop end. Editorial
@@ -181,39 +182,61 @@ export default function GraduationScreen({
     );
   }
 
-  // Build and download the participant's takeaway as a real text-based
-  // PDF — searchable, copy-pasteable, multi-page with auto-pagination.
-  // Pulled together at click-time from the same data the rest of the
-  // page already has loaded; jsPDF is lazy-imported inside the builder.
+  // Build and download the participant's takeaway as a designed PDF.
+  // Mount the styled <HandoutPage> offscreen, let the browser paint and
+  // fonts settle, capture via html2canvas, slice into A4 pages, embed
+  // in jsPDF, save. Same image-based-PDF approach as the certificate —
+  // not text-searchable, but renders exactly as designed.
   const [handoutBusy, setHandoutBusy] = useState(false);
+  const [handoutMounted, setHandoutMounted] = useState(false);
   async function handleDownloadHandout() {
     if (handoutBusy) return;
     setHandoutBusy(true);
+    setHandoutMounted(true);
     try {
-      const orgName = (participants || []).find(p => p.name === userName)?.org_name || '';
-      const { doc, filename } = await buildHandoutPdf({
-        userName,
-        orgName,
-        level: overall,
-        scorecard,
-        reflections: myReflections,
-        capstoneRows,
-        coworkers,
-        workflows,
-        flatFiles,
-        participants,
-      });
+      // Two-frame wait: first frame mounts the DOM, second frame lets
+      // layout + web fonts settle before html2canvas snaps.
+      await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+      if (document.fonts && document.fonts.ready) {
+        try { await document.fonts.ready; } catch { /* non-fatal */ }
+      }
+      const { doc, filename } = await buildHandoutPdf({ userName });
       doc.save(filename);
     } catch (err) {
       console.error('[graduation] handout download failed:', err);
       alert('Could not generate the takeaway PDF. Please try again.');
     } finally {
+      setHandoutMounted(false);
       setHandoutBusy(false);
     }
   }
 
+  // Resolve participant org from the participants table when present;
+  // falls back to empty so the cover header just lists name + date.
+  const handoutOrgName = useMemo(
+    () => (participants || []).find(p => p.name === userName)?.org_name || '',
+    [participants, userName],
+  );
+
   return (
     <div className={`gr-page${embedded ? ' is-embedded' : ''}`}>
+      {handoutMounted && (
+        <div className="gr-handout-stage" aria-hidden>
+          <HandoutPage
+            userName={userName}
+            orgName={handoutOrgName}
+            level={overall}
+            date={issuedDate}
+            scorecard={scorecard}
+            reflections={myReflections}
+            capstoneRows={capstoneRows}
+            coworkers={coworkers}
+            workflows={workflows}
+            flatFiles={flatFiles}
+            participants={participants}
+          />
+        </div>
+      )}
       <main className="gr-container">
         <CertificatePlate userName={userName} date={issuedDate} level={overall} />
         <Tally tally={tally} />

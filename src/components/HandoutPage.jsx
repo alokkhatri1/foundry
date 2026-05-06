@@ -1,45 +1,18 @@
 import { REFLECTION_PROMPTS } from '../data/reflectionPrompts';
 import { LEVELS } from '../utils/graduationScorecard';
 
-// One-page synthesis takeaway. Rendered offscreen, captured by
-// html2canvas, embedded into a single A4-portrait jsPDF page. The doc
-// is meant to *help the participant reflect*, not enumerate everything
-// they did — so it picks one signal from each piece of data they
-// generated:
+// Reflections takeaway. Rendered offscreen, captured by html2canvas,
+// embedded as A4 portrait pages in jsPDF. The doc is just a clean,
+// well-designed record of what the participant wrote — for each stage
+// they reflected on, we show the stage's intent (the anchor we
+// authored) plus their understanding rating, their note, and their
+// daily-action habit.
 //
-//   - their voice         → hero quote pulled from their longest note
-//   - their progress      → confidence ladder across the eight primitives
-//   - their commitments   → their accumulated habit answers as a practice plan
-//   - their next move     → three carry-forward prompts authored by us
-//
-// Sized to fit a single A4 portrait page; if a participant didn't
-// reflect on every stage, the page just gets quieter, not longer.
+// Multi-page is fine — handoutPdf.js slices the captured canvas into
+// page-height chunks. Empty stages are skipped so the doc only grows
+// with what the participant actually generated.
 
 const REFLECTION_STAGES_ORDERED = ['3', '4', '5', '6', '7', '8', '9', '10'];
-
-// Three prompts for the participant to sit with after the workshop.
-// Authored, not collected — the per-stage habit answers above are the
-// "what to do tomorrow"; these are the "what to think about beyond it".
-const CARRY_FORWARD = [
-  'Which primitive felt easiest, and which still feels fuzzy?',
-  'What’s the first real workflow at work where you’ll start applying this?',
-  'Who on your team would benefit most from learning this with you?',
-];
-
-function pickHeroQuote(reflections) {
-  // Pull the longest non-empty reflection note as the hero. Length is a
-  // proxy for "they had the most to say there" — better than picking
-  // the first or last, both of which are positional accidents.
-  let best = null;
-  for (const r of (reflections || [])) {
-    const text = (r.note || '').trim();
-    if (!text) continue;
-    if (!best || text.length > best.text.length) {
-      best = { text, stage: String(r.stage) };
-    }
-  }
-  return best;
-}
 
 export default function HandoutPage({
   userName,
@@ -53,121 +26,90 @@ export default function HandoutPage({
     reflectionsByStage.set(String(r.stage), r);
   }
 
+  // Only show stages where the participant actually wrote something.
+  const filledStages = REFLECTION_STAGES_ORDERED
+    .map(stage => ({ stage, prompt: REFLECTION_PROMPTS[stage], r: reflectionsByStage.get(stage) }))
+    .filter(({ r }) => r && (r.note?.trim() || r.habit?.trim() || typeof r.confidence === 'number'));
+
   const levelWord = (typeof level === 'number' && LEVELS[level]) ? LEVELS[level] : null;
   const metaParts = [userName || 'Participant'];
   if (orgName) metaParts.push(orgName);
   metaParts.push(`Issued ${date}`);
   if (levelWord) metaParts.push(`Level: ${levelWord}`);
 
-  const hero = pickHeroQuote(reflections);
-  const heroLabel = hero ? (REFLECTION_PROMPTS[hero.stage]?.label || `Stage ${hero.stage}`) : null;
-
-  // Practice plan: each habit the participant wrote, paired with its stage.
-  const practicePlan = REFLECTION_STAGES_ORDERED
-    .map(stage => {
-      const r = reflectionsByStage.get(stage);
-      const habit = r?.habit?.trim();
-      if (!habit) return null;
-      return {
-        stage,
-        label: REFLECTION_PROMPTS[stage]?.label || `Stage ${stage}`,
-        habit,
-      };
-    })
-    .filter(Boolean);
-
   return (
     <div className="gr-takeaway">
       {/* Cover */}
-      <header className="gr-handout-cover">
-        <div className="gr-handout-eyebrow">
-          <span className="gr-handout-eyebrow-dot" aria-hidden />
-          FOUNDRY · WORKSHOP TAKEAWAY
+      <header className="gr-takeaway-cover">
+        <div className="gr-takeaway-eyebrow">
+          <span className="gr-takeaway-eyebrow-dot" aria-hidden />
+          FOUNDRY · YOUR REFLECTIONS
         </div>
-        <h1 className="gr-handout-title">
-          What you learned,&nbsp;<em>what to try next</em>.
+        <h1 className="gr-takeaway-title">
+          Six primitives,&nbsp;<em>in your own words</em>.
         </h1>
-        <div className="gr-handout-meta">
+        <div className="gr-takeaway-meta">
           {metaParts.map((p, i) => (
-            <span key={i} className="gr-handout-meta-bit">{p}</span>
+            <span key={i} className="gr-takeaway-meta-bit">{p}</span>
           ))}
         </div>
       </header>
 
-      {/* Hero quote — their voice, pulled from their longest reflection */}
-      {hero && (
-        <section className="gr-handout-hero">
-          <div className="gr-handout-hero-eyebrow">In your own words</div>
-          <blockquote className="gr-handout-hero-quote">
-            {hero.text}
-          </blockquote>
-          <div className="gr-handout-hero-attr">— Stage {hero.stage} · {heroLabel}</div>
-        </section>
-      )}
+      {/* Per-stage reflection cards */}
+      <div className="gr-takeaway-cards">
+        {filledStages.map(({ stage, prompt, r }) => (
+          <article key={stage} className="gr-takeaway-card">
+            <header className="gr-takeaway-card-head">
+              <div className="gr-takeaway-card-stage">Stage {stage}</div>
+              <h2 className="gr-takeaway-card-label">{prompt?.label || `Stage ${stage}`}</h2>
+              {prompt?.anchor && (
+                <p className="gr-takeaway-card-anchor"><em>{prompt.anchor}</em></p>
+              )}
+            </header>
 
-      {/* Confidence ladder — visual snapshot of their progress */}
-      <section className="gr-handout-ladder-section">
-        <div className="gr-handout-section-eyebrow">THE ARC OF YOUR UNDERSTANDING</div>
-        <div className="gr-handout-ladder">
-          {REFLECTION_STAGES_ORDERED.map(stage => {
-            const r = reflectionsByStage.get(stage);
-            const confidence = typeof r?.confidence === 'number' ? r.confidence : 0;
-            const label = REFLECTION_PROMPTS[stage]?.label || `Stage ${stage}`;
-            return (
-              <div key={stage} className="gr-handout-ladder-row">
-                <span className="gr-handout-ladder-stage">Stage {stage}</span>
-                <span className="gr-handout-ladder-name">{label}</span>
-                <span className="gr-handout-ladder-dots" aria-label={`${confidence} of 5`}>
+            {typeof r.confidence === 'number' && (
+              <div className="gr-takeaway-card-rating">
+                <span className="gr-takeaway-card-rating-l">Understanding</span>
+                <span className="gr-takeaway-card-rating-dots" aria-label={`${r.confidence} of 5`}>
                   {[1, 2, 3, 4, 5].map(n => (
                     <span
                       key={n}
-                      className={`gr-handout-ladder-dot${n <= confidence ? ' is-on' : ''}`}
+                      className={`gr-takeaway-card-rating-dot${n <= r.confidence ? ' is-on' : ''}`}
                       aria-hidden
                     />
                   ))}
                 </span>
-                <span className="gr-handout-ladder-num">{confidence || '—'}</span>
+                <span className="gr-takeaway-card-rating-num">{r.confidence} / 5</span>
               </div>
-            );
-          })}
-        </div>
-      </section>
+            )}
 
-      {/* Practice plan — their accumulated habit answers */}
-      {practicePlan.length > 0 && (
-        <section className="gr-handout-practice">
-          <div className="gr-handout-section-eyebrow">YOUR PRACTICE PLAN</div>
-          <h2 className="gr-handout-practice-title">
-            Eight small habits,&nbsp;<em>in your own hand</em>.
-          </h2>
-          <ol className="gr-handout-practice-list">
-            {practicePlan.map(item => (
-              <li key={item.stage} className="gr-handout-practice-item">
-                <div className="gr-handout-practice-stage">{item.label}</div>
-                <div className="gr-handout-practice-text">{item.habit}</div>
-              </li>
-            ))}
-          </ol>
-        </section>
-      )}
+            {r.note && r.note.trim() && (
+              <div className="gr-takeaway-card-section">
+                <div className="gr-takeaway-card-section-label">What you wrote</div>
+                <blockquote className="gr-takeaway-card-quote">{r.note.trim()}</blockquote>
+              </div>
+            )}
 
-      {/* Carry forward — authored prompts for after the workshop */}
-      <section className="gr-handout-carry">
-        <div className="gr-handout-section-eyebrow">CARRY FORWARD</div>
-        <ol className="gr-handout-carry-list">
-          {CARRY_FORWARD.map((q, i) => (
-            <li key={i} className="gr-handout-carry-item">{q}</li>
-          ))}
-        </ol>
-      </section>
+            {r.habit && r.habit.trim() && (
+              <div className="gr-takeaway-card-section">
+                <div className="gr-takeaway-card-section-label">What you’ll try</div>
+                <blockquote className="gr-takeaway-card-quote is-habit">{r.habit.trim()}</blockquote>
+              </div>
+            )}
+          </article>
+        ))}
+      </div>
 
       {/* Closer */}
-      <footer className="gr-handout-closer">
-        <div className="gr-handout-closer-mark">
+      <footer className="gr-takeaway-closer">
+        <div className="gr-takeaway-closer-mark">
           <svg viewBox="0 0 80 24" aria-hidden>
             <path d="M 4 18 C 14 4, 24 22, 34 12 S 54 4, 64 18" stroke="#d97757" strokeWidth="1.5" fill="none" strokeLinecap="round" />
             <circle cx="68" cy="18" r="1.5" fill="#d97757" />
           </svg>
+        </div>
+        <div className="gr-takeaway-closer-text">
+          Generated by Foundry. Save this somewhere you’ll see it when you next sit down to build.
         </div>
       </footer>
     </div>

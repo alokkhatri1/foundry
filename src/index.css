@@ -15700,17 +15700,21 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
 }
 
 /* ───── Takeaway handout — reflections, well-designed (PDF source) ────
-   Rendered offscreen during the export click, captured by html2canvas,
-   embedded into A4 portrait pages in jsPDF (multi-page if the
-   participant reflected on enough stages). The doc is just the
-   participant's own words across the workshop, one card per stage. */
+   Rendered offscreen, captured by html2canvas, embedded into A4
+   portrait pages in jsPDF.
+
+   Type scale (kept tight for consistency):
+     - mono 10px (caps, 0.18em) — eyebrows, section labels, rating num
+     - serif italic 14px        — anchor + blockquotes
+     - serif 24px               — card titles
+     - serif 38px               — cover title
+
+   Spacing scale: 8 / 16 / 24 / 32. Nothing else. */
 .gr-handout-stage {
   position: fixed;
   left: -10000px;
   top: 0;
   pointer-events: none;
-  /* Width matches A4 portrait at ~96dpi so the capture's aspect ratio
-     resolves correctly when sliced into pages. */
   width: 794px;
 }
 .gr-takeaway {
@@ -15724,8 +15728,8 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
 
 /* Cover */
 .gr-takeaway-cover {
-  margin-bottom: 36px;
-  padding-bottom: 22px;
+  margin-bottom: 32px;
+  padding-bottom: 24px;
   border-bottom: 1px solid var(--rule, #E2D3BD);
 }
 .gr-takeaway-eyebrow {
@@ -15736,7 +15740,7 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
   font-size: 10px;
   letter-spacing: 0.18em;
   color: var(--peach-deep, #d97757);
-  margin-bottom: 14px;
+  margin-bottom: 16px;
 }
 .gr-takeaway-eyebrow-dot {
   width: 6px; height: 6px;
@@ -15760,13 +15764,13 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
   display: flex;
   flex-wrap: wrap;
   font-family: var(--mono);
-  font-size: 10.5px;
+  font-size: 10px;
   letter-spacing: 0.06em;
   color: var(--ink-mid, #4A3A2C);
 }
 .gr-takeaway-meta-bit:not(:last-child)::after {
   content: '·';
-  margin: 0 12px;
+  margin: 0 8px;
   color: var(--ink-muted, #8A7A68);
 }
 
@@ -15774,71 +15778,41 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
 .gr-takeaway-cards {
   display: flex;
   flex-direction: column;
-  gap: 24px;
+  gap: 16px;
 }
 .gr-takeaway-card {
   background: var(--paper, #FFFFFF);
   border: 1px solid var(--rule-soft, #EDE0CC);
   border-left: 3px solid var(--peach-deep, #d97757);
-  border-radius: 10px;
-  padding: 24px 28px;
-  /* Try to keep a card on one page when the slicer breaks pages —
-     prevents a card splitting awkwardly across the seam. */
+  border-radius: 8px;
+  padding: 24px 32px;
   page-break-inside: avoid;
   break-inside: avoid;
 }
 .gr-takeaway-card-head {
-  margin-bottom: 18px;
+  margin-bottom: 24px;
+}
+.gr-takeaway-card-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 8px;
 }
 .gr-takeaway-card-stage {
   font-family: var(--mono);
   font-size: 10px;
   letter-spacing: 0.18em;
   color: var(--peach-deep, #d97757);
-  margin-bottom: 6px;
 }
-.gr-takeaway-card-label {
-  font-family: var(--serif, 'Fraunces', Georgia, serif);
-  font-size: 26px;
-  font-weight: 500;
-  letter-spacing: -0.01em;
-  margin: 0 0 10px;
-  color: var(--ink, #1A1410);
-}
-.gr-takeaway-card-anchor {
-  font-family: var(--serif, 'Fraunces', Georgia, serif);
-  font-size: 13.5px;
-  line-height: 1.55;
-  color: var(--ink-mid, #4A3A2C);
-  margin: 0;
-}
-.gr-takeaway-card-anchor em { font-style: italic; }
-
 .gr-takeaway-card-rating {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 18px;
-  padding: 10px 14px;
-  background: var(--cream, #FBF4EE);
-  border-radius: 8px;
-}
-.gr-takeaway-card-rating-l {
-  font-family: var(--mono);
-  font-size: 9.5px;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-  color: var(--ink-muted, #8A7A68);
-}
-.gr-takeaway-card-rating-dots {
   display: inline-flex;
-  gap: 5px;
   align-items: center;
-  flex: 1;
+  gap: 8px;
 }
 .gr-takeaway-card-rating-dot {
-  width: 9px;
-  height: 9px;
+  width: 8px;
+  height: 8px;
   border-radius: 50%;
   background: var(--cream-deep, #F0E4D3);
   border: 1px solid var(--rule, #E2D3BD);
@@ -15849,10 +15823,28 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
 }
 .gr-takeaway-card-rating-num {
   font-family: var(--mono);
-  font-size: 11px;
-  font-weight: 600;
+  font-size: 10px;
+  letter-spacing: 0.06em;
   color: var(--peach-deep, #d97757);
   font-variant-numeric: tabular-nums;
+  margin-left: 4px;
+}
+.gr-takeaway-card-label {
+  font-family: var(--serif, 'Fraunces', Georgia, serif);
+  font-size: 24px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  line-height: 1.15;
+  margin: 0 0 8px;
+  color: var(--ink, #1A1410);
+}
+.gr-takeaway-card-anchor {
+  font-family: var(--serif, 'Fraunces', Georgia, serif);
+  font-style: italic;
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--ink-mid, #4A3A2C);
+  margin: 0;
 }
 
 .gr-takeaway-card-section + .gr-takeaway-card-section {
@@ -15860,7 +15852,7 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
 }
 .gr-takeaway-card-section-label {
   font-family: var(--mono);
-  font-size: 9.5px;
+  font-size: 10px;
   letter-spacing: 0.18em;
   text-transform: uppercase;
   color: var(--ink-muted, #8A7A68);
@@ -15872,27 +15864,23 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
   border-left: 3px solid var(--peach-deep, #d97757);
   font-family: var(--serif, 'Fraunces', Georgia, serif);
   font-style: italic;
-  font-size: 15px;
+  font-size: 14px;
   line-height: 1.6;
   color: var(--ink, #1A1410);
   white-space: pre-wrap;
 }
-.gr-takeaway-card-quote.is-habit {
-  border-left-color: var(--ink-mid, #4A3A2C);
-  color: var(--ink-mid, #4A3A2C);
-}
 
 /* Closer */
 .gr-takeaway-closer {
-  margin-top: 36px;
-  padding-top: 20px;
+  margin-top: 32px;
+  padding-top: 24px;
   border-top: 1px solid var(--rule, #E2D3BD);
   text-align: center;
 }
 .gr-takeaway-closer-mark svg {
   width: 70px;
   height: 22px;
-  margin-bottom: 10px;
+  margin-bottom: 8px;
 }
 .gr-takeaway-closer-text {
   font-family: var(--mono);

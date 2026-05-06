@@ -60,28 +60,26 @@ export default function HandoutPage({
         {filledStages.map(({ stage, prompt, r }) => (
           <article key={stage} className="gr-takeaway-card">
             <header className="gr-takeaway-card-head">
-              <div className="gr-takeaway-card-stage">Stage {stage}</div>
+              <div className="gr-takeaway-card-meta">
+                <span className="gr-takeaway-card-stage">Stage {stage}</span>
+                {typeof r.confidence === 'number' && (
+                  <span className="gr-takeaway-card-rating" aria-label={`Understanding ${r.confidence} of 5`}>
+                    {[1, 2, 3, 4, 5].map(n => (
+                      <span
+                        key={n}
+                        className={`gr-takeaway-card-rating-dot${n <= r.confidence ? ' is-on' : ''}`}
+                        aria-hidden
+                      />
+                    ))}
+                    <span className="gr-takeaway-card-rating-num">{r.confidence} / 5</span>
+                  </span>
+                )}
+              </div>
               <h2 className="gr-takeaway-card-label">{prompt?.label || `Stage ${stage}`}</h2>
               {prompt?.anchor && (
                 <p className="gr-takeaway-card-anchor"><em>{prompt.anchor}</em></p>
               )}
             </header>
-
-            {typeof r.confidence === 'number' && (
-              <div className="gr-takeaway-card-rating">
-                <span className="gr-takeaway-card-rating-l">Understanding</span>
-                <span className="gr-takeaway-card-rating-dots" aria-label={`${r.confidence} of 5`}>
-                  {[1, 2, 3, 4, 5].map(n => (
-                    <span
-                      key={n}
-                      className={`gr-takeaway-card-rating-dot${n <= r.confidence ? ' is-on' : ''}`}
-                      aria-hidden
-                    />
-                  ))}
-                </span>
-                <span className="gr-takeaway-card-rating-num">{r.confidence} / 5</span>
-              </div>
-            )}
 
             {r.note && r.note.trim() && (
               <div className="gr-takeaway-card-section">
@@ -93,7 +91,7 @@ export default function HandoutPage({
             {r.habit && r.habit.trim() && (
               <div className="gr-takeaway-card-section">
                 <div className="gr-takeaway-card-section-label">What you’ll try</div>
-                <blockquote className="gr-takeaway-card-quote is-habit">{r.habit.trim()}</blockquote>
+                <blockquote className="gr-takeaway-card-quote">{r.habit.trim()}</blockquote>
               </div>
             )}
           </article>

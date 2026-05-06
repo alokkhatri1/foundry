@@ -1235,7 +1235,7 @@ export default function useSupabase() {
     if (!isSupabaseConfigured || !roomIdRef.current || !participantId) return [];
     const { data, error } = await supabase
       .from('stage_reflections')
-      .select('stage, confidence, note, updated_at')
+      .select('stage, confidence, note, habit, updated_at')
       .eq('workshop_id', roomIdRef.current)
       .eq('participant_id', participantId);
     if (error) { console.error('[sb] loadMyStageReflections:', error.message); return []; }
@@ -1268,7 +1268,7 @@ export default function useSupabase() {
     if (!isSupabaseConfigured || !workshopId) return [];
     const { data, error } = await supabase
       .from('stage_reflections')
-      .select('participant_id, stage, confidence, note, updated_at')
+      .select('participant_id, stage, confidence, note, habit, updated_at')
       .eq('workshop_id', workshopId);
     if (error) { console.error('[sb] loadAllStageReflections:', error.message); return []; }
     return data || [];

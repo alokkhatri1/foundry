@@ -62,6 +62,22 @@ import { supabase as supabaseClient } from './supabase';
 
 const STORAGE_KEY = 'sandbox:state';
 
+// Conversations are scoped per workshop so a participant who attends
+// two rooms doesn't see the other's chat history bleed in. Read +
+// write under sandbox:conversations:<code>; the legacy unscoped
+// sandbox:conversations key is left untouched (it just won't be read).
+function convoKey(code) {
+  return code ? `sandbox:conversations:${code}` : null;
+}
+function loadConversations(code) {
+  const key = convoKey(code);
+  if (!key) return [];
+  try {
+    const raw = localStorage.getItem(key);
+    return raw ? JSON.parse(raw) : [];
+  } catch { return []; }
+}
+
 // Avatar colors for Capstone-materialized coworkers. Mirrors the palette
 // CoworkerBuilder uses for hand-built coworkers so the library stays
 // visually coherent regardless of how a coworker was created.
@@ -364,19 +380,15 @@ function App() {
   const [tools, setTools] = useState(saved?.tools || null);
   const [selectedFileId, setSelectedFileId] = useState(null);
   const [selectedDeptId, setSelectedDeptId] = useState(saved?.selectedDeptId || null);
-  const [conversations, setConversations] = useState(() => {
-    try {
-      const raw = localStorage.getItem('sandbox:conversations');
-      return raw ? JSON.parse(raw) : [];
-    } catch { return []; }
-  });
-  const [activeConvoId, setActiveConvoId] = useState(() => {
-    try {
-      const raw = localStorage.getItem('sandbox:conversations');
-      const convos = raw ? JSON.parse(raw) : [];
-      return convos.length > 0 ? convos[convos.length - 1].id : null;
-    } catch { return null; }
-  });
+  // Initial conversations are scoped to the workshop the participant
+  // last joined so a returning user lands back in their own chat
+  // history, not someone else's that happened to be in the unscoped
+  // legacy key.
+  const initialConvos = loadConversations(saved?.workshopCode);
+  const [conversations, setConversations] = useState(initialConvos);
+  const [activeConvoId, setActiveConvoId] = useState(
+    initialConvos.length > 0 ? initialConvos[initialConvos.length - 1].id : null
+  );
 
   const activeConvo = conversations.find(c => c.id === activeConvoId);
   const messages = activeConvo?.messages || [];
@@ -1095,6 +1107,12 @@ function App() {
 
     setUserName(name);
     setWorkshopCode(code);
+    // Restore conversations scoped to the workshop the participant
+    // just joined — covers the cross-room case where they joined a
+    // different code earlier in the same browser.
+    const roomConvos = loadConversations(code);
+    setConversations(roomConvos);
+    setActiveConvoId(roomConvos.length > 0 ? roomConvos[roomConvos.length - 1].id : null);
     setWorkflowRuns(runs);
     if (starterLogs.length > 0) setLogs(starterLogs);
     setParticipants(newParticipants);

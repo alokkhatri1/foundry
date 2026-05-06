@@ -1,94 +1,39 @@
 import { useMemo, useState } from 'react';
 
-// Pre-graduation feedback survey. Editorial layout — all 18 questions on
-// one page, grouped into 6 sections (A-F). Required = every scale + yes/no
-// question (12 total); optional = the three free-text fields in section D.
+// Pre-graduation feedback survey. Trimmed to a five-question wrap-up —
+// per-primitive learning ratings live in the per-stage reflections now,
+// so this final form only captures what those can't:
 //
-// Payload keys match the workshop_feedback DB columns one-for-one so
-// sb.saveFeedback receives the exact shape it always has. Yes/no controls
-// store 'yes'/'no' strings locally for easier toggling, then convert to
-// booleans at submit time for the DB.
+//   1. would_recommend  — yes/no, the headline NPS-style signal
+//   2. trainer          — 1-5 composite of pacing, clarity, energy
+//   3. pace             — too_slow / just_right / too_fast
+//   4. most_valuable    — free text, single most valuable part
+//   5. improvement_notes — free text, one specific change for next time
+//
+// Every field is required; no optional fields. The form keeps the
+// participant honest at the close — five questions, ~one minute.
+//
+// Payload mapping: the single trainer rating is written into all three
+// existing trainer_* columns so the admin Recap card's averages keep
+// working without a schema rewrite. Old columns we no longer ask
+// about (satisfaction, relevance, clarity, materials_quality,
+// theory_practice, improved_skills, can_apply, duration_appropriate,
+// future_topics, platform_*) are simply omitted from the upsert and
+// land as NULL on new rows.
 
 const SCALE_LEGEND = [
-  { v: 1, label: 'Strongly disagree' },
-  { v: 2, label: 'Disagree' },
-  { v: 3, label: 'Neutral' },
-  { v: 4, label: 'Agree' },
-  { v: 5, label: 'Strongly agree' },
+  { v: 1, label: 'Poor' },
+  { v: 2, label: 'Fair' },
+  { v: 3, label: 'Good' },
+  { v: 4, label: 'Great' },
+  { v: 5, label: 'Excellent' },
 ];
 
-// Section + question schema. `id` matches the DB payload key.
-const SECTIONS = [
-  {
-    id: 'A',
-    eyebrow: 'Section A',
-    title: 'Training evaluation',
-    sub: 'A read of the session itself — content, trainer, delivery.',
-    questions: [
-      { id: 'satisfaction',       type: 'scale', text: 'Overall satisfaction with the training session.' },
-      { id: 'relevance',          type: 'scale', text: 'Relevance of the training content to your role and work.' },
-      { id: 'clarity',            type: 'scale', text: 'Clarity and organization of the training content.' },
-      { id: 'trainer_knowledge',  type: 'scale', text: "Trainer's knowledge of the subject matter." },
-      { id: 'trainer_delivery',   type: 'scale', text: "Trainer's effectiveness in delivering the content." },
-      { id: 'trainer_engagement', type: 'scale', text: "Trainer's ability to engage and interact with participants." },
-    ],
-  },
-  {
-    id: 'B',
-    eyebrow: 'Section B',
-    title: 'Design & materials',
-    sub: 'Slides, pacing, time on the platform.',
-    questions: [
-      { id: 'materials_quality',    type: 'scale', text: 'Quality and usefulness of the slides and reference content.' },
-      { id: 'duration_appropriate', type: 'yesno', text: 'Was the training duration appropriate?' },
-      { id: 'theory_practice',      type: 'scale', text: 'Balance between guided explanation and hands-on practice on the platform.' },
-    ],
-  },
-  {
-    id: 'C',
-    eyebrow: 'Section C',
-    title: 'Learning impact',
-    sub: 'What you take with you.',
-    questions: [
-      { id: 'improved_skills', type: 'scale', text: 'The training improved my knowledge and skills.' },
-      { id: 'can_apply',       type: 'scale', text: 'I can apply what I learned in my work.' },
-    ],
-  },
-  {
-    id: 'D',
-    eyebrow: 'Section D',
-    title: 'Open feedback',
-    sub: 'In your own words. All three are optional.',
-    questions: [
-      { id: 'most_valuable',     type: 'text', text: 'What aspects of the training did you find most valuable?', placeholder: 'A method, a moment, a mental model that clicked…' },
-      { id: 'future_topics',     type: 'text', text: 'What topics would you like to see in future trainings?',   placeholder: 'A skill, a tool, an unanswered question…' },
-      { id: 'improvement_notes', type: 'text', text: 'Any suggestions to improve future training sessions?',     placeholder: 'Anything you would change, drop, or add.' },
-    ],
-  },
-  {
-    id: 'E',
-    eyebrow: 'Section E',
-    title: 'Recommendation',
-    sub: 'Would you send a colleague?',
-    questions: [
-      { id: 'would_recommend', type: 'yesno', text: 'Would you recommend this training to others?' },
-    ],
-  },
-  {
-    id: 'F',
-    eyebrow: 'Section F',
-    title: 'The platform',
-    sub: 'How Foundry held up while you were learning.',
-    questions: [
-      { id: 'platform_rating',       type: 'scale', text: 'Ease of using the Foundry platform — intuitive, easy to navigate.' },
-      { id: 'platform_reliability',  type: 'scale', text: 'Reliability during the workshop — no lag, errors, or sync issues.' },
-      { id: 'platform_support',      type: 'scale', text: 'How well the platform supported what you were trying to learn.' },
-    ],
-  },
+const PACE_OPTIONS = [
+  { v: 'too_slow',   label: 'Too slow' },
+  { v: 'just_right', label: 'Just right' },
+  { v: 'too_fast',   label: 'Too fast' },
 ];
-
-const REQUIRED_IDS = SECTIONS.flatMap(s => s.questions)
-  .filter(q => q.type !== 'text').map(q => q.id);
 
 function pad2(n) { return String(n).padStart(2, '0'); }
 
@@ -112,8 +57,8 @@ function ScaleControl({ value, onChange, name }) {
         );
       })}
       <div className="sv-scale-legend" aria-hidden>
-        <span>Strongly disagree</span>
-        <span>Strongly agree</span>
+        <span>{SCALE_LEGEND[0].label}</span>
+        <span>{SCALE_LEGEND[SCALE_LEGEND.length - 1].label}</span>
       </div>
     </div>
   );
@@ -141,6 +86,28 @@ function YesNoControl({ value, onChange, name }) {
   );
 }
 
+function PaceControl({ value, onChange, name }) {
+  return (
+    <div className="sv-yesno sv-pace" role="radiogroup" aria-label={name}>
+      {PACE_OPTIONS.map(opt => {
+        const sel = value === opt.v;
+        return (
+          <button
+            key={opt.v}
+            type="button"
+            role="radio"
+            aria-checked={sel}
+            className={`sv-yesno-btn${sel ? ' is-selected' : ''}`}
+            onClick={() => onChange(opt.v)}
+          >
+            {opt.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 function TextControl({ value, onChange, placeholder }) {
   return (
     <textarea
@@ -148,50 +115,63 @@ function TextControl({ value, onChange, placeholder }) {
       value={value || ''}
       onChange={e => onChange(e.target.value)}
       placeholder={placeholder}
-      rows={3}
+      rows={4}
     />
   );
 }
 
-function Question({ q, index, value, onChange, isRequired }) {
-  const answered = value !== undefined && value !== null && value !== '';
+const QUESTIONS = [
+  {
+    id: 'would_recommend',
+    type: 'yesno',
+    text: 'Would you recommend this workshop to a colleague?',
+  },
+  {
+    id: 'trainer',
+    type: 'scale',
+    text: 'How was the trainer overall — pacing, clarity, energy?',
+  },
+  {
+    id: 'pace',
+    type: 'pace',
+    text: 'How was the pace of the workshop?',
+  },
+  {
+    id: 'most_valuable',
+    type: 'text',
+    text: 'Looking across everything you built and learned, what was the single most valuable part for you?',
+    placeholder: 'A method, a moment, a mental model that clicked…',
+  },
+  {
+    id: 'improvement_notes',
+    type: 'text',
+    text: 'One specific thing we should change for the next group?',
+    placeholder: 'Anything you would change, drop, or add.',
+  },
+];
+
+function isAnswered(q, value) {
+  if (value === undefined || value === null) return false;
+  if (q.type === 'text') return String(value).trim().length > 0;
+  return value !== '';
+}
+
+function Question({ q, index, value, onChange }) {
+  const answered = isAnswered(q, value);
   return (
     <div className={`sv-q${answered ? ' is-answered' : ''}`}>
       <div className="sv-q-meta">
         <span className="sv-q-num">{pad2(index)}</span>
-        {isRequired && <span className="sv-q-req">required</span>}
+        <span className="sv-q-req">required</span>
       </div>
       <div className="sv-q-body">
         <p className="sv-q-text">{q.text}</p>
         {q.type === 'scale' && <ScaleControl value={value} onChange={onChange} name={q.text} />}
         {q.type === 'yesno' && <YesNoControl value={value} onChange={onChange} name={q.text} />}
+        {q.type === 'pace'  && <PaceControl  value={value} onChange={onChange} name={q.text} />}
         {q.type === 'text'  && <TextControl  value={value} onChange={onChange} placeholder={q.placeholder} />}
       </div>
     </div>
-  );
-}
-
-function Section({ section, startIndex, answers, setAnswer }) {
-  return (
-    <section className="sv-section">
-      <header className="sv-section-head">
-        <div className="sv-section-eyebrow">{section.eyebrow}</div>
-        <h2 className="sv-section-title">{section.title}</h2>
-        <p className="sv-section-sub">{section.sub}</p>
-      </header>
-      <div className="sv-questions">
-        {section.questions.map((q, i) => (
-          <Question
-            key={q.id}
-            q={q}
-            index={startIndex + i + 1}
-            value={answers[q.id]}
-            onChange={v => setAnswer(q.id, v)}
-            isRequired={q.type !== 'text'}
-          />
-        ))}
-      </div>
-    </section>
   );
 }
 
@@ -199,44 +179,27 @@ export default function FeedbackForm({ onSubmit, submitting, errorMessage, userN
   const [answers, setAnswers] = useState({});
   const setAnswer = (id, v) => setAnswers(a => ({ ...a, [id]: v }));
 
-  const answeredRequired = useMemo(
-    () => REQUIRED_IDS.filter(id => answers[id] !== undefined && answers[id] !== null && answers[id] !== '').length,
+  const answeredCount = useMemo(
+    () => QUESTIONS.filter(q => isAnswered(q, answers[q.id])).length,
     [answers],
   );
-  const totalRequired = REQUIRED_IDS.length;
-  const ready = answeredRequired === totalRequired;
-
-  // Section start indices (1-based question numbering across the page)
-  let cursor = 0;
-  const startIndices = SECTIONS.map(s => {
-    const start = cursor;
-    cursor += s.questions.length;
-    return start;
-  });
+  const totalCount = QUESTIONS.length;
+  const ready = answeredCount === totalCount;
 
   function handleSubmit() {
     if (!ready || submitting) return;
-    // DB expects yes/no questions as booleans, free-text as nullable strings.
-    // Send only the keys the existing schema defined; extras would fail.
+    // Single trainer rating fans out to all three trainer_* columns so the
+    // admin Recap card's existing averages keep working without a schema
+    // rewrite. Dropped fields land as NULL on new rows.
+    const trainer = answers.trainer;
     const payload = {
-      satisfaction:         answers.satisfaction,
-      relevance:            answers.relevance,
-      clarity:              answers.clarity,
-      trainer_knowledge:    answers.trainer_knowledge,
-      trainer_delivery:     answers.trainer_delivery,
-      trainer_engagement:   answers.trainer_engagement,
-      materials_quality:    answers.materials_quality,
-      duration_appropriate: answers.duration_appropriate === 'yes',
-      theory_practice:      answers.theory_practice,
-      improved_skills:      answers.improved_skills,
-      can_apply:            answers.can_apply,
-      most_valuable:        (answers.most_valuable || '').trim() || null,
-      future_topics:        (answers.future_topics || '').trim() || null,
-      improvement_notes:    (answers.improvement_notes || '').trim() || null,
-      would_recommend:      answers.would_recommend === 'yes',
-      platform_rating:      answers.platform_rating,
-      platform_reliability: answers.platform_reliability,
-      platform_support:     answers.platform_support,
+      would_recommend:    answers.would_recommend === 'yes',
+      trainer_knowledge:  trainer,
+      trainer_delivery:   trainer,
+      trainer_engagement: trainer,
+      pace:               answers.pace,
+      most_valuable:      answers.most_valuable.trim(),
+      improvement_notes:  answers.improvement_notes.trim(),
     };
     onSubmit(payload);
   }
@@ -253,30 +216,24 @@ export default function FeedbackForm({ onSubmit, submitting, errorMessage, userN
             Before your scorecard,&nbsp;<em>a few words from you</em>.
           </h1>
           <p className="sv-sub">
-            Eighteen short questions, about five minutes. Your answers shape the next cohort.
+            Five quick questions, about a minute. The per-stage reflections
+            captured what you learned; this is the look-back on the whole.
           </p>
-          <div className="sv-legend" aria-label="Scale legend">
-            <span className="sv-legend-eyebrow">Scale</span>
-            <span className="sv-legend-row">
-              {SCALE_LEGEND.map(opt => (
-                <span key={opt.v} className="sv-legend-item">
-                  <span className="sv-legend-num">{opt.v}</span>
-                  {opt.label}
-                </span>
-              ))}
-            </span>
-          </div>
         </header>
 
-        {SECTIONS.map((s, i) => (
-          <Section
-            key={s.id}
-            section={s}
-            startIndex={startIndices[i]}
-            answers={answers}
-            setAnswer={setAnswer}
-          />
-        ))}
+        <section className="sv-section">
+          <div className="sv-questions">
+            {QUESTIONS.map((q, i) => (
+              <Question
+                key={q.id}
+                q={q}
+                index={i + 1}
+                value={answers[q.id]}
+                onChange={v => setAnswer(q.id, v)}
+              />
+            ))}
+          </div>
+        </section>
 
         {errorMessage && <div className="sv-error">{errorMessage}</div>}
 
@@ -285,11 +242,11 @@ export default function FeedbackForm({ onSubmit, submitting, errorMessage, userN
             {ready ? (
               <span className="sv-footer-ready">
                 <span className="sv-footer-ready-dot" aria-hidden />
-                All required questions answered. Optional notes are still open.
+                All five answered. Ready to submit.
               </span>
             ) : (
               <span className="sv-footer-pending">
-                <em>{totalRequired - answeredRequired}</em> required {totalRequired - answeredRequired === 1 ? 'question' : 'questions'} left to answer.
+                <em>{totalCount - answeredCount}</em> {totalCount - answeredCount === 1 ? 'question' : 'questions'} left.
               </span>
             )}
           </div>
@@ -309,7 +266,7 @@ export default function FeedbackForm({ onSubmit, submitting, errorMessage, userN
         <div className="sv-stickybar-track">
           <div
             className="sv-stickybar-fill"
-            style={{ width: `${(answeredRequired / totalRequired) * 100}%` }}
+            style={{ width: `${(answeredCount / totalCount) * 100}%` }}
           />
         </div>
       </div>

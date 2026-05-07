@@ -1178,7 +1178,24 @@ function App() {
     const prevIds = new Set((flatFiles || []).map(f => f.id));
     const newIds = new Set(newFlat.map(f => f.id));
     const removedIds = [...prevIds].filter(id => !newIds.has(id));
+    // Files added in this update — newly-created with a content body.
+    // We've seen real production rows where saveFilesBatch landed the
+    // metadata but lost the content (NULL in the DB), most likely
+    // because concurrent migration-driven batch writes from other
+    // clients during a stage transition raced this one. Fire an
+    // explicit single-row saveFile for each new file so the body has
+    // a guaranteed dedicated upsert that doesn't share a payload with
+    // anyone else's tree.
+    const addedFilesWithContent = newFlat.filter(f =>
+      f.type === 'file'
+      && !prevIds.has(f.id)
+      && typeof f.content === 'string'
+      && f.content.length > 0
+    );
     setFlatFiles(newFlat);
+    for (const f of addedFilesWithContent) {
+      sb.saveFile(f);
+    }
     sb.saveFilesBatch(flattenTree(newTree, sb.getRoomId()));
     for (const id of removedIds) sb.deleteFile(id);
     persistLocal({ fileTree: newTree });

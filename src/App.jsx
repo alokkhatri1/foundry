@@ -864,16 +864,45 @@ function App() {
         if (row?.credit_allocation != null) setCreditAllocation(row.credit_allocation);
       },
       onReconnect: async () => {
-        // Realtime reattached after a disconnect — refetch what matters for
-        // workflow continuity. Any INSERT/UPDATE events that fired during the
-        // offline window are gone from the realtime stream; we catch up via
-        // snapshot. Deliberately skip big tables (files, messages) — user
-        // will naturally refetch those when interacting.
+        // Realtime reattached after a disconnect — refetch what matters
+        // for workflow continuity AND cross-participant visibility. Any
+        // INSERT/UPDATE events that fired during the offline window are
+        // gone from the realtime stream; we catch up via snapshot.
+        // Files used to be skipped on the assumption participants would
+        // "naturally refetch when interacting", but they only do so for
+        // the file's content (lazy-load on click). Metadata for files
+        // created during the outage was never refetched, so other
+        // participants' files vanished after stage transitions when
+        // realtime saturation caused brief drops.
         try {
-          const [runs, approvals] = await Promise.all([
+          const [runs, approvals, files] = await Promise.all([
             sb.loadWorkflowRuns(),
             sb.loadAllRoomApprovals(),
+            sb.loadFiles(),
           ]);
+          // Merge file metadata back in without clobbering any locally-
+          // loaded content. DB rows give us the canonical metadata
+          // (name, parent_id, created_by, sort_order); local rows that
+          // already have a content string keep that body. Any local
+          // rows not yet committed to the DB (in-flight saves) are
+          // preserved as-is so we don't drop them.
+          if (Array.isArray(files)) {
+            setFlatFiles(prev => {
+              const localById = new Map((prev || []).map(f => [f.id, f]));
+              const dbIds = new Set(files.map(f => f.id));
+              const merged = files.map(dbF => {
+                const local = localById.get(dbF.id);
+                if (local && typeof local.content === 'string' && local.content.length > 0) {
+                  return { ...dbF, content: local.content };
+                }
+                return dbF;
+              });
+              for (const local of (prev || [])) {
+                if (!dbIds.has(local.id)) merged.push(local);
+              }
+              return merged;
+            });
+          }
           if (runs?.length) {
             setWorkflowRuns(prev => {
               const TERMINAL = new Set(['completed', 'rejected', 'error', 'cancelled']);

@@ -3,7 +3,23 @@
 Production is served by **Vercel** at **[foundry.alokkhatri.com](https://foundry.alokkhatri.com)**,
 wired to the `main` branch of the GitHub repo
 [`alokkhatri1/foundry`](https://github.com/alokkhatri1/foundry). Every push to
-`main` triggers an automatic build + deploy. There is no staging environment yet.
+`main` triggers an automatic build + deploy.
+
+A staging environment lives at **[dev.foundry.alokkhatri.com](https://dev.foundry.alokkhatri.com)**,
+wired to the `dev` branch of the same repo. Every push to `dev` triggers an
+automatic preview build at the same URL — that's the testing link. Work on
+larger changes lands on `dev` first; once verified there, `dev` is merged
+into `main` and the change ships to production.
+
+**Shared-Supabase caveat.** Both environments hit the *same* Supabase
+project — env vars are set once at the Vercel project level. So:
+
+- Database migrations applied to Supabase land for both `dev` and `main`
+  at the same moment. There is no "preview Supabase" without standing up a
+  second project (deferred — flag scope creep before proposing it).
+- Anything you click on `dev.foundry.alokkhatri.com` reads/writes the
+  production DB. Test rows show up everywhere. Useful for testing the
+  pipes on real data, dangerous if you forget which environment you're in.
 
 Vercel ships everything in this repo on every push to `main`:
 
@@ -20,15 +36,19 @@ to `api/*.js`.
 ## Domain setup
 
 - Custom domain `foundry.alokkhatri.com` is configured as the Vercel production
-  domain. The underlying `*.vercel.app` URL still resolves but shouldn't be
-  shared with participants.
+  domain (assigned to the `main` branch). The underlying `*.vercel.app` URL
+  still resolves but shouldn't be shared with participants.
+- Custom domain `dev.foundry.alokkhatri.com` is assigned to the `dev` branch
+  in Vercel → Project Settings → Domains. Pushes to `dev` rebuild this URL.
 - DNS is managed by **Netlify DNS** (not GoDaddy — GoDaddy only registers the
-  name and delegates to Netlify nameservers). The `foundry` subdomain is a
-  CNAME to `cname.vercel-dns.com`.
-- SSL is auto-provisioned by Vercel once the CNAME resolves.
-- Supabase auth **Site URL** must match the custom domain
+  name and delegates to Netlify nameservers). Both `foundry` and
+  `dev.foundry` are CNAMEs to `cname.vercel-dns.com`.
+- SSL is auto-provisioned by Vercel once each CNAME resolves.
+- Supabase auth **Site URL** must match the production domain
   (`https://foundry.alokkhatri.com`) or OAuth will bounce users back to the
-  `*.vercel.app` URL after Google sign-in.
+  `*.vercel.app` URL after Google sign-in. Add `https://dev.foundry.alokkhatri.com`
+  to Supabase **Additional Redirect URLs** so Google sign-in works on staging
+  too — without this, `dev` will sign-in-loop.
 
 ## Deploy checklist
 
@@ -53,13 +73,24 @@ git commit -m "Short imperative subject
 Optional body: the reason this change exists, the user-visible
 effect, any follow-up it leaves open."
 
-# 5. Push to the remote named `personal` (points at alokkhatri1/foundry).
+# 5a. For larger or higher-risk work: push to `dev` first.
+#     Verify on https://dev.foundry.alokkhatri.com, then promote to prod
+#     by fast-forward-merging dev into main and pushing main.
+git push personal dev
+# ...test on dev URL...
+git checkout main && git merge --ff-only dev && git push personal main
+
+# 5b. For tiny, low-risk fixes: push directly to `main`.
 git push personal main
 ```
 
 Vercel picks up the push, builds, and rolls out. Watch the build in the
 [Vercel dashboard](https://vercel.com/dashboard) — a failed build does not
 take down the current production version, but it also doesn't ship the fix.
+
+**Default to 5a (dev first) for any change that touches a migration, a new
+component, or anything you can't fully cover with `npx vite build`. Reserve
+5b for one-line CSS tweaks and copy edits.**
 
 ## Before deploying
 

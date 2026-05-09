@@ -2087,6 +2087,12 @@ function App() {
       ? workflows.find(w => w.id === workflowOrId)
       : workflowOrId;
     if (!workflow) return;
+    // Re-bind workflowId so the rest of the function — which was written
+    // around the old signature where workflowId was the parameter — keeps
+    // working. Without this rebinding, line ~2188's `workflowId,` is an
+    // undefined reference and the run dies with a ReferenceError after the
+    // dangling-leaf warning fires but before executeWorkflowRun starts.
+    const workflowId = workflow.id;
 
     // Credit budget enforcement — workflow runs are the priciest calls on
     // the platform (multi-step Sonnet coworkers). Block if the starter is

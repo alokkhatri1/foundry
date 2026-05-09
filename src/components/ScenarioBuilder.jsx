@@ -892,10 +892,28 @@ export default function ScenarioBuilder({
     : (incompleteReason || `Fill every step first (${completeCount}/${rows.length} complete)`);
 
   async function handleRun() {
-    if (!canRun) return;
+    console.log('[ScenarioBuilder] Run clicked', {
+      canRun,
+      caseReady,
+      allComplete,
+      sending,
+      running,
+      caseInputLen: (caseInput || '').length,
+      rowCount: (rows || []).length,
+      rowStatuses: (rows || []).map(r => ({ type: r.type, complete: isRowComplete(r), step: (r.step || '').slice(0, 30) })),
+      hasOnRunWorkflow: typeof onRunWorkflow === 'function',
+    });
+    if (!canRun) {
+      console.warn('[ScenarioBuilder] Run blocked — canRun is false', { runBlockedReason });
+      return;
+    }
     setSending(true);
     try {
+      console.log('[ScenarioBuilder] Calling onRunWorkflow...');
       await onRunWorkflow?.(rows, caseInput);
+      console.log('[ScenarioBuilder] onRunWorkflow returned');
+    } catch (err) {
+      console.error('[ScenarioBuilder] onRunWorkflow threw', err);
     } finally {
       setSending(false);
     }

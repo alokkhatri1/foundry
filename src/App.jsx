@@ -1343,7 +1343,18 @@ function App() {
   // workflow object) so we don't have to wait for setWorkflows to commit
   // before we can run it.
   async function handleRunCaseWorkflow(rows, caseInput) {
-    if (!Array.isArray(rows) || rows.length === 0) return;
+    console.log('[handleRunCaseWorkflow] entered', {
+      rowCount: (rows || []).length,
+      caseInputLen: (caseInput || '').length,
+      hasUserName: !!userName,
+      hasMyParticipantId: !!myParticipantId,
+      creditsExhausted,
+      creditsLeft,
+    });
+    if (!Array.isArray(rows) || rows.length === 0) {
+      console.warn('[handleRunCaseWorkflow] aborted — no rows');
+      return;
+    }
 
     // Materialise coworker rows into real saved coworkers, like the old
     // capstone-to-copilot path did — names auto-derived and uniquified
@@ -1439,6 +1450,11 @@ function App() {
     handleUpdateWorkflows([...(workflows || []), newWf]);
     // Flip to Observability and kick off the run with the workflow object
     // directly — no need to wait for setWorkflows to commit.
+    console.log('[handleRunCaseWorkflow] workflow built, kicking off run', {
+      workflowId: newWf.id,
+      stepCount: newWf.steps.length,
+      edgeCount: newWf.edges.length,
+    });
     setActiveTab('activity');
     runWorkflow(newWf, caseInput);
   }

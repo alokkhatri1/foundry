@@ -16536,6 +16536,147 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
   .sv-submit { justify-content: center; }
 }
 
+/* ===== Run audit panel (Stage 7 — Observability peer audit) ===== */
+.ra-panel {
+  margin-top: 24px;
+  padding: 20px 24px;
+  background: var(--paper);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+}
+.ra-panel-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+.ra-panel-title {
+  margin: 0 0 4px;
+  font-size: 16px;
+  font-weight: 500;
+}
+.ra-panel-sub {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-muted);
+  line-height: 1.4;
+}
+.ra-panel-cta {
+  flex-shrink: 0;
+  padding: 8px 16px;
+  border: 1px solid var(--ink);
+  background: var(--ink);
+  color: var(--paper);
+  border-radius: 6px;
+  font-size: 13px;
+  cursor: pointer;
+}
+.ra-panel-cta:hover { background: var(--ink-mid); }
+
+.ra-empty {
+  padding: 16px;
+  color: var(--text-muted);
+  font-size: 13px;
+  font-style: italic;
+}
+
+.ra-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+  background: var(--surface-muted);
+  border-radius: 6px;
+  margin-bottom: 16px;
+}
+.ra-form-head {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+.ra-form-row { display: flex; flex-direction: column; gap: 4px; }
+.ra-form-label {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--ink);
+}
+.ra-form-input {
+  font-family: inherit;
+  font-size: 13px;
+  line-height: 1.5;
+  padding: 8px 10px;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  background: var(--paper);
+  color: var(--ink);
+  resize: vertical;
+}
+.ra-form-input:focus { outline: 1px solid var(--ink); border-color: var(--ink); }
+.ra-form-error {
+  padding: 8px 10px;
+  background: #fdf0f0;
+  border: 1px solid #e8c4c4;
+  color: #a04545;
+  border-radius: 4px;
+  font-size: 12px;
+}
+.ra-form-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+.ra-form-submit {
+  padding: 8px 16px;
+  border: 1px solid var(--ink);
+  background: var(--ink);
+  color: var(--paper);
+  border-radius: 6px;
+  font-size: 13px;
+  cursor: pointer;
+}
+.ra-form-submit:disabled { opacity: 0.5; cursor: not-allowed; }
+.ra-form-submit:hover:not(:disabled) { background: var(--ink-mid); }
+
+.ra-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.ra-card {
+  padding: 14px 16px;
+  background: var(--surface-muted);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+}
+.ra-card-head {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 8px;
+  font-size: 12px;
+}
+.ra-card-name { color: var(--ink); }
+.ra-card-time { color: var(--text-muted); }
+.ra-card-row {
+  display: flex;
+  gap: 12px;
+  margin-top: 8px;
+  font-size: 13px;
+  line-height: 1.5;
+}
+.ra-card-label {
+  flex-shrink: 0;
+  width: 70px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  padding-top: 2px;
+}
+.ra-card-body { flex: 1; color: var(--ink); }
+
 /* ===== Research view (admin) ===== */
 .rv { display: flex; flex-direction: column; gap: 16px; }
 .rv-loading { padding: 32px; color: var(--text-muted); }

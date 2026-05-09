@@ -1420,6 +1420,68 @@ export default function useSupabase() {
     return { ok: true };
   }, []);
 
+  // ===== Run audits (Stage 7 — peer audit on workflow runs) =====
+  // Public to the cohort: anyone can write, anyone can read. Realtime so
+  // the audited participant sees a new audit show up live without
+  // refreshing.
+  const saveRunAudit = useCallback(async ({ runId, auditorId, revieweeId, observation, meaning, suggestion }) => {
+    if (!isSupabaseConfigured || !roomIdRef.current) return { ok: false, error: 'Not connected' };
+    if (!runId || !auditorId) return { ok: false, error: 'Missing runId or auditorId' };
+    const payload = {
+      workshop_id: roomIdRef.current,
+      run_id: runId,
+      auditor_id: auditorId,
+      reviewee_id: revieweeId || null,
+      observation: (observation || '').trim(),
+      meaning: (meaning || '').trim(),
+      suggestion: (suggestion || '').trim(),
+    };
+    const { data, error } = await supabase
+      .from('run_audits')
+      .insert(payload)
+      .select()
+      .single();
+    if (error) { console.error('[sb] saveRunAudit:', error.message); return { ok: false, error: error.message }; }
+    return { ok: true, audit: data };
+  }, []);
+
+  const loadRunAudits = useCallback(async (runId) => {
+    if (!isSupabaseConfigured || !runId) return [];
+    const { data, error } = await supabase
+      .from('run_audits')
+      .select('id, run_id, auditor_id, reviewee_id, observation, meaning, suggestion, created_at')
+      .eq('run_id', runId)
+      .order('created_at', { ascending: true });
+    if (error) { console.error('[sb] loadRunAudits:', error.message); return []; }
+    return data || [];
+  }, []);
+
+  const loadAllRoomRunAudits = useCallback(async (workshopId) => {
+    if (!isSupabaseConfigured) return [];
+    const id = workshopId || roomIdRef.current;
+    if (!id) return [];
+    const { data, error } = await supabase
+      .from('run_audits')
+      .select('id, run_id, auditor_id, reviewee_id, observation, meaning, suggestion, created_at')
+      .eq('workshop_id', id)
+      .order('created_at', { ascending: false });
+    if (error) { console.error('[sb] loadAllRoomRunAudits:', error.message); return []; }
+    return data || [];
+  }, []);
+
+  const subscribeToRunAudits = useCallback((workshopId, onChange) => {
+    if (!isSupabaseConfigured) return () => {};
+    const id = workshopId || roomIdRef.current;
+    if (!id) return () => {};
+    const channel = supabase
+      .channel(`run-audits-${id}-${Math.random().toString(36).slice(2, 8)}`)
+      .on('postgres_changes',
+        { event: '*', schema: 'public', table: 'run_audits', filter: `workshop_id=eq.${id}` },
+        (payload) => onChange(payload))
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, []);
+
   // ===== Stage reflections (Stage 3-10 micro-surveys) =====
   // One row per (workshop, participant, stage). Both fields nullable so a
   // skipped row could still be persisted as a "we already asked" flag —
@@ -1613,6 +1675,7 @@ export default function useSupabase() {
     loadMyFeedback, saveFeedback, loadAllFeedback,
     saveResearchConsent, loadMyResearchConsent, loadConsentMapForWorkshop,
     loadCapstoneDraft, loadCapstoneDrafts, saveCapstoneDraft, deleteCapstoneDraft,
+    saveRunAudit, loadRunAudits, loadAllRoomRunAudits, subscribeToRunAudits,
     loadMyStageReflections, saveStageReflection, loadAllStageReflections,
   }), []);
 }

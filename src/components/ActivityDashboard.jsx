@@ -14,6 +14,7 @@ import EducationalCue from './EducationalCue';
 import { CoworkerGlyph } from './Icon';
 import RichText from './RichText';
 import { stageReached } from './RevealAt';
+import RunAuditPanel from './RunAuditPanel';
 
 function isIconOrImage(avatar) {
   return typeof avatar === 'string' && (avatar.startsWith('icon:') || avatar.startsWith('data:'));
@@ -150,7 +151,7 @@ function RunCard({ run, onClick, onNudge, showEducationalCues }) {
 // node selects it on both sides; the sidebar row expands inline with the
 // step's output, decision log, or (if it's the run owner's turn) the
 // approval form.
-function RunDetailView({ run, onBack, onApprovalAction, onCancelRun, onNudge, showEducationalCues, currentUserName, approvals, onLoadApprovals, workflows, currentStage, sb }) {
+function RunDetailView({ run, onBack, onApprovalAction, onCancelRun, onNudge, showEducationalCues, currentUserName, approvals, onLoadApprovals, workflows, currentStage, sb, myParticipantId, participants }) {
   const showCost = stageReached(currentStage, '8');
   const [costByStepId, setCostByStepId] = useState({});
 
@@ -292,6 +293,21 @@ function RunDetailView({ run, onBack, onApprovalAction, onCancelRun, onNudge, sh
           />
         </aside>
       </div>
+
+      {/* Peer audit lives below the body — full-width, available on every
+          run, public to the cohort. Only renders once the run has produced
+          something to audit (i.e. has at least one stepResult entry). */}
+      {(run.stepResults || []).length > 0 && (
+        <RunAuditPanel
+          run={run}
+          sb={sb}
+          myParticipantId={myParticipantId}
+          participants={participants}
+          runOwnerParticipantId={
+            (participants || []).find(p => p.name === run.startedBy)?.id || null
+          }
+        />
+      )}
     </div>
   );
 }
@@ -611,7 +627,7 @@ function DecisionRow({ step, run, isSelected, onSelect, approvalsForStep, isOwne
 }
 
 // ===== Main Dashboard =====
-export default function ActivityDashboard({ workflowRuns, onApprovalAction, onCancelRun, onNudge, participants, currentUserName, coworkers, workflows, showEducationalCues, approvalsByRun, onLoadApprovals, currentStage, sb }) {
+export default function ActivityDashboard({ workflowRuns, onApprovalAction, onCancelRun, onNudge, participants, currentUserName, coworkers, workflows, showEducationalCues, approvalsByRun, onLoadApprovals, currentStage, sb, myParticipantId }) {
   // Tick once a minute so timestamps like "5m ago" advance live.
   useTick(60_000);
   const [selectedRunId, setSelectedRunId] = useState(null);
@@ -653,6 +669,8 @@ export default function ActivityDashboard({ workflowRuns, onApprovalAction, onCa
         workflows={workflows}
         currentStage={currentStage}
         sb={sb}
+        myParticipantId={myParticipantId}
+        participants={participants}
       />
     );
   }

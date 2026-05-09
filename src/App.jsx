@@ -3280,6 +3280,7 @@ Answer in ONE sentence. If the user asks "how", a second sentence is allowed —
               }}
               currentStage={currentStage}
               sb={sb}
+              myParticipantId={myParticipantId}
             />
           </div>
         )}

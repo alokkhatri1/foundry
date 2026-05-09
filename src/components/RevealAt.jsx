@@ -28,8 +28,16 @@ export function stageReached(currentStage, targetStage) {
 }
 
 export function nextStage(currentStage) {
+  // No stage yet, or a stale value the new numbering doesn't know — treat
+  // as pre-Stage-1 so the admin reveal panel always offers Stage 1's
+  // Reveal button. Without this fallback, a renumber that strands an old
+  // current_stage value (e.g. '8' from before the Capstone retirement)
+  // leaves the room with every stage Locked and no way to recover from
+  // the UI.
+  if (!currentStage) return STAGE_ORDER[0];
   const idx = STAGE_ORDER.indexOf(normalizeStage(currentStage));
-  if (idx === -1 || idx >= STAGE_ORDER.length - 1) return null;
+  if (idx === -1) return STAGE_ORDER[0];
+  if (idx >= STAGE_ORDER.length - 1) return null;
   return STAGE_ORDER[idx + 1];
 }
 

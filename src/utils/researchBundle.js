@@ -1,11 +1,16 @@
-// Build a JSONL research bundle from the loadAdminResearchData payload.
-// One JSON object per line, one record per human participant, with their
-// stage-by-stage artifacts nested inside. Designed to be slurped into a
-// notebook or piped through an external LLM pass.
+// Build a Markdown research bundle from the loadAdminResearchData payload.
+// One Markdown document per workshop, one H1 section per human participant,
+// with all 9 stages laid out in their own subsections. Optimised for
+// readability: scan the doc by eye, paste excerpts into a notebook, or
+// upload the whole thing to Claude for synthesis.
 //
-// v1 includes everyone (test bed); each record carries its consent state
-// so downstream pipelines can filter to consented rows when this becomes
-// real research.
+// v1 includes every participant regardless of consent (test bed). The
+// "Consent" line in each section tells the truth so downstream synthesis
+// can decide what's eligible.
+//
+// Long content (full file bodies, full step outputs) is included verbatim
+// — research wants fidelity over compactness. Code-fenced with ~~~ to
+// avoid colliding with any ``` the participant may have typed.
 
 function pathLookup(files) {
   const byId = Object.fromEntries(files.map(f => [f.id, f]));
@@ -32,12 +37,12 @@ function chatsForName(messages, name) {
   for (const [cid, msgs] of byConv.entries()) {
     if (!msgs.some(m => m.type === 'user' && m.participant_name === name)) continue;
     out.push({
-      conversation_id: cid,
-      messages: msgs
-        .filter(m => m.type === 'user' || m.type === 'assistant')
-        .map(m => ({ role: m.type, who: m.participant_name || m.label, text: m.content, at: m.created_at })),
+      id: cid,
+      messages: msgs.filter(m => m.type === 'user' || m.type === 'assistant')
+        .sort((a, b) => new Date(a.created_at) - new Date(b.created_at)),
     });
   }
+  out.sort((a, b) => new Date(a.messages[0]?.created_at || 0) - new Date(b.messages[0]?.created_at || 0));
   return out;
 }
 
@@ -51,10 +56,8 @@ function dmsForPid(dms, participants, pid) {
     threads.get(otherPid).push(dm);
   }
   return [...threads.entries()].map(([otherPid, msgs]) => ({
-    other: byPid[otherPid] ? { id: otherPid, name: byPid[otherPid].name, kind: byPid[otherPid].kind } : { id: otherPid, name: 'unknown' },
-    messages: msgs
-      .sort((a, b) => new Date(a.created_at) - new Date(b.created_at))
-      .map(m => ({ from: m.from_participant_id === pid ? 'self' : 'other', text: m.content, at: m.created_at })),
+    other: byPid[otherPid] || { id: otherPid, name: 'unknown', kind: 'human' },
+    messages: msgs.sort((a, b) => new Date(a.created_at) - new Date(b.created_at)),
   }));
 }
 
@@ -75,52 +78,225 @@ function tokensFor(usage, pid) {
   return { tokens, cost, bySegment };
 }
 
-export function buildResearchBundle(data, { workshopId, workshopCode, orgName }) {
-  const pathFor = pathLookup(data.files);
-  const lines = [];
-  for (const p of data.participants) {
-    if ((p.kind || 'human') !== 'human') continue;
-    const consent = data.consentByPid[p.id];
-    const myFiles = data.files.filter(f => f.created_by === p.name && f.type === 'file');
-    const knowledge = myFiles
-      .filter(f => pathFor(f.id).some(s => s === 'knowledge'))
-      .map(f => ({ name: f.name, content: f.content || '', updated_at: f.updated_at, created_at: f.created_at }));
-    const skills = myFiles
-      .filter(f => pathFor(f.id).some(s => s === 'skills'))
-      .map(f => ({ name: f.name, content: f.content || '', updated_at: f.updated_at, created_at: f.created_at }));
+function fmtTime(ts) {
+  if (!ts) return '';
+  const d = typeof ts === 'string' ? new Date(ts) : ts;
+  return d.toISOString().slice(0, 16).replace('T', ' ');
+}
 
-    const record = {
-      participant: { id: p.id, name: p.name, email: p.email, joined_at: p.joined_at },
-      workshop: { id: workshopId, code: workshopCode, org_name: orgName },
-      consent: consent
-        ? { granted: !!consent.granted, scope: consent.scope, text_version: consent.consent_text_version, granted_at: consent.granted_at, withdrawn_at: consent.withdrawn_at }
-        : { granted: null, status: 'pending' },
-      stages: {
-        '1_chat':         chatsForName(data.messages, p.name),
-        '2_preferences':  data.prefsByPid[p.id] ? { content: data.prefsByPid[p.id].content, updated_at: data.prefsByPid[p.id].updated_at } : null,
-        '3_knowledge':    knowledge,
-        '4_skills':       skills,
-        '5_coworkers':    data.coworkers.filter(c => c.created_by === p.name),
-        '5_dms':          dmsForPid(data.directMessages, data.participants, p.id),
-        '6_workflows':    data.workflows.filter(w => w.created_by === p.name),
-        '6_runs':         data.workflowRuns.filter(r => r.started_by === p.name),
-        '7_approvals':    data.approvals.filter(a => a.resolved_by === p.name),
-        '8_tokens':       tokensFor(data.llmUsage, p.id),
-        '9_reflections':  data.stageReflections.filter(r => r.participant_id === p.id),
-      },
-    };
-    lines.push(JSON.stringify(record));
-  }
-  return lines.join('\n') + '\n';
+function fmtDate(ts) {
+  if (!ts) return '';
+  return new Date(ts).toISOString().slice(0, 10);
+}
+
+// Code-fence content with ~~~ so we don't collide with ``` the participant
+// may have typed (e.g. in their skill files). Markdown renderers handle
+// either fence; ~~~ is just safer for arbitrary user content.
+function code(content, lang = '') {
+  return `~~~${lang}\n${(content || '').replace(/\r/g, '')}\n~~~`;
+}
+
+function section(heading, body) {
+  if (!body || body.trim() === '') return `${heading}\n\n_(no activity)_`;
+  return `${heading}\n\n${body}`;
+}
+
+function renderChats(chats) {
+  if (!chats.length) return '';
+  return chats.map((c, i) => {
+    const t0 = fmtTime(c.messages[0]?.created_at);
+    const turns = c.messages.map(m => {
+      const who = m.type === 'user' ? (m.participant_name || 'user') : (m.label || 'assistant');
+      return `**${who}** _(${fmtTime(m.created_at)})_\n\n${m.content || ''}`;
+    }).join('\n\n');
+    return `### Conversation ${i + 1} — ${t0}\n\n${turns}`;
+  }).join('\n\n---\n\n');
+}
+
+function renderPrefs(prefs) {
+  if (!prefs?.content) return '';
+  return `_Updated ${fmtTime(prefs.updated_at)}_\n\n${code(prefs.content)}`;
+}
+
+function renderFiles(files) {
+  if (!files.length) return '';
+  return files.map(f => {
+    const t = fmtTime(f.updated_at || f.created_at);
+    return `### ${f.name}\n_(${t})_\n\n${code(f.content || '')}`;
+  }).join('\n\n');
+}
+
+function renderCoworkers(coworkers, files) {
+  if (!coworkers.length) return '';
+  const fileById = Object.fromEntries(files.map(f => [f.id, f]));
+  return coworkers.map(cw => {
+    const skills = (cw.instruction_file_ids || []).map(id => fileById[id]?.name).filter(Boolean);
+    const knows = (cw.knowledge_file_ids || []).map(id => fileById[id]?.name).filter(Boolean);
+    const lines = [
+      `### ${cw.name}`,
+      cw.role ? `- **Role**: ${cw.role}` : null,
+      `- **Built**: ${fmtTime(cw.created_at)}`,
+      skills.length ? `- **Skill files**: ${skills.join(', ')}` : null,
+      knows.length ? `- **Knowledge files**: ${knows.join(', ')}` : null,
+    ].filter(Boolean);
+    return lines.join('\n');
+  }).join('\n\n');
+}
+
+function renderDms(threads, selfPid) {
+  if (!threads.length) return '';
+  return threads.map(t => {
+    const turns = t.messages.map(m => {
+      const who = m.from_participant_id === selfPid ? '**self**' : `**${t.other.name}${t.other.kind === 'ai' ? ' (AI)' : ''}**`;
+      return `${who} _(${fmtTime(m.created_at)})_\n\n${m.content || ''}`;
+    }).join('\n\n');
+    return `### DM thread — with ${t.other.name}${t.other.kind === 'ai' ? ' (AI)' : ''}\n\n${turns}`;
+  }).join('\n\n---\n\n');
+}
+
+function renderWorkflows(workflows) {
+  if (!workflows.length) return '';
+  return workflows.map(w => {
+    const steps = (w.steps || w.nodes || []).length;
+    return `### ${w.name}\n_(${steps} nodes · ${fmtTime(w.created_at)})_\n\n${code(JSON.stringify({ nodes: w.nodes, edges: w.edges, steps: w.steps }, null, 2), 'json')}`;
+  }).join('\n\n');
+}
+
+function renderRuns(runs) {
+  if (!runs.length) return '';
+  return runs.map(r => {
+    const head = `### Run — ${r.workflow_name} _(${r.status} · started ${fmtTime(r.started_at)})_`;
+    const steps = (r.step_results || []).map((s, i) => {
+      const name = s.name || s.type || `step ${i + 1}`;
+      const status = s.status || '';
+      let body = '';
+      if (s.output) {
+        const out = typeof s.output === 'string' ? s.output : JSON.stringify(s.output, null, 2);
+        body = '\n\n' + code(out);
+      }
+      return `**${i + 1}. ${name}** — _${status}_${body}`;
+    }).join('\n\n');
+    return `${head}\n\n${steps}`;
+  }).join('\n\n---\n\n');
+}
+
+function renderApprovals(approvals) {
+  if (!approvals.length) return '';
+  const rows = approvals.map(a =>
+    `| ${fmtTime(a.resolved_at)} | ${a.step_name || a.step_id || ''} | ${a.action || ''} | ${(a.comment || '').replace(/\|/g, '\\|').replace(/\n/g, ' ')} |`
+  ).join('\n');
+  return `| When | Step | Action | Comment |\n| --- | --- | --- | --- |\n${rows}`;
+}
+
+function renderTokens(totals) {
+  if (!totals || !totals.tokens) return '';
+  const segs = Object.entries(totals.bySegment).sort((a, b) => b[1].tokens - a[1].tokens);
+  const segRows = segs.map(([seg, val]) => `| ${seg} | ${val.tokens.toLocaleString()} | $${val.cost.toFixed(4)} |`).join('\n');
+  return [
+    `**Total**: ${totals.tokens.toLocaleString()} tokens · $${totals.cost.toFixed(4)}`,
+    '',
+    '| Segment | Tokens | Cost |',
+    '| --- | --- | --- |',
+    segRows,
+  ].join('\n');
+}
+
+function renderReflections(reflections) {
+  if (!reflections.length) return '';
+  const sorted = [...reflections].sort((a, b) => String(a.stage).localeCompare(String(b.stage)));
+  return sorted.map(r => {
+    const lines = [
+      `### Stage ${r.stage}`,
+      r.confidence != null ? `- **Confidence**: ${r.confidence} / 5` : null,
+      r.note ? `- **Note**: ${r.note}` : null,
+      r.habit ? `- **Habit**: ${r.habit}` : null,
+    ].filter(Boolean);
+    return lines.join('\n');
+  }).join('\n\n');
+}
+
+function consentLine(consent) {
+  if (!consent) return '_pending — not yet asked or not yet submitted_';
+  if (consent.withdrawn_at) return `_withdrawn ${fmtTime(consent.withdrawn_at)} (was ${consent.granted ? 'granted' : 'declined'} · text v${consent.consent_text_version})_`;
+  const verb = consent.granted ? 'granted' : 'declined';
+  return `${verb} · text v${consent.consent_text_version} · ${fmtTime(consent.granted_at)}`;
+}
+
+function renderParticipant(p, data, pathFor) {
+  const consent = data.consentByPid[p.id];
+  const myFiles = data.files.filter(f => f.created_by === p.name && f.type === 'file');
+  const knowledge = myFiles.filter(f => pathFor(f.id).some(s => s === 'knowledge'));
+  const skills    = myFiles.filter(f => pathFor(f.id).some(s => s === 'skills'));
+  const myCw      = data.coworkers.filter(c => c.created_by === p.name);
+  const myDms     = dmsForPid(data.directMessages, data.participants, p.id);
+  const myWf      = data.workflows.filter(w => w.created_by === p.name);
+  const myRuns    = data.workflowRuns.filter(r => r.started_by === p.name);
+  const myApps    = data.approvals.filter(a => a.resolved_by === p.name);
+  const tokens    = tokensFor(data.llmUsage, p.id);
+  const myRefl    = data.stageReflections.filter(r => r.participant_id === p.id);
+  const chats     = chatsForName(data.messages, p.name);
+
+  const lines = [
+    `# ${p.name}`,
+    '',
+    p.email ? `- **Email**: ${p.email}` : null,
+    `- **Joined**: ${fmtTime(p.joined_at)}`,
+    `- **Consent**: ${consentLine(consent)}`,
+    '',
+    section('## Stage 1 — Chat',                  renderChats(chats)),
+    '',
+    section('## Stage 2 — Preferences',           renderPrefs(data.prefsByPid[p.id])),
+    '',
+    section('## Stage 3 — Knowledge files',       renderFiles(knowledge)),
+    '',
+    section('## Stage 4 — Skill files',           renderFiles(skills)),
+    '',
+    section('## Stage 5a — Coworkers built',      renderCoworkers(myCw, data.files)),
+    '',
+    section('## Stage 5b — DM threads',           renderDms(myDms, p.id)),
+    '',
+    section('## Stage 6a — Workflows authored',   renderWorkflows(myWf)),
+    '',
+    section('## Stage 6b — Runs initiated',       renderRuns(myRuns)),
+    '',
+    section('## Stage 7 — Approval decisions',    renderApprovals(myApps)),
+    '',
+    section('## Stage 8 — Token spend',           renderTokens(tokens)),
+    '',
+    section('## Stage 9 — Reflections',           renderReflections(myRefl)),
+  ].filter(l => l !== null);
+
+  return lines.join('\n');
+}
+
+export function buildResearchMarkdown(data, { workshopCode, orgName }) {
+  const pathFor = pathLookup(data.files);
+  const humans = data.participants
+    .filter(p => (p.kind || 'human') === 'human')
+    .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+  const header = [
+    `# Foundry research bundle — ${orgName || 'workshop'}`,
+    '',
+    `- **Workshop code**: ${workshopCode || '—'}`,
+    `- **Generated**: ${fmtTime(new Date())}`,
+    `- **Participants**: ${humans.length}`,
+    '',
+    '_v1 test bed — every participant included regardless of consent. The Consent line on each section tells the truth; downstream synthesis can filter._',
+    '',
+    '---',
+    '',
+  ].join('\n');
+  const body = humans.map(p => renderParticipant(p, data, pathFor)).join('\n\n---\n\n');
+  return header + body + '\n';
 }
 
 export function downloadResearchBundle(data, meta) {
-  const text = buildResearchBundle(data, meta);
-  const blob = new Blob([text], { type: 'application/x-ndjson' });
+  const text = buildResearchMarkdown(data, meta);
+  const blob = new Blob([text], { type: 'text/markdown' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = `foundry-research-${meta.workshopCode || 'workshop'}-${new Date().toISOString().slice(0, 10)}.jsonl`;
+  a.download = `foundry-research-${meta.workshopCode || 'workshop'}-${fmtDate(new Date())}.md`;
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);

@@ -523,7 +523,7 @@ export default function ResearchView({ data, loading, onDownloadBundle }) {
           <button type="button" className={`rv-axis-btn${axis === 'participant' ? ' is-active' : ''}`} onClick={() => setAxis('participant')}>By participant</button>
           <button type="button" className={`rv-axis-btn${axis === 'stage' ? ' is-active' : ''}`} onClick={() => setAxis('stage')}>By stage</button>
         </div>
-        <button type="button" className="rv-export" onClick={onDownloadBundle}>Download research bundle</button>
+        <button type="button" className="rv-export" onClick={onDownloadBundle}>Download research notes (.md)</button>
       </div>
 
       {axis === 'participant'

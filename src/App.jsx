@@ -3211,7 +3211,6 @@ Answer in ONE sentence. If the user asks "how", a second sentence is allowed —
               fileTree={fileTree}
               participants={participants || []}
               onRunWorkflow={handleRunCaseWorkflow}
-              running={activeRuns.length > 0}
             />
           </div>
         )}

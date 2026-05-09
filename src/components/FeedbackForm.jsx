@@ -120,6 +120,10 @@ function TextControl({ value, onChange, placeholder }) {
   );
 }
 
+// Bumped whenever the on-screen consent copy materially changes, so each
+// research_consent row records the wording the participant actually saw.
+export const CONSENT_TEXT_VERSION = 1;
+
 const QUESTIONS = [
   {
     id: 'would_recommend',
@@ -148,6 +152,12 @@ const QUESTIONS = [
     text: 'One specific thing we should change for the next group?',
     placeholder: 'Anything you would change, drop, or add.',
   },
+  {
+    id: 'research_consent',
+    type: 'yesno',
+    text: 'May we learn from your journey to improve future workshops?',
+    description: 'If yes, the chats, files, coworkers, workflows, and reflections you produced during this workshop will be used as research data to make Foundry better. Your name and email will be replaced with an anonymous participant ID before any analysis. You can withdraw consent any time by emailing alok@tangible.careers.',
+  },
 ];
 
 function isAnswered(q, value) {
@@ -166,6 +176,7 @@ function Question({ q, index, value, onChange }) {
       </div>
       <div className="sv-q-body">
         <p className="sv-q-text">{q.text}</p>
+        {q.description && <p className="sv-q-desc">{q.description}</p>}
         {q.type === 'scale' && <ScaleControl value={value} onChange={onChange} name={q.text} />}
         {q.type === 'yesno' && <YesNoControl value={value} onChange={onChange} name={q.text} />}
         {q.type === 'pace'  && <PaceControl  value={value} onChange={onChange} name={q.text} />}
@@ -192,7 +203,7 @@ export default function FeedbackForm({ onSubmit, submitting, errorMessage, userN
     // admin Recap card's existing averages keep working without a schema
     // rewrite. Dropped fields land as NULL on new rows.
     const trainer = answers.trainer;
-    const payload = {
+    const feedback = {
       would_recommend:    answers.would_recommend === 'yes',
       trainer_knowledge:  trainer,
       trainer_delivery:   trainer,
@@ -201,7 +212,14 @@ export default function FeedbackForm({ onSubmit, submitting, errorMessage, userN
       most_valuable:      answers.most_valuable.trim(),
       improvement_notes:  answers.improvement_notes.trim(),
     };
-    onSubmit(payload);
+    // Consent rides alongside feedback but is a separate write to its own
+    // table — the parent splits and saves both. Versioned against the on-
+    // screen text the participant actually saw at submit time.
+    const consent = {
+      granted: answers.research_consent === 'yes',
+      consentTextVersion: CONSENT_TEXT_VERSION,
+    };
+    onSubmit({ feedback, consent });
   }
 
   return (
@@ -216,8 +234,9 @@ export default function FeedbackForm({ onSubmit, submitting, errorMessage, userN
             Before your scorecard,&nbsp;<em>a few words from you</em>.
           </h1>
           <p className="sv-sub">
-            Five quick questions, about a minute. The per-stage reflections
-            captured what you learned; this is the look-back on the whole.
+            A handful of questions, about a minute. The per-stage reflections
+            captured what you learned; this is the look-back on the whole —
+            plus a final ask about using your work for research.
           </p>
         </header>
 
@@ -242,7 +261,7 @@ export default function FeedbackForm({ onSubmit, submitting, errorMessage, userN
             {ready ? (
               <span className="sv-footer-ready">
                 <span className="sv-footer-ready-dot" aria-hidden />
-                All five answered. Ready to submit.
+                All {totalCount} answered. Ready to submit.
               </span>
             ) : (
               <span className="sv-footer-pending">

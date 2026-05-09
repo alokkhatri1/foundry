@@ -1195,6 +1195,59 @@ export default function useSupabase() {
     return data || [];
   }, []);
 
+  // ===== Research consent =====
+  // Captured as the closing question on the pre-graduation feedback form.
+  // Stored separately from workshop_feedback because consent is durable —
+  // versioned against the on-screen text, withdrawable later, and may be
+  // re-asked across cohorts as the wording evolves.
+  const saveResearchConsent = useCallback(async ({ participantId, granted, consentTextVersion = 1 }) => {
+    if (!isSupabaseConfigured || !roomIdRef.current) return { ok: false, error: 'Not connected' };
+    if (!participantId) return { ok: false, error: 'Missing participant_id' };
+    const row = {
+      workshop_id: roomIdRef.current,
+      participant_id: participantId,
+      granted: !!granted,
+      scope: 'all-anonymized',
+      consent_text_version: consentTextVersion,
+      granted_at: new Date().toISOString(),
+    };
+    const { data, error } = await supabase
+      .from('research_consent')
+      .upsert(row, { onConflict: 'workshop_id,participant_id' })
+      .select()
+      .single();
+    if (error) { console.error('[sb] saveResearchConsent:', error.message); return { ok: false, error: error.message }; }
+    return { ok: true, data };
+  }, []);
+
+  const loadMyResearchConsent = useCallback(async (participantId) => {
+    if (!isSupabaseConfigured || !roomIdRef.current || !participantId) return null;
+    const { data, error } = await supabase
+      .from('research_consent')
+      .select('granted, scope, consent_text_version, granted_at, withdrawn_at')
+      .eq('workshop_id', roomIdRef.current)
+      .eq('participant_id', participantId)
+      .maybeSingle();
+    if (error) { console.error('[sb] loadMyResearchConsent:', error.message); return null; }
+    return data;
+  }, []);
+
+  // Admin-side bulk read: keyed by participant_id so the Research view can
+  // stamp every participant row with a Consented / Declined / Pending badge.
+  const loadConsentMapForWorkshop = useCallback(async (workshopId) => {
+    if (!isSupabaseConfigured) return {};
+    const id = workshopId || roomIdRef.current;
+    if (!id) return {};
+    const { data, error } = await supabase
+      .from('research_consent')
+      .select('participant_id, granted, withdrawn_at, granted_at, consent_text_version')
+      .eq('workshop_id', id);
+    if (error) { console.error('[sb] loadConsentMapForWorkshop:', error.message); return {}; }
+    const out = {};
+    for (const row of (data || [])) out[row.participant_id] = row;
+    return out;
+  }, []);
+
   // ===== Capstone draft (Stage 8) =====
   // Single-author per (workshop_id, participant_id). Returns the row's
   // `rows` JSONB array (or null if the participant hasn't started yet);
@@ -1418,6 +1471,7 @@ export default function useSupabase() {
     loadWorkshopUsage, subscribeToWorkshopUsage, loadRunUsage, loadAdminWorkshopUsage,
     subscribeToRoom, trackPresence, leavePresence,
     loadMyFeedback, saveFeedback, loadAllFeedback,
+    saveResearchConsent, loadMyResearchConsent, loadConsentMapForWorkshop,
     loadCapstoneDraft, saveCapstoneDraft,
     loadMyStageReflections, saveStageReflection, loadAllStageReflections,
   }), []);

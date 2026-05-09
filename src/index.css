@@ -16206,6 +16206,13 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
   letter-spacing: -0.005em;
   max-width: 640px;
 }
+.sv-q-desc {
+  font-size: 14px;
+  color: var(--text-muted);
+  line-height: 1.5;
+  max-width: 640px;
+  margin: -4px 0 0;
+}
 
 /* Scale control */
 .sv-scale {

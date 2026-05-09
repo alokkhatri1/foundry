@@ -126,19 +126,30 @@ export default function GraduationScreen({
     });
   }, [userName, conversations, coworkers, workflows, workflowRuns, flatFiles, participants, approvals, tools, fileTree, userPreferences, capstoneRows]);
 
-  async function handleFeedbackSubmit(payload) {
+  async function handleFeedbackSubmit({ feedback, consent }) {
     setFeedbackError(null);
     setSubmitting(true);
-    const res = await sb.saveFeedback({
-      ...payload,
-      participant_id: myParticipantId,
-      participant_name: userName,
-    });
+    // Two independent writes — feedback row (workshop_feedback) and consent
+    // row (research_consent). Run in parallel; if either fails, surface the
+    // error and keep the user on the form so nothing silently drops.
+    const [fbRes, consentRes] = await Promise.all([
+      sb.saveFeedback({
+        ...feedback,
+        participant_id: myParticipantId,
+        participant_name: userName,
+      }),
+      sb.saveResearchConsent({
+        participantId: myParticipantId,
+        granted: consent.granted,
+        consentTextVersion: consent.consentTextVersion,
+      }),
+    ]);
     setSubmitting(false);
-    if (res.ok) {
+    if (fbRes.ok && consentRes.ok) {
       setFeedbackStatus('submitted');
     } else {
-      setFeedbackError(res.error || 'Could not save feedback. Try again.');
+      const err = fbRes.error || consentRes.error || 'Could not save. Try again.';
+      setFeedbackError(err);
     }
   }
 

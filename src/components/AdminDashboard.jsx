@@ -3,6 +3,8 @@ import { STAGE_ORDER, STAGE_META, stageReached, nextStage } from './RevealAt';
 import { useConfirm } from './ConfirmDialog';
 import { computeScorecard, LEVELS, LEVEL_COLORS } from '../utils/graduationScorecard';
 import { buildTree } from '../utils/treeUtils';
+import ResearchView from './ResearchView';
+import { downloadResearchBundle } from '../utils/researchBundle';
 
 // Per-participant credit allocation editor. Small inline row above the
 // stage list — big enough to notice, small enough not to steal focus from
@@ -101,6 +103,12 @@ export default function AdminDashboard({ sb, user, onBack, onEnterWorkshop }) {
   const [feedback, setFeedback] = useState([]);
   const [usage, setUsage] = useState([]);
   const [scorecardData, setScorecardData] = useState(null);
+  // Research data is heavy (full message bodies, full DM threads) so it
+  // lazy-loads only when the admin opens the Research tab. Keyed by
+  // workshop id so switching workshops invalidates the cache.
+  const [researchData, setResearchData] = useState(null);
+  const [researchLoading, setResearchLoading] = useState(false);
+  const researchLoadedRef = useRef({ workshopId: null });
   const [expandedPid, setExpandedPid] = useState(null);
   const [detailTab, setDetailTab] = useState('stages');
   const [copied, setCopied] = useState(null);
@@ -255,6 +263,8 @@ export default function AdminDashboard({ sb, user, onBack, onEnterWorkshop }) {
     setScorecardData(null);
     setUsage([]);
     setExpandedPid(null);
+    setResearchData(null);
+    researchLoadedRef.current = { workshopId: null };
     const requestedId = workshop.id;
     selectionTokenRef.current = requestedId;
     const [p, c, a, sc, fb, uz] = await Promise.all([
@@ -407,6 +417,38 @@ export default function AdminDashboard({ sb, user, onBack, onEnterWorkshop }) {
     });
     return enriched;
   }, [humanParticipants, feedbackByName, tokensByPid]);
+
+  // Lazy-load the research dataset the first time the admin opens the
+  // Research tab on this workshop. Subsequent tab switches reuse the
+  // cached payload; switching workshops clears it via handleSelect.
+  useEffect(() => {
+    if (detailTab !== 'research') return;
+    if (!selected) return;
+    if (researchLoadedRef.current.workshopId === selected.id) return;
+    let cancelled = false;
+    setResearchLoading(true);
+    sb.loadAdminResearchData(selected.id).then(d => {
+      if (cancelled) return;
+      if (researchLoadedRef.current.workshopId === selected.id) return;
+      researchLoadedRef.current = { workshopId: selected.id };
+      setResearchData(d);
+      setResearchLoading(false);
+    }).catch(err => {
+      if (cancelled) return;
+      console.error('[admin] loadAdminResearchData:', err);
+      setResearchLoading(false);
+    });
+    return () => { cancelled = true; };
+  }, [detailTab, selected, sb]);
+
+  function handleDownloadResearchBundle() {
+    if (!researchData || !selected) return;
+    downloadResearchBundle(researchData, {
+      workshopId: selected.id,
+      workshopCode: selected.code,
+      orgName: selected.org_name,
+    });
+  }
 
   // Per-participant engagement counters — what they actually built and
   // sent during the workshop. Lives next to the level + feedback on the
@@ -608,7 +650,7 @@ export default function AdminDashboard({ sb, user, onBack, onEnterWorkshop }) {
 
               {/* Sub-tabs */}
               <div className="admin-tabs">
-                {['stages', 'participants', 'content', 'activity', 'feedback'].map(tab => (
+                {['stages', 'participants', 'content', 'research', 'feedback'].map(tab => (
                   <button
                     key={tab}
                     className={`admin-tab${detailTab === tab ? ' active' : ''}`}
@@ -852,21 +894,13 @@ export default function AdminDashboard({ sb, user, onBack, onEnterWorkshop }) {
                 </div>
               )}
 
-              {detailTab === 'activity' && (
+              {detailTab === 'research' && (
                 <div className="admin-tab-content">
-                  {activity.length === 0 ? (
-                    <p className="admin-empty">No activity yet.</p>
-                  ) : (
-                    <div className="admin-activity">
-                      {activity.map(a => (
-                        <div key={a.id} className="admin-activity-item">
-                          <span className="admin-activity-time">{new Date(a.created_at).toLocaleTimeString()}</span>
-                          <span className="admin-activity-user">{a.participant_name || a.label || 'System'}</span>
-                          <span className="admin-activity-content">{a.content?.slice(0, 80) || a.type}{a.content?.length > 80 ? '...' : ''}</span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
+                  <ResearchView
+                    data={researchData}
+                    loading={researchLoading}
+                    onDownloadBundle={handleDownloadResearchBundle}
+                  />
                 </div>
               )}
 

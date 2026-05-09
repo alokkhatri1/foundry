@@ -384,6 +384,96 @@ export default function useSupabase() {
     };
   }, []);
 
+  // Research-grade per-workshop fetch. Pulls everything the Research tab
+  // needs to render full transcripts and run details — chat messages,
+  // DM threads, stage reflections, approval comments, llm_usage, the
+  // consent map. Heavier than loadAdminScorecardData (full message bodies,
+  // not just counts) so it's lazy-loaded when the admin opens the tab.
+  const loadAdminResearchData = useCallback(async (roomId) => {
+    if (!isSupabaseConfigured) return null;
+    const [
+      participants, coworkers, workflows, runs, approvals, files,
+      messages, dms, reflections, consent, usage,
+    ] = await Promise.all([
+      supabase.from('participants')
+        .select('id, name, email, auth_user_id, kind, joined_at')
+        .eq('room_id', roomId),
+      supabase.from('coworkers')
+        .select('id, name, role, avatar, color, instruction_file_ids, knowledge_file_ids, tool_ids, tool_configs, created_by, created_at')
+        .eq('room_id', roomId),
+      supabase.from('workflows')
+        .select('id, name, steps, nodes, edges, created_by, created_at')
+        .eq('room_id', roomId),
+      supabase.from('workflow_runs')
+        .select('id, workflow_id, workflow_name, status, started_by, step_results, started_at, completed_at')
+        .eq('room_id', roomId)
+        .limit(1000),
+      supabase.from('approvals')
+        .select('id, run_id, step_id, action, comment, resolved_by, resolved_at, requested_by')
+        .eq('room_id', roomId)
+        .limit(2000),
+      supabase.from('files')
+        .select('id, parent_id, name, type, content, room_id, created_by, created_at, updated_at')
+        .eq('room_id', roomId),
+      supabase.from('messages')
+        .select('id, conversation_id, type, participant_name, content, label, created_at')
+        .eq('room_id', roomId)
+        .order('created_at', { ascending: true })
+        .limit(20000),
+      supabase.from('direct_messages')
+        .select('id, from_participant_id, to_participant_id, content, created_at')
+        .eq('room_id', roomId)
+        .order('created_at', { ascending: true })
+        .limit(20000),
+      supabase.from('stage_reflections')
+        .select('participant_id, stage, confidence, note, habit, created_at, updated_at')
+        .eq('workshop_id', roomId),
+      supabase.from('research_consent')
+        .select('participant_id, granted, scope, consent_text_version, granted_at, withdrawn_at')
+        .eq('workshop_id', roomId),
+      supabase.from('llm_usage')
+        .select('participant_id, segment, segment_ref_id, model, input_tokens, output_tokens, cache_creation_input_tokens, cache_read_input_tokens, cost_usd, created_at')
+        .eq('workshop_id', roomId)
+        .limit(50000),
+    ]);
+
+    // Preferences live keyed by auth_user_id; fold them into a per-participant
+    // map so the Research view doesn't need to know about that join.
+    const participantRows = participants.data || [];
+    const authUserIds = participantRows.map(p => p.auth_user_id).filter(Boolean);
+    let prefsByPid = {};
+    if (authUserIds.length > 0) {
+      const { data: prefsData } = await supabase
+        .from('user_preferences')
+        .select('auth_user_id, content, updated_at')
+        .in('auth_user_id', authUserIds);
+      const byAuth = Object.fromEntries((prefsData || []).map(r => [r.auth_user_id, r]));
+      for (const p of participantRows) {
+        if (p.auth_user_id && byAuth[p.auth_user_id]) {
+          prefsByPid[p.id] = byAuth[p.auth_user_id];
+        }
+      }
+    }
+
+    const consentByPid = {};
+    for (const c of (consent.data || [])) consentByPid[c.participant_id] = c;
+
+    return {
+      participants: participantRows,
+      coworkers: coworkers.data || [],
+      workflows: workflows.data || [],
+      workflowRuns: runs.data || [],
+      approvals: approvals.data || [],
+      files: files.data || [],
+      messages: messages.data || [],
+      directMessages: dms.data || [],
+      stageReflections: reflections.data || [],
+      llmUsage: usage.data || [],
+      prefsByPid,
+      consentByPid,
+    };
+  }, []);
+
   const seedWorkshopContent = useCallback(async (roomId) => {
     if (!isSupabaseConfigured) return;
     const { createStarterTools } = await import('../data/starterContent');
@@ -1469,7 +1559,7 @@ export default function useSupabase() {
     // Admin
     createWorkshop, loadAdminWorkshops, loadWorkshopParticipants,
     deleteWorkshop, deprecateWorkshop, revealStage, unrevealStage, revealAllStages, loadWorkshopStats, loadWorkshopContent, loadWorkshopActivity,
-    loadAdminScorecardData,
+    loadAdminScorecardData, loadAdminResearchData,
     seedWorkshopContent, subscribeToWorkshopPresence,
     // Room
     joinRoom, getRoomId, setCreditAllocation, setParticipantCreditBonus,

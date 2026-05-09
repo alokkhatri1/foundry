@@ -1,5 +1,5 @@
 // Per-stage reflection prompts. Fires when the participant advances OUT
-// of the listed stage. Stages 1, 2, 11 don't have a reflection — they're
+// of the listed stage. Stages 1, 2, 9 don't have a reflection — they're
 // either intro (no primitive to consolidate yet) or the final scorecard.
 //
 // Each prompt has four pieces — three required at submit time:
@@ -15,7 +15,7 @@
 //              answers across stages become the participant's personal
 //              practice plan in the takeaway PDF.
 
-export const REFLECTION_STAGES = new Set(['3', '4', '5', '6', '7', '8', '9', '10']);
+export const REFLECTION_STAGES = new Set(['3', '4', '5', '6', '7', '8']);
 
 export const REFLECTION_PROMPTS = {
   '3': {
@@ -54,20 +54,6 @@ export const REFLECTION_PROMPTS = {
     habit: 'A habit you’ll start to debug or improve AI work via the run log?',
   },
   '8': {
-    label: 'Capstone',
-    anchor: 'You laid out a full real-world workflow as a step-by-step plan — coworkers, knowledge, skills, human checks.',
-    scaled: 'How clearly do you understand how the pieces fit together end-to-end?',
-    note: 'In your own words: what does it take to make a workflow that actually runs?',
-    habit: 'A small step you’ll take this week toward making your capstone real?',
-  },
-  '9': {
-    label: 'Copilot',
-    anchor: 'You sent your capstone plan to the workflow copilot and let it build alongside you.',
-    scaled: 'How clearly do you understand how the copilot turns a plan into a running workflow?',
-    note: 'In your own words: what does the copilot do for you?',
-    habit: 'A real workflow you’ll co-build with the copilot this week?',
-  },
-  '10': {
     label: 'Economics',
     anchor: 'You saw the bill — the actual token cost of every AI conversation, run, and coworker your team consumed.',
     scaled: 'How clearly do you understand what drives token cost in an AI workflow?',

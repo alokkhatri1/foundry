@@ -1,28 +1,20 @@
-const STAGE_ORDER = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11'];
+const STAGE_ORDER = ['1', '2', '3', '4', '5', '6', '7', '8', '9'];
 
 // Rooms deprecated before each arc change can carry stage IDs that no longer
 // exist in STAGE_ORDER. Without normalization, indexOf returns -1 and every
 // stageReached() check fails, hiding all gated UI. Map retired IDs to their
 // new positions.
-//   '5c' / '5b' / '5a' → '5'
-//     5b (Coworker Tools) was retired when tools were removed from the editor.
-//     5a then collapsed into a single Coworkers stage and got renumbered '5'.
-//     5c was an older collaboration substage folded earlier.
-//   '7b' → '8'
-//     Old Economics renumbered to '8' in an earlier pass.
-//   Capstone-arc renumber: Capstone (new 8) and Copilot (new 9) were
-//   inserted between Observability (7) and the older Economics/Graduation
-//   stages. Anything that used to be '8' (Economics) is now '10'; anything
-//   that used to be '9' (Graduation) is now '11'. The paired SQL migration
-//   (025_renumber_stages_for_capstone.sql) shifts existing rooms in the DB;
-//   these aliases keep any straggler that didn't get migrated routing
-//   correctly.
 //
-// CAUTION: '7b' -> '8' was previously aliasing to old-Economics. Under the
-// new numbering, 8 is now Capstone. We re-route '7b' to the new Economics
-// position '10' so an old deprecated room with stage '7b' still sees the
-// final Economics + Graduation tabs as it expected.
-const STAGE_ALIASES = { '5c': '5', '5b': '5', '5a': '5', '7b': '10' };
+//   '5c' / '5b' / '5a' → '5'  — older Coworker substages collapsed into '5'.
+//
+// The 9-stage renumber on 2026-05-09 (Capstone + Copilot retired; Economics
+// 10→8; Graduation 11→9) is handled by a one-shot SQL migration
+// (032_renumber_stages_kill_capstone_copilot.sql) that updates every
+// `rooms.current_stage` row in place — there's no in-code alias for it
+// because the DB itself has been normalised.
+const STAGE_ALIASES = {
+  '5c': '5', '5b': '5', '5a': '5',
+};
 function normalizeStage(s) {
   return STAGE_ALIASES[s] || s;
 }
@@ -42,17 +34,15 @@ export function nextStage(currentStage) {
 }
 
 export const STAGE_META = {
-  '1':  { label: 'Chat',                 description: 'Go say hi to the humans in the room, {name} — and try a chat with the AI too.' },
-  '2':  { label: 'Preferences',          description: 'Alright {name} — time to tell the AI who you are and how you like to work.' },
-  '3':  { label: 'Files as context',     description: 'Okay {name}, now you can hand it files to read before it answers you.' },
-  '4':  { label: 'Files as skills',      description: 'Going deeper, {name}. Write instructions that shape how the AI thinks.' },
-  '5':  { label: 'AI Coworkers',         description: 'Let\u2019s build your team, {name} \u2014 named AI teammates with skills, knowledge, and a voice.' },
-  '6':  { label: 'Orchestration',        description: 'Now choreograph it, {name} \u2014 chain coworkers and humans into a workflow with human-in-loop checks.' },
-  '7':  { label: 'Observability',        description: 'Watch the mixed team work, {name} \u2014 every run, approval, and tool call on the record.' },
-  '8':  { label: 'Capstone',             description: 'Design the real thing, {name}. Lay out a full workflow as a five-column plan you can take away.' },
-  '9':  { label: 'Copilot',              description: 'Now plug it in, {name}. Send your capstone to the workflow copilot and let it build with you.' },
-  '10': { label: 'Economics',            description: 'Time to see the bill, {name} \u2014 every token your team spent is on the record now.' },
-  '11': { label: 'Graduation',           description: 'Here\u2019s a read of what you built, {name} \u2014 your competency scorecard across everything we just did together.' },
+  '1': { label: 'Chat',             description: 'Go say hi to the humans in the room, {name} — and try a chat with the AI too.' },
+  '2': { label: 'Preferences',      description: 'Alright {name} — time to tell the AI who you are and how you like to work.' },
+  '3': { label: 'Files as context', description: 'Okay {name}, now you can hand it files to read before it answers you.' },
+  '4': { label: 'Files as skills',  description: 'Going deeper, {name}. Write instructions that shape how the AI thinks.' },
+  '5': { label: 'AI Coworkers',     description: 'Let’s build your team, {name} — named AI teammates with skills, knowledge, and a voice.' },
+  '6': { label: 'Orchestration',    description: 'Now choreograph it, {name} — chain coworkers and humans into a workflow with human-in-loop checks.' },
+  '7': { label: 'Observability',    description: 'Watch the mixed team work, {name} — every run, approval, and tool call on the record.' },
+  '8': { label: 'Economics',        description: 'Time to see the bill, {name} — every token your team spent is on the record now.' },
+  '9': { label: 'Graduation',       description: 'Here’s a read of what you built, {name} — your competency scorecard across everything we just did together.' },
 };
 
 export { STAGE_ORDER, normalizeStage };

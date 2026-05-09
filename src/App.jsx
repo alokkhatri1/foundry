@@ -4,7 +4,6 @@ import AuthGate, { useAuth } from './components/AuthGate';
 import GraduationScreen from './components/GraduationScreen';
 import StageReflection from './components/StageReflection';
 import { REFLECTION_STAGES } from './data/reflectionPrompts';
-import Capstone, { deriveCoworkerName } from './components/Capstone';
 import { COWORKER_ICONS } from './components/Icon';
 import FileExplorer from './components/FileExplorer';
 import FileEditor from './components/FileEditor';
@@ -243,11 +242,11 @@ function SettingsMenu({ userName, orgName, currentStage, sb, myParticipantId, cr
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
   const { isAdmin, openAdmin } = useAuth();
-  const showSpend = stageReached(currentStage, '10');
+  const showSpend = stageReached(currentStage, '8');
   // Workshop-wide total — matches the pedagogy of the Usage tab
   // ("look how cheap the whole room is"). We always run the hook (can't
   // call hooks conditionally) but only render its result after Economics
-  // (Stage 10 under the Capstone-arc renumber; was Stage 8).
+  // (Stage 8 in the 9-stage arc).
   const spend = useWorkshopUsageTotal(sb);
   const showPreferences = stageReached(currentStage, '2');
   const initial = (userName || '?').trim().charAt(0).toUpperCase();
@@ -474,8 +473,8 @@ function App() {
       // Graduation — the whole-room moment. Snap every participant
       // to the graduation tab so they see their scorecard together. Later
       // navigation away is fine; this only fires on the transition.
-      // Stage 11 under the Capstone-arc renumber; was Stage 9.
-      if (currentStage === '11') setActiveTab('graduation');
+      // Stage 9 in the 9-stage arc.
+      if (currentStage === '9') setActiveTab('graduation');
     }
     // Facilitator un-reveal safety net: if the active tab requires a stage
     // that's no longer reached (admin rolled the dial back), bounce to
@@ -484,7 +483,7 @@ function App() {
     // states. Chat is always available so it's the safe fallback.
     const TAB_STAGE_REQ = {
       files: '3', coworkers: '5', workflow: '6', activity: '7',
-      capstone: '8', usage: '10', graduation: '11',
+      usage: '8', graduation: '9',
     };
     const required = TAB_STAGE_REQ[activeTab];
     if (required && !stageReached(currentStage, required)) {
@@ -1306,108 +1305,6 @@ function App() {
     );
     setFlatFiles(next);
     return next;
-  }
-
-  // Capstone send-to-copilot bridge. Each Coworker row in the plan
-  // materializes into a real saved coworker (auto-named from the step
-  // text, uniquified against the existing library) so the workflow
-  // copilot can reference it by name through its existing
-  // add_coworker_node tool. We then create a fresh workflow, drop the
-  // user into Orchestration on it, and stash a build-prompt for
-  // WorkflowBuilder to inject as the copilot's pre-filled input. The
-  // user still hits Send themselves to fire the build — that gives them
-  // a chance to read/edit the prompt and avoids surprise token spend.
-  // Repeatable: each click creates a fresh batch of coworkers + a fresh
-  // workflow.
-  const [capstoneSendoff, setCapstoneSendoff] = useState(null);
-  function handleSendCapstoneToCopilot(rows) {
-    if (!stageReached(currentStage, '9')) return;
-    if (!Array.isArray(rows) || rows.length === 0) return;
-
-    // Pre-create coworkers for every coworker row. Names are derived from
-    // step text and uniquified against the existing library — duplicates
-    // would break the copilot's name → coworker lookup.
-    const usedNames = new Set((coworkers || []).map(c => (c.name || '').toLowerCase()).filter(Boolean));
-    const newCoworkers = [];
-    const coworkerNameByRowId = new Map();
-    for (const r of rows) {
-      if (r.type !== 'coworker') continue;
-      const base = deriveCoworkerName(r.step) || 'Coworker';
-      let name = base;
-      let n = 2;
-      while (usedNames.has(name.toLowerCase())) {
-        name = `${base} ${n}`;
-        n++;
-      }
-      usedNames.add(name.toLowerCase());
-      const id = 'cw-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6);
-      newCoworkers.push({
-        id,
-        name,
-        role: (r.step || '').trim(),
-        avatar: 'icon:' + COWORKER_ICONS[Math.floor(Math.random() * COWORKER_ICONS.length)],
-        color: CAPSTONE_COWORKER_COLORS[Math.floor(Math.random() * CAPSTONE_COWORKER_COLORS.length)],
-        instructionFileIds: r.skillsFileIds || [],
-        knowledgeFileIds: r.knowledgeFileIds || [],
-        toolIds: [],
-        createdBy: userName,
-        createdAt: Date.now(),
-      });
-      coworkerNameByRowId.set(r.id, name);
-    }
-    if (newCoworkers.length) {
-      handleUpdateCoworkers([...(coworkers || []), ...newCoworkers]);
-    }
-
-    // Build the markdown prompt that pre-fills the copilot input. The
-    // coworkers are already saved by the time the participant hits Send
-    // (handleUpdateCoworkers fires sb.saveCoworker per coworker), so the
-    // copilot's existing add_coworker_node({coworkerName}) flow Just Works.
-    const fileNameById = new Map((flatFiles || []).map(f => [f.id, f.name]));
-    const lines = [
-      'Build this workflow. The coworkers below have already been created in my library — reference them by name. Bindings are explicit; skip Discover, do a one-line preview, then build.',
-      '',
-    ];
-    rows.forEach((r, i) => {
-      const stepText = (r.step || '').trim();
-      lines.push(`### Step ${i + 1}: ${stepText}`);
-      if (r.type === 'human') {
-        lines.push(`- Type: Human review`);
-        lines.push(`- Reviewer: ${r.reviewerName || ''}`);
-        lines.push(`- Prompt: ${stepText}`);
-        if ((r.remarks || '').trim()) lines.push(`- Remarks: ${r.remarks.trim()}`);
-      } else {
-        const knowFiles = (r.knowledgeFileIds || []).map(id => fileNameById.get(id) || id).filter(Boolean);
-        const skillFiles = (r.skillsFileIds || []).map(id => fileNameById.get(id) || id).filter(Boolean);
-        lines.push(`- Type: AI coworker`);
-        lines.push(`- Coworker: ${coworkerNameByRowId.get(r.id) || ''}`);
-        if (knowFiles.length) lines.push(`- Knowledge: ${knowFiles.join(', ')}`);
-        if (skillFiles.length) lines.push(`- Skills: ${skillFiles.join(', ')}`);
-      }
-      lines.push('');
-    });
-    lines.push('Wire the steps in order; terminate the final step into the pre-seeded Capture Learning node.');
-    const markdown = lines.join('\n').trim();
-
-    // Fresh workflow, pre-seeded with Trigger + Capture (unwired).
-    const wfId = 'wf-' + (typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`);
-    const triggerStep = { id: 'trigger-' + wfId, type: 'trigger', name: 'Trigger', caseInput: '' };
-    const captureStep = { id: 'step-' + (typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`), type: 'capture', name: 'Capture Learning', mode: 'knowledge', targetFileId: '' };
-    const newWf = {
-      id: wfId,
-      name: 'Capstone build',
-      steps: [triggerStep, captureStep],
-      nodes: [
-        { id: triggerStep.id, type: 'trigger', position: { x: 240, y: 0 }, data: { ...triggerStep } },
-        { id: captureStep.id, type: 'capture', position: { x: 240, y: 360 }, data: { ...captureStep } },
-      ],
-      edges: [],
-      createdBy: userName,
-      createdAt: Date.now(),
-    };
-    handleUpdateWorkflows([...(workflows || []), newWf]);
-    setCapstoneSendoff({ workflowId: wfId, prompt: markdown });
-    setActiveTab('workflow');
   }
 
   function handleUpdateWorkflows(newWorkflows) {
@@ -3083,16 +2980,11 @@ Answer in ONE sentence. If the user asks "how", a second sentence is allowed —
             </button>
           </RevealAt>
           <RevealAt stage="8" currentStage={currentStage}>
-            <button className={`tab-nav-item${activeTab === 'capstone' ? ' active' : ''}`} onClick={() => setActiveTab('capstone')}>
-              Capstone
-            </button>
-          </RevealAt>
-          <RevealAt stage="10" currentStage={currentStage}>
             <button className={`tab-nav-item${activeTab === 'usage' ? ' active' : ''}`} onClick={() => setActiveTab('usage')}>
               Economics
             </button>
           </RevealAt>
-          <RevealAt stage="11" currentStage={currentStage}>
+          <RevealAt stage="9" currentStage={currentStage}>
             <button className={`tab-nav-item${activeTab === 'graduation' ? ' active' : ''}`} onClick={() => setActiveTab('graduation')}>
               Graduation
             </button>
@@ -3198,7 +3090,7 @@ Answer in ONE sentence. If the user asks "how", a second sentence is allowed —
         )}
         {activeTab === 'workflow' && (
           <div className="tab-pane tab-pane-workflow">
-            <WorkflowBuilder workflows={workflows} onUpdateWorkflows={handleUpdateWorkflows} fileTree={fileTree} onRun={runWorkflow} onCancelRun={handleCancelRun} onCancelAllRuns={handleCancelAllRuns} workflowRuns={workflowRuns} participants={participants} currentUserName={userName} coworkers={coworkers || []} tools={tools || []} showEducationalCues={showEducationalCues} callClaudeAPI={callClaudeAPI} onSaveCoworkerToLibrary={handleSaveCoworkerToLibrary} onUpdateFileContent={handleUpdateFileContent} onCopilotUsage={({ usage, model }) => sb.logLlmUsage({ participantId: myParticipantId, segment: 'workflow_copilot', model, usage, costUsd: computeCost(usage, model) })} copilotEnabled={stageReached(currentStage, '9')} capstoneSendoff={capstoneSendoff} onConsumeCapstoneSendoff={() => setCapstoneSendoff(null)} />
+            <WorkflowBuilder workflows={workflows} onUpdateWorkflows={handleUpdateWorkflows} fileTree={fileTree} onRun={runWorkflow} onCancelRun={handleCancelRun} onCancelAllRuns={handleCancelAllRuns} workflowRuns={workflowRuns} participants={participants} currentUserName={userName} coworkers={coworkers || []} tools={tools || []} showEducationalCues={showEducationalCues} callClaudeAPI={callClaudeAPI} onSaveCoworkerToLibrary={handleSaveCoworkerToLibrary} onUpdateFileContent={handleUpdateFileContent} onCopilotUsage={({ usage, model }) => sb.logLlmUsage({ participantId: myParticipantId, segment: 'workflow_copilot', model, usage, costUsd: computeCost(usage, model) })} copilotEnabled={false} />
           </div>
         )}
         {activeTab === 'files' && (
@@ -3249,22 +3141,7 @@ Answer in ONE sentence. If the user asks "how", a second sentence is allowed —
             />
           </div>
         )}
-        {activeTab === 'capstone' && stageReached(currentStage, '8') && (
-          <div className="tab-pane tab-pane-capstone">
-            <Capstone
-              sb={sb}
-              myParticipantId={myParticipantId}
-              currentUserName={userName}
-              fileTree={fileTree}
-              flatFiles={flatFiles}
-              onEnsureFileContent={handleEnsureFileContent}
-              participants={participants || []}
-              copilotUnlocked={stageReached(currentStage, '9')}
-              onSendToCopilot={handleSendCapstoneToCopilot}
-            />
-          </div>
-        )}
-        {activeTab === 'usage' && stageReached(currentStage, '10') && (
+        {activeTab === 'usage' && stageReached(currentStage, '8') && (
           <div className="tab-pane tab-pane-usage">
             <UsageView
               sb={sb}

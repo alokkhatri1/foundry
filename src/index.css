@@ -13532,6 +13532,44 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
   line-height: 1.55;
 }
 
+/* Case input — the anchor of the case-driven build. Sits between the page
+   header and the step list so it reads as "this is what every step is in
+   service of". Larger type than the step body to feel weighty. */
+.cs-case-input {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 16px 0 24px;
+  padding: 16px 20px;
+  background: var(--paper);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+}
+.cs-case-input-label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+.cs-case-input-textarea {
+  font-family: var(--serif, inherit);
+  font-size: 16px;
+  line-height: 1.5;
+  color: var(--ink);
+  background: transparent;
+  border: none;
+  outline: none;
+  resize: vertical;
+  padding: 0;
+  min-height: 60px;
+  width: 100%;
+}
+.cs-case-input-textarea::placeholder {
+  color: var(--text-muted);
+  font-style: italic;
+}
+
 /* Action row — paper "Show blueprint" + dark "Send to copilot" */
 .cs-page-actions {
   display: flex;

@@ -7,7 +7,8 @@ import { REFLECTION_STAGES } from './data/reflectionPrompts';
 import { COWORKER_ICONS } from './components/Icon';
 import FileExplorer from './components/FileExplorer';
 import FileEditor from './components/FileEditor';
-import WorkflowBuilder from './components/WorkflowBuilder';
+import ScenarioBuilder from './components/ScenarioBuilder';
+import { deriveCoworkerName } from './components/Capstone';
 import CoworkerBuilder from './components/CoworkerBuilder';
 import ChatPanel from './components/ChatPanel';
 import ActivityDashboard from './components/ActivityDashboard';
@@ -1336,6 +1337,112 @@ function App() {
     persistLocal({ workflows: newWorkflows });
   }
 
+  // Materialise ScenarioBuilder rows + caseInput into a runnable workflow,
+  // persist it, run it, and flip to Observability. The workflow object is
+  // passed straight to runWorkflow (the runWorkflow signature accepts a
+  // workflow object) so we don't have to wait for setWorkflows to commit
+  // before we can run it.
+  async function handleRunCaseWorkflow(rows, caseInput) {
+    if (!Array.isArray(rows) || rows.length === 0) return;
+
+    // Materialise coworker rows into real saved coworkers, like the old
+    // capstone-to-copilot path did — names auto-derived and uniquified
+    // against the existing library so the agent step's coworker reference
+    // is unambiguous and the participant has the coworkers in their tab
+    // afterward to inspect or reuse.
+    const usedNames = new Set((coworkers || []).map(c => (c.name || '').toLowerCase()).filter(Boolean));
+    const newCoworkers = [];
+    const coworkerByRowId = new Map();
+    for (const r of rows) {
+      if (r.type !== 'coworker') continue;
+      const base = deriveCoworkerName(r.step) || 'Coworker';
+      let name = base;
+      let n = 2;
+      while (usedNames.has(name.toLowerCase())) { name = `${base} ${n}`; n++; }
+      usedNames.add(name.toLowerCase());
+      const id = 'cw-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6);
+      const cw = {
+        id,
+        name,
+        role: (r.step || '').trim(),
+        avatar: 'icon:' + COWORKER_ICONS[Math.floor(Math.random() * COWORKER_ICONS.length)],
+        color: CAPSTONE_COWORKER_COLORS[Math.floor(Math.random() * CAPSTONE_COWORKER_COLORS.length)],
+        instructionFileIds: r.skillsFileIds || [],
+        knowledgeFileIds: r.knowledgeFileIds || [],
+        toolIds: [],
+        createdBy: userName,
+        createdAt: Date.now(),
+      };
+      newCoworkers.push(cw);
+      coworkerByRowId.set(r.id, cw);
+    }
+    if (newCoworkers.length) handleUpdateCoworkers([...(coworkers || []), ...newCoworkers]);
+
+    // Build the workflow: trigger → step1 → step2 → ... — strictly linear,
+    // edges chain forward only. The trigger holds the case input so the
+    // executor pulls it via its standard caseInput resolution.
+    const wfId = 'wf-' + (typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`);
+    const triggerId = 'trigger-' + wfId;
+    const triggerStep = { id: triggerId, type: 'trigger', name: 'Case', caseInput };
+    const builtSteps = [triggerStep];
+    for (const r of rows) {
+      const id = 'step-' + Math.random().toString(36).slice(2, 10);
+      if (r.type === 'human') {
+        const reviewer = (participants || []).find(p => p.id === r.reviewerId)
+          || { id: r.reviewerId, name: r.reviewerName };
+        builtSteps.push({
+          id,
+          type: 'approval',
+          name: (r.step || 'Review').trim().slice(0, 60) || 'Review',
+          prompt: (r.step || '').trim(),
+          assigneeId: reviewer.id,
+          assigneeName: reviewer.name || r.reviewerName,
+        });
+      } else {
+        const cw = coworkerByRowId.get(r.id);
+        builtSteps.push({
+          id,
+          type: 'agent',
+          name: cw?.name || 'Coworker',
+          coworkerId: cw?.id,
+          coworker: cw,
+        });
+      }
+    }
+    // Linear edges: trigger → step1 → step2 → ... → stepN
+    const edges = [];
+    for (let i = 0; i < builtSteps.length - 1; i++) {
+      edges.push({
+        id: `e-${builtSteps[i].id}-${builtSteps[i + 1].id}`,
+        source: builtSteps[i].id,
+        target: builtSteps[i + 1].id,
+      });
+    }
+    // Nodes mirror steps (positions don't matter — we don't render a
+    // canvas — but the executor reads from steps[]+edges[], not nodes[],
+    // so this is just for shape parity with legacy workflows).
+    const nodes = builtSteps.map((s, i) => ({
+      id: s.id, type: s.type, position: { x: 240, y: i * 120 }, data: { ...s },
+    }));
+    const newWf = {
+      id: wfId,
+      name: (caseInput || '').trim().slice(0, 60) || 'Case run',
+      steps: builtSteps,
+      nodes,
+      edges,
+      createdBy: userName,
+      createdAt: Date.now(),
+    };
+
+    // Persist to local + DB so the run shows up in the workflows list and
+    // future revisits restore it.
+    handleUpdateWorkflows([...(workflows || []), newWf]);
+    // Flip to Observability and kick off the run with the workflow object
+    // directly — no need to wait for setWorkflows to commit.
+    setActiveTab('activity');
+    runWorkflow(newWf, caseInput);
+  }
+
   function handleUpdateTools(newTools) {
     const prevIds = new Set((tools || []).map(t => t.id));
     const nextIds = new Set((newTools || []).map(t => t.id));
@@ -1954,8 +2061,15 @@ function App() {
     });
   }
 
-  async function runWorkflow(workflowId, autoInput) {
-    const workflow = workflows.find(w => w.id === workflowId);
+  async function runWorkflow(workflowOrId, autoInput) {
+    // Accept either a workflow id (the existing canvas/run-button path) or
+    // a full workflow object (the new ScenarioBuilder path, where the
+    // workflow was just materialised from rows and isn't in `workflows`
+    // state yet for this render). Object form skips the lookup so we
+    // don't have to wait a tick for setWorkflows to commit.
+    const workflow = typeof workflowOrId === 'string'
+      ? workflows.find(w => w.id === workflowOrId)
+      : workflowOrId;
     if (!workflow) return;
 
     // Credit budget enforcement — workflow runs are the priciest calls on
@@ -3090,7 +3204,15 @@ Answer in ONE sentence. If the user asks "how", a second sentence is allowed —
         )}
         {activeTab === 'workflow' && (
           <div className="tab-pane tab-pane-workflow">
-            <WorkflowBuilder workflows={workflows} onUpdateWorkflows={handleUpdateWorkflows} fileTree={fileTree} onRun={runWorkflow} onCancelRun={handleCancelRun} onCancelAllRuns={handleCancelAllRuns} workflowRuns={workflowRuns} participants={participants} currentUserName={userName} coworkers={coworkers || []} tools={tools || []} showEducationalCues={showEducationalCues} callClaudeAPI={callClaudeAPI} onSaveCoworkerToLibrary={handleSaveCoworkerToLibrary} onUpdateFileContent={handleUpdateFileContent} onCopilotUsage={({ usage, model }) => sb.logLlmUsage({ participantId: myParticipantId, segment: 'workflow_copilot', model, usage, costUsd: computeCost(usage, model) })} copilotEnabled={false} />
+            <ScenarioBuilder
+              sb={sb}
+              myParticipantId={myParticipantId}
+              currentUserName={userName}
+              fileTree={fileTree}
+              participants={participants || []}
+              onRunWorkflow={handleRunCaseWorkflow}
+              running={activeRuns.length > 0}
+            />
           </div>
         )}
         {activeTab === 'files' && (

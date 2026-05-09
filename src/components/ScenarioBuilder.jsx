@@ -732,6 +732,12 @@ function injectCaseInput(rows, caseInput) {
   return [{ id: CASE_INPUT_ID, caseInput: caseInput || '' }, ...without];
 }
 
+function deriveDraftName(caseInput) {
+  const t = (caseInput || '').trim().replace(/\s+/g, ' ');
+  if (!t) return 'Untitled workflow';
+  return t.length > 60 ? t.slice(0, 60) + '…' : t;
+}
+
 export default function ScenarioBuilder({
   sb,
   myParticipantId,
@@ -741,6 +747,8 @@ export default function ScenarioBuilder({
   onRunWorkflow,
   running = false,
 }) {
+  const [drafts, setDrafts] = useState([]);
+  const [activeDraftId, setActiveDraftId] = useState(null);
   const [rows, setRows] = useState(null);
   const [caseInput, setCaseInput] = useState('');
   const [saving, setSaving] = useState(false);
@@ -749,6 +757,10 @@ export default function ScenarioBuilder({
   const [sending, setSending] = useState(false);
   const [collapsed, setCollapsed] = useState({});
   const [now, setNow] = useState(() => Date.now());
+  // Suppress save-effect on the very first render after switching drafts —
+  // otherwise the load-then-save sequence writes the same draft back over
+  // itself and bumps updated_at every time you switch.
+  const skipNextSaveRef = useRef(false);
 
   // Tick once a second so the "Saved Xs ago" relative time keeps moving.
   useEffect(() => {
@@ -756,36 +768,41 @@ export default function ScenarioBuilder({
     return () => clearInterval(id);
   }, []);
 
+  // Load the participant's full draft library on mount; pick the most
+  // recent draft as the active one. If the participant has no drafts yet,
+  // the active state stays null and the editor renders an empty
+  // first-draft skeleton until they type or click Run.
   useEffect(() => {
     let cancelled = false;
     if (!myParticipantId || !sb) {
       setRows([newRow()]);
       return;
     }
-    // DB is the source of truth when reachable, but always check
-    // localStorage second so a missing capstone_drafts table or an
-    // offline session still restores the participant's last draft.
-    const applyStored = (stored) => {
-      const ci = extractCaseInput(stored);
-      const realRows = stripCaseInput(stored);
-      setCaseInput(ci);
-      setRows(realRows.length > 0 ? realRows.map(migrateRow) : [newRow()]);
-    };
     const restoreFromLocal = () => {
       const local = loadLocalCapstoneDraft(myParticipantId);
       if (Array.isArray(local) && local.length > 0) {
-        applyStored(local);
+        const ci = extractCaseInput(local);
+        const realRows = stripCaseInput(local);
+        setCaseInput(ci);
+        setRows(realRows.length > 0 ? realRows.map(migrateRow) : [newRow()]);
       } else {
         setRows([newRow()]);
       }
     };
-    sb.loadCapstoneDraft(myParticipantId).then(serverRows => {
+    sb.loadCapstoneDrafts(myParticipantId).then(list => {
       if (cancelled) return;
-      if (Array.isArray(serverRows) && serverRows.length > 0) {
-        applyStored(serverRows);
-      } else {
+      if (!Array.isArray(list) || list.length === 0) {
         restoreFromLocal();
+        return;
       }
+      setDrafts(list);
+      const first = list[0];
+      skipNextSaveRef.current = true;
+      setActiveDraftId(first.id);
+      const ci = extractCaseInput(first.rows);
+      const realRows = stripCaseInput(first.rows);
+      setCaseInput(ci);
+      setRows(realRows.length > 0 ? realRows.map(migrateRow) : [newRow()]);
     }).catch(() => { if (!cancelled) restoreFromLocal(); });
     return () => { cancelled = true; };
   }, [sb, myParticipantId]);
@@ -840,18 +857,78 @@ export default function ScenarioBuilder({
   // ride into the same JSONB blob so a single save covers both.
   // localStorage is written immediately on every edit so a refresh never
   // loses keystrokes even if Supabase is down or the network is flaky.
+  // The save targets the active draft id; without one, the first save
+  // creates a fresh row and we adopt the returned id.
   useEffect(() => {
     if (rows === null || !myParticipantId) return;
+    if (skipNextSaveRef.current) {
+      skipNextSaveRef.current = false;
+      return;
+    }
     const blob = injectCaseInput(rows, caseInput);
     saveLocalCapstoneDraft(myParticipantId, blob);
     const handle = setTimeout(async () => {
       setSaving(true);
-      const res = await sb.saveCapstoneDraft(myParticipantId, blob);
+      const res = await sb.saveCapstoneDraft({
+        participantId: myParticipantId,
+        id: activeDraftId,
+        name: deriveDraftName(caseInput),
+        rows: blob,
+      });
       setSaving(false);
-      if (res?.ok) setLastSavedAt(Date.now());
+      if (res?.ok) {
+        setLastSavedAt(Date.now());
+        if (res.draft) {
+          // Adopt the freshly-inserted id and refresh the chooser pill.
+          if (!activeDraftId) setActiveDraftId(res.draft.id);
+          setDrafts(prev => {
+            const without = prev.filter(d => d.id !== res.draft.id);
+            return [{ id: res.draft.id, name: res.draft.name, rows: res.draft.rows, updated_at: res.draft.updated_at }, ...without];
+          });
+        }
+      }
     }, 800);
     return () => clearTimeout(handle);
-  }, [rows, caseInput, sb, myParticipantId]);
+  }, [rows, caseInput, sb, myParticipantId, activeDraftId]);
+
+  function handleSwitchDraft(draftId) {
+    if (draftId === activeDraftId) return;
+    const target = drafts.find(d => d.id === draftId);
+    if (!target) return;
+    skipNextSaveRef.current = true;
+    setActiveDraftId(draftId);
+    const ci = extractCaseInput(target.rows);
+    const realRows = stripCaseInput(target.rows);
+    setCaseInput(ci);
+    setRows(realRows.length > 0 ? realRows.map(migrateRow) : [newRow()]);
+    setCollapsed({});
+  }
+
+  function handleNewDraft() {
+    skipNextSaveRef.current = false; // let the empty-state save create the row
+    setActiveDraftId(null);
+    setCaseInput('');
+    setRows([newRow()]);
+    setCollapsed({});
+  }
+
+  async function handleDeleteDraft(draftId) {
+    if (!draftId) return;
+    if (!window.confirm('Delete this workflow? This can’t be undone.')) return;
+    const res = await sb.deleteCapstoneDraft(draftId);
+    if (!res?.ok) return;
+    setDrafts(prev => prev.filter(d => d.id !== draftId));
+    if (draftId === activeDraftId) {
+      // If there are other drafts, switch to the most recent one;
+      // otherwise reset to a fresh empty draft.
+      const remaining = drafts.filter(d => d.id !== draftId);
+      if (remaining.length > 0) {
+        handleSwitchDraft(remaining[0].id);
+      } else {
+        handleNewDraft();
+      }
+    }
+  }
 
   const completeCount = useMemo(
     () => (rows || []).filter(r => isRowComplete(r)).length,
@@ -939,6 +1016,43 @@ export default function ScenarioBuilder({
 
   return (
     <div className="cs-page">
+      <nav className="cs-draft-chooser" aria-label="Saved workflows">
+        <div className="cs-draft-chooser-list">
+          {drafts.map(d => {
+            const isActive = d.id === activeDraftId;
+            return (
+              <button
+                key={d.id}
+                type="button"
+                className={`cs-draft-pill${isActive ? ' is-active' : ''}`}
+                onClick={() => handleSwitchDraft(d.id)}
+                title={d.name || 'Untitled workflow'}
+              >
+                <span className="cs-draft-pill-name">{d.name || 'Untitled workflow'}</span>
+                {isActive && drafts.length > 1 && (
+                  <span
+                    className="cs-draft-pill-x"
+                    role="button"
+                    tabIndex={0}
+                    aria-label="Delete this workflow"
+                    onClick={e => { e.stopPropagation(); handleDeleteDraft(d.id); }}
+                    onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.stopPropagation(); handleDeleteDraft(d.id); } }}
+                  >×</span>
+                )}
+              </button>
+            );
+          })}
+          {/* In the brand-new-draft empty state there's no row in `drafts`
+              yet — show a synthetic "Untitled" pill so the chooser doesn't
+              look broken. */}
+          {drafts.length === 0 && (
+            <span className="cs-draft-pill is-active">
+              <span className="cs-draft-pill-name">Untitled workflow</span>
+            </span>
+          )}
+        </div>
+        <button type="button" className="cs-draft-new" onClick={handleNewDraft}>+ New workflow</button>
+      </nav>
       <header className="cs-page-head">
         <div className="cs-page-head-text">
           <div className="cs-eyebrow">

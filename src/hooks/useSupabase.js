@@ -1352,35 +1352,80 @@ export default function useSupabase() {
     return out;
   }, []);
 
-  // ===== Capstone draft (Stage 8) =====
-  // Single-author per (workshop_id, participant_id). Returns the row's
-  // `rows` JSONB array (or null if the participant hasn't started yet);
-  // saveCapstoneDraft upserts the array on every commit.
+  // ===== Workflow drafts (Stage 6 case-driven Orchestration) =====
+  // Stored in capstone_drafts (legacy table name kept for back-compat — the
+  // artefact shape is the same, just used at Stage 6 now). Migration 033
+  // dropped the (workshop, participant) unique constraint so a participant
+  // can have many saved drafts side by side.
+  //
+  // loadCapstoneDraft (singular, legacy) aggregates rows across ALL of a
+  // participant's drafts so the GraduationScreen scorecard's row-counting
+  // keeps working without a code change. New code should use
+  // loadCapstoneDrafts (plural) which returns the per-draft list.
   const loadCapstoneDraft = useCallback(async (participantId) => {
     if (!isSupabaseConfigured || !roomIdRef.current || !participantId) return null;
     const { data, error } = await supabase
       .from('capstone_drafts')
       .select('rows')
       .eq('workshop_id', roomIdRef.current)
-      .eq('participant_id', participantId)
-      .maybeSingle();
+      .eq('participant_id', participantId);
     if (error) { console.error('[sb] loadCapstoneDraft:', error.message); return null; }
-    return data?.rows ?? null;
+    if (!data || data.length === 0) return null;
+    const all = [];
+    for (const row of data) for (const r of (row.rows || [])) all.push(r);
+    return all;
   }, []);
 
-  const saveCapstoneDraft = useCallback(async (participantId, rows) => {
+  const loadCapstoneDrafts = useCallback(async (participantId) => {
+    if (!isSupabaseConfigured || !roomIdRef.current || !participantId) return [];
+    const { data, error } = await supabase
+      .from('capstone_drafts')
+      .select('id, name, rows, updated_at')
+      .eq('workshop_id', roomIdRef.current)
+      .eq('participant_id', participantId)
+      .order('updated_at', { ascending: false });
+    if (error) { console.error('[sb] loadCapstoneDrafts:', error.message); return []; }
+    return data || [];
+  }, []);
+
+  // saveCapstoneDraft now takes either:
+  //   (participantId, rows)              — legacy 2-arg form, creates or
+  //                                        updates the participant's
+  //                                        only-or-newest draft (back-compat).
+  //   ({participantId, id, name, rows})  — new explicit form, upserts by id.
+  const saveCapstoneDraft = useCallback(async (participantOrPayload, maybeRows) => {
     if (!isSupabaseConfigured || !roomIdRef.current) return { ok: false, error: 'Not connected' };
+    let participantId, id, name, rows;
+    if (typeof participantOrPayload === 'object' && participantOrPayload !== null) {
+      ({ participantId, id, name, rows } = participantOrPayload);
+    } else {
+      participantId = participantOrPayload;
+      rows = maybeRows;
+    }
     if (!participantId) return { ok: false, error: 'Missing participant_id' };
     const payload = {
       workshop_id: roomIdRef.current,
       participant_id: participantId,
       rows: rows || [],
+      name: name ?? null,
       updated_at: new Date().toISOString(),
     };
-    const { error } = await supabase
+    if (id) payload.id = id;
+    // No onConflict — id-based upsert handles the update path; without an
+    // id Supabase inserts a fresh row, which is what "+ New" expects.
+    const { data, error } = await supabase
       .from('capstone_drafts')
-      .upsert(payload, { onConflict: 'workshop_id,participant_id' });
+      .upsert(payload)
+      .select('id, name, rows, updated_at')
+      .single();
     if (error) { console.error('[sb] saveCapstoneDraft:', error.message); return { ok: false, error: error.message }; }
+    return { ok: true, draft: data };
+  }, []);
+
+  const deleteCapstoneDraft = useCallback(async (draftId) => {
+    if (!isSupabaseConfigured || !draftId) return { ok: false };
+    const { error } = await supabase.from('capstone_drafts').delete().eq('id', draftId);
+    if (error) { console.error('[sb] deleteCapstoneDraft:', error.message); return { ok: false, error: error.message }; }
     return { ok: true };
   }, []);
 
@@ -1576,7 +1621,7 @@ export default function useSupabase() {
     subscribeToRoom, trackPresence, leavePresence,
     loadMyFeedback, saveFeedback, loadAllFeedback,
     saveResearchConsent, loadMyResearchConsent, loadConsentMapForWorkshop,
-    loadCapstoneDraft, saveCapstoneDraft,
+    loadCapstoneDraft, loadCapstoneDrafts, saveCapstoneDraft, deleteCapstoneDraft,
     loadMyStageReflections, saveStageReflection, loadAllStageReflections,
   }), []);
 }

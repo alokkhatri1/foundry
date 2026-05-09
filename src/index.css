@@ -13570,6 +13570,77 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
   font-style: italic;
 }
 
+/* Draft chooser — pill row at the top of Stage 6 listing the participant's
+   saved workflows. The active pill carries an inline × to delete; only one
+   draft is deletable at a time (the active one) so the affordance reads as
+   "delete the open workflow" rather than mass-edit. */
+.cs-draft-chooser {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border-color);
+  flex-wrap: wrap;
+}
+.cs-draft-chooser-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+}
+.cs-draft-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  border: 1px solid var(--border-color);
+  background: var(--paper);
+  border-radius: 999px;
+  font-size: 13px;
+  cursor: pointer;
+  max-width: 260px;
+}
+.cs-draft-pill:hover { background: var(--surface-muted); }
+.cs-draft-pill.is-active {
+  background: var(--ink);
+  color: var(--paper);
+  border-color: var(--ink);
+  cursor: default;
+}
+.cs-draft-pill-name {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-weight: 500;
+}
+.cs-draft-pill-x {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.18);
+  font-size: 12px;
+  line-height: 1;
+  cursor: pointer;
+}
+.cs-draft-pill-x:hover { background: rgba(255,255,255,0.35); }
+.cs-draft-new {
+  padding: 6px 14px;
+  border: 1px dashed var(--border-color);
+  background: transparent;
+  border-radius: 999px;
+  font-size: 13px;
+  cursor: pointer;
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+.cs-draft-new:hover { color: var(--ink); border-color: var(--ink); }
+
 /* Inline run-blocked banner — surfaces the same reason a disabled-button
    tooltip would have hidden, but visibly. */
 .cs-run-error {

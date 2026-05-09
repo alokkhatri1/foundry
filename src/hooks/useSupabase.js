@@ -2,6 +2,7 @@ import { useRef, useCallback, useEffect, useMemo } from 'react';
 import { supabase, isSupabaseConfigured } from '../supabase';
 import { mapFileRow, mapCoworkerRow, mapToolRow, mapWorkflowRow } from '../utils/treeUtils';
 import { withSupabaseRetry } from '../utils/supabaseRetry';
+import { getCurrentEnvironment, isProduction } from '../utils/environment';
 import {
   createExampleFiles,
   createExampleCoworkers,
@@ -137,9 +138,12 @@ export default function useSupabase() {
   const createWorkshop = useCallback(async (name, orgName, adminId) => {
     if (!isSupabaseConfigured) return null;
     const code = Math.random().toString(36).slice(2, 8).toUpperCase();
+    // Tag the workshop with the environment it was created in so prod and
+    // dev surfaces can filter correctly later. See utils/environment.js.
+    const environment = getCurrentEnvironment();
     const { data, error } = await supabase.from('rooms')
-      .insert({ code, org_name: orgName || name, admin_id: adminId, current_stage: '1' })
-      .select('id, code')
+      .insert({ code, org_name: orgName || name, admin_id: adminId, current_stage: '1', environment })
+      .select('id, code, environment')
       .single();
     if (error) { console.error('[sb] createWorkshop:', error.message); return null; }
     return data;
@@ -147,10 +151,15 @@ export default function useSupabase() {
 
   const loadAdminWorkshops = useCallback(async (adminId) => {
     if (!isSupabaseConfigured) return [];
-    const { data, error } = await supabase.from('rooms')
-      .select('id, code, org_name, created_at, deprecated_at, current_stage, credit_allocation')
+    // Asymmetric filter: production admin only sees production workshops
+    // (clean live-session view); dev admin sees everything (so the research
+    // view can be built and tested against real prod data without merging).
+    let query = supabase.from('rooms')
+      .select('id, code, org_name, created_at, deprecated_at, current_stage, credit_allocation, environment')
       .eq('admin_id', adminId)
       .order('created_at', { ascending: false });
+    if (isProduction()) query = query.eq('environment', 'production');
+    const { data, error } = await query;
     if (error) { console.error('[sb] loadAdminWorkshops:', error.message); return []; }
     return data || [];
   }, []);
@@ -418,10 +427,15 @@ export default function useSupabase() {
   // Regular JoinScreen entry still gets the deprecated rejection.
   const joinRoom = useCallback(async (code, { allowDeprecated = false } = {}) => {
     if (!isSupabaseConfigured) return { error: 'not_configured' };
+    // Strict per-environment join: a dev workshop's code typed on prod
+    // resolves to not_found (and vice versa), so participants never
+    // accidentally cross the boundary.
+    const env = getCurrentEnvironment();
     const { data: room, error } = await supabase
       .from('rooms')
       .select('id, org_name, deprecated_at, current_stage, credit_allocation')
       .eq('code', code)
+      .eq('environment', env)
       .maybeSingle();
     if (error) { console.error('[sb] joinRoom:', error.message); return { error: 'db_error' }; }
     if (!room) return { error: 'not_found' };

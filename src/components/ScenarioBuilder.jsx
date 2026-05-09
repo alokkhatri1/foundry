@@ -891,6 +891,8 @@ export default function ScenarioBuilder({
     ? 'Describe the case first — what one real situation are you working through?'
     : (incompleteReason || `Fill every step first (${completeCount}/${rows.length} complete)`);
 
+  const [runError, setRunError] = useState(null);
+
   async function handleRun() {
     console.log('[ScenarioBuilder] Run clicked', {
       canRun,
@@ -903,17 +905,25 @@ export default function ScenarioBuilder({
       rowStatuses: (rows || []).map(r => ({ type: r.type, complete: isRowComplete(r), step: (r.step || '').slice(0, 30) })),
       hasOnRunWorkflow: typeof onRunWorkflow === 'function',
     });
+    setRunError(null);
     if (!canRun) {
-      console.warn('[ScenarioBuilder] Run blocked — canRun is false', { runBlockedReason });
+      console.warn('[ScenarioBuilder] Run blocked', { runBlockedReason });
+      setRunError(runBlockedReason);
+      return;
+    }
+    if (typeof onRunWorkflow !== 'function') {
+      console.error('[ScenarioBuilder] onRunWorkflow is not a function');
+      setRunError('Run handler not wired — refresh the page and try again.');
       return;
     }
     setSending(true);
     try {
       console.log('[ScenarioBuilder] Calling onRunWorkflow...');
-      await onRunWorkflow?.(rows, caseInput);
+      await onRunWorkflow(rows, caseInput);
       console.log('[ScenarioBuilder] onRunWorkflow returned');
     } catch (err) {
       console.error('[ScenarioBuilder] onRunWorkflow threw', err);
+      setRunError(`Run failed: ${err?.message || String(err)}`);
     } finally {
       setSending(false);
     }
@@ -958,9 +968,8 @@ export default function ScenarioBuilder({
           </button>
           <button
             type="button"
-            className="cs-btn-dark"
+            className={`cs-btn-dark${canRun ? '' : ' is-blocked'}`}
             onClick={handleRun}
-            disabled={!canRun}
             title={canRun ? 'Run this workflow on the case above — flips you to Observability' : runBlockedReason}
           >
             <span className="cs-btn-dark-text">{sending || running ? 'Running…' : 'Run workflow'}</span>
@@ -982,6 +991,12 @@ export default function ScenarioBuilder({
           rows={3}
         />
       </section>
+
+      {runError && (
+        <div className="cs-run-error" role="alert">
+          {runError}
+        </div>
+      )}
 
       <div className="cs-status-row">
         <div className="cs-status-progress">

@@ -13570,6 +13570,23 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
   font-style: italic;
 }
 
+/* Inline run-blocked banner — surfaces the same reason a disabled-button
+   tooltip would have hidden, but visibly. */
+.cs-run-error {
+  padding: 12px 16px;
+  background: #fdf0f0;
+  border: 1px solid #e8c4c4;
+  color: #a04545;
+  border-radius: 6px;
+  font-size: 13px;
+  margin-bottom: 16px;
+}
+
+/* When the Run button can't actually fire we keep it clickable (so the
+   click handler shows an inline reason) but visually mark it so the user
+   knows it isn't ready. */
+.cs-btn-dark.is-blocked { opacity: 0.55; }
+
 /* Action row — paper "Show blueprint" + dark "Send to copilot" */
 .cs-page-actions {
   display: flex;

@@ -1356,24 +1356,22 @@ function App() {
       return;
     }
 
-    // Materialise coworker rows into real saved coworkers, like the old
-    // capstone-to-copilot path did — names auto-derived and uniquified
-    // against the existing library so the agent step's coworker reference
-    // is unambiguous and the participant has the coworkers in their tab
-    // afterward to inspect or reuse.
-    const usedNames = new Set((coworkers || []).map(c => (c.name || '').toLowerCase()).filter(Boolean));
-    const newCoworkers = [];
+    // Build an INLINE coworker per Coworker row — used by the executor for
+    // this run only. We deliberately don't save these into the Coworkers
+    // table: that would pollute the participant's library with a new row
+    // every Run click, and it would collapse the Stage 5 vs Stage 6
+    // distinction (Stage 5 is where you build coworkers; Stage 6 should
+    // use them, not silently mint more).
+    //
+    // The executor's agent path falls back through `step.coworker` first
+    // (embedded), then `step.coworkerId` lookup — so an inline-only
+    // coworker runs identically to a saved one for this step's purposes.
     const coworkerByRowId = new Map();
     for (const r of rows) {
       if (r.type !== 'coworker') continue;
-      const base = deriveCoworkerName(r.step) || 'Coworker';
-      let name = base;
-      let n = 2;
-      while (usedNames.has(name.toLowerCase())) { name = `${base} ${n}`; n++; }
-      usedNames.add(name.toLowerCase());
-      const id = 'cw-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6);
+      const name = deriveCoworkerName(r.step) || 'Coworker';
       const cw = {
-        id,
+        id: 'cw-inline-' + Math.random().toString(36).slice(2, 8),
         name,
         role: (r.step || '').trim(),
         avatar: 'icon:' + COWORKER_ICONS[Math.floor(Math.random() * COWORKER_ICONS.length)],
@@ -1384,10 +1382,8 @@ function App() {
         createdBy: userName,
         createdAt: Date.now(),
       };
-      newCoworkers.push(cw);
       coworkerByRowId.set(r.id, cw);
     }
-    if (newCoworkers.length) handleUpdateCoworkers([...(coworkers || []), ...newCoworkers]);
 
     // Build the workflow: trigger → step1 → step2 → ... — strictly linear,
     // edges chain forward only. The trigger holds the case input so the

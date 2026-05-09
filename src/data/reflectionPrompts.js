@@ -19,18 +19,18 @@ export const REFLECTION_STAGES = new Set(['3', '4', '5', '6', '7', '8']);
 
 export const REFLECTION_PROMPTS = {
   '3': {
-    label: 'Files as context',
-    anchor: 'You just handed the AI a file before asking your question and watched it pull from the contents in its answer. Files became its working memory for that conversation.',
-    scaled: 'How clearly do you understand how files act as context for the AI?',
-    note: 'In your own words: what does it mean to give the AI a file as context?',
-    habit: 'A small habit to make “give the AI a file first” your default this week?',
+    label: 'Files as skills',
+    anchor: 'You wrote an instruction file — a skill — and watched the AI follow it. You stopped describing what you wanted every time and started authoring how it should think.',
+    scaled: 'How clearly do you understand what a skill file does?',
+    note: 'In your own words: what does a skill file change about how you work with the AI?',
+    habit: 'A small experiment you’ll run this week to test a skill file in real work?',
   },
   '4': {
-    label: 'Files as skills',
-    anchor: 'You moved from giving the AI raw information to giving it instructions — a skill file telling it how to think about a task.',
-    scaled: 'How clearly do you understand the difference between a knowledge file and a skill file?',
-    note: 'In your own words: what does a skill file do that a knowledge file doesn’t?',
-    habit: 'A small experiment you’ll run this week to test a skill file in real work?',
+    label: 'Files as knowledge',
+    anchor: 'You handed the AI a knowledge file before asking your question and watched it pull from the contents. Documents became its working memory for the conversation.',
+    scaled: 'How clearly do you understand the difference between a skill file and a knowledge file?',
+    note: 'In your own words: what does a knowledge file do that a skill file doesn’t?',
+    habit: 'A small habit to make “give the AI a doc first” your default this week?',
   },
   '5': {
     label: 'AI Coworkers',

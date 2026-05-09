@@ -3245,9 +3245,12 @@ Answer in ONE sentence. If the user asks "how", a second sentence is allowed —
                 </div>
                 <div className="fl-page-legend">
                   <span className="fl-legend-item"><span className="fl-legend-swatch" style={{ background: '#d97757' }} /> Folder</span>
-                  <span className="fl-legend-item"><span className="fl-legend-swatch" style={{ background: '#5a9e6f' }} /> Knowledge</span>
-                  {stageReached(currentStage, '4') && (
+                  {/* Post-2026-05-09 swap: skills appear at Stage 3, knowledge at Stage 4. */}
+                  {stageReached(currentStage, '3') && (
                     <span className="fl-legend-item"><span className="fl-legend-swatch" style={{ background: '#4a7fb5' }} /> Skills</span>
+                  )}
+                  {stageReached(currentStage, '4') && (
+                    <span className="fl-legend-item"><span className="fl-legend-swatch" style={{ background: '#5a9e6f' }} /> Knowledge</span>
                   )}
                 </div>
               </header>

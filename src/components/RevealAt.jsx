@@ -44,8 +44,8 @@ export function nextStage(currentStage) {
 export const STAGE_META = {
   '1': { label: 'Chat',             description: 'Go say hi to the humans in the room, {name} — and try a chat with the AI too.' },
   '2': { label: 'Preferences',      description: 'Alright {name} — time to tell the AI who you are and how you like to work.' },
-  '3': { label: 'Files as context', description: 'Okay {name}, now you can hand it files to read before it answers you.' },
-  '4': { label: 'Files as skills',  description: 'Going deeper, {name}. Write instructions that shape how the AI thinks.' },
+  '3': { label: 'Files as skills',     description: 'Time to author behavior, {name} — write instruction files that shape how the AI thinks.' },
+  '4': { label: 'Files as knowledge',  description: 'Now hand the AI documents to read before it answers — your knowledge becomes its working memory.' },
   '5': { label: 'AI Coworkers',     description: 'Let’s build your team, {name} — named AI teammates with skills, knowledge, and a voice.' },
   '6': { label: 'Orchestration',    description: 'Now choreograph it, {name} — chain coworkers and humans into a workflow with human-in-loop checks.' },
   '7': { label: 'Observability',    description: 'Watch the mixed team work, {name} — every run, approval, and tool call on the record.' },

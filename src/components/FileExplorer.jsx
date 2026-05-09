@@ -147,7 +147,8 @@ export default function FileExplorer({ fileTree, selectedFileId, onSelectFile, o
   // a workspace. Block creation, upload, and AI-draft entry points when
   // any ancestor in the breadcrumb is system-owned.
   const insideExample = breadcrumb.some(n => n.createdBy === 'System');
-  const skillsRevealed = stageReached(currentStage, '4');
+  // Skills reveal at Stage 3 in the post-2026-05-09 swap (was Stage 4).
+  const skillsRevealed = stageReached(currentStage, '3');
   // The example references folder (a canonical workflow file) is only
   // revealed once the copilot is unlocked at Stage 9 (after Capstone).
   // Hidden before that even if it exists in the data.

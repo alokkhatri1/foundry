@@ -15,14 +15,14 @@ const STAGE_GUIDES = {
     externalReference: 'This is the same idea as "Custom Instructions" in ChatGPT or "About me" in Claude — personal context.',
   },
   '3': {
-    nowAvailable: 'Files — a shared document library (Files tab in the header; also a Files section in the sidebar).',
-    invitation: 'Invite them to attach a file to the chat as context. Explain that you\'ll ground your answers in what they give you.',
-    externalReference: 'Similar to how Notion, Obsidian, or Google Drive share knowledge — here it\'s knowledge you can reference.',
+    nowAvailable: 'Files — a shared library where they can author SKILL files (instructions) that shape how you respond. A skill toggle appears on each attached file chip.',
+    invitation: 'Invite them to write a short instruction file (e.g., "summarize responses in 3 bullet points") and attach it as a skill. Explain that skills shape HOW you behave on the next reply.',
+    externalReference: 'This is how Custom GPTs\' instructions work under the hood. Skill files shape HOW you respond, not WHAT you know.',
   },
   '4': {
-    nowAvailable: 'Files can now be attached as skills (instructions), not just context (knowledge). A small context/skill toggle appears on each attached file chip.',
-    invitation: 'Invite them to try writing an instruction file (e.g., "summarize responses in 3 bullet points") and toggle it as a skill.',
-    externalReference: 'This is how Custom GPTs\' instructions work under the hood. Skill files shape HOW you respond, not WHAT you know.',
+    nowAvailable: 'Knowledge files now too — they can attach documents as knowledge (read-once context) alongside the skill files from Stage 3. A small skill/knowledge toggle appears on each attached file chip.',
+    invitation: 'Invite them to attach a document as knowledge. Explain that you\'ll ground your answers in what they give you, while the skill files keep shaping your style.',
+    externalReference: 'Similar to how Notion, Obsidian, or Google Drive share knowledge — here it\'s knowledge you can reference.',
   },
   '5': {
     nowAvailable: 'AI Coworkers — they can build named AI teammates with their own instructions (skills), knowledge files, and identity (Coworkers tab in the header). A coworker is skills + knowledge + persona, full stop; producing artifacts and acting on the world is what Stage 6 (Orchestration) adds on top.',

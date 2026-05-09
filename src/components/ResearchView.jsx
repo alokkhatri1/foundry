@@ -17,8 +17,8 @@ import { useMemo, useState } from 'react';
 const STAGE_META = [
   { id: '1', label: 'Chat',                    short: 'S1' },
   { id: '2', label: 'Preferences',             short: 'S2' },
-  { id: '3', label: 'Files as context',        short: 'S3' },
-  { id: '4', label: 'Files as skills',         short: 'S4' },
+  { id: '3', label: 'Files as skills',         short: 'S3' },
+  { id: '4', label: 'Files as knowledge',      short: 'S4' },
   { id: '5', label: 'Coworkers',               short: 'S5' },
   { id: '6', label: 'Orchestration',           short: 'S6' },
   { id: '7', label: 'Observability',           short: 'S7' },
@@ -364,13 +364,13 @@ function StagePanel({ stageId, participant, data, derived }) {
     case '2': return <PreferencesPanel prefs={prefsByPid[pid]} />;
     case '3': {
       const own = files.filter(f => f.created_by === name && f.type === 'file');
-      const knowledge = own.filter(f => pathFor(f.id).some(seg => seg === 'knowledge'));
-      return <FilesPanel files={knowledge} kind="knowledge" />;
+      const skills = own.filter(f => pathFor(f.id).some(seg => seg === 'skills'));
+      return <FilesPanel files={skills} kind="skills" />;
     }
     case '4': {
       const own = files.filter(f => f.created_by === name && f.type === 'file');
-      const skills = own.filter(f => pathFor(f.id).some(seg => seg === 'skills'));
-      return <FilesPanel files={skills} kind="skills" />;
+      const knowledge = own.filter(f => pathFor(f.id).some(seg => seg === 'knowledge'));
+      return <FilesPanel files={knowledge} kind="knowledge" />;
     }
     case '5': {
       const ownCw = coworkers.filter(c => c.created_by === name);

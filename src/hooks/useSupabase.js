@@ -14,7 +14,8 @@ import {
 
 // ===== Per-stage example seeding =====
 // Each stage reveals a layer of the canonical "Credit Review" example —
-// Stage 3 lands the knowledge files, Stage 4 the skill files, Stage 5 the
+// Stage 3 lands the SKILL files (authored behaviour comes first), Stage 4
+// the KNOWLEDGE files (domain context layered on top), Stage 5 the
 // coworkers (which now have valid file refs), Stage 6 the workflow that
 // chains those coworkers with two human review steps. Idempotent: every
 // row uses upsert(onConflict: 'id') so a re-reveal or revealAll that
@@ -24,28 +25,28 @@ async function seedStageExamples(roomId, toStage) {
   const stageStr = String(toStage);
 
   if (stageStr === '3') {
-    // Examples/ root + knowledge subfolder + the two knowledge files.
-    // Skills subfolder is intentionally deferred to stage 4 so the
-    // structure reveals progressively.
+    // Examples/ root + skills subfolder + the two skill files. Knowledge
+    // subfolder is intentionally deferred to stage 4 so the structure
+    // reveals progressively (skills first under the post-2026-05-09 swap).
+    const { folders, skills } = createExampleFiles(roomId);
+    const rootFolder = folders.find(f => f.id === EXAMPLE_FOLDER_ID);
+    const skillsFolder = folders.find(f => f.id === EXAMPLE_SKILLS_FOLDER_ID);
+    const rows = [rootFolder, skillsFolder, ...skills].filter(Boolean);
+    const { error } = await supabase.from('files').upsert(rows, { onConflict: 'id' });
+    if (error) console.error('[sb] seedStageExamples(3):', error.message);
+    return;
+  }
+
+  if (stageStr === '4') {
+    // Knowledge subfolder + the two knowledge files. The Examples/ folder
+    // root is upserted again as a safety net for late-revealed stage 4 in
+    // a workshop where stage 3 was somehow skipped.
     const { folders, knowledge } = createExampleFiles(roomId);
     const folderRows = folders.filter(f => f.id !== EXAMPLE_SKILLS_FOLDER_ID);
     const { error } = await supabase.from('files').upsert(
       [...folderRows, ...knowledge],
       { onConflict: 'id' }
     );
-    if (error) console.error('[sb] seedStageExamples(3):', error.message);
-    return;
-  }
-
-  if (stageStr === '4') {
-    // Skills subfolder + the two skill files. The Examples/ folder
-    // root is upserted again as a safety net for late-revealed stage
-    // 4 in a workshop where stage 3 was somehow skipped.
-    const { folders, skills } = createExampleFiles(roomId);
-    const skillsFolder = folders.find(f => f.id === EXAMPLE_SKILLS_FOLDER_ID);
-    const rootFolder = folders.find(f => f.id === EXAMPLE_FOLDER_ID);
-    const rows = [rootFolder, skillsFolder, ...skills].filter(Boolean);
-    const { error } = await supabase.from('files').upsert(rows, { onConflict: 'id' });
     if (error) console.error('[sb] seedStageExamples(4):', error.message);
     return;
   }
@@ -64,19 +65,9 @@ async function seedStageExamples(roomId, toStage) {
     return;
   }
 
-  if (stageStr === '8') {
-    // Capstone reveal — drop the Blueprints subfolder and the seeded
-    // blueprint.md so the Capstone tab's "Show blueprint" drawer has
-    // something to read from. Examples/ root re-upserted as a safety net
-    // in case the room never reached stages 3-4 (deprecated/cloned).
-    const { folders, blueprints } = createExampleFiles(roomId);
-    const blueprintsFolder = folders.find(f => f.id === EXAMPLE_BLUEPRINTS_FOLDER_ID);
-    const rootFolder = folders.find(f => f.id === EXAMPLE_FOLDER_ID);
-    const rows = [rootFolder, blueprintsFolder, ...blueprints].filter(Boolean);
-    const { error } = await supabase.from('files').upsert(rows, { onConflict: 'id' });
-    if (error) console.error('[sb] seedStageExamples(8):', error.message);
-    return;
-  }
+  // Stage 8 used to seed Capstone blueprints when 8 was Capstone. Since
+  // the 9-stage renumber on 2026-05-09 stage 8 is Economics — no example
+  // seeding needed.
 }
 
 export default function useSupabase() {

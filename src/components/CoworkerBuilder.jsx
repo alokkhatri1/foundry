@@ -199,7 +199,8 @@ function CreateFileConfig({ fileTree, currentStage, config, onChange }) {
   const topFolders = (fileTree?.children || []).filter(c => c.type === 'folder');
   const folderId = config?.folderId || '';
   const subfolder = config?.subfolder || 'knowledge';
-  const skillsAvailable = stageReached(currentStage, '4');
+  // Skills attachable from Stage 3 onward in the post-2026-05-09 swap.
+  const skillsAvailable = stageReached(currentStage, '3');
 
   return (
     <div className="cwb-tool-config">

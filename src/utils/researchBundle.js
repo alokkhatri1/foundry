@@ -269,6 +269,27 @@ function renderParticipant(p, data, pathFor) {
   return lines.join('\n');
 }
 
+// One participant's section as a standalone Markdown doc — used both by
+// the cohort export (concatenated under a workshop-level header) and by
+// the per-participant download button on the detail header.
+export function buildParticipantMarkdown(participant, data, { workshopCode, orgName } = {}) {
+  const pathFor = pathLookup(data.files);
+  const header = [
+    `# ${participant.name}`,
+    '',
+    `- **Workshop**: ${orgName || 'workshop'}${workshopCode ? ` (${workshopCode})` : ''}`,
+    `- **Generated**: ${fmtTime(new Date())}`,
+    '',
+    '---',
+    '',
+  ].join('\n');
+  // renderParticipant emits its own H1 for the cohort export; for the
+  // per-participant doc we want the H1 above (with the workshop context),
+  // so strip the leading H1 line off renderParticipant's output.
+  const body = renderParticipant(participant, data, pathFor).replace(/^#[^\n]*\n/, '');
+  return header + body + '\n';
+}
+
 export function buildResearchMarkdown(data, { workshopCode, orgName }) {
   const pathFor = pathLookup(data.files);
   const humans = data.participants
@@ -290,15 +311,33 @@ export function buildResearchMarkdown(data, { workshopCode, orgName }) {
   return header + body + '\n';
 }
 
-export function downloadResearchBundle(data, meta) {
-  const text = buildResearchMarkdown(data, meta);
+function nameSlug(name) {
+  return (name || 'participant')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 40) || 'participant';
+}
+
+function triggerDownload(text, filename) {
   const blob = new Blob([text], { type: 'text/markdown' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = `foundry-research-${meta.workshopCode || 'workshop'}-${fmtDate(new Date())}.md`;
+  a.download = filename;
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
+}
+
+export function downloadResearchBundle(data, meta) {
+  const text = buildResearchMarkdown(data, meta);
+  triggerDownload(text, `foundry-research-${meta.workshopCode || 'workshop'}-${fmtDate(new Date())}.md`);
+}
+
+export function downloadParticipantNotes(participant, data, meta) {
+  const text = buildParticipantMarkdown(participant, data, meta);
+  const slug = nameSlug(participant.name);
+  triggerDownload(text, `foundry-research-${meta.workshopCode || 'workshop'}-${slug}-${fmtDate(new Date())}.md`);
 }

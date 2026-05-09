@@ -397,7 +397,7 @@ function StagePanel({ stageId, participant, data, derived }) {
 
 // ---- By-participant view ----
 
-function ByParticipantView({ data, derived, selectedPid, onSelectPid, expandedStage, onToggleStage }) {
+function ByParticipantView({ data, derived, selectedPid, onSelectPid, expandedStage, onToggleStage, onDownloadParticipant }) {
   const humans = useMemo(
     () => data.participants.filter(p => (p.kind || 'human') === 'human').sort((a, b) => a.name.localeCompare(b.name)),
     [data.participants],
@@ -431,6 +431,14 @@ function ByParticipantView({ data, derived, selectedPid, onSelectPid, expandedSt
                 <h3>{sel.name}</h3>
                 {sel.email && <div className="rv-detail-email">{sel.email}</div>}
               </div>
+              {onDownloadParticipant && (
+                <button
+                  type="button"
+                  className="rv-export"
+                  onClick={() => onDownloadParticipant(sel)}
+                  title="Download this participant's notes as Markdown"
+                >Download notes (.md)</button>
+              )}
             </header>
             <div className="rv-stages">
               {STAGE_META.map(s => {
@@ -498,7 +506,7 @@ function ByStageView({ data, derived, selectedStage, onSelectStage }) {
 
 // ---- Top-level ----
 
-export default function ResearchView({ data, loading, onDownloadBundle }) {
+export default function ResearchView({ data, loading, onDownloadBundle, onDownloadParticipant }) {
   const [axis, setAxis] = useState('participant');
   const [selectedPid, setSelectedPid] = useState(null);
   const [expandedStage, setExpandedStage] = useState('1');
@@ -523,11 +531,11 @@ export default function ResearchView({ data, loading, onDownloadBundle }) {
           <button type="button" className={`rv-axis-btn${axis === 'participant' ? ' is-active' : ''}`} onClick={() => setAxis('participant')}>By participant</button>
           <button type="button" className={`rv-axis-btn${axis === 'stage' ? ' is-active' : ''}`} onClick={() => setAxis('stage')}>By stage</button>
         </div>
-        <button type="button" className="rv-export" onClick={onDownloadBundle}>Download research notes (.md)</button>
+        <button type="button" className="rv-export" onClick={onDownloadBundle}>Download all (.md)</button>
       </div>
 
       {axis === 'participant'
-        ? <ByParticipantView data={data} derived={derived} selectedPid={selectedPid} onSelectPid={setSelectedPid} expandedStage={expandedStage} onToggleStage={setExpandedStage} />
+        ? <ByParticipantView data={data} derived={derived} selectedPid={selectedPid} onSelectPid={setSelectedPid} expandedStage={expandedStage} onToggleStage={setExpandedStage} onDownloadParticipant={onDownloadParticipant} />
         : <ByStageView data={data} derived={derived} selectedStage={selectedStage} onSelectStage={setSelectedStage} />
       }
     </div>

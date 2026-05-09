@@ -4,7 +4,7 @@ import { useConfirm } from './ConfirmDialog';
 import { computeScorecard, LEVELS, LEVEL_COLORS } from '../utils/graduationScorecard';
 import { buildTree } from '../utils/treeUtils';
 import ResearchView from './ResearchView';
-import { downloadResearchBundle } from '../utils/researchBundle';
+import { downloadResearchBundle, downloadParticipantNotes } from '../utils/researchBundle';
 
 // Per-participant credit allocation editor. Small inline row above the
 // stage list — big enough to notice, small enough not to steal focus from
@@ -444,6 +444,15 @@ export default function AdminDashboard({ sb, user, onBack, onEnterWorkshop }) {
   function handleDownloadResearchBundle() {
     if (!researchData || !selected) return;
     downloadResearchBundle(researchData, {
+      workshopId: selected.id,
+      workshopCode: selected.code,
+      orgName: selected.org_name,
+    });
+  }
+
+  function handleDownloadParticipantNotes(participant) {
+    if (!researchData || !selected || !participant) return;
+    downloadParticipantNotes(participant, researchData, {
       workshopId: selected.id,
       workshopCode: selected.code,
       orgName: selected.org_name,
@@ -900,6 +909,7 @@ export default function AdminDashboard({ sb, user, onBack, onEnterWorkshop }) {
                     data={researchData}
                     loading={researchLoading}
                     onDownloadBundle={handleDownloadResearchBundle}
+                    onDownloadParticipant={handleDownloadParticipantNotes}
                   />
                 </div>
               )}

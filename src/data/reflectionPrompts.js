@@ -40,14 +40,14 @@ export const REFLECTION_PROMPTS = {
     habit: 'A moment in your week you’ll try delegating something to an AI coworker?',
   },
   '6': {
-    label: 'Orchestration',
+    label: 'Workflow',
     anchor: 'You composed multiple coworkers and a human review into a workflow — choreographing a small mixed team to handle one job end-to-end.',
     scaled: 'How clearly do you understand how a workflow chains coworkers and human steps?',
     note: 'In your own words: why would a workflow include a human review step?',
     habit: 'A workflow at work you’ll sketch out this week as a chain of AI + human steps?',
   },
   '7': {
-    label: 'Observability',
+    label: 'Audit',
     anchor: 'You watched a workflow run play out — every step, every approval, every tool call on the record.',
     scaled: 'How clearly do you understand what a run log tells you?',
     note: 'In your own words: what does observability give you that a normal chat doesn’t?',

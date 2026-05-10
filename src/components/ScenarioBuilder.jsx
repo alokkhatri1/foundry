@@ -1045,13 +1045,13 @@ export default function ScenarioBuilder({
       <header className="cs-page-head">
         <div className="cs-page-head-text">
           <div className="cs-eyebrow">
-            <span className="cs-eyebrow-dot" aria-hidden />STAGE 6 · ORCHESTRATION
+            <span className="cs-eyebrow-dot" aria-hidden />STAGE 6 · WORKFLOW
           </div>
           <h2 className="cs-page-title">
             Pick one real case,&nbsp;<em>build the workflow that handles it</em>.
           </h2>
           <p className="cs-page-sub">
-            Describe the case below. Then chain coworkers and human reviewers in order. Hit Run and you'll watch it play out in Observability.
+            Describe the case below. Then chain coworkers and human reviewers in order. Hit Run and you'll watch it play out in Audit.
           </p>
         </div>
         <div className="cs-page-actions">
@@ -1073,7 +1073,7 @@ export default function ScenarioBuilder({
             type="button"
             className={`cs-btn-dark${canRun ? '' : ' is-blocked'}`}
             onClick={handleRun}
-            title={canRun ? 'Run this workflow on the case above — flips you to Observability' : runBlockedReason}
+            title={canRun ? 'Run this workflow on the case above — flips you to Audit' : runBlockedReason}
           >
             <span className="cs-btn-dark-text">{sending || running ? 'Running…' : 'Run workflow'}</span>
             <span className="cs-btn-dark-arrow" aria-hidden>→</span>

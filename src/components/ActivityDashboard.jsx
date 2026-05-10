@@ -662,7 +662,7 @@ export default function ActivityDashboard({ workflowRuns, onApprovalAction, onCa
     <div className="ob-page">
       <header className="ob-page-head">
         <div className="ob-page-head-left">
-          <div className="ob-page-eyebrow">Stage 7 · Observability</div>
+          <div className="ob-page-eyebrow">Stage 7 · Audit</div>
           <h1 className="ob-page-title">Everything your mixed team did, <em>on the record</em>.</h1>
           <p className="ob-page-sub">
             Each run is an artifact; each decision is logged.
@@ -689,7 +689,7 @@ export default function ActivityDashboard({ workflowRuns, onApprovalAction, onCa
         {workflowRuns.length === 0 && (
           <div className="ob-empty">
             <p className="ob-empty-title">No runs yet</p>
-            <p className="ob-empty-desc">Go to Orchestration and click Run on a workflow. Active runs land here, visible to everyone in the room.</p>
+            <p className="ob-empty-desc">Go to Workflow and click Run on one. Active runs land here, visible to everyone in the room.</p>
           </div>
         )}
 

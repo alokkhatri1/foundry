@@ -20,8 +20,8 @@ const STAGE_META = [
   { id: '3', label: 'Files as skills',         short: 'S3' },
   { id: '4', label: 'Files as knowledge',      short: 'S4' },
   { id: '5', label: 'Coworkers',               short: 'S5' },
-  { id: '6', label: 'Orchestration',           short: 'S6' },
-  { id: '7', label: 'Observability',           short: 'S7' },
+  { id: '6', label: 'Workflow',                short: 'S6' },
+  { id: '7', label: 'Audit',                   short: 'S7' },
   { id: '8', label: 'Economics',               short: 'S8' },
   { id: '9', label: 'Reflections',             short: 'S9' },
 ];

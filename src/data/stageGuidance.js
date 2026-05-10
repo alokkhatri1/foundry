@@ -25,17 +25,17 @@ const STAGE_GUIDES = {
     externalReference: 'Similar to how Notion, Obsidian, or Google Drive share knowledge — here it\'s knowledge you can reference.',
   },
   '5': {
-    nowAvailable: 'AI Coworkers — they can build named AI teammates with their own instructions (skills), knowledge files, and identity (Coworkers tab in the header). A coworker is skills + knowledge + persona, full stop; producing artifacts and acting on the world is what Stage 6 (Orchestration) adds on top.',
+    nowAvailable: 'AI Coworkers — they can build named AI teammates with their own instructions (skills), knowledge files, and identity (Coworkers tab in the header). A coworker is skills + knowledge + persona, full stop; producing artifacts and acting on the world is what Stage 6 (Workflow) adds on top.',
     invitation: 'Invite them to build their first coworker. A credit analyst, a legal reviewer, a creative partner — whatever fits their work. Encourage them to think of it as packaging a way of thinking, not as a do-it-all bot.',
     externalReference: 'Like Custom GPTs or Claude Projects — bundled specialists. Same primitive you already know, just with a shared organizational context the room can see.',
   },
   '6': {
-    nowAvailable: 'Orchestration — chain AI coworkers and human approval steps into a multi-step workflow. Each coworker step processes upstream output with its knowledge + instructions; each human step reviews and either approves (flow continues) or rejects with feedback (flow halts and bounces back to the previous human step for revision). This is also where coworkers stop just responding and start producing artifacts — each step can save its output to the team workspace.',
+    nowAvailable: 'Workflow — chain AI coworkers and human approval steps into a multi-step workflow. Each coworker step processes upstream output with its knowledge + instructions; each human step reviews and either approves (flow continues) or rejects with feedback (flow halts and bounces back to the previous human step for revision). This is also where coworkers stop just responding and start producing artifacts — each step can save its output to the team workspace.',
     invitation: 'Invite them to chain the coworker primitive they just felt — put a coworker, then a reviewer, then another coworker, then another reviewer. Run it. See a mixed team produce one outcome through several hands, with artifacts landing in Files for everyone to read.',
     externalReference: 'Same primitive as Temporal, n8n, or Zapier — but with AI coworkers as first-class steps and humans pausing the flow for review.',
   },
   '7': {
-    nowAvailable: 'Observability — your team\'s queryable record. Every workflow run, approval, and tool call your mixed team produced is now legible to AI and to every participant in the room. This is what makes the closed loop possible: nothing important happens off-record.',
+    nowAvailable: 'Audit — your team\'s queryable record. Every workflow run, approval, and tool call your mixed team produced is now legible to AI and to every participant in the room. This is what makes the closed loop possible: nothing important happens off-record.',
     invitation: 'Invite them to look at what\'s already happened in the workshop — the runs, the approvals they gave, the tools that fired. The framing isn\'t just accountability; it\'s that this record is what makes the next workflow smarter. Their coworkers can read it. They can read it. The substrate just got richer.',
     externalReference: 'Same role as Datadog, OpenTelemetry, or Grafana in a software system — but for a team of humans and agents working together. The deeper analogy is Diana Hu\'s "queryable organization": every important action produces an artifact the AI at the centre of the company can learn from.',
   },

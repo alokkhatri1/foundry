@@ -46,8 +46,8 @@ export const STAGE_META = {
   '3': { label: 'Files as skills',  description: 'Time to author behavior, {name} — write instruction files that shape how the AI thinks.' },
   '4': { label: 'Files as knowledge', description: 'Now hand the AI documents to read before it answers — your knowledge becomes its working memory.' },
   '5': { label: 'AI Coworkers',     description: 'Let’s build your team, {name} — named AI teammates with skills, knowledge, and a voice.' },
-  '6': { label: 'Orchestration',    description: 'Now choreograph it, {name} — chain coworkers and humans into a workflow with human-in-loop checks.' },
-  '7': { label: 'Observability',    description: 'Watch the mixed team work, {name} — every run, approval, and tool call on the record.' },
+  '6': { label: 'Workflow',         description: 'Now choreograph it, {name} — chain coworkers and humans into a workflow with human-in-loop checks.' },
+  '7': { label: 'Audit',            description: 'Watch the mixed team work, {name} — every run, approval, and tool call on the record.' },
   '8': { label: 'Economics',        description: 'Time to see the bill, {name} — every token your team spent is on the record now.' },
   '9': { label: 'Graduation',       description: 'Here’s a read of what you built, {name} — your competency scorecard across everything we just did together.' },
 };

@@ -715,21 +715,15 @@ function BlueprintDrawer({ open, onClose, blueprint }) {
   );
 }
 
-// caseInput rides on the same capstone_drafts JSONB column as a sentinel
-// row so we don't need a schema change. Distinguishable by id prefix.
+// Legacy: older drafts saved a case-input sentinel row inside the rows
+// JSONB. The case input was retired — workflow name now plays both
+// roles ("what this is" and "what to chew on"). We strip the sentinel
+// on load so it doesn't pollute the step list, and we never inject it
+// on save anymore.
 const CASE_INPUT_ID = '__case_input__';
-function extractCaseInput(rows) {
-  if (!Array.isArray(rows)) return '';
-  const r = rows.find(x => x && x.id === CASE_INPUT_ID);
-  return r ? (r.caseInput || '') : '';
-}
 function stripCaseInput(rows) {
   if (!Array.isArray(rows)) return [];
   return rows.filter(x => !x || x.id !== CASE_INPUT_ID);
-}
-function injectCaseInput(rows, caseInput) {
-  const without = stripCaseInput(rows);
-  return [{ id: CASE_INPUT_ID, caseInput: caseInput || '' }, ...without];
 }
 
 export default function ScenarioBuilder({
@@ -745,7 +739,6 @@ export default function ScenarioBuilder({
   const [activeDraftId, setActiveDraftId] = useState(null);
   const [rows, setRows] = useState(null);
   const [workflowName, setWorkflowName] = useState('');
-  const [caseInput, setCaseInput] = useState('');
   const [saving, setSaving] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [lastSavedAt, setLastSavedAt] = useState(null);
@@ -776,9 +769,7 @@ export default function ScenarioBuilder({
     const restoreFromLocal = () => {
       const local = loadLocalCapstoneDraft(myParticipantId);
       if (Array.isArray(local) && local.length > 0) {
-        const ci = extractCaseInput(local);
         const realRows = stripCaseInput(local);
-        setCaseInput(ci);
         setRows(realRows.length > 0 ? realRows.map(migrateRow) : [newRow()]);
       } else {
         setRows([newRow()]);
@@ -794,9 +785,7 @@ export default function ScenarioBuilder({
       const first = list[0];
       skipNextSaveRef.current = true;
       setActiveDraftId(first.id);
-      const ci = extractCaseInput(first.rows);
       const realRows = stripCaseInput(first.rows);
-      setCaseInput(ci);
       setWorkflowName(first.name || '');
       setRows(realRows.length > 0 ? realRows.map(migrateRow) : [newRow()]);
     }).catch(() => { if (!cancelled) restoreFromLocal(); });
@@ -861,7 +850,7 @@ export default function ScenarioBuilder({
       skipNextSaveRef.current = false;
       return;
     }
-    const blob = injectCaseInput(rows, caseInput);
+    const blob = stripCaseInput(rows);
     saveLocalCapstoneDraft(myParticipantId, blob);
     const handle = setTimeout(async () => {
       setSaving(true);
@@ -885,7 +874,7 @@ export default function ScenarioBuilder({
       }
     }, 800);
     return () => clearTimeout(handle);
-  }, [rows, caseInput, workflowName, sb, myParticipantId, activeDraftId]);
+  }, [rows, workflowName, sb, myParticipantId, activeDraftId]);
 
   function handleSwitchDraft(draftId) {
     if (draftId === activeDraftId) return;
@@ -893,9 +882,7 @@ export default function ScenarioBuilder({
     if (!target) return;
     skipNextSaveRef.current = true;
     setActiveDraftId(draftId);
-    const ci = extractCaseInput(target.rows);
     const realRows = stripCaseInput(target.rows);
-    setCaseInput(ci);
     setWorkflowName(target.name || '');
     setRows(realRows.length > 0 ? realRows.map(migrateRow) : [newRow()]);
     setCollapsed({});
@@ -904,7 +891,6 @@ export default function ScenarioBuilder({
   function handleNewDraft() {
     skipNextSaveRef.current = false; // let the empty-state save create the row
     setActiveDraftId(null);
-    setCaseInput('');
     setWorkflowName('');
     setRows([newRow()]);
     setCollapsed({});
@@ -957,16 +943,13 @@ export default function ScenarioBuilder({
     return me ? [me] : [];
   }, [participants, myParticipantId, currentUserName]);
 
-  // Run gate: a workflow name AND a case must be declared, AND every step
-  // must be complete. The name is what the workflow IS; the case is what
-  // it handles this time. Both are required before Run.
+  // Run gate: a workflow name must be declared and every step must be
+  // complete. The name plays both roles — what the workflow is AND what
+  // its coworkers chew on (the executor receives it as the case input).
   const nameReady = (workflowName || '').trim().length > 0;
-  const caseReady = (caseInput || '').trim().length > 0;
-  const canRun = nameReady && caseReady && allComplete && !sending && !running;
+  const canRun = nameReady && allComplete && !sending && !running;
   const runBlockedReason = !nameReady
     ? 'Name the workflow first — what is this thing called?'
-    : !caseReady
-    ? 'Describe the case first — what one real situation are you working through?'
     : (incompleteReason || `Fill every step first (${completeCount}/${rows.length} complete)`);
 
   const [runError, setRunError] = useState(null);
@@ -974,11 +957,11 @@ export default function ScenarioBuilder({
   async function handleRun() {
     console.log('[ScenarioBuilder] Run clicked', {
       canRun,
-      caseReady,
+      nameReady,
       allComplete,
       sending,
       running,
-      caseInputLen: (caseInput || '').length,
+      workflowNameLen: (workflowName || '').length,
       rowCount: (rows || []).length,
       rowStatuses: (rows || []).map(r => ({ type: r.type, complete: isRowComplete(r), step: (r.step || '').slice(0, 30) })),
       hasOnRunWorkflow: typeof onRunWorkflow === 'function',
@@ -997,7 +980,12 @@ export default function ScenarioBuilder({
     setSending(true);
     try {
       console.log('[ScenarioBuilder] Calling onRunWorkflow...');
-      await onRunWorkflow(rows, caseInput, workflowName.trim());
+      // Workflow name doubles as the case input the executor receives —
+      // the case-input field was retired in favour of using the name as
+      // the anchor for both the workflow's identity and its coworkers'
+      // input.
+      const trimmedName = workflowName.trim();
+      await onRunWorkflow(rows, trimmedName, trimmedName);
       console.log('[ScenarioBuilder] onRunWorkflow returned');
     } catch (err) {
       console.error('[ScenarioBuilder] onRunWorkflow threw', err);
@@ -1102,22 +1090,8 @@ export default function ScenarioBuilder({
           className="cs-name-input-textarea"
           value={workflowName}
           onChange={e => setWorkflowName(e.target.value)}
-          placeholder="e.g. Credit risk review · Customer onboarding · Loan exception triage"
+          placeholder="e.g. Credit risk review for John Doe · Loan exception #1234"
           maxLength={120}
-        />
-      </section>
-
-      <section className="cs-case-input">
-        <label className="cs-case-input-label" htmlFor="cs-case-input">
-          The case you're working through
-        </label>
-        <textarea
-          id="cs-case-input"
-          className="cs-case-input-textarea"
-          value={caseInput}
-          onChange={e => setCaseInput(e.target.value)}
-          placeholder="One real situation from your work. The more specific, the more useful — your coworkers will see this verbatim as their input."
-          rows={3}
         />
       </section>
 

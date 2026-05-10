@@ -306,7 +306,7 @@ export default function DemographicsForm({ onSubmit, submitting, errorMessage, u
           <p className="sv-sub">
             Eight short questions — about a minute. We use these to make
             sense of how different roles and starting points experience
-            the workshop. You can&rsquo;t open Chat until you submit.
+            the workshop.
           </p>
         </header>
 

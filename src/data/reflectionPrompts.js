@@ -30,7 +30,7 @@ export const REFLECTION_PROMPTS = {
     anchor: 'You handed the AI a knowledge file before asking your question and watched it pull from the contents. Documents became its working memory for the conversation.',
     scaled: 'How clearly do you understand the difference between a skill file and a knowledge file?',
     note: 'In your own words: what does a knowledge file do that a skill file doesn’t?',
-    habit: 'A real document at work you’ll start attaching to your AI conversations this week, instead of explaining it from scratch every time?',
+    habit: 'What’s a real document at work you’ll start attaching to your AI conversations this week, instead of explaining it from scratch every time?',
   },
   '5': {
     label: 'AI Coworkers',

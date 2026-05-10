@@ -58,6 +58,6 @@ export const REFLECTION_PROMPTS = {
     anchor: 'You saw the bill — the actual token cost of every AI conversation, run, and coworker your team consumed.',
     scaled: 'How clearly do you understand what drives token cost in an AI workflow?',
     note: 'In your own words: what makes one workflow more expensive than another?',
-    habit: 'A habit you’ll start to keep AI costs in check?',
+    habit: 'A habit you’ll start to better understand what each AI conversation, coworker, and run is actually costing — so you can spend with intent, not by accident?',
   },
 };

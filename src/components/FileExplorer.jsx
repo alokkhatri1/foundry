@@ -255,6 +255,19 @@ export default function FileExplorer({ fileTree, selectedFileId, onSelectFile, o
         && (!c.children || c.children.length === 0)) return false;
     return true;
   });
+  // Skills before Knowledge to match the stage-reveal order (Stage 3
+  // skills, then Stage 4 knowledge). Other folders keep their insertion
+  // order via Array.sort's stability — non-skills/knowledge entries all
+  // share the same sort key.
+  items.sort((a, b) => {
+    const order = (item) => {
+      if (item.type !== 'folder') return 2;
+      if (item.name === 'skills') return 0;
+      if (item.name === 'knowledge') return 1;
+      return 2;
+    };
+    return order(a) - order(b);
+  });
   const isKnowledgeFolder = currentFolder.name === 'knowledge';
   const isSkillsFolder = currentFolder.name === 'skills';
 

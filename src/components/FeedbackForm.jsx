@@ -1,25 +1,29 @@
 import { useMemo, useState } from 'react';
 
-// Pre-graduation feedback survey. Trimmed to a five-question wrap-up —
-// per-primitive learning ratings live in the per-stage reflections now,
-// so this final form only captures what those can't:
+// Pre-graduation feedback survey. Per-primitive learning ratings live
+// in the per-stage reflections, so this final form captures only what
+// those can't — separating trainer skill from workshop content quality:
 //
-//   1. would_recommend  — yes/no, the headline NPS-style signal
-//   2. trainer          — 1-5 composite of pacing, clarity, energy
-//   3. pace             — too_slow / just_right / too_fast
-//   4. most_valuable    — free text, single most valuable part
-//   5. improvement_notes — free text, one specific change for next time
+//   1. would_recommend   — yes/no, the headline NPS-style signal
+//   2. trainer_clarity   — 1-5, trainer's content clarity
+//   3. trainer_pacing    — 1-5, trainer's pacing
+//   4. workshop_content  — 1-5, the workshop's content quality itself
+//   5. most_valuable     — free text, single most valuable part
+//   6. improvement_notes — free text, one specific change for next time
+//   7. research_consent  — yes/no, opt-in to research use
 //
-// Every field is required; no optional fields. The form keeps the
-// participant honest at the close — five questions, ~one minute.
+// Every field is required; no optional fields. ~one minute end-to-end.
 //
-// Payload mapping: the single trainer rating is written into all three
-// existing trainer_* columns so the admin Recap card's averages keep
-// working without a schema rewrite. Old columns we no longer ask
-// about (satisfaction, relevance, clarity, materials_quality,
-// theory_practice, improved_skills, can_apply, duration_appropriate,
-// future_topics, platform_*) are simply omitted from the upsert and
-// land as NULL on new rows.
+// Payload mapping (kept on existing trainer_* columns to avoid a schema
+// rewrite — admin Recap averages keep working):
+//   trainer_clarity  → trainer_knowledge
+//   trainer_pacing   → trainer_delivery
+//   workshop_content → trainer_engagement
+// Admin labels were updated to match the new meaning. Columns we no
+// longer ask about (pace, satisfaction, relevance, clarity,
+// materials_quality, theory_practice, improved_skills, can_apply,
+// duration_appropriate, future_topics, platform_*) are omitted from
+// the upsert and land as NULL on new rows.
 
 const SCALE_LEGEND = [
   { v: 1, label: 'Poor' },
@@ -27,12 +31,6 @@ const SCALE_LEGEND = [
   { v: 3, label: 'Good' },
   { v: 4, label: 'Great' },
   { v: 5, label: 'Excellent' },
-];
-
-const PACE_OPTIONS = [
-  { v: 'too_slow',   label: 'Too slow' },
-  { v: 'just_right', label: 'Just right' },
-  { v: 'too_fast',   label: 'Too fast' },
 ];
 
 function pad2(n) { return String(n).padStart(2, '0'); }
@@ -86,28 +84,6 @@ function YesNoControl({ value, onChange, name }) {
   );
 }
 
-function PaceControl({ value, onChange, name }) {
-  return (
-    <div className="sv-yesno sv-pace" role="radiogroup" aria-label={name}>
-      {PACE_OPTIONS.map(opt => {
-        const sel = value === opt.v;
-        return (
-          <button
-            key={opt.v}
-            type="button"
-            role="radio"
-            aria-checked={sel}
-            className={`sv-yesno-btn${sel ? ' is-selected' : ''}`}
-            onClick={() => onChange(opt.v)}
-          >
-            {opt.label}
-          </button>
-        );
-      })}
-    </div>
-  );
-}
-
 function TextControl({ value, onChange, placeholder }) {
   return (
     <textarea
@@ -131,14 +107,19 @@ const QUESTIONS = [
     text: 'Would you recommend this workshop to a colleague?',
   },
   {
-    id: 'trainer',
+    id: 'trainer_clarity',
     type: 'scale',
-    text: 'How was the trainer overall — pacing, clarity, energy?',
+    text: 'How was the trainer in terms of content clarity?',
   },
   {
-    id: 'pace',
-    type: 'pace',
-    text: 'How was the pace of the workshop?',
+    id: 'trainer_pacing',
+    type: 'scale',
+    text: 'How was the trainer in terms of pacing?',
+  },
+  {
+    id: 'workshop_content',
+    type: 'scale',
+    text: 'How would you rate the content of the workshop?',
   },
   {
     id: 'most_valuable',
@@ -179,7 +160,6 @@ function Question({ q, index, value, onChange }) {
         {q.description && <p className="sv-q-desc">{q.description}</p>}
         {q.type === 'scale' && <ScaleControl value={value} onChange={onChange} name={q.text} />}
         {q.type === 'yesno' && <YesNoControl value={value} onChange={onChange} name={q.text} />}
-        {q.type === 'pace'  && <PaceControl  value={value} onChange={onChange} name={q.text} />}
         {q.type === 'text'  && <TextControl  value={value} onChange={onChange} placeholder={q.placeholder} />}
       </div>
     </div>
@@ -199,16 +179,18 @@ export default function FeedbackForm({ onSubmit, submitting, errorMessage, userN
 
   function handleSubmit() {
     if (!ready || submitting) return;
-    // Single trainer rating fans out to all three trainer_* columns so the
-    // admin Recap card's existing averages keep working without a schema
-    // rewrite. Dropped fields land as NULL on new rows.
-    const trainer = answers.trainer;
+    // Three specific 1-5 ratings ride on the existing trainer_* columns
+    // so the admin Recap averages keep working without a schema rewrite:
+    //   trainer_clarity  → trainer_knowledge
+    //   trainer_pacing   → trainer_delivery
+    //   workshop_content → trainer_engagement
+    // Admin labels were updated to match the new meaning. Dropped fields
+    // (pace, etc.) land as NULL on new rows.
     const feedback = {
       would_recommend:    answers.would_recommend === 'yes',
-      trainer_knowledge:  trainer,
-      trainer_delivery:   trainer,
-      trainer_engagement: trainer,
-      pace:               answers.pace,
+      trainer_knowledge:  answers.trainer_clarity,
+      trainer_delivery:   answers.trainer_pacing,
+      trainer_engagement: answers.workshop_content,
       most_valuable:      answers.most_valuable.trim(),
       improvement_notes:  answers.improvement_notes.trim(),
     };

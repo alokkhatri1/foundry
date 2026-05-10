@@ -13600,51 +13600,60 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
   font-style: italic;
 }
 
-/* Draft chooser — pill row at the top of Stage 6 listing the participant's
-   saved workflows. The active pill carries an inline × to delete; only one
-   draft is deletable at a time (the active one) so the affordance reads as
-   "delete the open workflow" rather than mass-edit. */
+/* Draft chooser — tab row at the top of Stage 6 listing the participant's
+   saved workflows. Active tab is marked by a dark underline that meets the
+   chooser's bottom border. Inactive tabs are quieter; hover lifts to ink.
+   The active tab carries an inline × to delete (only the active one is
+   deletable so the affordance reads as "delete the open workflow"). */
 .cs-draft-chooser {
   display: flex;
-  align-items: center;
+  align-items: stretch;
   justify-content: space-between;
   gap: 16px;
   margin-bottom: 16px;
-  padding-bottom: 12px;
   border-bottom: 1px solid var(--border-color);
   flex-wrap: wrap;
 }
 .cs-draft-chooser-list {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: 0;
   flex: 1;
   min-width: 0;
+  align-items: stretch;
 }
 .cs-draft-pill {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  padding: 6px 12px;
-  border: 1px solid var(--border-color);
-  background: var(--paper);
-  border-radius: 999px;
-  font-size: 13px;
+  padding: 10px 16px;
+  border: none;
+  background: transparent;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  font-size: 14px;
   cursor: pointer;
   max-width: 260px;
+  margin-bottom: -1px;       /* overlap the chooser's 1px bottom border */
+  color: var(--text-muted);
+  font-weight: 400;
+  transition: color 0.12s, background 0.12s, border-color 0.12s;
 }
-.cs-draft-pill:hover { background: var(--surface-muted); }
+.cs-draft-pill:hover {
+  background: var(--surface-muted);
+  color: var(--ink);
+}
 .cs-draft-pill.is-active {
-  background: var(--ink);
-  color: var(--paper);
-  border-color: var(--ink);
+  background: transparent;
+  color: var(--ink);
+  border-bottom-color: var(--ink);
   cursor: default;
+  font-weight: 500;
 }
 .cs-draft-pill-name {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  font-weight: 500;
 }
 .cs-draft-pill-x {
   display: inline-flex;
@@ -13653,23 +13662,29 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
   width: 18px;
   height: 18px;
   border-radius: 50%;
-  background: rgba(255,255,255,0.18);
+  background: var(--border-color);
+  color: var(--ink);
   font-size: 12px;
   line-height: 1;
   cursor: pointer;
 }
-.cs-draft-pill-x:hover { background: rgba(255,255,255,0.35); }
+.cs-draft-pill-x:hover {
+  background: var(--text-muted);
+  color: var(--paper);
+}
 .cs-draft-new {
-  padding: 6px 14px;
-  border: 1px dashed var(--border-color);
+  padding: 10px 16px;
+  border: none;
   background: transparent;
-  border-radius: 999px;
-  font-size: 13px;
+  font-size: 14px;
   cursor: pointer;
   color: var(--text-muted);
   flex-shrink: 0;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  align-self: stretch;
 }
-.cs-draft-new:hover { color: var(--ink); border-color: var(--ink); }
+.cs-draft-new:hover { color: var(--ink); }
 
 /* Inline run-blocked banner — surfaces the same reason a disabled-button
    tooltip would have hidden, but visibly. */

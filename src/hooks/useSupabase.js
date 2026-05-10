@@ -1551,6 +1551,71 @@ export default function useSupabase() {
     return () => { supabase.removeChannel(channel); };
   }, []);
 
+  // ===== Per-run AI audits (Stage 8 — Auditability v2) =====
+  // One AI audit per run, shared across all viewers. The Auditability
+  // page kicks off audits on runs the participant peer-audited at
+  // Stage 7. Idempotent — saveAiRunAudit upserts on (workshop, run).
+  const loadAiRunAudits = useCallback(async (runIds) => {
+    if (!isSupabaseConfigured || !roomIdRef.current) return [];
+    if (!runIds?.length) return [];
+    const { data, error } = await supabase
+      .from('ai_run_audits')
+      .select('id, run_id, findings, prompt_version, status, error, model, triggered_by, created_at, updated_at')
+      .eq('workshop_id', roomIdRef.current)
+      .in('run_id', runIds);
+    if (error) { console.error('[sb] loadAiRunAudits:', error.message); return []; }
+    return data || [];
+  }, []);
+
+  const loadAllRoomAiRunAudits = useCallback(async (workshopId) => {
+    if (!isSupabaseConfigured) return [];
+    const id = workshopId || roomIdRef.current;
+    if (!id) return [];
+    const { data, error } = await supabase
+      .from('ai_run_audits')
+      .select('id, run_id, findings, status, model, triggered_by, created_at, updated_at')
+      .eq('workshop_id', id)
+      .order('updated_at', { ascending: false });
+    if (error) { console.error('[sb] loadAllRoomAiRunAudits:', error.message); return []; }
+    return data || [];
+  }, []);
+
+  const saveAiRunAudit = useCallback(async ({ runId, findings, status, error, model, triggeredBy, promptVersion }) => {
+    if (!isSupabaseConfigured || !roomIdRef.current) return { ok: false, error: 'Not connected' };
+    if (!runId) return { ok: false, error: 'Missing runId' };
+    const payload = {
+      workshop_id: roomIdRef.current,
+      run_id: runId,
+      findings: findings || {},
+      status: status || 'pending',
+      error: error || null,
+      model: model || null,
+      triggered_by: triggeredBy || null,
+      prompt_version: promptVersion || 1,
+      updated_at: new Date().toISOString(),
+    };
+    const { data, error: dbErr } = await supabase
+      .from('ai_run_audits')
+      .upsert(payload, { onConflict: 'workshop_id,run_id' })
+      .select()
+      .single();
+    if (dbErr) { console.error('[sb] saveAiRunAudit:', dbErr.message); return { ok: false, error: dbErr.message }; }
+    return { ok: true, audit: data };
+  }, []);
+
+  const subscribeToAiRunAudits = useCallback((workshopId, onChange) => {
+    if (!isSupabaseConfigured) return () => {};
+    const id = workshopId || roomIdRef.current;
+    if (!id) return () => {};
+    const channel = supabase
+      .channel(`ai-run-audits-${id}-${Math.random().toString(36).slice(2, 8)}`)
+      .on('postgres_changes',
+        { event: '*', schema: 'public', table: 'ai_run_audits', filter: `workshop_id=eq.${id}` },
+        (payload) => onChange(payload))
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, []);
+
   // ===== Stage reflections (Stage 3-10 micro-surveys) =====
   // One row per (workshop, participant, stage). Both fields nullable so a
   // skipped row could still be persisted as a "we already asked" flag —
@@ -1746,6 +1811,7 @@ export default function useSupabase() {
     loadCapstoneDraft, loadCapstoneDrafts, saveCapstoneDraft, deleteCapstoneDraft,
     saveRunAudit, loadRunAudits, loadAllRoomRunAudits, subscribeToRunAudits,
     loadMyAiAudit, loadAllRoomAiAudits, saveAiAudit, subscribeToAiAudits,
+    loadAiRunAudits, loadAllRoomAiRunAudits, saveAiRunAudit, subscribeToAiRunAudits,
     loadMyStageReflections, saveStageReflection, loadAllStageReflections,
   }), []);
 }

@@ -3301,8 +3301,6 @@ Answer in ONE sentence. If the user asks "how", a second sentence is allowed —
               participants={participants || []}
               workflowRuns={workflowRuns}
               workflows={workflows}
-              coworkers={coworkers || []}
-              flatFiles={flatFiles}
               callClaudeAPI={callClaudeAPI}
             />
           </div>

@@ -1,15 +1,18 @@
 import { useEffect, useMemo, useState } from 'react';
-import { gatherParticipantArtefacts, runAiAudit, AUDIT_PROMPT_VERSION } from '../utils/aiAuditor';
+import { runAiAuditOnRun, AUDIT_PROMPT_VERSION } from '../utils/aiAuditor';
 
-// Stage 8 — Auditability. The platform reads everything the participant
-// has produced, writes structured findings, and shows them alongside any
-// peer audits that already exist on the participant's runs. The lesson
-// is the comparison: where AI's read agrees with peers, where they pull
-// apart.
+// Stage 8 — Auditability (per-run scope).
 //
-// The audit kicks off on first open if none exists; subsequent visits
-// just render the cached findings. A "Re-run" button is available if
-// the participant wants a fresh pass after they've added more work.
+// At Stage 7 the participant peer-audits at least 2 runs. At Stage 8 the
+// platform shows AI's read on those same runs alongside the peer audits.
+// One AI audit per run, shared across the cohort — the same run may
+// already be audited by another peer's visit.
+//
+// If the participant has fewer than 2 peer audits we surface a prompt
+// instead of running anything — the Stage's whole point is the
+// comparison, and there's nothing to compare without their reading.
+
+const MIN_PEER_AUDITS = 2;
 
 function StatusBadge({ status }) {
   const map = {
@@ -22,334 +25,279 @@ function StatusBadge({ status }) {
   return <span className={cfg.className}>{cfg.label}</span>;
 }
 
-function FindingCard({ finding, kind }) {
-  if (!finding) return null;
+function timeAgo(ts) {
+  if (!ts) return '';
+  const diff = Math.floor((Date.now() - new Date(ts).getTime()) / 1000);
+  if (diff < 60) return 'just now';
+  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+  return `${Math.floor(diff / 86400)}d ago`;
+}
+
+function FindingCard({ finding, kind, author }) {
+  if (!finding || !finding.observation) return null;
   return (
-    <div className={`au-finding au-finding-${kind || 'overall'}`}>
-      <div className="au-finding-row">
-        <span className="au-finding-label">Noticed</span>
-        <div className="au-finding-body">{finding.observation}</div>
-      </div>
-      <div className="au-finding-row">
-        <span className="au-finding-label">Means</span>
-        <div className="au-finding-body">{finding.meaning}</div>
-      </div>
-      <div className="au-finding-row">
-        <span className="au-finding-label">Try</span>
-        <div className="au-finding-body">{finding.suggestion}</div>
-      </div>
+    <div className={`au-finding au-finding-${kind || 'ai'}`}>
+      {author && <div className="au-finding-author">— {author}</div>}
+      <div className="au-finding-row"><span className="au-finding-label">Noticed</span><div className="au-finding-body">{finding.observation}</div></div>
+      <div className="au-finding-row"><span className="au-finding-label">Means</span><div className="au-finding-body">{finding.meaning}</div></div>
+      <div className="au-finding-row"><span className="au-finding-label">Try</span><div className="au-finding-body">{finding.suggestion}</div></div>
     </div>
   );
 }
 
-// For a run, render AI's finding + any peer audits side by side. The
-// diff-style layout is the heart of the comparison view: it forces the
-// participant to read both at once rather than collapsing to one read.
-function RunComparisonCard({ run, aiFinding, peerAudits, participantsById }) {
+function RunComparisonCard({
+  run, workflow, peerAudits, aiAudit, participantsById,
+  isAuditing, onRetry,
+}) {
+  const aiFinding = aiAudit?.findings;
+  const aiStatus = aiAudit?.status || (isAuditing ? 'running' : 'pending');
   return (
     <article className="au-run-card">
       <header className="au-run-head">
-        <strong>{run.name}</strong>
-        <span className="au-run-meta">{run.status}{peerAudits.length > 0 ? ` · ${peerAudits.length} peer audit${peerAudits.length === 1 ? '' : 's'}` : ' · no peer audits yet'}</span>
+        <div>
+          <strong>{run.workflowName || workflow?.name || 'Run'}</strong>
+          <div className="au-run-meta">
+            {run.status} · {timeAgo(run.startedAt)} · {peerAudits.length} peer audit{peerAudits.length === 1 ? '' : 's'}
+          </div>
+        </div>
+        <div className="au-run-status">
+          <StatusBadge status={aiStatus} />
+          {aiAudit?.status === 'error' && (
+            <button type="button" className="au-rerun" onClick={() => onRetry(run.id)} disabled={isAuditing}>Retry</button>
+          )}
+        </div>
       </header>
       <div className="au-compare">
         <div className="au-compare-col">
-          <div className="au-compare-col-head">AI auditor</div>
-          {aiFinding ? <FindingCard finding={aiFinding} kind="ai" /> : <div className="au-empty">AI didn't audit this run.</div>}
+          <div className="au-compare-col-head">Your peer audit</div>
+          {peerAudits.length === 0 && <div className="au-empty">No peer audit on this run yet.</div>}
+          {peerAudits.map(a => (
+            <FindingCard
+              key={a.id}
+              kind="peer"
+              author={participantsById?.[a.auditor_id]?.name || 'someone'}
+              finding={{ observation: a.observation, meaning: a.meaning, suggestion: a.suggestion }}
+            />
+          ))}
         </div>
         <div className="au-compare-col">
-          <div className="au-compare-col-head">Peer audits</div>
-          {peerAudits.length === 0 && <div className="au-empty">No peers have audited this run yet.</div>}
-          {peerAudits.map(a => {
-            const auditor = participantsById?.[a.auditor_id]?.name || 'someone';
-            return (
-              <div key={a.id} className="au-finding au-finding-peer">
-                <div className="au-finding-author">— {auditor}</div>
-                <div className="au-finding-row"><span className="au-finding-label">Noticed</span><div className="au-finding-body">{a.observation}</div></div>
-                <div className="au-finding-row"><span className="au-finding-label">Means</span><div className="au-finding-body">{a.meaning}</div></div>
-                <div className="au-finding-row"><span className="au-finding-label">Try</span><div className="au-finding-body">{a.suggestion}</div></div>
-              </div>
-            );
-          })}
+          <div className="au-compare-col-head">AI auditor</div>
+          {aiStatus === 'completed' && aiFinding?.observation
+            ? <FindingCard finding={aiFinding} kind="ai" />
+            : aiStatus === 'running'
+              ? <div className="au-empty">AI is reading the run…</div>
+              : aiStatus === 'error'
+                ? <div className="au-empty">AI audit failed{aiAudit?.error ? ` — ${aiAudit.error}` : ''}.</div>
+                : <div className="au-empty">AI hasn't audited this run yet.</div>}
         </div>
       </div>
-    </article>
-  );
-}
-
-function ArtefactCard({ artefact, finding }) {
-  const kindLabel = {
-    file: 'File',
-    coworker: 'Coworker',
-    workflow: 'Workflow',
-  }[artefact.kind] || artefact.kind;
-  return (
-    <article className="au-art-card">
-      <header className="au-art-head">
-        <span className="au-art-kind">{kindLabel}</span>
-        <strong className="au-art-name">{artefact.name}</strong>
-      </header>
-      {finding
-        ? <FindingCard finding={finding} kind="ai" />
-        : <div className="au-empty">AI didn't write a finding for this artefact.</div>}
     </article>
   );
 }
 
 export default function AuditabilityView({
   sb, myParticipantId, currentUserName, participants,
-  workflowRuns, workflows, coworkers, flatFiles, callClaudeAPI,
+  workflowRuns, workflows, callClaudeAPI,
 }) {
-  const [audit, setAudit] = useState(null);
-  const [loaded, setLoaded] = useState(false);
-  const [running, setRunning] = useState(false);
-  const [err, setErr] = useState(null);
+  const [aiAuditsByRun, setAiAuditsByRun] = useState({});
   const [peerAuditsByRun, setPeerAuditsByRun] = useState({});
+  const [auditingRunIds, setAuditingRunIds] = useState({});
+  const [loadedAi, setLoadedAi] = useState(false);
+  const [loadedPeers, setLoadedPeers] = useState(false);
 
-  // Load existing audit + all peer audits on the participant's own runs
-  // when the tab opens. Realtime keeps both in sync.
-  useEffect(() => {
-    if (!myParticipantId || !sb) return;
-    let cancelled = false;
-    sb.loadMyAiAudit(myParticipantId).then(row => {
-      if (cancelled) return;
-      setAudit(row);
-      setLoaded(true);
-    });
-    return () => { cancelled = true; };
-  }, [myParticipantId, sb]);
-
-  // Pull peer audits for the participant's runs so we can compare.
-  useEffect(() => {
-    if (!sb || !workflowRuns?.length || !currentUserName) return;
-    const myRuns = workflowRuns.filter(r => r.startedBy === currentUserName);
-    let cancelled = false;
-    Promise.all(myRuns.map(r => sb.loadRunAudits(r.id).then(audits => [r.id, audits || []])))
-      .then(entries => {
-        if (cancelled) return;
-        setPeerAuditsByRun(Object.fromEntries(entries));
-      });
-    return () => { cancelled = true; };
-  }, [sb, workflowRuns, currentUserName]);
-
-  // Kick off the AI audit on first open if none exists or the existing
-  // row is in a non-terminal state (pending / error / stale-running).
-  // Stale running = row marked 'running' but updated_at is more than 2
-  // minutes ago — the original run almost certainly died (network blip,
-  // tab refresh) and never wrote its terminal state. Without this
-  // detection the page shows "running" indefinitely.
-  useEffect(() => {
-    if (!loaded || running || !myParticipantId || !callClaudeAPI) return;
-    if (!audit) { runOnce(); return; }
-    if (audit.status === 'completed') return;
-    if (audit.status === 'running') {
-      const updatedAt = audit.updated_at ? new Date(audit.updated_at).getTime() : 0;
-      if (Date.now() - updatedAt < 120_000) return; // fresh — wait it out
-    }
-    // pending / error / stale running — re-run.
-    runOnce();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loaded, audit, running, myParticipantId, callClaudeAPI]);
-
-  async function runOnce() {
-    if (running) return;
-    console.log('[Auditability] runOnce starting', { participantId: myParticipantId, userName: currentUserName });
-    setRunning(true);
-    setErr(null);
-    try {
-      // Mark pending in the table immediately so other clients (admin,
-      // facilitator) see the audit was triggered even if the call takes
-      // a moment.
-      await sb.saveAiAudit({
-        participantId: myParticipantId,
-        findings: {},
-        status: 'running',
-        promptVersion: AUDIT_PROMPT_VERSION,
-      });
-      const artefacts = gatherParticipantArtefacts({
-        userName: currentUserName, flatFiles, coworkers, workflows, workflowRuns,
-      });
-      console.log('[Auditability] artefacts gathered', {
-        files: artefacts.files.length,
-        coworkers: artefacts.coworkers.length,
-        workflows: artefacts.workflows.length,
-        runs: artefacts.runs.length,
-      });
-      const result = await runAiAudit({ artefacts, callClaudeAPI });
-      console.log('[Auditability] AI audit returned', {
-        perArtifact: result.findings?.per_artifact?.length,
-        hasOverall: !!result.findings?.overall,
-        model: result.model,
-      });
-      // Token + cost bookkeeping is already in llm_usage via callClaudeAPI's
-      // existing path (segment='ai_audit'); the ai_audits row records the
-      // findings and the model used, not the per-call usage detail.
-      const res = await sb.saveAiAudit({
-        participantId: myParticipantId,
-        findings: result.findings,
-        status: 'completed',
-        model: result.model,
-        promptVersion: AUDIT_PROMPT_VERSION,
-      });
-      if (res.ok) {
-        setAudit(res.audit);
-        console.log('[Auditability] audit completed and saved');
-      } else {
-        console.error('[Auditability] saveAiAudit failed on completion', res.error);
-        setErr(`Audit ran but couldn't save: ${res.error}`);
+  // Runs the *current participant* started — the candidates for
+  // comparison; we look up the participant's peer audits ON OTHER
+  // people's runs separately below. The "you peer-audited two of
+  // your peers' runs" pattern means we want runs the participant
+  // attached audits to, not runs they themselves started.
+  const myRunsAuditedByMe = useMemo(() => {
+    const ids = new Set();
+    for (const list of Object.values(peerAuditsByRun)) {
+      for (const a of (list || [])) {
+        if (a.auditor_id === myParticipantId) {
+          ids.add(a.run_id);
+        }
       }
-    } catch (e) {
-      console.error('[Auditability] runOnce failed', e);
-      setErr(e.message || String(e));
-      await sb.saveAiAudit({
-        participantId: myParticipantId,
-        findings: {},
-        status: 'error',
-        error: e.message || String(e),
-        promptVersion: AUDIT_PROMPT_VERSION,
-      });
-    } finally {
-      setRunning(false);
     }
-  }
+    return [...ids];
+  }, [peerAuditsByRun, myParticipantId]);
 
-  // Index findings by (kind,id) so each artefact card can pick up its
-  // matching finding cheaply.
-  const findingByKey = useMemo(() => {
-    const out = {};
-    for (const f of (audit?.findings?.per_artifact || [])) {
-      out[`${f.kind}:${f.id}`] = f;
-    }
-    return out;
-  }, [audit]);
-
+  const runsById = useMemo(
+    () => Object.fromEntries((workflowRuns || []).map(r => [r.id, r])),
+    [workflowRuns]
+  );
+  const workflowsById = useMemo(
+    () => Object.fromEntries((workflows || []).map(w => [w.id, w])),
+    [workflows]
+  );
   const participantsById = useMemo(
     () => Object.fromEntries((participants || []).map(p => [p.id, p])),
     [participants]
   );
 
-  const myRuns = useMemo(
-    () => (workflowRuns || []).filter(r => r.startedBy === currentUserName),
-    [workflowRuns, currentUserName]
-  );
-  const myWorkflows = useMemo(
-    () => (workflows || []).filter(w => w.createdBy === currentUserName),
-    [workflows, currentUserName]
-  );
-  const myCoworkers = useMemo(
-    () => (coworkers || []).filter(c => c.createdBy === currentUserName),
-    [coworkers, currentUserName]
-  );
-  const myFiles = useMemo(
-    () => (flatFiles || []).filter(f => f.type === 'file' && f.createdBy === currentUserName),
-    [flatFiles, currentUserName]
-  );
+  // Load all peer audits for runs in scope (every run the participant
+  // can see) so we can find which they've audited and how many. This is
+  // a small per-workshop fetch.
+  useEffect(() => {
+    if (!sb || !workflowRuns?.length) { setLoadedPeers(true); return; }
+    let cancelled = false;
+    Promise.all(workflowRuns.map(r => sb.loadRunAudits(r.id).then(audits => [r.id, audits || []])))
+      .then(entries => {
+        if (cancelled) return;
+        setPeerAuditsByRun(Object.fromEntries(entries));
+        setLoadedPeers(true);
+      });
+    return () => { cancelled = true; };
+  }, [sb, workflowRuns]);
 
-  const status = audit?.status || (running ? 'running' : 'pending');
-  const overall = audit?.findings?.overall;
+  // Load existing AI run audits for the runs the participant has
+  // peer-audited.
+  useEffect(() => {
+    if (!sb || !loadedPeers) return;
+    if (myRunsAuditedByMe.length === 0) { setLoadedAi(true); return; }
+    let cancelled = false;
+    sb.loadAiRunAudits(myRunsAuditedByMe).then(rows => {
+      if (cancelled) return;
+      setAiAuditsByRun(Object.fromEntries(rows.map(r => [r.run_id, r])));
+      setLoadedAi(true);
+    });
+    return () => { cancelled = true; };
+  }, [sb, loadedPeers, myRunsAuditedByMe.join('|')]);
+
+  // Realtime: any new AI run audit (triggered by another participant
+  // visiting the same run) flows in here.
+  useEffect(() => {
+    if (!sb?.subscribeToAiRunAudits) return;
+    const unsub = sb.subscribeToAiRunAudits(null, (payload) => {
+      const row = payload.new || payload.old;
+      if (!row) return;
+      setAiAuditsByRun(prev => {
+        if (payload.eventType === 'DELETE') {
+          const { [row.run_id]: _, ...rest } = prev;
+          return rest;
+        }
+        return { ...prev, [row.run_id]: row };
+      });
+    });
+    return unsub;
+  }, [sb]);
+
+  // For each run the participant peer-audited, ensure an AI audit
+  // exists; kick one off if missing or stale (>2 min running, or in
+  // pending/error state).
+  useEffect(() => {
+    if (!loadedAi || !callClaudeAPI || !sb) return;
+    for (const runId of myRunsAuditedByMe) {
+      const existing = aiAuditsByRun[runId];
+      if (existing && existing.status === 'completed') continue;
+      if (existing?.status === 'running') {
+        const updatedAt = existing.updated_at ? new Date(existing.updated_at).getTime() : 0;
+        if (Date.now() - updatedAt < 120_000) continue;
+      }
+      if (auditingRunIds[runId]) continue;
+      kickoffOne(runId);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loadedAi, myRunsAuditedByMe.join('|'), aiAuditsByRun, callClaudeAPI, sb]);
+
+  async function kickoffOne(runId) {
+    const run = runsById[runId];
+    if (!run) return;
+    setAuditingRunIds(prev => ({ ...prev, [runId]: true }));
+    console.log('[Auditability] runOnce starting for run', runId);
+    try {
+      await sb.saveAiRunAudit({
+        runId, findings: {}, status: 'running',
+        triggeredBy: myParticipantId, promptVersion: AUDIT_PROMPT_VERSION,
+      });
+      const workflow = workflowsById[run.workflowId];
+      const peerAudits = peerAuditsByRun[runId] || [];
+      const result = await runAiAuditOnRun({
+        run, workflow, peerAudits, participantsById, callClaudeAPI,
+      });
+      console.log('[Auditability] AI audit returned for run', runId);
+      const res = await sb.saveAiRunAudit({
+        runId,
+        findings: result.finding,
+        status: 'completed',
+        model: result.model,
+        triggeredBy: myParticipantId,
+        promptVersion: AUDIT_PROMPT_VERSION,
+      });
+      if (res.ok) setAiAuditsByRun(prev => ({ ...prev, [runId]: res.audit }));
+    } catch (e) {
+      console.error('[Auditability] runOnce failed for run', runId, e);
+      await sb.saveAiRunAudit({
+        runId, findings: {}, status: 'error',
+        error: e.message || String(e),
+        triggeredBy: myParticipantId,
+        promptVersion: AUDIT_PROMPT_VERSION,
+      });
+    } finally {
+      setAuditingRunIds(prev => {
+        const { [runId]: _, ...rest } = prev;
+        return rest;
+      });
+    }
+  }
+
+  function handleRetry(runId) {
+    if (auditingRunIds[runId]) return;
+    kickoffOne(runId);
+  }
+
+  const myAuditCount = myRunsAuditedByMe.length;
+  const ready = loadedPeers && myAuditCount >= MIN_PEER_AUDITS;
 
   return (
     <div className="au-page">
       <div className="au-page-inner">
-      <header className="au-page-head">
-        <div>
-          <div className="au-eyebrow"><span className="au-eyebrow-dot" />STAGE 8 · AUDITABILITY</div>
-          <h1 className="au-page-title">Two reads on your work — <em>side by side</em>.</h1>
-          <p className="au-page-sub">
-            The platform reads everything you produced and writes its own audit.
-            Below, AI's read sits next to peer audits on the same runs. Where do they agree?
-            Where do they pull apart? That gap is the lesson.
-          </p>
-        </div>
-        <div className="au-page-actions">
-          <StatusBadge status={status} />
-          {/* Always offer a manual retry except while we're actively in-
-              flight on this client. Covers the stuck-running case
-              (DB row at 'running' but the original run died) without
-              waiting on the 2-minute stale-detection. */}
-          <button
-            type="button"
-            className="au-rerun"
-            onClick={runOnce}
-            disabled={running}
-          >
-            {running ? 'Running…' : status === 'completed' ? 'Re-run audit' : status === 'error' ? 'Try again' : 'Run / retry'}
-          </button>
-        </div>
-      </header>
+        <header className="au-page-head">
+          <div>
+            <div className="au-eyebrow"><span className="au-eyebrow-dot" />STAGE 8 · AUDITABILITY</div>
+            <h1 className="au-page-title">Two reads on the same run — <em>side by side</em>.</h1>
+            <p className="au-page-sub">
+              For every run you peer-audited at Stage 7, the platform reads the same run and writes its own audit.
+              Where do they agree? Where do they pull apart? That gap is the lesson.
+            </p>
+          </div>
+        </header>
 
-      {err && <div className="au-error">{err}</div>}
+        {!ready && loadedPeers && (
+          <div className="au-gate">
+            <div className="au-gate-title">
+              {myAuditCount === 0
+                ? 'Audit at least two peer runs at Stage 7 to unlock the comparison here.'
+                : `One more peer audit at Stage 7 unlocks the comparison.`}
+            </div>
+            <div className="au-gate-sub">
+              You've audited <strong>{myAuditCount}</strong> of {MIN_PEER_AUDITS}. Open Observability and pick another peer's run to audit.
+            </div>
+          </div>
+        )}
 
-      {status === 'running' && (
-        <div className="au-loading">
-          The AI auditor is reading your work — files, coworkers, workflows, runs. This usually takes 30–60 seconds.
-        </div>
-      )}
-
-      {status === 'completed' && (
-        <>
-          {overall && (
-            <section className="au-overall">
-              <div className="au-section-head">Overall — AI's read across everything you built</div>
-              <FindingCard finding={overall} kind="overall" />
-            </section>
-          )}
-
-          {myRuns.length > 0 && (
-            <section className="au-section">
-              <div className="au-section-head">Runs — peer vs. AI</div>
-              {myRuns.map(r => (
+        {ready && (
+          <section className="au-section">
+            {myRunsAuditedByMe.map(runId => {
+              const run = runsById[runId];
+              if (!run) return null;
+              const peerAuditsHere = (peerAuditsByRun[runId] || []).filter(a => a.auditor_id === myParticipantId);
+              return (
                 <RunComparisonCard
-                  key={r.id}
-                  run={{ name: r.workflowName, status: r.status }}
-                  aiFinding={findingByKey[`run:${r.id}`]}
-                  peerAudits={peerAuditsByRun[r.id] || []}
+                  key={runId}
+                  run={run}
+                  workflow={workflowsById[run.workflowId]}
+                  peerAudits={peerAuditsHere}
+                  aiAudit={aiAuditsByRun[runId]}
                   participantsById={participantsById}
+                  isAuditing={!!auditingRunIds[runId]}
+                  onRetry={handleRetry}
                 />
-              ))}
-            </section>
-          )}
-
-          {myWorkflows.length > 0 && (
-            <section className="au-section">
-              <div className="au-section-head">Workflows you authored</div>
-              {myWorkflows.map(w => (
-                <ArtefactCard
-                  key={w.id}
-                  artefact={{ kind: 'workflow', id: w.id, name: w.name }}
-                  finding={findingByKey[`workflow:${w.id}`]}
-                />
-              ))}
-            </section>
-          )}
-
-          {myCoworkers.length > 0 && (
-            <section className="au-section">
-              <div className="au-section-head">Coworkers you built</div>
-              {myCoworkers.map(c => (
-                <ArtefactCard
-                  key={c.id}
-                  artefact={{ kind: 'coworker', id: c.id, name: c.name }}
-                  finding={findingByKey[`coworker:${c.id}`]}
-                />
-              ))}
-            </section>
-          )}
-
-          {myFiles.length > 0 && (
-            <section className="au-section">
-              <div className="au-section-head">Files you wrote</div>
-              {myFiles.map(f => (
-                <ArtefactCard
-                  key={f.id}
-                  artefact={{ kind: 'file', id: f.id, name: f.name }}
-                  finding={findingByKey[`file:${f.id}`]}
-                />
-              ))}
-            </section>
-          )}
-        </>
-      )}
+              );
+            })}
+          </section>
+        )}
       </div>
     </div>
   );

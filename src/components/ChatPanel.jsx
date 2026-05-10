@@ -48,7 +48,6 @@ function AssistantAvatar({ label, coworkerAvatar }) {
 }
 
 function ChatMessage({ msg, onApprovalAction, onPickRecipient, onNudgeRecipient, onGoToFiles, onRetry, participants, currentUserName, showEducationalCues }) {
-  const [comment, setComment] = useState('');
   const [contextExpanded, setContextExpanded] = useState(false);
   const sender = msg.participantName ? participants?.find(p => p.name === msg.participantName) : null;
 
@@ -177,24 +176,12 @@ function ChatMessage({ msg, onApprovalAction, onPickRecipient, onNudgeRecipient,
           )}
           {isActive && viewerIsAssignee && (
             <>
-              <textarea className="cl-approval-comment" placeholder="Feedback (required if rejecting)..." value={comment} onChange={e => setComment(e.target.value)} rows={2} />
               <EducationalCue cueId="chat-approval-actions" show={showEducationalCues} />
-              <div className="cl-approval-actions">
-                <button
-                  className="cl-send-btn-approve"
-                  onClick={() => onApprovalAction(msg.runId, msg.id, 'Approve', comment, { stepId: msg.stepId, stepName: msg.stepName, assigneeName: msg.assigneeName })}
-                >
-                  Approve
-                </button>
-                <button
-                  className="cl-send-btn-cancel"
-                  disabled={!comment.trim()}
-                  title={comment.trim() ? '' : 'Add feedback before rejecting'}
-                  onClick={() => onApprovalAction(msg.runId, msg.id, 'Reject', comment, { stepId: msg.stepId, stepName: msg.stepName, assigneeName: msg.assigneeName })}
-                >
-                  Reject with feedback
-                </button>
-              </div>
+              <ApprovalActionForm
+                onAct={(action, foldedComment) =>
+                  onApprovalAction(msg.runId, msg.id, action, foldedComment, { stepId: msg.stepId, stepName: msg.stepName, assigneeName: msg.assigneeName })
+                }
+              />
             </>
           )}
           {isActive && !viewerIsAssignee && (
@@ -864,47 +851,127 @@ function InlineEditor({ file, onUpdateContent, onClose }) {
   );
 }
 
-// Inline approval actions for review_request DMs in the assignee's chat
-// thread. Same wiring as PendingReviewCard below — fires onRemoteApprove,
-// which writes to the approvals table and lets the initiator's tab
-// resolve the executor via the realtime echo.
-function ReviewRequestActions({ run, stepResult, onRemoteApprove }) {
+// Shared review form: typed feedback + file attachments. The reviewer
+// must write something before approving or rejecting (deliberate gate —
+// silent thumbs-ups bypass the consolidation the review step exists for).
+// Attached files are parsed inline (parseFile, same as chat composer) and
+// folded into the resolved comment as markdown sections, so downstream
+// coworker steps see the file contents as upstream context.
+function ApprovalActionForm({
+  onAct,
+  busy = false,
+  approveLabel = 'Approve',
+  rejectLabel = 'Reject with feedback',
+  placeholder = 'Feedback (required)…',
+}) {
   const [comment, setComment] = useState('');
-  const [busy, setBusy] = useState(false);
-  async function act(action) {
-    if (busy) return;
-    setBusy(true);
-    try { await onRemoteApprove(run, stepResult, action, comment); }
-    finally { setBusy(false); }
+  const [attachedFiles, setAttachedFiles] = useState([]);
+  const [parsingFiles, setParsingFiles] = useState(false);
+  const fileInputRef = useRef(null);
+
+  async function handleFileSelect(e) {
+    const files = Array.from(e.target.files);
+    if (files.length === 0) return;
+    setParsingFiles(true);
+    const parsed = [];
+    for (const file of files) {
+      const result = await parseFile(file);
+      parsed.push({ ...result, category: getFileCategory(file), originalName: file.name });
+    }
+    setAttachedFiles(prev => [...prev, ...parsed]);
+    setParsingFiles(false);
+    if (fileInputRef.current) fileInputRef.current.value = '';
   }
+
+  function removeAttachment(i) {
+    setAttachedFiles(prev => prev.filter((_, idx) => idx !== i));
+  }
+
+  function buildFoldedComment() {
+    if (attachedFiles.length === 0) return comment;
+    const sections = attachedFiles
+      .map(f => `\n\n---\n**Attached: ${f.fileName}**\n\n${f.content || ''}`)
+      .join('');
+    return comment + sections;
+  }
+
+  const canAct = !!comment.trim() && !busy && !parsingFiles;
+  const blockedReason = !comment.trim() ? 'Write a comment before deciding' : '';
+
   return (
     <>
       <textarea
         className="cl-approval-comment"
         value={comment}
         onChange={e => setComment(e.target.value)}
-        placeholder="Feedback (required if rejecting)…"
+        placeholder={parsingFiles ? 'Reading files…' : placeholder}
         rows={2}
       />
+      <input
+        type="file"
+        ref={fileInputRef}
+        style={{ display: 'none' }}
+        multiple
+        onChange={handleFileSelect}
+      />
+      {attachedFiles.length > 0 && (
+        <div className="cl-attached-files cl-approval-attached">
+          {attachedFiles.map((f, i) => (
+            <span key={i} className="cl-attached-chip">
+              <span className="cl-attached-chip-icon">{getFileIcon(f.category)}</span>
+              <span className="cl-attached-chip-name">{f.fileName}</span>
+              <button className="cl-attached-chip-remove" onClick={() => removeAttachment(i)}>{'✕'}</button>
+            </span>
+          ))}
+        </div>
+      )}
       <div className="cl-approval-actions">
         <button
-          className="cl-send-btn-approve"
-          onClick={() => act('Approve')}
-          disabled={busy}
+          type="button"
+          className="cl-approval-attach-btn"
+          onClick={() => fileInputRef.current?.click()}
+          disabled={busy || parsingFiles}
+          title="Attach a document — its contents flow forward as context"
         >
-          Approve
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+            <path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48" />
+          </svg>
+          {parsingFiles ? 'Reading…' : 'Attach'}
+        </button>
+        <button
+          className="cl-send-btn-approve"
+          onClick={() => onAct('Approve', buildFoldedComment())}
+          disabled={!canAct}
+          title={blockedReason}
+        >
+          {approveLabel}
         </button>
         <button
           className="cl-send-btn-cancel"
-          onClick={() => act('Reject')}
-          disabled={busy || !comment.trim()}
-          title={comment.trim() ? '' : 'Add feedback before rejecting'}
+          onClick={() => onAct('Reject', buildFoldedComment())}
+          disabled={!canAct}
+          title={blockedReason}
         >
-          Reject with feedback
+          {rejectLabel}
         </button>
       </div>
     </>
   );
+}
+
+// Inline approval actions for review_request DMs in the assignee's chat
+// thread. Same wiring as PendingReviewCard below — fires onRemoteApprove,
+// which writes to the approvals table and lets the initiator's tab
+// resolve the executor via the realtime echo.
+function ReviewRequestActions({ run, stepResult, onRemoteApprove }) {
+  const [busy, setBusy] = useState(false);
+  async function act(action, comment) {
+    if (busy) return;
+    setBusy(true);
+    try { await onRemoteApprove(run, stepResult, action, comment); }
+    finally { setBusy(false); }
+  }
+  return <ApprovalActionForm onAct={act} busy={busy} />;
 }
 
 // ===== Cross-user review surface =====
@@ -913,9 +980,8 @@ function ReviewRequestActions({ run, stepResult, onRemoteApprove }) {
 // or Reject — the initiator's tab owns the Promise resolver and picks up the
 // decision via the `approvals` realtime subscription.
 function PendingReviewCard({ run, step, onRemoteApprove }) {
-  const [comment, setComment] = useState('');
   const [busy, setBusy] = useState(false);
-  async function act(action) {
+  async function act(action, comment) {
     if (busy) return;
     setBusy(true);
     try { await onRemoteApprove(run, step, action, comment); }
@@ -926,17 +992,7 @@ function PendingReviewCard({ run, step, onRemoteApprove }) {
       <div style={{ fontSize: 13, color: '#5a5048', marginBottom: 4 }}>
         Workflow <strong>{run.workflowName}</strong> · Step <strong>{step.stepName || 'Review'}</strong> · Requested by <strong>{run.startedBy || 'someone'}</strong>
       </div>
-      <textarea
-        value={comment}
-        onChange={e => setComment(e.target.value)}
-        placeholder="Optional comment (required for Reject)"
-        rows={2}
-        style={{ width: '100%', marginTop: 6, padding: 6, fontSize: 13, border: '1px solid #ddd', borderRadius: 4, resize: 'vertical', fontFamily: 'inherit' }}
-      />
-      <div style={{ display: 'flex', gap: 8, marginTop: 6 }}>
-        <button onClick={() => act('Approve')} disabled={busy} style={{ background: '#3f8f4a', color: '#fff', border: 0, padding: '6px 14px', borderRadius: 4, cursor: busy ? 'wait' : 'pointer' }}>Approve</button>
-        <button onClick={() => act('Reject')} disabled={busy || !comment.trim()} style={{ background: '#b8453d', color: '#fff', border: 0, padding: '6px 14px', borderRadius: 4, cursor: (busy || !comment.trim()) ? 'not-allowed' : 'pointer', opacity: (busy || !comment.trim()) ? 0.6 : 1 }}>Reject</button>
-      </div>
+      <ApprovalActionForm onAct={act} busy={busy} rejectLabel="Reject" />
     </div>
   );
 }

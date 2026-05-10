@@ -3734,6 +3734,29 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
 }
 .cl-send-btn-cancel:hover { border-color: var(--text-muted); color: var(--text-dark); }
 
+.cl-approval-attach-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  border-radius: var(--radius-pill);
+  border: 1px dashed var(--border-color);
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
+}
+.cl-approval-attach-btn:hover:not(:disabled) {
+  border-color: var(--text-muted);
+  color: var(--text-dark);
+  background: rgba(0, 0, 0, 0.02);
+}
+.cl-approval-attach-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.cl-approval-attach-btn svg { display: block; }
+.cl-approval-attached { margin-top: 8px; margin-bottom: 4px; }
+
 /* Review request card inside a DM thread */
 .cl-dm-review {
   border: 1.5px solid var(--accent-approval, #b88b3a);

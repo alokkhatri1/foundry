@@ -1616,6 +1616,65 @@ export default function useSupabase() {
     return () => { supabase.removeChannel(channel); };
   }, []);
 
+  // ===== Step comments (Stage 7 — inline peer audit) =====
+  // Replaces the W/SW/NW peer audit shape. One row per (run, step,
+  // comment). Public + named, audited by humans; AI auditor at Stage 8
+  // shares the table with author_kind='ai'.
+  const saveStepComment = useCallback(async ({ runId, stepId, body, authorId, authorKind = 'human' }) => {
+    if (!isSupabaseConfigured || !roomIdRef.current) return { ok: false, error: 'Not connected' };
+    if (!runId || !stepId || !body) return { ok: false, error: 'Missing runId, stepId, or body' };
+    const payload = {
+      workshop_id: roomIdRef.current,
+      run_id: runId,
+      step_id: stepId,
+      body: body.trim(),
+      author_id: authorId || null,
+      author_kind: authorKind,
+    };
+    const { data, error } = await supabase
+      .from('step_comments')
+      .insert(payload)
+      .select()
+      .single();
+    if (error) { console.error('[sb] saveStepComment:', error.message); return { ok: false, error: error.message }; }
+    return { ok: true, comment: data };
+  }, []);
+
+  const loadStepComments = useCallback(async (runId) => {
+    if (!isSupabaseConfigured || !runId) return [];
+    const { data, error } = await supabase
+      .from('step_comments')
+      .select('id, run_id, step_id, body, author_id, author_kind, created_at')
+      .eq('run_id', runId)
+      .order('created_at', { ascending: true });
+    if (error) { console.error('[sb] loadStepComments:', error.message); return []; }
+    return data || [];
+  }, []);
+
+  const loadAllRoomStepComments = useCallback(async (workshopId) => {
+    if (!isSupabaseConfigured) return [];
+    const id = workshopId || roomIdRef.current;
+    if (!id) return [];
+    const { data, error } = await supabase
+      .from('step_comments')
+      .select('id, run_id, step_id, body, author_id, author_kind, created_at')
+      .eq('workshop_id', id)
+      .order('created_at', { ascending: false });
+    if (error) { console.error('[sb] loadAllRoomStepComments:', error.message); return []; }
+    return data || [];
+  }, []);
+
+  const subscribeToStepComments = useCallback((runId, onChange) => {
+    if (!isSupabaseConfigured || !runId) return () => {};
+    const channel = supabase
+      .channel(`step-comments-${runId}-${Math.random().toString(36).slice(2, 8)}`)
+      .on('postgres_changes',
+        { event: '*', schema: 'public', table: 'step_comments', filter: `run_id=eq.${runId}` },
+        (payload) => onChange(payload))
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, []);
+
   // ===== Stage reflections (Stage 3-10 micro-surveys) =====
   // One row per (workshop, participant, stage). Both fields nullable so a
   // skipped row could still be persisted as a "we already asked" flag —
@@ -1812,6 +1871,7 @@ export default function useSupabase() {
     saveRunAudit, loadRunAudits, loadAllRoomRunAudits, subscribeToRunAudits,
     loadMyAiAudit, loadAllRoomAiAudits, saveAiAudit, subscribeToAiAudits,
     loadAiRunAudits, loadAllRoomAiRunAudits, saveAiRunAudit, subscribeToAiRunAudits,
+    saveStepComment, loadStepComments, loadAllRoomStepComments, subscribeToStepComments,
     loadMyStageReflections, saveStageReflection, loadAllStageReflections,
   }), []);
 }

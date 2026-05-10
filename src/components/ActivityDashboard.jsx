@@ -14,7 +14,7 @@ import EducationalCue from './EducationalCue';
 import { CoworkerGlyph } from './Icon';
 import RichText from './RichText';
 import { stageReached } from './RevealAt';
-import RunAuditPanel from './RunAuditPanel';
+import StepCommentThread from './StepCommentThread';
 
 function isIconOrImage(avatar) {
   return typeof avatar === 'string' && (avatar.startsWith('icon:') || avatar.startsWith('data:'));
@@ -202,6 +202,12 @@ function RunDetailView({ run, onBack, onApprovalAction, onCancelRun, onNudge, sh
     [run, approvals]
   );
 
+  // Map for resolving comment-author names in StepCommentThread.
+  const participantsById = useMemo(
+    () => Object.fromEntries((participants || []).map(p => [p.id, p])),
+    [participants]
+  );
+
   const [selectedStepId, setSelectedStepId] = useState(() => {
     // Default selection: the current action — running, waiting, or the
     // most recently completed step. Empty if nothing has moved yet.
@@ -281,7 +287,7 @@ function RunDetailView({ run, onBack, onApprovalAction, onCancelRun, onNudge, sh
         </div>
 
         <aside className="ob-detail-sidebar">
-          <div className="ob-detail-sidebar-title">Decisions</div>
+          <div className="ob-detail-sidebar-title">Decisions — comment on each step</div>
           <DecisionList
             run={run}
             selectedStepId={selectedStepId}
@@ -290,24 +296,12 @@ function RunDetailView({ run, onBack, onApprovalAction, onCancelRun, onNudge, sh
             isOwner={isOwner}
             onApprovalAction={onApprovalAction}
             onNudge={onNudge}
+            sb={sb}
+            myParticipantId={myParticipantId}
+            participantsById={participantsById}
           />
         </aside>
       </div>
-
-      {/* Peer audit lives below the body — full-width, available on every
-          run, public to the cohort. Only renders once the run has produced
-          something to audit (i.e. has at least one stepResult entry). */}
-      {(run.stepResults || []).length > 0 && (
-        <RunAuditPanel
-          run={run}
-          sb={sb}
-          myParticipantId={myParticipantId}
-          participants={participants}
-          runOwnerParticipantId={
-            (participants || []).find(p => p.name === run.startedBy)?.id || null
-          }
-        />
-      )}
     </div>
   );
 }
@@ -382,7 +376,7 @@ function DagStatusBadge({ status }) {
 // completed steps by completion time, then whatever's in progress, then
 // still-pending (dim). The selected row expands inline with output /
 // decision log / approval form.
-function DecisionList({ run, selectedStepId, onSelectStep, approvalsForStep, isOwner, onApprovalAction, onNudge }) {
+function DecisionList({ run, selectedStepId, onSelectStep, approvalsForStep, isOwner, onApprovalAction, onNudge, sb, myParticipantId, participantsById }) {
   const [comment, setComment] = useState('');
 
   // Bucket + order the steps so the list reads as a timeline of decisions
@@ -413,6 +407,9 @@ function DecisionList({ run, selectedStepId, onSelectStep, approvalsForStep, isO
           setComment={setComment}
           onApprovalAction={onApprovalAction}
           onNudge={onNudge}
+          sb={sb}
+          myParticipantId={myParticipantId}
+          participantsById={participantsById}
         />
       ))}
     </div>
@@ -423,7 +420,7 @@ function DecisionList({ run, selectedStepId, onSelectStep, approvalsForStep, isO
 // Each row reads like a headline: actor + verb + object, with a small meta
 // line below (when, how long, comment). Expanded rows show the full output
 // / decision log / approval controls depending on step state.
-function DecisionRow({ step, run, isSelected, onSelect, approvalsForStep, isOwner, comment, setComment, onApprovalAction, onNudge }) {
+function DecisionRow({ step, run, isSelected, onSelect, approvalsForStep, isOwner, comment, setComment, onApprovalAction, onNudge, sb, myParticipantId, participantsById }) {
   const state = step.status;
   const isReview = step.type === 'approval';
   const isTrigger = step.type === 'trigger';
@@ -620,6 +617,20 @@ function DecisionRow({ step, run, isSelected, onSelect, approvalsForStep, isOwne
               {state === 'skipped' ? 'Skipped.' : state === 'pending' || !state ? 'Hasn\'t been reached yet.' : 'No decision recorded.'}
             </div>
           )}
+
+          {/* Step comments — Stage 7's primary peer-audit affordance.
+              Trigger steps don't have a decision and so don't get a
+              comment thread. */}
+          {!isTrigger && sb && (
+            <StepCommentThread
+              runId={run.id}
+              stepId={step.stepId}
+              stepType={step.type}
+              myParticipantId={myParticipantId}
+              participantsById={participantsById}
+              sb={sb}
+            />
+          )}
         </div>
       )}
     </div>
@@ -680,9 +691,9 @@ export default function ActivityDashboard({ workflowRuns, onApprovalAction, onCa
       <header className="ob-page-head">
         <div className="ob-page-head-left">
           <div className="ob-page-eyebrow">Stage 7 · Observability</div>
-          <h1 className="ob-page-title">Everything your mixed team did, <em>on the record</em>.</h1>
+          <h1 className="ob-page-title">Read each others' work — <em>comment on every decision</em>.</h1>
           <p className="ob-page-sub">
-            Each run is an artifact; each decision is logged.
+            Open a peer's run, click any step, and leave a note: was the AI right? was the human right? Comments are public, named, and live in realtime.
           </p>
           <EducationalCue cueId="activity-dashboard" show={showEducationalCues} />
         </div>

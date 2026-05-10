@@ -50,8 +50,8 @@ export const REFLECTION_PROMPTS = {
     label: 'Audit',
     anchor: 'You watched a workflow run play out — every step, every approval, every tool call on the record.',
     scaled: 'How clearly do you understand what a run log tells you?',
-    note: 'In your own words: what does observability give you that a normal chat doesn’t?',
-    habit: 'A habit you’ll start to debug or improve AI work via the run log?',
+    note: 'In your own words: what does the audit trail give you that a normal chat doesn’t?',
+    habit: 'A habit you’ll start to debug or improve AI work via the audit log?',
   },
   '8': {
     label: 'Economics',

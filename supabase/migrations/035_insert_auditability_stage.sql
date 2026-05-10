@@ -35,10 +35,10 @@ to_stage = case to_stage
 end
 where from_stage in ('8', '9') or to_stage in ('8', '9');
 
-update stage_reflections
-set stage = case stage
-  when '9' then '10'
-  when '8' then '9'
-  else stage
-end
-where stage in ('8', '9');
+-- stage_reflections has UNIQUE (workshop_id, participant_id, stage),
+-- which Postgres checks per row, not at statement end. A single CASE-
+-- based UPDATE collides: when the row at '8' tries to become '9',
+-- the row already at '9' hasn't moved to '10' yet. Two ordered steps
+-- avoid the collision: empty '9' first, then fill it.
+update stage_reflections set stage = '10' where stage = '9';
+update stage_reflections set stage = '9'  where stage = '8';

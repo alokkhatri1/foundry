@@ -132,17 +132,28 @@ export default function AuditabilityView({
     return () => { cancelled = true; };
   }, [sb, workflowRuns, currentUserName]);
 
-  // Kick off the AI audit on first open if none exists. Idempotent —
-  // existing audit (any status) blocks the auto-run; participant can
-  // explicitly Re-run to force.
+  // Kick off the AI audit on first open if none exists or the existing
+  // row is in a non-terminal state (pending / error / stale-running).
+  // Stale running = row marked 'running' but updated_at is more than 2
+  // minutes ago — the original run almost certainly died (network blip,
+  // tab refresh) and never wrote its terminal state. Without this
+  // detection the page shows "running" indefinitely.
   useEffect(() => {
-    if (!loaded || audit || running || !myParticipantId || !callClaudeAPI) return;
+    if (!loaded || running || !myParticipantId || !callClaudeAPI) return;
+    if (!audit) { runOnce(); return; }
+    if (audit.status === 'completed') return;
+    if (audit.status === 'running') {
+      const updatedAt = audit.updated_at ? new Date(audit.updated_at).getTime() : 0;
+      if (Date.now() - updatedAt < 120_000) return; // fresh — wait it out
+    }
+    // pending / error / stale running — re-run.
     runOnce();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loaded, audit, running, myParticipantId, callClaudeAPI]);
 
   async function runOnce() {
     if (running) return;
+    console.log('[Auditability] runOnce starting', { participantId: myParticipantId, userName: currentUserName });
     setRunning(true);
     setErr(null);
     try {
@@ -158,7 +169,18 @@ export default function AuditabilityView({
       const artefacts = gatherParticipantArtefacts({
         userName: currentUserName, flatFiles, coworkers, workflows, workflowRuns,
       });
+      console.log('[Auditability] artefacts gathered', {
+        files: artefacts.files.length,
+        coworkers: artefacts.coworkers.length,
+        workflows: artefacts.workflows.length,
+        runs: artefacts.runs.length,
+      });
       const result = await runAiAudit({ artefacts, callClaudeAPI });
+      console.log('[Auditability] AI audit returned', {
+        perArtifact: result.findings?.per_artifact?.length,
+        hasOverall: !!result.findings?.overall,
+        model: result.model,
+      });
       // Token + cost bookkeeping is already in llm_usage via callClaudeAPI's
       // existing path (segment='ai_audit'); the ai_audits row records the
       // findings and the model used, not the per-call usage detail.
@@ -169,9 +191,15 @@ export default function AuditabilityView({
         model: result.model,
         promptVersion: AUDIT_PROMPT_VERSION,
       });
-      if (res.ok) setAudit(res.audit);
+      if (res.ok) {
+        setAudit(res.audit);
+        console.log('[Auditability] audit completed and saved');
+      } else {
+        console.error('[Auditability] saveAiAudit failed on completion', res.error);
+        setErr(`Audit ran but couldn't save: ${res.error}`);
+      }
     } catch (e) {
-      console.error('[AuditabilityView] runOnce failed', e);
+      console.error('[Auditability] runOnce failed', e);
       setErr(e.message || String(e));
       await sb.saveAiAudit({
         participantId: myParticipantId,
@@ -234,16 +262,18 @@ export default function AuditabilityView({
         </div>
         <div className="au-page-actions">
           <StatusBadge status={status} />
-          {status === 'completed' && (
-            <button type="button" className="au-rerun" onClick={runOnce} disabled={running}>
-              {running ? 'Re-running…' : 'Re-run audit'}
-            </button>
-          )}
-          {status === 'error' && (
-            <button type="button" className="au-rerun" onClick={runOnce} disabled={running}>
-              Try again
-            </button>
-          )}
+          {/* Always offer a manual retry except while we're actively in-
+              flight on this client. Covers the stuck-running case
+              (DB row at 'running' but the original run died) without
+              waiting on the 2-minute stale-detection. */}
+          <button
+            type="button"
+            className="au-rerun"
+            onClick={runOnce}
+            disabled={running}
+          >
+            {running ? 'Running…' : status === 'completed' ? 'Re-run audit' : status === 'error' ? 'Try again' : 'Run / retry'}
+          </button>
         </div>
       </header>
 

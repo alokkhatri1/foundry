@@ -8,8 +8,17 @@ import { COWORKER_ICONS } from './components/Icon';
 import FileExplorer from './components/FileExplorer';
 import FileEditor from './components/FileEditor';
 import ScenarioBuilder from './components/ScenarioBuilder';
-import AuditabilityView from './components/AuditabilityView';
-import { deriveCoworkerName } from './components/Capstone';
+
+// Was imported from the now-retired Capstone component; small enough to
+// inline and self-contained — used only when materialising case-driven
+// rows into runnable workflows in handleRunCaseWorkflow.
+function deriveCoworkerName(step) {
+  const cleaned = (step || '').trim().replace(/\s+/g, ' ');
+  if (!cleaned) return '';
+  const words = cleaned.split(' ').slice(0, 5);
+  const titled = words.map(w => w ? w[0].toUpperCase() + w.slice(1).toLowerCase() : w).join(' ');
+  return titled.replace(/[.,;:!?]+$/, '').slice(0, 60);
+}
 import CoworkerBuilder from './components/CoworkerBuilder';
 import ChatPanel from './components/ChatPanel';
 import ActivityDashboard from './components/ActivityDashboard';
@@ -244,11 +253,11 @@ function SettingsMenu({ userName, orgName, currentStage, sb, myParticipantId, cr
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
   const { isAdmin, openAdmin } = useAuth();
-  const showSpend = stageReached(currentStage, '9');
+  const showSpend = stageReached(currentStage, '8');
   // Workshop-wide total — matches the pedagogy of the Usage tab
   // ("look how cheap the whole room is"). We always run the hook (can't
   // call hooks conditionally) but only render its result after Economics
-  // (Stage 9 in the 10-stage arc with Auditability inserted at 8).
+  // (Stage 8 in the 9-stage arc).
   const spend = useWorkshopUsageTotal(sb);
   const showPreferences = stageReached(currentStage, '2');
   const initial = (userName || '?').trim().charAt(0).toUpperCase();
@@ -475,8 +484,8 @@ function App() {
       // Graduation — the whole-room moment. Snap every participant
       // to the graduation tab so they see their scorecard together. Later
       // navigation away is fine; this only fires on the transition.
-      // Stage 10 in the 10-stage arc.
-      if (currentStage === '10') setActiveTab('graduation');
+      // Stage 9 in the 9-stage arc.
+      if (currentStage === '9') setActiveTab('graduation');
     }
     // Facilitator un-reveal safety net: if the active tab requires a stage
     // that's no longer reached (admin rolled the dial back), bounce to
@@ -485,7 +494,7 @@ function App() {
     // states. Chat is always available so it's the safe fallback.
     const TAB_STAGE_REQ = {
       files: '3', coworkers: '5', workflow: '6', activity: '7',
-      auditability: '8', usage: '9', graduation: '10',
+      usage: '8', graduation: '9',
     };
     const required = TAB_STAGE_REQ[activeTab];
     if (required && !stageReached(currentStage, required)) {
@@ -3116,16 +3125,11 @@ Answer in ONE sentence. If the user asks "how", a second sentence is allowed —
             </button>
           </RevealAt>
           <RevealAt stage="8" currentStage={currentStage}>
-            <button className={`tab-nav-item${activeTab === 'auditability' ? ' active' : ''}`} onClick={() => setActiveTab('auditability')}>
-              Auditability
-            </button>
-          </RevealAt>
-          <RevealAt stage="9" currentStage={currentStage}>
             <button className={`tab-nav-item${activeTab === 'usage' ? ' active' : ''}`} onClick={() => setActiveTab('usage')}>
               Economics
             </button>
           </RevealAt>
-          <RevealAt stage="10" currentStage={currentStage}>
+          <RevealAt stage="9" currentStage={currentStage}>
             <button className={`tab-nav-item${activeTab === 'graduation' ? ' active' : ''}`} onClick={() => setActiveTab('graduation')}>
               Graduation
             </button>
@@ -3293,20 +3297,7 @@ Answer in ONE sentence. If the user asks "how", a second sentence is allowed —
             />
           </div>
         )}
-        {activeTab === 'auditability' && stageReached(currentStage, '8') && (
-          <div className="tab-pane tab-pane-auditability">
-            <AuditabilityView
-              sb={sb}
-              myParticipantId={myParticipantId}
-              currentUserName={userName}
-              participants={participants || []}
-              workflowRuns={workflowRuns}
-              workflows={workflows}
-              callClaudeAPI={callClaudeAPI}
-            />
-          </div>
-        )}
-        {activeTab === 'usage' && stageReached(currentStage, '9') && (
+        {activeTab === 'usage' && stageReached(currentStage, '8') && (
           <div className="tab-pane tab-pane-usage">
             <UsageView
               sb={sb}

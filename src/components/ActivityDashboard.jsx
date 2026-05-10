@@ -14,7 +14,6 @@ import EducationalCue from './EducationalCue';
 import { CoworkerGlyph } from './Icon';
 import RichText from './RichText';
 import { stageReached } from './RevealAt';
-import StepCommentThread from './StepCommentThread';
 
 function isIconOrImage(avatar) {
   return typeof avatar === 'string' && (avatar.startsWith('icon:') || avatar.startsWith('data:'));
@@ -75,7 +74,7 @@ const STATUS_TONE = {
   interrupted:      'is-muted',
 };
 
-function RunCard({ run, onClick, onNudge, showEducationalCues, isOwner, onSubmitForReview, onUnsubmitFromReview }) {
+function RunCard({ run, onClick, onNudge, showEducationalCues }) {
   const eff = effectiveRunStatus(run);
   const cfg = STATUS_CONFIG[eff] || STATUS_CONFIG.running;
   const tone = STATUS_TONE[eff] || 'is-running';
@@ -83,13 +82,11 @@ function RunCard({ run, onClick, onNudge, showEducationalCues, isOwner, onSubmit
   const completedSteps = stepResults.filter(s => s.status === 'completed').length;
   const totalSteps = stepResults.length;
   const waitingStep = stepResults.find(s => s.status === 'waiting');
-  const isSubmitted = !!run.submittedForReviewAt;
 
   return (
-    <button className={`ob-card ${tone}${isSubmitted ? ' is-submitted' : ''}`} onClick={() => onClick(run.id)} type="button">
+    <button className={`ob-card ${tone}`} onClick={() => onClick(run.id)} type="button">
       <div className="ob-card-top">
         <span className="ob-card-name">{run.workflowName}</span>
-        {isSubmitted && <span className="ob-card-review-badge" title="The author has submitted this run for peer review">★ Up for review</span>}
         <span className={`ob-card-status ${tone}`}>
           {tone === 'is-running' && <span className="ob-card-status-dot is-pulse" />}
           {cfg.label}
@@ -143,29 +140,6 @@ function RunCard({ run, onClick, onNudge, showEducationalCues, isOwner, onSubmit
         </div>
       )}
 
-      {isOwner && (eff === 'completed' || eff === 'rerouted') && (
-        <div className="ob-card-review">
-          {isSubmitted
-            ? (
-              <button
-                className="ob-card-review-undo"
-                onClick={e => { e.stopPropagation(); onUnsubmitFromReview?.(run.id); }}
-              >
-                ✓ Up for review · Undo
-              </button>
-            )
-            : (
-              <button
-                className="ob-card-review-submit"
-                onClick={e => { e.stopPropagation(); onSubmitForReview?.(run); }}
-              >
-                Send for review
-              </button>
-            )
-          }
-        </div>
-      )}
-
       <EducationalCue cueId="activity-nudge" show={showEducationalCues && !!waitingStep} />
     </button>
   );
@@ -176,7 +150,7 @@ function RunCard({ run, onClick, onNudge, showEducationalCues, isOwner, onSubmit
 // node selects it on both sides; the sidebar row expands inline with the
 // step's output, decision log, or (if it's the run owner's turn) the
 // approval form.
-function RunDetailView({ run, onBack, onApprovalAction, onCancelRun, onNudge, showEducationalCues, currentUserName, approvals, onLoadApprovals, workflows, currentStage, sb, myParticipantId, participants, onSubmitForReview, onUnsubmitFromReview }) {
+function RunDetailView({ run, onBack, onApprovalAction, onCancelRun, onNudge, showEducationalCues, currentUserName, approvals, onLoadApprovals, workflows, currentStage, sb }) {
   const showCost = stageReached(currentStage, '8');
   const [costByStepId, setCostByStepId] = useState({});
 
@@ -227,12 +201,6 @@ function RunDetailView({ run, onBack, onApprovalAction, onCancelRun, onNudge, sh
     [run, approvals]
   );
 
-  // Map for resolving comment-author names in StepCommentThread.
-  const participantsById = useMemo(
-    () => Object.fromEntries((participants || []).map(p => [p.id, p])),
-    [participants]
-  );
-
   const [selectedStepId, setSelectedStepId] = useState(() => {
     // Default selection: the current action — running, waiting, or the
     // most recently completed step. Empty if nothing has moved yet.
@@ -280,11 +248,6 @@ function RunDetailView({ run, onBack, onApprovalAction, onCancelRun, onNudge, sh
             title="Stop this run"
           >Stop run</button>
         )}
-        {isOwner && (eff === 'completed' || eff === 'rerouted') && (
-          run.submittedForReviewAt
-            ? <button className="ob-card-review-undo" onClick={() => onUnsubmitFromReview?.(run.id)}>✓ Up for review · Undo</button>
-            : <button className="ob-card-review-submit" onClick={() => onSubmitForReview?.(run)}>Send for review</button>
-        )}
       </header>
 
       {run.caseInput && (
@@ -317,7 +280,7 @@ function RunDetailView({ run, onBack, onApprovalAction, onCancelRun, onNudge, sh
         </div>
 
         <aside className="ob-detail-sidebar">
-          <div className="ob-detail-sidebar-title">Decisions — comment on each step</div>
+          <div className="ob-detail-sidebar-title">Decisions</div>
           <DecisionList
             run={run}
             selectedStepId={selectedStepId}
@@ -326,11 +289,6 @@ function RunDetailView({ run, onBack, onApprovalAction, onCancelRun, onNudge, sh
             isOwner={isOwner}
             onApprovalAction={onApprovalAction}
             onNudge={onNudge}
-            sb={sb}
-            myParticipantId={myParticipantId}
-            currentUserName={currentUserName}
-            participantsById={participantsById}
-            isOwnRun={isOwner}
           />
         </aside>
       </div>
@@ -408,7 +366,7 @@ function DagStatusBadge({ status }) {
 // completed steps by completion time, then whatever's in progress, then
 // still-pending (dim). The selected row expands inline with output /
 // decision log / approval form.
-function DecisionList({ run, selectedStepId, onSelectStep, approvalsForStep, isOwner, onApprovalAction, onNudge, sb, myParticipantId, currentUserName, participantsById, isOwnRun }) {
+function DecisionList({ run, selectedStepId, onSelectStep, approvalsForStep, isOwner, onApprovalAction, onNudge }) {
   const [comment, setComment] = useState('');
 
   // Bucket + order the steps so the list reads as a timeline of decisions
@@ -439,11 +397,6 @@ function DecisionList({ run, selectedStepId, onSelectStep, approvalsForStep, isO
           setComment={setComment}
           onApprovalAction={onApprovalAction}
           onNudge={onNudge}
-          sb={sb}
-          myParticipantId={myParticipantId}
-          currentUserName={currentUserName}
-          participantsById={participantsById}
-          isOwnRun={isOwnRun}
         />
       ))}
     </div>
@@ -454,7 +407,7 @@ function DecisionList({ run, selectedStepId, onSelectStep, approvalsForStep, isO
 // Each row reads like a headline: actor + verb + object, with a small meta
 // line below (when, how long, comment). Expanded rows show the full output
 // / decision log / approval controls depending on step state.
-function DecisionRow({ step, run, isSelected, onSelect, approvalsForStep, isOwner, comment, setComment, onApprovalAction, onNudge, sb, myParticipantId, currentUserName, participantsById, isOwnRun }) {
+function DecisionRow({ step, run, isSelected, onSelect, approvalsForStep, isOwner, comment, setComment, onApprovalAction, onNudge }) {
   const state = step.status;
   const isReview = step.type === 'approval';
   const isTrigger = step.type === 'trigger';
@@ -652,21 +605,6 @@ function DecisionRow({ step, run, isSelected, onSelect, approvalsForStep, isOwne
             </div>
           )}
 
-          {/* Step comments — Stage 7's primary peer-audit affordance.
-              Trigger steps don't have a decision and so don't get a
-              comment thread. */}
-          {!isTrigger && sb && (
-            <StepCommentThread
-              runId={run.id}
-              stepId={step.stepId}
-              stepType={step.type}
-              myParticipantId={myParticipantId}
-              currentUserName={currentUserName}
-              participantsById={participantsById}
-              isOwnRun={isOwnRun}
-              sb={sb}
-            />
-          )}
         </div>
       )}
     </div>
@@ -682,48 +620,14 @@ export default function ActivityDashboard({ workflowRuns, onApprovalAction, onCa
   const selectedRun = selectedRunId ? workflowRuns.find(r => r.id === selectedRunId) : null;
 
   // Two buckets per the Stage 7 spec: Active (in-flight or waiting on a human)
-  // and Recent (finished, rejected, errored). Submitted-for-review runs float
-  // to the top of each bucket so peers can find the explicit asks first.
-  const sortReviewFirst = (a, b) => {
-    const aSub = !!a.submittedForReviewAt;
-    const bSub = !!b.submittedForReviewAt;
-    if (aSub !== bSub) return aSub ? -1 : 1;
-    if (aSub && bSub) return (b.submittedForReviewAt || 0) - (a.submittedForReviewAt || 0);
-    return 0;
-  };
+  // and Recent (finished, rejected, errored). Active sorts newest-first so a
+  // fresh run jumps to the top; Recent sorts by completion time.
   const activeRuns = workflowRuns
     .filter(r => r.status === 'running' || r.status === 'waiting_approval')
-    .sort((a, b) => {
-      const r = sortReviewFirst(a, b);
-      if (r !== 0) return r;
-      return (b.startedAt || 0) - (a.startedAt || 0);
-    });
+    .sort((a, b) => (b.startedAt || 0) - (a.startedAt || 0));
   const recentRuns = workflowRuns
     .filter(r => r.status === 'completed' || r.status === 'rejected' || r.status === 'error' || r.status === 'cancelled')
-    .sort((a, b) => {
-      const r = sortReviewFirst(a, b);
-      if (r !== 0) return r;
-      return (b.completedAt || b.startedAt || 0) - (a.completedAt || a.startedAt || 0);
-    });
-
-  async function handleSubmitForReview(run) {
-    if (!sb || !run) return;
-    const res = await sb.submitRunForReview({
-      runId: run.id,
-      workflowId: run.workflowId,
-      participantId: myParticipantId,
-    });
-    if (!res?.ok) {
-      console.error('[Observability] submitRunForReview failed', res?.error);
-    }
-  }
-  async function handleUnsubmitFromReview(runId) {
-    if (!sb) return;
-    const res = await sb.unsubmitRunFromReview(runId);
-    if (!res?.ok) {
-      console.error('[Observability] unsubmitRunFromReview failed', res?.error);
-    }
-  }
+    .sort((a, b) => (b.completedAt || b.startedAt || 0) - (a.completedAt || a.startedAt || 0));
   const pendingReviewCount = activeRuns.filter(r => r.status === 'waiting_approval').length;
   const [showRecent, setShowRecent] = useState(true);
   // Cap how many completed runs hit the DOM at once. With 35 pax × multiple
@@ -750,10 +654,6 @@ export default function ActivityDashboard({ workflowRuns, onApprovalAction, onCa
         workflows={workflows}
         currentStage={currentStage}
         sb={sb}
-        myParticipantId={myParticipantId}
-        participants={participants}
-        onSubmitForReview={handleSubmitForReview}
-        onUnsubmitFromReview={handleUnsubmitFromReview}
       />
     );
   }
@@ -763,9 +663,9 @@ export default function ActivityDashboard({ workflowRuns, onApprovalAction, onCa
       <header className="ob-page-head">
         <div className="ob-page-head-left">
           <div className="ob-page-eyebrow">Stage 7 · Observability</div>
-          <h1 className="ob-page-title">Read each others' work — <em>comment on every decision</em>.</h1>
+          <h1 className="ob-page-title">Everything your mixed team did, <em>on the record</em>.</h1>
           <p className="ob-page-sub">
-            Open a peer's run, click any step, and leave a note: was the AI right? was the human right? Comments are public, named, and live in realtime.
+            Each run is an artifact; each decision is logged.
           </p>
           <EducationalCue cueId="activity-dashboard" show={showEducationalCues} />
         </div>
@@ -801,16 +701,7 @@ export default function ActivityDashboard({ workflowRuns, onApprovalAction, onCa
             </div>
             <div className="ob-grid">
               {activeRuns.map(run => (
-                <RunCard
-                  key={run.id}
-                  run={run}
-                  onClick={setSelectedRunId}
-                  onNudge={onNudge}
-                  showEducationalCues={showEducationalCues}
-                  isOwner={run.startedBy === currentUserName}
-                  onSubmitForReview={handleSubmitForReview}
-                  onUnsubmitFromReview={handleUnsubmitFromReview}
-                />
+                <RunCard key={run.id} run={run} onClick={setSelectedRunId} onNudge={onNudge} showEducationalCues={showEducationalCues} />
               ))}
             </div>
           </div>
@@ -830,16 +721,7 @@ export default function ActivityDashboard({ workflowRuns, onApprovalAction, onCa
               <>
                 <div className="ob-grid">
                   {visibleRecent.map(run => (
-                    <RunCard
-                  key={run.id}
-                  run={run}
-                  onClick={setSelectedRunId}
-                  onNudge={onNudge}
-                  showEducationalCues={showEducationalCues}
-                  isOwner={run.startedBy === currentUserName}
-                  onSubmitForReview={handleSubmitForReview}
-                  onUnsubmitFromReview={handleUnsubmitFromReview}
-                />
+                    <RunCard key={run.id} run={run} onClick={setSelectedRunId} onNudge={onNudge} showEducationalCues={showEducationalCues} />
                   ))}
                 </div>
                 {hasMoreRecent && (

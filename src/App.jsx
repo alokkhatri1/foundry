@@ -8,6 +8,7 @@ import { COWORKER_ICONS } from './components/Icon';
 import FileExplorer from './components/FileExplorer';
 import FileEditor from './components/FileEditor';
 import ScenarioBuilder from './components/ScenarioBuilder';
+import AuditabilityView from './components/AuditabilityView';
 import { deriveCoworkerName } from './components/Capstone';
 import CoworkerBuilder from './components/CoworkerBuilder';
 import ChatPanel from './components/ChatPanel';
@@ -243,11 +244,11 @@ function SettingsMenu({ userName, orgName, currentStage, sb, myParticipantId, cr
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
   const { isAdmin, openAdmin } = useAuth();
-  const showSpend = stageReached(currentStage, '8');
+  const showSpend = stageReached(currentStage, '9');
   // Workshop-wide total — matches the pedagogy of the Usage tab
   // ("look how cheap the whole room is"). We always run the hook (can't
   // call hooks conditionally) but only render its result after Economics
-  // (Stage 8 in the 9-stage arc).
+  // (Stage 9 in the 10-stage arc with Auditability inserted at 8).
   const spend = useWorkshopUsageTotal(sb);
   const showPreferences = stageReached(currentStage, '2');
   const initial = (userName || '?').trim().charAt(0).toUpperCase();
@@ -474,8 +475,8 @@ function App() {
       // Graduation — the whole-room moment. Snap every participant
       // to the graduation tab so they see their scorecard together. Later
       // navigation away is fine; this only fires on the transition.
-      // Stage 9 in the 9-stage arc.
-      if (currentStage === '9') setActiveTab('graduation');
+      // Stage 10 in the 10-stage arc.
+      if (currentStage === '10') setActiveTab('graduation');
     }
     // Facilitator un-reveal safety net: if the active tab requires a stage
     // that's no longer reached (admin rolled the dial back), bounce to
@@ -484,7 +485,7 @@ function App() {
     // states. Chat is always available so it's the safe fallback.
     const TAB_STAGE_REQ = {
       files: '3', coworkers: '5', workflow: '6', activity: '7',
-      usage: '8', graduation: '9',
+      auditability: '8', usage: '9', graduation: '10',
     };
     const required = TAB_STAGE_REQ[activeTab];
     if (required && !stageReached(currentStage, required)) {
@@ -1679,8 +1680,10 @@ function App() {
         // step outputs (most finish under 500). Tighter cap directly
         // reduces TPM pressure during cohort-scale load, where the single
         // shared Anthropic org is the bottleneck. Structured assessments
-        // truncate gracefully at this ceiling.
-        max_tokens: 600,
+        // truncate gracefully at this ceiling. Callers that need more
+        // headroom (the AI auditor at Stage 8 needs ~4000 to write
+        // structured findings across many artefacts) can override.
+        max_tokens: options.max_tokens || 600,
         // Cache the system prompt so repeated turns with the same coworker /
         // skills / knowledge hit the 10x-cheaper cache_read rate. Claude
         // ignores cache_control below its 1024-token minimum gracefully.
@@ -3112,11 +3115,16 @@ Answer in ONE sentence. If the user asks "how", a second sentence is allowed —
             </button>
           </RevealAt>
           <RevealAt stage="8" currentStage={currentStage}>
+            <button className={`tab-nav-item${activeTab === 'auditability' ? ' active' : ''}`} onClick={() => setActiveTab('auditability')}>
+              Auditability
+            </button>
+          </RevealAt>
+          <RevealAt stage="9" currentStage={currentStage}>
             <button className={`tab-nav-item${activeTab === 'usage' ? ' active' : ''}`} onClick={() => setActiveTab('usage')}>
               Economics
             </button>
           </RevealAt>
-          <RevealAt stage="9" currentStage={currentStage}>
+          <RevealAt stage="10" currentStage={currentStage}>
             <button className={`tab-nav-item${activeTab === 'graduation' ? ' active' : ''}`} onClick={() => setActiveTab('graduation')}>
               Graduation
             </button>
@@ -3284,7 +3292,22 @@ Answer in ONE sentence. If the user asks "how", a second sentence is allowed —
             />
           </div>
         )}
-        {activeTab === 'usage' && stageReached(currentStage, '8') && (
+        {activeTab === 'auditability' && stageReached(currentStage, '8') && (
+          <div className="tab-pane tab-pane-auditability">
+            <AuditabilityView
+              sb={sb}
+              myParticipantId={myParticipantId}
+              currentUserName={userName}
+              participants={participants || []}
+              workflowRuns={workflowRuns}
+              workflows={workflows}
+              coworkers={coworkers || []}
+              flatFiles={flatFiles}
+              callClaudeAPI={callClaudeAPI}
+            />
+          </div>
+        )}
+        {activeTab === 'usage' && stageReached(currentStage, '9') && (
           <div className="tab-pane tab-pane-usage">
             <UsageView
               sb={sb}

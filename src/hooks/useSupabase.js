@@ -1482,6 +1482,75 @@ export default function useSupabase() {
     return () => { supabase.removeChannel(channel); };
   }, []);
 
+  // ===== AI audits (Stage 8 — Auditability) =====
+  // One row per (workshop, participant). Re-running an audit overwrites
+  // the previous findings; status moves pending → running → completed
+  // (or error). The findings JSONB carries per-artefact and overall reads.
+  const loadMyAiAudit = useCallback(async (participantId) => {
+    if (!isSupabaseConfigured || !roomIdRef.current || !participantId) return null;
+    const { data, error } = await supabase
+      .from('ai_audits')
+      .select('id, findings, prompt_version, status, error, model, input_tokens, output_tokens, cost_usd, created_at, updated_at')
+      .eq('workshop_id', roomIdRef.current)
+      .eq('participant_id', participantId)
+      .maybeSingle();
+    if (error) { console.error('[sb] loadMyAiAudit:', error.message); return null; }
+    return data;
+  }, []);
+
+  const loadAllRoomAiAudits = useCallback(async (workshopId) => {
+    if (!isSupabaseConfigured) return [];
+    const id = workshopId || roomIdRef.current;
+    if (!id) return [];
+    const { data, error } = await supabase
+      .from('ai_audits')
+      .select('id, participant_id, findings, status, model, input_tokens, output_tokens, cost_usd, created_at, updated_at')
+      .eq('workshop_id', id)
+      .order('updated_at', { ascending: false });
+    if (error) { console.error('[sb] loadAllRoomAiAudits:', error.message); return []; }
+    return data || [];
+  }, []);
+
+  // Upsert by (workshop, participant). The runner uses this to write
+  // pending → running → completed / error transitions plus the findings.
+  const saveAiAudit = useCallback(async ({ participantId, findings, status, error, model, inputTokens, outputTokens, costUsd, promptVersion }) => {
+    if (!isSupabaseConfigured || !roomIdRef.current) return { ok: false, error: 'Not connected' };
+    if (!participantId) return { ok: false, error: 'Missing participant_id' };
+    const payload = {
+      workshop_id: roomIdRef.current,
+      participant_id: participantId,
+      findings: findings || {},
+      status: status || 'pending',
+      error: error || null,
+      model: model || null,
+      input_tokens: inputTokens || 0,
+      output_tokens: outputTokens || 0,
+      cost_usd: costUsd || 0,
+      prompt_version: promptVersion || 1,
+      updated_at: new Date().toISOString(),
+    };
+    const { data, error: dbErr } = await supabase
+      .from('ai_audits')
+      .upsert(payload, { onConflict: 'workshop_id,participant_id' })
+      .select()
+      .single();
+    if (dbErr) { console.error('[sb] saveAiAudit:', dbErr.message); return { ok: false, error: dbErr.message }; }
+    return { ok: true, audit: data };
+  }, []);
+
+  const subscribeToAiAudits = useCallback((workshopId, onChange) => {
+    if (!isSupabaseConfigured) return () => {};
+    const id = workshopId || roomIdRef.current;
+    if (!id) return () => {};
+    const channel = supabase
+      .channel(`ai-audits-${id}-${Math.random().toString(36).slice(2, 8)}`)
+      .on('postgres_changes',
+        { event: '*', schema: 'public', table: 'ai_audits', filter: `workshop_id=eq.${id}` },
+        (payload) => onChange(payload))
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, []);
+
   // ===== Stage reflections (Stage 3-10 micro-surveys) =====
   // One row per (workshop, participant, stage). Both fields nullable so a
   // skipped row could still be persisted as a "we already asked" flag —
@@ -1676,6 +1745,7 @@ export default function useSupabase() {
     saveResearchConsent, loadMyResearchConsent, loadConsentMapForWorkshop,
     loadCapstoneDraft, loadCapstoneDrafts, saveCapstoneDraft, deleteCapstoneDraft,
     saveRunAudit, loadRunAudits, loadAllRoomRunAudits, subscribeToRunAudits,
+    loadMyAiAudit, loadAllRoomAiAudits, saveAiAudit, subscribeToAiAudits,
     loadMyStageReflections, saveStageReflection, loadAllStageReflections,
   }), []);
 }

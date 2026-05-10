@@ -15,7 +15,7 @@
 //              answers across stages become the participant's personal
 //              practice plan in the takeaway PDF.
 
-export const REFLECTION_STAGES = new Set(['3', '4', '5', '6', '7', '8']);
+export const REFLECTION_STAGES = new Set(['3', '4', '5', '6', '7', '8', '9']);
 
 export const REFLECTION_PROMPTS = {
   '3': {
@@ -54,6 +54,13 @@ export const REFLECTION_PROMPTS = {
     habit: 'A habit you’ll start to debug or improve AI work via the run log?',
   },
   '8': {
+    label: 'Auditability',
+    anchor: 'You read your work and your peers’ work twice — once through human eyes, once through AI eyes — and saw the gap.',
+    scaled: 'How clearly do you understand where AI review and human review each add the most value?',
+    note: 'In your own words: what did the AI catch that peers missed, and what did peers catch that the AI missed?',
+    habit: 'A habit you’ll start to combine AI review and human review on your real work?',
+  },
+  '9': {
     label: 'Economics',
     anchor: 'You saw the bill — the actual token cost of every AI conversation, run, and coworker your team consumed.',
     scaled: 'How clearly do you understand what drives token cost in an AI workflow?',

@@ -1,14 +1,15 @@
-// Build the takeaway as a designed PDF. The cover (eyebrow + title +
-// meta) stamps the top of every page, and the closer (brand mark +
-// generated-by line) stamps the bottom of every page. The reflection
-// cards fill the variable middle, paginating with card-aware breaks
-// so a single card never splits across the seam.
+// Build the takeaway as a designed PDF.
+//
+// Page rhythm:
+//   Page 1     — cover only, vertically centered (title-page treatment)
+//   Pages 2..N — reflection cards, two per page, with the closer footer
+//                stamped at the bottom of each
 //
 // Implementation: capture the whole .gr-takeaway DOM once, then carve
 // the resulting canvas into three regions — cover, cards, closer —
 // using the elements' measured top/bottom positions. The cards region
-// is sub-sliced per PDF page; cover and closer are addImage'd at the
-// same coords on every page.
+// is sub-sliced per PDF page; the cover lands once on page 1, the
+// closer lands as a footer on every content page.
 
 function safeName(s) {
   return (s || 'Participant').replace(/[^a-zA-Z0-9_-]+/g, '_');
@@ -98,38 +99,42 @@ export async function buildHandoutPdf({ userName, captureSelector = '.gr-takeawa
 
   const coverHeightPt = coverCanvas.height / pxPerPt;
   const closerHeightPt = closerCanvas.height / pxPerPt;
-  // Visual gap between cover and cards, and between cards and closer,
-  // so the cards body breathes a little inside the page frame.
+  // Top margin on content pages — matches the takeaway's outer
+  // padding so the cards body is visually anchored, not floating.
+  const contentTopPt = 56;
+  // Breathing gap between the last card slice and the closer footer.
   const gapPt = 16;
-  const cardsTopPt = coverHeightPt + gapPt;
-  const cardsAvailHeightPt = pageH - cardsTopPt - closerHeightPt - gapPt;
+  const cardsAvailHeightPt = pageH - contentTopPt - closerHeightPt - gapPt;
   const cardsAvailHeightPx = cardsAvailHeightPt * pxPerPt;
   // Card-aware break only honours a card boundary if it leaves at
   // least 25% of the cards body filled — otherwise we'd ship pages
   // that are almost empty in the middle.
   const minPageFillPx = cardsAvailHeightPx * 0.25;
 
-  let cardsPosPx = 0;
-  let pageIndex = 0;
-
-  // Paint the page cream before stamping the cover / cards / closer
-  // layers. Otherwise any uncovered area (e.g. when a card-aware
-  // break ends the cards body short of the closer) reveals jsPDF's
-  // default white page background as a band.
+  // Paint the page cream before stamping any layers. Otherwise any
+  // uncovered area reveals jsPDF's default white page background.
   function paintPageBg() {
     pdf.setFillColor(251, 244, 238); // var(--cream) #FBF4EE
     pdf.rect(0, 0, pageW, pageH, 'F');
   }
 
-  // If there are no cards (participant didn't reflect on anything), the
-  // PDF is just a one-page cover + closer.
+  // Page 1 — cover only, vertically centered. Title-page treatment so
+  // the editorial moment of "your reflections" gets to breathe before
+  // the dense Q&A cards begin.
+  paintPageBg();
+  const coverY = Math.max(contentTopPt, (pageH - coverHeightPt) / 2);
+  pdf.addImage(coverCanvas, 'PNG', 0, coverY, pageW, coverHeightPt);
+
+  // No cards (participant didn't reflect on anything): drop the closer
+  // at the bottom of the cover page and ship a one-page artifact.
   if (cardsCanvas.height <= 0 || cardsAvailHeightPx <= 0) {
-    paintPageBg();
-    pdf.addImage(coverCanvas, 'PNG', 0, 0, pageW, coverHeightPt);
     pdf.addImage(closerCanvas, 'PNG', 0, pageH - closerHeightPt, pageW, closerHeightPt);
     return { doc: pdf, filename: `${safeName(userName)}_Foundry_Takeaway.pdf` };
   }
 
+  // Pages 2..N — cards (top-anchored) + closer (bottom-anchored). No
+  // repeated cover header; each content page carries a uniform rhythm.
+  let cardsPosPx = 0;
   while (cardsPosPx < cardsCanvas.height) {
     const remainingPx = cardsCanvas.height - cardsPosPx;
     let endPx = Math.min(cardsPosPx + cardsAvailHeightPx, cardsCanvas.height);
@@ -154,14 +159,12 @@ export async function buildHandoutPdf({ userName, captureSelector = '.gr-takeawa
     const cardsSlice = subCanvas(cardsCanvas, cardsPosPx, endPx);
     const cardsSliceHeightPt = cardsSlice.height / pxPerPt;
 
-    if (pageIndex > 0) pdf.addPage();
+    pdf.addPage();
     paintPageBg();
-    pdf.addImage(coverCanvas, 'PNG', 0, 0, pageW, coverHeightPt);
-    pdf.addImage(cardsSlice, 'PNG', 0, cardsTopPt, pageW, cardsSliceHeightPt);
+    pdf.addImage(cardsSlice, 'PNG', 0, contentTopPt, pageW, cardsSliceHeightPt);
     pdf.addImage(closerCanvas, 'PNG', 0, pageH - closerHeightPt, pageW, closerHeightPt);
 
     cardsPosPx = endPx;
-    pageIndex++;
   }
 
   return { doc: pdf, filename: `${safeName(userName)}_Foundry_Takeaway.pdf` };

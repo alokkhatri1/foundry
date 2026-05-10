@@ -3089,27 +3089,21 @@ Answer in ONE sentence. If the user asks "how", a second sentence is allowed —
     );
   }
 
-  // Demographics gate. Authed + joined participants who haven't submitted
-  // the baseline questionnaire are bounced to the form before the app
-  // shell renders. While we're still resolving the row, paint a quiet
-  // loading shell so we don't flash the workshop UI.
-  if (isJoined && demographicsStatus !== 'submitted') {
+  // Demographics gate. Only blocks when we've *confirmed* the participant
+  // hasn't submitted yet (status === 'pending'). While the load is still
+  // in flight (status === 'unknown'), let the app shell render — the
+  // gate will appear the moment the load resolves. Earlier we showed a
+  // 'Loading…' screen on 'unknown', but that hung forever whenever the
+  // bootstrap effect bailed (stale localStorage room, auth flake, etc.).
+  if (isJoined && demographicsStatus === 'pending') {
     return (
       <AuthGate onJoin={handleJoin} workshopCode={workshopCode}>
-        {demographicsStatus === 'pending' ? (
-          <DemographicsForm
-            userName={userName}
-            onSubmit={handleSaveDemographics}
-            submitting={savingDemographics}
-            errorMessage={demographicsError}
-          />
-        ) : (
-          <div className="sv-page">
-            <main className="sv-container">
-              <p style={{ color: 'var(--ink-muted)', fontStyle: 'italic' }}>Loading…</p>
-            </main>
-          </div>
-        )}
+        <DemographicsForm
+          userName={userName}
+          onSubmit={handleSaveDemographics}
+          submitting={savingDemographics}
+          errorMessage={demographicsError}
+        />
       </AuthGate>
     );
   }

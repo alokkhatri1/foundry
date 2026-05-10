@@ -58,14 +58,29 @@ export default function HandoutPage({
         </div>
       </header>
 
-      {/* Per-stage reflection cards */}
+      {/* Per-stage reflection cards. Each card now reads as a Q&A: the
+          actual prompt text appears above each answer, so the takeaway
+          stands on its own as a record of what was asked AND what was
+          said. */}
       <div className="gr-takeaway-cards">
         {filledStages.map(({ stage, prompt, r }) => (
           <article key={stage} className="gr-takeaway-card">
             <header className="gr-takeaway-card-head">
               <div className="gr-takeaway-card-meta">
                 <span className="gr-takeaway-card-stage">Stage {stage}</span>
-                {typeof r.confidence === 'number' && (
+              </div>
+              <h2 className="gr-takeaway-card-label">{prompt?.label || `Stage ${stage}`}</h2>
+              {prompt?.anchor && (
+                <p className="gr-takeaway-card-anchor"><em>{prompt.anchor}</em></p>
+              )}
+            </header>
+
+            {typeof r.confidence === 'number' && (
+              <div className="gr-takeaway-card-section">
+                {prompt?.scaled && (
+                  <div className="gr-takeaway-card-question">{prompt.scaled}</div>
+                )}
+                <div className="gr-takeaway-card-rating-row">
                   <span className="gr-takeaway-card-rating" aria-label={`Understanding ${r.confidence} of 5`}>
                     {[1, 2, 3, 4, 5].map(n => (
                       <span
@@ -74,26 +89,26 @@ export default function HandoutPage({
                         aria-hidden
                       />
                     ))}
-                    <span className="gr-takeaway-card-rating-num">{r.confidence} / 5</span>
                   </span>
-                )}
+                  <span className="gr-takeaway-card-rating-num">{r.confidence} / 5</span>
+                </div>
               </div>
-              <h2 className="gr-takeaway-card-label">{prompt?.label || `Stage ${stage}`}</h2>
-              {prompt?.anchor && (
-                <p className="gr-takeaway-card-anchor"><em>{prompt.anchor}</em></p>
-              )}
-            </header>
+            )}
 
             {r.note && r.note.trim() && (
               <div className="gr-takeaway-card-section">
-                <div className="gr-takeaway-card-section-label">What you wrote</div>
+                {prompt?.note && (
+                  <div className="gr-takeaway-card-question">{prompt.note}</div>
+                )}
                 <blockquote className="gr-takeaway-card-quote">{r.note.trim()}</blockquote>
               </div>
             )}
 
             {r.habit && r.habit.trim() && (
               <div className="gr-takeaway-card-section">
-                <div className="gr-takeaway-card-section-label">What you’ll try</div>
+                {prompt?.habit && (
+                  <div className="gr-takeaway-card-question">{prompt.habit}</div>
+                )}
                 <blockquote className="gr-takeaway-card-quote">{r.habit.trim()}</blockquote>
               </div>
             )}

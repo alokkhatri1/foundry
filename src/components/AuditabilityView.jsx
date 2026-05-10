@@ -250,6 +250,7 @@ export default function AuditabilityView({
 
   return (
     <div className="au-page">
+      <div className="au-page-inner">
       <header className="au-page-head">
         <div>
           <div className="au-eyebrow"><span className="au-eyebrow-dot" />STAGE 8 · AUDITABILITY</div>
@@ -349,6 +350,7 @@ export default function AuditabilityView({
           )}
         </>
       )}
+      </div>
     </div>
   );
 }

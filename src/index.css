@@ -16537,12 +16537,17 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
 }
 
 /* ===== Auditability page (Stage 8) ===== */
+/* Outer container takes the full tab pane width and owns the scroll, so
+   the scrollbar lands on the viewport's right edge like every other
+   tab. .au-page-inner is the centred content rail. */
 .au-page {
+  height: 100%;
+  overflow-y: auto;
+}
+.au-page-inner {
   padding: 32px 40px 64px;
   max-width: 980px;
   margin: 0 auto;
-  height: 100%;
-  overflow-y: auto;
 }
 .au-page-head {
   display: flex; justify-content: space-between; align-items: flex-start; gap: 24px;

@@ -330,6 +330,7 @@ function RunDetailView({ run, onBack, onApprovalAction, onCancelRun, onNudge, sh
             myParticipantId={myParticipantId}
             currentUserName={currentUserName}
             participantsById={participantsById}
+            isOwnRun={isOwner}
           />
         </aside>
       </div>
@@ -407,7 +408,7 @@ function DagStatusBadge({ status }) {
 // completed steps by completion time, then whatever's in progress, then
 // still-pending (dim). The selected row expands inline with output /
 // decision log / approval form.
-function DecisionList({ run, selectedStepId, onSelectStep, approvalsForStep, isOwner, onApprovalAction, onNudge, sb, myParticipantId, currentUserName, participantsById }) {
+function DecisionList({ run, selectedStepId, onSelectStep, approvalsForStep, isOwner, onApprovalAction, onNudge, sb, myParticipantId, currentUserName, participantsById, isOwnRun }) {
   const [comment, setComment] = useState('');
 
   // Bucket + order the steps so the list reads as a timeline of decisions
@@ -442,6 +443,7 @@ function DecisionList({ run, selectedStepId, onSelectStep, approvalsForStep, isO
           myParticipantId={myParticipantId}
           currentUserName={currentUserName}
           participantsById={participantsById}
+          isOwnRun={isOwnRun}
         />
       ))}
     </div>
@@ -452,7 +454,7 @@ function DecisionList({ run, selectedStepId, onSelectStep, approvalsForStep, isO
 // Each row reads like a headline: actor + verb + object, with a small meta
 // line below (when, how long, comment). Expanded rows show the full output
 // / decision log / approval controls depending on step state.
-function DecisionRow({ step, run, isSelected, onSelect, approvalsForStep, isOwner, comment, setComment, onApprovalAction, onNudge, sb, myParticipantId, currentUserName, participantsById }) {
+function DecisionRow({ step, run, isSelected, onSelect, approvalsForStep, isOwner, comment, setComment, onApprovalAction, onNudge, sb, myParticipantId, currentUserName, participantsById, isOwnRun }) {
   const state = step.status;
   const isReview = step.type === 'approval';
   const isTrigger = step.type === 'trigger';
@@ -661,6 +663,7 @@ function DecisionRow({ step, run, isSelected, onSelect, approvalsForStep, isOwne
               myParticipantId={myParticipantId}
               currentUserName={currentUserName}
               participantsById={participantsById}
+              isOwnRun={isOwnRun}
               sb={sb}
             />
           )}

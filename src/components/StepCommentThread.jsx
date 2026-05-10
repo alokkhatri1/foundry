@@ -30,6 +30,7 @@ function promptForStepType(type) {
 export default function StepCommentThread({
   runId, stepId, stepType,
   myParticipantId, currentUserName, participantsById,
+  isOwnRun,
   sb,
 }) {
   const prompt = promptForStepType(stepType);
@@ -111,29 +112,35 @@ export default function StepCommentThread({
           })}
         </div>
       )}
-      <div className="sc-thread-input">
-        <textarea
-          className="sc-thread-textarea"
-          rows={2}
-          value={draft}
-          onChange={e => setDraft(e.target.value)}
-          placeholder="Add a comment on this decision…"
-          onKeyDown={e => {
-            if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') { e.preventDefault(); submit(); }
-          }}
-        />
-        <div className="sc-thread-actions">
-          {err && <span className="sc-thread-err">{err}</span>}
-          <button
-            type="button"
-            className="sc-thread-submit"
-            onClick={submit}
-            disabled={!draft.trim() || submitting}
-          >
-            {submitting ? 'Posting…' : 'Post comment'}
-          </button>
+      {isOwnRun ? (
+        <div className="sc-thread-self-note">
+          You can't review your own run — peers will leave their comments here. Send the run for review on the dashboard to invite their reads.
         </div>
-      </div>
+      ) : (
+        <div className="sc-thread-input">
+          <textarea
+            className="sc-thread-textarea"
+            rows={2}
+            value={draft}
+            onChange={e => setDraft(e.target.value)}
+            placeholder="Add a comment on this decision…"
+            onKeyDown={e => {
+              if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') { e.preventDefault(); submit(); }
+            }}
+          />
+          <div className="sc-thread-actions">
+            {err && <span className="sc-thread-err">{err}</span>}
+            <button
+              type="button"
+              className="sc-thread-submit"
+              onClick={submit}
+              disabled={!draft.trim() || submitting}
+            >
+              {submitting ? 'Posting…' : 'Post comment'}
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

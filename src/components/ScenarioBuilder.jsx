@@ -732,12 +732,6 @@ function injectCaseInput(rows, caseInput) {
   return [{ id: CASE_INPUT_ID, caseInput: caseInput || '' }, ...without];
 }
 
-function deriveDraftName(caseInput) {
-  const t = (caseInput || '').trim().replace(/\s+/g, ' ');
-  if (!t) return 'Untitled workflow';
-  return t.length > 60 ? t.slice(0, 60) + '…' : t;
-}
-
 export default function ScenarioBuilder({
   sb,
   myParticipantId,
@@ -750,6 +744,7 @@ export default function ScenarioBuilder({
   const [drafts, setDrafts] = useState([]);
   const [activeDraftId, setActiveDraftId] = useState(null);
   const [rows, setRows] = useState(null);
+  const [workflowName, setWorkflowName] = useState('');
   const [caseInput, setCaseInput] = useState('');
   const [saving, setSaving] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -802,6 +797,7 @@ export default function ScenarioBuilder({
       const ci = extractCaseInput(first.rows);
       const realRows = stripCaseInput(first.rows);
       setCaseInput(ci);
+      setWorkflowName(first.name || '');
       setRows(realRows.length > 0 ? realRows.map(migrateRow) : [newRow()]);
     }).catch(() => { if (!cancelled) restoreFromLocal(); });
     return () => { cancelled = true; };
@@ -872,7 +868,7 @@ export default function ScenarioBuilder({
       const res = await sb.saveCapstoneDraft({
         participantId: myParticipantId,
         id: activeDraftId,
-        name: deriveDraftName(caseInput),
+        name: workflowName.trim() || 'Untitled workflow',
         rows: blob,
       });
       setSaving(false);
@@ -889,7 +885,7 @@ export default function ScenarioBuilder({
       }
     }, 800);
     return () => clearTimeout(handle);
-  }, [rows, caseInput, sb, myParticipantId, activeDraftId]);
+  }, [rows, caseInput, workflowName, sb, myParticipantId, activeDraftId]);
 
   function handleSwitchDraft(draftId) {
     if (draftId === activeDraftId) return;
@@ -900,6 +896,7 @@ export default function ScenarioBuilder({
     const ci = extractCaseInput(target.rows);
     const realRows = stripCaseInput(target.rows);
     setCaseInput(ci);
+    setWorkflowName(target.name || '');
     setRows(realRows.length > 0 ? realRows.map(migrateRow) : [newRow()]);
     setCollapsed({});
   }
@@ -908,6 +905,7 @@ export default function ScenarioBuilder({
     skipNextSaveRef.current = false; // let the empty-state save create the row
     setActiveDraftId(null);
     setCaseInput('');
+    setWorkflowName('');
     setRows([newRow()]);
     setCollapsed({});
   }
@@ -959,12 +957,15 @@ export default function ScenarioBuilder({
     return me ? [me] : [];
   }, [participants, myParticipantId, currentUserName]);
 
-  // Run gate: a case must be declared AND every step must be complete.
-  // The case is the orchestration's anchor; without it the AI coworkers
-  // have no concrete material to chew on.
+  // Run gate: a workflow name AND a case must be declared, AND every step
+  // must be complete. The name is what the workflow IS; the case is what
+  // it handles this time. Both are required before Run.
+  const nameReady = (workflowName || '').trim().length > 0;
   const caseReady = (caseInput || '').trim().length > 0;
-  const canRun = caseReady && allComplete && !sending && !running;
-  const runBlockedReason = !caseReady
+  const canRun = nameReady && caseReady && allComplete && !sending && !running;
+  const runBlockedReason = !nameReady
+    ? 'Name the workflow first — what is this thing called?'
+    : !caseReady
     ? 'Describe the case first — what one real situation are you working through?'
     : (incompleteReason || `Fill every step first (${completeCount}/${rows.length} complete)`);
 
@@ -996,7 +997,7 @@ export default function ScenarioBuilder({
     setSending(true);
     try {
       console.log('[ScenarioBuilder] Calling onRunWorkflow...');
-      await onRunWorkflow(rows, caseInput);
+      await onRunWorkflow(rows, caseInput, workflowName.trim());
       console.log('[ScenarioBuilder] onRunWorkflow returned');
     } catch (err) {
       console.error('[ScenarioBuilder] onRunWorkflow threw', err);
@@ -1091,6 +1092,20 @@ export default function ScenarioBuilder({
           </button>
         </div>
       </header>
+
+      <section className="cs-name-input">
+        <label className="cs-case-input-label" htmlFor="cs-workflow-name">
+          Workflow name
+        </label>
+        <input
+          id="cs-workflow-name"
+          className="cs-name-input-textarea"
+          value={workflowName}
+          onChange={e => setWorkflowName(e.target.value)}
+          placeholder="e.g. Credit risk review · Customer onboarding · Loan exception triage"
+          maxLength={120}
+        />
+      </section>
 
       <section className="cs-case-input">
         <label className="cs-case-input-label" htmlFor="cs-case-input">

@@ -13532,6 +13532,36 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
   line-height: 1.55;
 }
 
+/* Workflow name — what this thing IS. Required, separate from the case.
+   Same visual chrome as the case input but a single-line input since the
+   name should be terse. */
+.cs-name-input {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 16px 0 12px;
+  padding: 12px 20px;
+  background: var(--paper);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+}
+.cs-name-input-textarea {
+  font-family: var(--serif, inherit);
+  font-size: 18px;
+  line-height: 1.4;
+  color: var(--ink);
+  background: transparent;
+  border: none;
+  outline: none;
+  padding: 0;
+  width: 100%;
+}
+.cs-name-input-textarea::placeholder {
+  color: var(--text-muted);
+  font-style: italic;
+  font-size: 16px;
+}
+
 /* Case input — the anchor of the case-driven build. Sits between the page
    header and the step list so it reads as "this is what every step is in
    service of". Larger type than the step body to feel weighty. */
@@ -16756,6 +16786,15 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
 }
 .sc-comment-meta strong { color: var(--ink); font-weight: 500; }
 .sc-comment-body { color: var(--ink); white-space: pre-wrap; }
+.sc-thread-self-note {
+  padding: 10px 12px;
+  background: var(--surface-muted);
+  border-radius: 4px;
+  font-size: 13px;
+  color: var(--text-muted);
+  font-style: italic;
+  line-height: 1.5;
+}
 .sc-thread-input {
   display: flex; flex-direction: column; gap: 6px;
 }

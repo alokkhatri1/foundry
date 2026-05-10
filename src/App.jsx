@@ -1343,10 +1343,11 @@ function App() {
   // passed straight to runWorkflow (the runWorkflow signature accepts a
   // workflow object) so we don't have to wait for setWorkflows to commit
   // before we can run it.
-  async function handleRunCaseWorkflow(rows, caseInput) {
+  async function handleRunCaseWorkflow(rows, caseInput, workflowName) {
     console.log('[handleRunCaseWorkflow] entered', {
       rowCount: (rows || []).length,
       caseInputLen: (caseInput || '').length,
+      workflowName,
       hasUserName: !!userName,
       hasMyParticipantId: !!myParticipantId,
       creditsExhausted,
@@ -1434,7 +1435,7 @@ function App() {
     }));
     const newWf = {
       id: wfId,
-      name: (caseInput || '').trim().slice(0, 60) || 'Case run',
+      name: (workflowName || '').trim() || (caseInput || '').trim().slice(0, 60) || 'Case run',
       steps: builtSteps,
       nodes,
       edges,

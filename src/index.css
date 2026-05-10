@@ -16537,7 +16537,13 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
 }
 
 /* ===== Auditability page (Stage 8) ===== */
-.au-page { padding: 32px 40px 64px; max-width: 980px; margin: 0 auto; }
+.au-page {
+  padding: 32px 40px 64px;
+  max-width: 980px;
+  margin: 0 auto;
+  height: 100%;
+  overflow-y: auto;
+}
 .au-page-head {
   display: flex; justify-content: space-between; align-items: flex-start; gap: 24px;
   margin-bottom: 24px; padding-bottom: 24px; border-bottom: 1px solid var(--border-color);

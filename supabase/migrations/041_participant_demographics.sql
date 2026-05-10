@@ -34,6 +34,15 @@ create index if not exists participant_demographics_workshop_idx
   on participant_demographics(workshop_id);
 
 alter table participant_demographics enable row level security;
+-- Both roles get the same posture as research_consent: anon for the
+-- pre-login JoinScreen path, authenticated once Supabase auth has stamped
+-- the request. Missing the authenticated policy was the cause of the
+-- "new row violates RLS" error participants hit at first sign-in.
+create policy "auth full access participant_demographics"
+  on participant_demographics
+  for all to authenticated
+  using (true)
+  with check (true);
 create policy "anon full access participant_demographics"
   on participant_demographics
   for all to anon

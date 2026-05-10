@@ -51,7 +51,7 @@ export const REFLECTION_PROMPTS = {
     anchor: 'You watched a workflow run play out — every step, every approval, every tool call on the record.',
     scaled: 'How clearly do you understand what a run log tells you?',
     note: 'In your own words: which signal in the audit log tells you the most about whether a run went right or wrong?',
-    habit: 'When an AI run feels off, what’s the one thing in the audit log you’ll open to check first?',
+    habit: 'When an AI’s answer feels off, what’s the first thing you’ll start checking to figure out what went wrong?',
   },
   '8': {
     label: 'Economics',

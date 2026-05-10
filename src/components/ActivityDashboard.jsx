@@ -120,7 +120,10 @@ function RunCard({ run, onClick, onNudge, showEducationalCues }) {
         <span className="ob-card-flow-count">{completedSteps}/{totalSteps}</span>
       </div>
 
-      {run.caseInput && (
+      {/* Workflow name now plays both roles ("what this is" + "what its
+          coworkers chew on"). When caseInput equals workflowName, skip
+          the duplicate render — the title already shows it. */}
+      {run.caseInput && run.caseInput !== run.workflowName && (
         <p className="ob-card-case">{run.caseInput}</p>
       )}
 
@@ -250,7 +253,9 @@ function RunDetailView({ run, onBack, onApprovalAction, onCancelRun, onNudge, sh
         )}
       </header>
 
-      {run.caseInput && (
+      {/* Same dedup as the card: skip the case row when it just echoes
+          the workflow name (which is the post-2026-05-10 default). */}
+      {run.caseInput && run.caseInput !== run.workflowName && (
         <div className="ob-detail-case">
           <span className="ob-detail-case-label">Case input</span>
           <span className="ob-detail-case-text">{run.caseInput}</span>

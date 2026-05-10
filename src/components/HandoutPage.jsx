@@ -12,7 +12,10 @@ import { LEVELS } from '../utils/graduationScorecard';
 // page-height chunks. Empty stages are skipped so the doc only grows
 // with what the participant actually generated.
 
-const REFLECTION_STAGES_ORDERED = ['3', '4', '5', '6', '7', '8', '9', '10'];
+// Stages 1, 2, and 9 (Graduation) don't have reflection prompts in the
+// 9-stage arc, so they're absent here. The takeaway PDF iterates this
+// list and renders one card per stage that has content.
+const REFLECTION_STAGES_ORDERED = ['3', '4', '5', '6', '7', '8'];
 
 export default function HandoutPage({
   userName,

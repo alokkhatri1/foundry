@@ -75,9 +75,9 @@ const SCORE_FIELDS = [
   { key: 'satisfaction',         label: 'Satisfaction' },
   { key: 'relevance',            label: 'Relevance' },
   { key: 'clarity',              label: 'Clarity' },
-  { key: 'trainer_knowledge',    label: 'Trainer content clarity' },
-  { key: 'trainer_delivery',     label: 'Trainer pacing' },
-  { key: 'trainer_engagement',   label: 'Workshop content' },
+  { key: 'trainer_knowledge',    label: 'Trainer knowledge' },
+  { key: 'trainer_delivery',     label: 'Trainer delivery' },
+  { key: 'trainer_engagement',   label: 'Trainer engagement' },
   { key: 'materials_quality',    label: 'Slides & content' },
   { key: 'theory_practice',      label: 'Explain / practice mix' },
   { key: 'improved_skills',      label: 'Improved skills' },
@@ -978,11 +978,8 @@ function WorkshopRecap({ feedback, humanParticipants }) {
   };
   const avgSatisfaction = avgOf('satisfaction');
   const avgImproved = avgOf('improved_skills');
-  // Trainer composite reflects only trainer-skill columns (clarity +
-  // pacing) — trainer_engagement now holds workshop-content rating, so
-  // mixing it back in would muddy the Recap tile.
   const trainerComposite = (() => {
-    const parts = ['trainer_knowledge', 'trainer_delivery'].map(avgOf).filter(v => v !== null);
+    const parts = ['trainer_knowledge', 'trainer_delivery', 'trainer_engagement'].map(avgOf).filter(v => v !== null);
     if (parts.length === 0) return null;
     return parts.reduce((a, b) => a + b, 0) / parts.length;
   })();

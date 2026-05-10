@@ -186,11 +186,16 @@ export default function AuditabilityView({
     return () => unsubs.forEach(u => u && u());
   }, [sb, workflowRuns]);
 
-  // Runs the current user has commented on — the unlock condition for
-  // Stage 8 and the set of runs we'll audit with AI.
+  // Runs the current user has commented on AND that the run owner has
+  // explicitly submitted for review — the unlock condition for Stage 8
+  // and the set of runs we'll audit with AI. Restricting to submitted
+  // runs sharpens the signal: a peer's comment on an unsubmitted draft
+  // run isn't really a "review" — the author wasn't asking for one.
   const myAuditedRunIds = useMemo(() => {
     const ids = new Set();
     for (const [runId, list] of Object.entries(allCommentsByRun)) {
+      const run = runsById[runId];
+      if (!run?.submittedForReviewAt) continue;
       for (const c of list) {
         if (c.author_kind === 'human' && c.author_id === myParticipantId) {
           ids.add(runId);
@@ -199,7 +204,7 @@ export default function AuditabilityView({
       }
     }
     return [...ids];
-  }, [allCommentsByRun, myParticipantId]);
+  }, [allCommentsByRun, myParticipantId, runsById]);
 
   // Load existing AI audit status rows for these runs (we still use
   // ai_run_audits as a status table even though the actual content
@@ -319,8 +324,8 @@ export default function AuditabilityView({
                 : `One more run with comments at Stage 7 unlocks the comparison.`}
             </div>
             <div className="au-gate-sub">
-              You've commented on <strong>{myAuditedRunIds.length}</strong> of {MIN_AUDITED_RUNS} runs.
-              Open Observability, click into a peer's run, click any step, and leave a comment on the decision.
+              You've commented on <strong>{myAuditedRunIds.length}</strong> of {MIN_AUDITED_RUNS} <em>submitted-for-review</em> runs.
+              Open Observability, find runs the author flagged <em>Up for review</em> (orange star), click into one, click any step, and leave a comment on the decision.
             </div>
           </div>
         )}

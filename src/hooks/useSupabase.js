@@ -1011,6 +1011,8 @@ export default function useSupabase() {
       stepResults: row.step_results || [],
       startedAt: row.started_at ? new Date(row.started_at).getTime() : Date.now(),
       completedAt: row.completed_at ? new Date(row.completed_at).getTime() : null,
+      submittedForReviewAt: row.submitted_for_review_at ? new Date(row.submitted_for_review_at).getTime() : null,
+      submittedForReviewBy: row.submitted_for_review_by || null,
     };
   }
 
@@ -1027,12 +1029,56 @@ export default function useSupabase() {
     if (!isSupabaseConfigured || !roomIdRef.current) return [];
     const { data, error } = await supabase
       .from('workflow_runs')
-      .select('id, room_id, workflow_id, workflow_name, status, current_step_index, started_by, step_results, started_at, completed_at')
+      .select('id, room_id, workflow_id, workflow_name, status, current_step_index, started_by, step_results, started_at, completed_at, submitted_for_review_at, submitted_for_review_by')
       .eq('room_id', roomIdRef.current)
       .order('started_at', { ascending: false })
       .limit(100);
     if (error) { console.error('[sb] loadWorkflowRuns:', error.message); return []; }
     return (data || []).map(mapWorkflowRunRow);
+  }, []);
+
+  // Submit a run for peer review. One submission per workflow at a
+  // time — submitting a fresh run clears the flag from any prior runs
+  // of the same workflow_id in the same room.
+  const submitRunForReview = useCallback(async ({ runId, workflowId, participantId }) => {
+    if (!isSupabaseConfigured || !roomIdRef.current) return { ok: false, error: 'Not connected' };
+    if (!runId || !workflowId) return { ok: false, error: 'Missing runId or workflowId' };
+    // Clear other runs of the same workflow first.
+    const { error: clearErr } = await supabase
+      .from('workflow_runs')
+      .update({ submitted_for_review_at: null, submitted_for_review_by: null })
+      .eq('workflow_id', workflowId)
+      .neq('id', runId)
+      .not('submitted_for_review_at', 'is', null);
+    if (clearErr) {
+      console.error('[sb] submitRunForReview clear:', clearErr.message);
+      return { ok: false, error: clearErr.message };
+    }
+    const { data, error } = await supabase
+      .from('workflow_runs')
+      .update({
+        submitted_for_review_at: new Date().toISOString(),
+        submitted_for_review_by: participantId || null,
+      })
+      .eq('id', runId)
+      .select('id, submitted_for_review_at, submitted_for_review_by')
+      .single();
+    if (error) {
+      console.error('[sb] submitRunForReview set:', error.message);
+      return { ok: false, error: error.message };
+    }
+    return { ok: true, run: data };
+  }, []);
+
+  // Retract a run from review.
+  const unsubmitRunFromReview = useCallback(async (runId) => {
+    if (!isSupabaseConfigured || !runId) return { ok: false };
+    const { error } = await supabase
+      .from('workflow_runs')
+      .update({ submitted_for_review_at: null, submitted_for_review_by: null })
+      .eq('id', runId);
+    if (error) { console.error('[sb] unsubmitRunFromReview:', error.message); return { ok: false, error: error.message }; }
+    return { ok: true };
   }, []);
 
   // Decision log for a specific run: every Approve/Reject with who, when,
@@ -1862,6 +1908,7 @@ export default function useSupabase() {
     loadTools, saveTool, deleteTool,
     loadWorkflows, saveWorkflow, deleteWorkflow,
     saveMessage, saveWorkflowRun, loadWorkflowRuns, loadApprovals, loadAllRoomApprovals, logToolCall, logApproval,
+    submitRunForReview, unsubmitRunFromReview,
     logLlmUsage, loadMyUsage, subscribeToMyUsage,
     loadWorkshopUsage, subscribeToWorkshopUsage, loadRunUsage, loadAdminWorkshopUsage,
     subscribeToRoom, trackPresence, leavePresence,

@@ -16681,6 +16681,42 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
   .au-page-actions { align-items: flex-start; flex-direction: row; }
 }
 
+/* ===== Submit-for-review on run cards ===== */
+.ob-card.is-submitted {
+  border-color: #c8956c;
+  box-shadow: 0 0 0 1px #c8956c inset;
+}
+.ob-card-review-badge {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 2px 8px;
+  background: #fdf0e6; color: #8c5a32;
+  border-radius: 999px;
+  font-size: 11px; font-weight: 600;
+  letter-spacing: 0.04em; text-transform: uppercase;
+  margin-left: 8px;
+}
+.ob-card-review {
+  display: flex; justify-content: flex-end;
+  margin-top: 8px; padding-top: 8px;
+  border-top: 1px solid var(--border-color);
+}
+.ob-card-review-submit, .ob-card-review-undo {
+  padding: 5px 12px;
+  border: 1px solid var(--border-color);
+  background: var(--paper);
+  color: var(--ink);
+  border-radius: 4px;
+  font-size: 12px;
+  cursor: pointer;
+}
+.ob-card-review-submit:hover, .ob-card-review-undo:hover { background: var(--surface-muted); }
+.ob-card-review-undo {
+  background: #fdf0e6;
+  color: #8c5a32;
+  border-color: #e8c8a8;
+}
+.ob-card-review-undo:hover { background: #f8e3c8; }
+
 /* ===== Inline step comments (Stage 7 — peer audit on each decision) ===== */
 .sc-thread {
   margin-top: 16px;

@@ -29,7 +29,7 @@ function promptForStepType(type) {
 
 export default function StepCommentThread({
   runId, stepId, stepType,
-  myParticipantId, participantsById,
+  myParticipantId, currentUserName, participantsById,
   sb,
 }) {
   const prompt = promptForStepType(stepType);
@@ -89,9 +89,16 @@ export default function StepCommentThread({
       {comments.length > 0 && (
         <div className="sc-thread-list">
           {comments.map(c => {
+            // Resolve display name: AI gets a fixed label; the current
+            // user's own comments use currentUserName directly (the
+            // participants prop sometimes doesn't include the live user
+            // at the moment the comment is rendered, depending on load
+            // order); peer comments look up by participant id.
             const authorName = c.author_kind === 'ai'
               ? 'AI auditor'
-              : (participantsById?.[c.author_id]?.name || 'someone');
+              : (c.author_id && c.author_id === myParticipantId)
+                ? (currentUserName || 'you')
+                : (participantsById?.[c.author_id]?.name || 'a peer');
             return (
               <div key={c.id} className={`sc-comment is-${c.author_kind}`}>
                 <div className="sc-comment-meta">

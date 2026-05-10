@@ -36,9 +36,11 @@ end
 where from_stage in ('8', '9') or to_stage in ('8', '9');
 
 -- stage_reflections has UNIQUE (workshop_id, participant_id, stage),
--- which Postgres checks per row, not at statement end. A single CASE-
--- based UPDATE collides: when the row at '8' tries to become '9',
--- the row already at '9' hasn't moved to '10' yet. Two ordered steps
--- avoid the collision: empty '9' first, then fill it.
-update stage_reflections set stage = '10' where stage = '9';
-update stage_reflections set stage = '9'  where stage = '8';
+-- checked per row, not at statement end. A single CASE-based UPDATE
+-- collides on the swap. Even a two-step (9->10 first, then 8->9) can
+-- collide in some Postgres MVCC situations — observed in the field on
+-- 2026-05-10. Three-step using a parking value is bulletproof: park
+-- '9' out of the way, fill '9' from '8', then move parked rows to '10'.
+update stage_reflections set stage = '_pending_10' where stage = '9';
+update stage_reflections set stage = '9'           where stage = '8';
+update stage_reflections set stage = '10'          where stage = '_pending_10';

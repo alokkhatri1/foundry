@@ -28,6 +28,7 @@ function newRow() {
   return {
     id: 'row-' + Math.random().toString(36).slice(2, 10),
     type: 'coworker', // 'coworker' | 'human'
+    name: '',             // coworker-only — what to call this teammate
     step: '',
     knowledgeFileIds: [], // coworker-only
     skillsFileIds: [],    // coworker-only
@@ -54,6 +55,12 @@ function migrateRow(row) {
   if (Array.isArray(row.fileIds) && row.fileIds.length && !row.knowledgeFileIds && !row.skillsFileIds) {
     next.knowledgeFileIds = row.fileIds;
   }
+  // Backfill the new `name` field from the derived name so old drafts
+  // surface as already-named (they were implicitly named all along).
+  // The user can rename, but they don't get a wall of empty inputs.
+  if (next.type === 'coworker' && !(next.name || '').trim()) {
+    next.name = deriveCoworkerName(next.step) || '';
+  }
   delete next.actorId;
   delete next.actorName;
   delete next.fileIds;
@@ -76,6 +83,7 @@ function isRowComplete(row) {
   const step = (row.step || '').trim();
   if (!step) return false;
   if ((row.type || 'coworker') === 'coworker') {
+    if (!(row.name || '').trim()) return false;
     const hasFiles = (row.knowledgeFileIds || []).length > 0 || (row.skillsFileIds || []).length > 0;
     return hasFiles;
   }
@@ -87,12 +95,16 @@ function firstIncompleteReason(rows) {
   for (let i = 0; i < (rows || []).length; i++) {
     const r = rows[i];
     const num = i + 1;
+    const isCoworker = (r.type || 'coworker') === 'coworker';
+    if (isCoworker && !(r.name || '').trim()) {
+      return `Step ${num}: name the coworker`;
+    }
     if (!(r.step || '').trim()) {
-      return (r.type || 'coworker') === 'coworker'
+      return isCoworker
         ? `Step ${num}: describe what the coworker does`
         : `Step ${num}: describe what the human verifies`;
     }
-    if ((r.type || 'coworker') === 'coworker') {
+    if (isCoworker) {
       const hasFiles = (r.knowledgeFileIds || []).length > 0 || (r.skillsFileIds || []).length > 0;
       if (!hasFiles) return `Step ${num}: attach at least one knowledge or skills file`;
     } else {
@@ -346,7 +358,8 @@ function StepCard({
   collapsed, onUpdate, onMove, onDelete, onToggleCollapse, canDelete,
 }) {
   const isCoworker = (row.type || 'coworker') !== 'human';
-  const derivedName = isCoworker ? deriveCoworkerName(row.step) : '';
+  const explicitName = (row.name || '').trim();
+  const derivedName = isCoworker ? (explicitName || deriveCoworkerName(row.step)) : '';
   const reviewerName = (row.reviewerName || '').trim();
   const reviewerInitial = reviewerName ? reviewerName[0].toUpperCase() : '';
   const reviewerOnline = useMemo(() => {
@@ -499,6 +512,20 @@ function StepCard({
         {isCoworker ? (
           <>
             <label className="cs-field">
+              <span className="cs-field-label">
+                COWORKER NAME
+                <em className="cs-field-hint">what to call them</em>
+              </span>
+              <input
+                type="text"
+                className="cs-input"
+                value={row.name || ''}
+                placeholder="e.g. Compliance Reviewer"
+                onChange={e => onUpdate({ name: e.target.value })}
+                maxLength={60}
+              />
+            </label>
+            <label className="cs-field">
               <span className="cs-field-label">WHAT DOES THE COWORKER DO?</span>
               <textarea
                 className="cs-textarea"
@@ -603,7 +630,8 @@ function BlueprintChips({ items, flavor }) {
 
 function BlueprintCard({ row, idx, total }) {
   const isCoworker = row.type !== 'human';
-  const derivedName = isCoworker ? deriveCoworkerName(row.step) : '';
+  const explicitName = (row.name || '').trim();
+  const derivedName = isCoworker ? (explicitName || deriveCoworkerName(row.step)) : '';
   const reviewerName = (row.reviewerName || row.reviewer || '').trim();
   const reviewerInitial = reviewerName ? reviewerName[0].toUpperCase() : '';
   const numStr = pad2(idx + 1);

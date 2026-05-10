@@ -14145,6 +14145,29 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
   font-style: italic;
 }
 
+.cs-input {
+  width: 100%;
+  padding: 12px 16px;
+  background: var(--paper);
+  border: 1px solid var(--cream-deep);
+  border-radius: var(--radius-sm);
+  font-family: var(--serif);
+  font-size: 16px;
+  color: var(--ink);
+  line-height: 1.4;
+  transition: border-color 0.12s;
+}
+.cs-input:hover { border-color: var(--ink-faint); }
+.cs-input:focus {
+  outline: none;
+  border-color: var(--peach-deep);
+  background: var(--paper);
+}
+.cs-input::placeholder {
+  color: var(--ink-faint);
+  font-style: italic;
+}
+
 .cs-field-row {
   display: grid;
   grid-template-columns: 1fr 1fr;

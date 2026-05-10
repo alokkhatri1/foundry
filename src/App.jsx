@@ -1380,7 +1380,7 @@ function App() {
     const coworkerByRowId = new Map();
     for (const r of rows) {
       if (r.type !== 'coworker') continue;
-      const name = deriveCoworkerName(r.step) || 'Coworker';
+      const name = (r.name || '').trim() || deriveCoworkerName(r.step) || 'Coworker';
       const cw = {
         id: 'cw-inline-' + Math.random().toString(36).slice(2, 8),
         name,

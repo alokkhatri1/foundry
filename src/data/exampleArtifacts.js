@@ -128,36 +128,42 @@ export const CAPSTONE_BLUEPRINT_REFERENCE = {
   rows: [
     {
       type: 'coworker',
+      name: 'Borrower Capture',
       step: 'Capture borrower identity, registration, ownership, and guarantor details to start the application.',
       knowledgeFiles: ['applicant intake checklist'],
       skillsFiles: ['borrower capture'],
     },
     {
       type: 'coworker',
+      name: 'Bureau Requester',
       step: 'Request the credit bureau report and attach it to the case file.',
       knowledgeFiles: ['credit history reading guide'],
       skillsFiles: ['bureau request'],
     },
     {
       type: 'coworker',
+      name: 'Proposal Drafter',
       step: 'Enter facility type, amount, tenure, security details, and any exception explanations into the application.',
       knowledgeFiles: ['proposal-fields checklist'],
       skillsFiles: ['proposal entry'],
     },
     {
       type: 'coworker',
+      name: 'Ratios Analyst',
       step: 'Compile audited and projected financials and calculate the standard financial ratios.',
       knowledgeFiles: [],
       skillsFiles: ['financial-ratios'],
     },
     {
       type: 'coworker',
+      name: 'Collateral Valuer',
       step: 'Inspect the collateral and produce a signed valuation report.',
       knowledgeFiles: [],
       skillsFiles: ['collateral valuation'],
     },
     {
       type: 'coworker',
+      name: 'Documents Verifier',
       step: 'Verify that the supporting-documents pack is complete (legal, financial, identity, business proof).',
       knowledgeFiles: ['required-documents checklist'],
       skillsFiles: [],
@@ -168,6 +174,7 @@ export const CAPSTONE_BLUEPRINT_REFERENCE = {
     },
     {
       type: 'coworker',
+      name: 'Security Docs Generator',
       step: 'Generate standard security documents; collect signatures; upload the signed scans.',
       knowledgeFiles: [],
       skillsFiles: ['security-doc templates'],
@@ -178,6 +185,7 @@ export const CAPSTONE_BLUEPRINT_REFERENCE = {
     },
     {
       type: 'coworker',
+      name: 'Booking Officer',
       step: 'Set limits, activate accounts, create contracts and deals, apply the relevant charges.',
       knowledgeFiles: [],
       skillsFiles: ['booking checklist'],

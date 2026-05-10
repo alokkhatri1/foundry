@@ -222,8 +222,59 @@ function consentLine(consent) {
   return `${verb} · text v${consent.consent_text_version} · ${fmtTime(consent.granted_at)}`;
 }
 
+// Pretty-print the demographics row's enum codes as the human-readable
+// labels participants saw on the form. Codes that aren't recognised pass
+// through verbatim (forward-compat for new options).
+const DEMOGRAPHICS_LABELS = {
+  tenure_band: {
+    lt_1y: 'Less than 1 year', '1_3y': '1–3 years', '3_7y': '3–7 years',
+    '7_15y': '7–15 years', gt_15y: '15+ years',
+  },
+  industry: {
+    tech: 'Technology', finance: 'Finance', healthcare: 'Healthcare',
+    education: 'Education', consulting: 'Consulting',
+    public_sector: 'Public sector', marketing: 'Media / Marketing',
+    other: 'Other',
+  },
+  age_band: {
+    '18_24': '18–24', '25_34': '25–34', '35_44': '35–44',
+    '45_54': '45–54', '55_plus': '55+',
+  },
+  ai_use_frequency: {
+    never: 'Never', occasional: 'Occasionally', weekly: 'Weekly',
+    daily: 'Daily', multi_daily: 'Multiple times a day',
+  },
+  ai_tools: {
+    chatgpt: 'ChatGPT', claude: 'Claude', gemini: 'Gemini',
+    copilot: 'Copilot', perplexity: 'Perplexity',
+    midjourney: 'Midjourney / image tools', other: 'Other', none: 'None yet',
+  },
+};
+function dmLabel(field, code) {
+  return DEMOGRAPHICS_LABELS[field]?.[code] || code || '_unset_';
+}
+
+function renderDemographics(d) {
+  if (!d) return '_no demographics on file_';
+  const tools = Array.isArray(d.ai_tools) && d.ai_tools.length > 0
+    ? d.ai_tools.map(t => dmLabel('ai_tools', t)).join(', ')
+    : '_none picked_';
+  return [
+    `- **Role**: ${(d.role || '').trim() || '_unset_'}`,
+    `- **Tenure**: ${dmLabel('tenure_band', d.tenure_band)}`,
+    `- **Industry**: ${dmLabel('industry', d.industry)}`,
+    `- **Age**: ${dmLabel('age_band', d.age_band)}`,
+    `- **AI familiarity**: ${d.ai_familiarity ?? '—'} / 5`,
+    `- **AI use frequency**: ${dmLabel('ai_use_frequency', d.ai_use_frequency)}`,
+    `- **AI tools used**: ${tools}`,
+    `- **Workshop goal**: ${(d.workshop_goal || '').trim() || '_unset_'}`,
+    `- **Submitted**: ${fmtTime(d.created_at)} · text v${d.questions_text_version || 1}`,
+  ].join('\n');
+}
+
 function renderParticipant(p, data, pathFor) {
   const consent = data.consentByPid[p.id];
+  const demographics = (data.demographicsByPid || {})[p.id];
   const myFiles = data.files.filter(f => f.created_by === p.name && f.type === 'file');
   const knowledge = myFiles.filter(f => pathFor(f.id).some(s => s === 'knowledge'));
   const skills    = myFiles.filter(f => pathFor(f.id).some(s => s === 'skills'));
@@ -242,6 +293,8 @@ function renderParticipant(p, data, pathFor) {
     p.email ? `- **Email**: ${p.email}` : null,
     `- **Joined**: ${fmtTime(p.joined_at)}`,
     `- **Consent**: ${consentLine(consent)}`,
+    '',
+    section('## Demographics',                    renderDemographics(demographics)),
     '',
     section('## Stage 1 — Chat',                  renderChats(chats)),
     '',

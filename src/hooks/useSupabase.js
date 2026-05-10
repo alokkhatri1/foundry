@@ -384,7 +384,7 @@ export default function useSupabase() {
     if (!isSupabaseConfigured) return null;
     const [
       participants, coworkers, workflows, runs, approvals, files,
-      messages, dms, reflections, consent, usage,
+      messages, dms, reflections, consent, usage, demographics,
     ] = await Promise.all([
       supabase.from('participants')
         .select('id, name, email, auth_user_id, kind, joined_at')
@@ -426,6 +426,9 @@ export default function useSupabase() {
         .select('participant_id, segment, segment_ref_id, model, input_tokens, output_tokens, cache_creation_input_tokens, cache_read_input_tokens, cost_usd, created_at')
         .eq('workshop_id', roomId)
         .limit(50000),
+      supabase.from('participant_demographics')
+        .select('participant_id, role, tenure_band, industry, age_band, ai_familiarity, ai_use_frequency, ai_tools, workshop_goal, questions_text_version, created_at')
+        .eq('workshop_id', roomId),
     ]);
 
     // Preferences live keyed by auth_user_id; fold them into a per-participant
@@ -449,6 +452,9 @@ export default function useSupabase() {
     const consentByPid = {};
     for (const c of (consent.data || [])) consentByPid[c.participant_id] = c;
 
+    const demographicsByPid = {};
+    for (const d of (demographics.data || [])) demographicsByPid[d.participant_id] = d;
+
     return {
       participants: participantRows,
       coworkers: coworkers.data || [],
@@ -462,6 +468,7 @@ export default function useSupabase() {
       llmUsage: usage.data || [],
       prefsByPid,
       consentByPid,
+      demographicsByPid,
     };
   }, []);
 
@@ -1373,6 +1380,49 @@ export default function useSupabase() {
     return data;
   }, []);
 
+  // ===== Participant demographics =====
+  // One-shot baseline questionnaire that gates Chat at first sign-in. Eight
+  // questions about role / tenure / industry / age + AI familiarity / use /
+  // tools / workshop goal. One row per (workshop, participant); the upsert
+  // here mirrors the same client-side dedupe the unique constraint enforces.
+  const loadMyDemographics = useCallback(async (participantId) => {
+    if (!isSupabaseConfigured || !roomIdRef.current || !participantId) return null;
+    const { data, error } = await supabase
+      .from('participant_demographics')
+      .select('*')
+      .eq('workshop_id', roomIdRef.current)
+      .eq('participant_id', participantId)
+      .maybeSingle();
+    if (error) { console.error('[sb] loadMyDemographics:', error.message); return null; }
+    return data;
+  }, []);
+
+  const saveDemographics = useCallback(async (payload) => {
+    if (!isSupabaseConfigured || !roomIdRef.current) return { ok: false, error: 'Not connected' };
+    if (!payload?.participant_id) return { ok: false, error: 'Missing participant_id' };
+    const row = { ...payload, workshop_id: roomIdRef.current };
+    const { data, error } = await supabase
+      .from('participant_demographics')
+      .upsert(row, { onConflict: 'workshop_id,participant_id' })
+      .select()
+      .single();
+    if (error) { console.error('[sb] saveDemographics:', error.message); return { ok: false, error: error.message }; }
+    return { ok: true, data };
+  }, []);
+
+  const loadAllDemographics = useCallback(async (workshopId) => {
+    if (!isSupabaseConfigured) return [];
+    const id = workshopId || roomIdRef.current;
+    if (!id) return [];
+    const { data, error } = await supabase
+      .from('participant_demographics')
+      .select('*')
+      .eq('workshop_id', id)
+      .order('created_at', { ascending: true });
+    if (error) { console.error('[sb] loadAllDemographics:', error.message); return []; }
+    return data || [];
+  }, []);
+
   // Admin-side bulk read: keyed by participant_id so the Research view can
   // stamp every participant row with a Consented / Declined / Pending badge.
   const loadConsentMapForWorkshop = useCallback(async (workshopId) => {
@@ -1914,6 +1964,7 @@ export default function useSupabase() {
     subscribeToRoom, trackPresence, leavePresence,
     loadMyFeedback, saveFeedback, loadAllFeedback,
     saveResearchConsent, loadMyResearchConsent, loadConsentMapForWorkshop,
+    loadMyDemographics, saveDemographics, loadAllDemographics,
     loadCapstoneDraft, loadCapstoneDrafts, saveCapstoneDraft, deleteCapstoneDraft,
     saveRunAudit, loadRunAudits, loadAllRoomRunAudits, subscribeToRunAudits,
     loadMyAiAudit, loadAllRoomAiAudits, saveAiAudit, subscribeToAiAudits,

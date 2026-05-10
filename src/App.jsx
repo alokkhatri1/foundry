@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, useMemo } from 'react';
 import './App.css';
 import AuthGate, { useAuth } from './components/AuthGate';
 import GraduationScreen from './components/GraduationScreen';
+import DemographicsForm from './components/DemographicsForm';
 import StageReflection from './components/StageReflection';
 import { REFLECTION_STAGES } from './data/reflectionPrompts';
 import { COWORKER_ICONS } from './components/Icon';
@@ -444,6 +445,14 @@ function App() {
   const [justRevealed, setJustRevealed] = useState(null);
   const previousStageRef = useRef(null);
   const [myParticipantId, setMyParticipantId] = useState(null);
+
+  // Demographics gate. 'unknown' until we've checked the table; 'pending'
+  // means the participant hasn't submitted the baseline questionnaire and
+  // can't reach Chat; 'submitted' unlocks the rest of the app.
+  const [demographicsStatus, setDemographicsStatus] = useState('unknown');
+  const [savingDemographics, setSavingDemographics] = useState(false);
+  const [demographicsError, setDemographicsError] = useState(null);
+
   const [activeDm, setActiveDm] = useState(null);
   const [unreadDmCounts, setUnreadDmCounts] = useState({});
   const activeDmRef = useRef(activeDm);
@@ -517,6 +526,38 @@ function App() {
     });
     return () => { cancelled = true; };
   }, [myParticipantId, sb]);
+
+  // Demographics gate: as soon as we know the participant, peek at
+  // participant_demographics. Null row = pending; any row = submitted.
+  // Render branch below blocks the app shell until status === 'submitted'.
+  useEffect(() => {
+    if (!myParticipantId || !sb) return;
+    let cancelled = false;
+    setDemographicsStatus('unknown');
+    sb.loadMyDemographics(myParticipantId).then(row => {
+      if (cancelled) return;
+      setDemographicsStatus(row ? 'submitted' : 'pending');
+    }).catch(() => {
+      if (!cancelled) setDemographicsStatus('pending');
+    });
+    return () => { cancelled = true; };
+  }, [myParticipantId, sb]);
+
+  async function handleSaveDemographics(payload) {
+    setDemographicsError(null);
+    setSavingDemographics(true);
+    const res = await sb.saveDemographics({
+      ...payload,
+      participant_id: myParticipantId,
+      participant_name: userName,
+    });
+    setSavingDemographics(false);
+    if (res.ok) {
+      setDemographicsStatus('submitted');
+    } else {
+      setDemographicsError(res.error || 'Could not save. Try again.');
+    }
+  }
 
   // Reflection stages, ordered. Memoised once because both inputs are
   // stable module-level constants.
@@ -3045,6 +3086,31 @@ Answer in ONE sentence. If the user asks "how", a second sentence is allowed —
           sb.signOut();
         }}
       />
+    );
+  }
+
+  // Demographics gate. Authed + joined participants who haven't submitted
+  // the baseline questionnaire are bounced to the form before the app
+  // shell renders. While we're still resolving the row, paint a quiet
+  // loading shell so we don't flash the workshop UI.
+  if (isJoined && demographicsStatus !== 'submitted') {
+    return (
+      <AuthGate onJoin={handleJoin} workshopCode={workshopCode}>
+        {demographicsStatus === 'pending' ? (
+          <DemographicsForm
+            userName={userName}
+            onSubmit={handleSaveDemographics}
+            submitting={savingDemographics}
+            errorMessage={demographicsError}
+          />
+        ) : (
+          <div className="sv-page">
+            <main className="sv-container">
+              <p style={{ color: 'var(--ink-muted)', fontStyle: 'italic' }}>Loading…</p>
+            </main>
+          </div>
+        )}
+      </AuthGate>
     );
   }
 

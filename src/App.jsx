@@ -702,7 +702,31 @@ function App() {
           setUserRoleLoaded(true);
         }
 
-        if (files.length > 0) setFlatFiles(files);
+        // Merge DB rows into the localStorage-seeded list rather than
+        // overwriting wholesale. Two failure modes the overwrite caused:
+        //   1. Local content blown away — loadFiles returns metadata only,
+        //      so the merge replaces flatFiles with bodies = undefined and
+        //      the user sees every file as empty until they click it.
+        //   2. Files that exist locally but haven't reached the DB yet
+        //      (save in flight, save failed silently, realtime lag)
+        //      disappear from the sidebar on refresh.
+        // Same body-preservation rule as the realtime onFileChange handler.
+        if (files.length > 0) {
+          setFlatFiles(prev => {
+            const byId = new Map((prev || []).map(f => [f.id, f]));
+            for (const dbFile of files) {
+              const local = byId.get(dbFile.id);
+              const dbHasBody    = typeof dbFile.content === 'string' && dbFile.content.length > 0;
+              const localHasBody = local && typeof local.content === 'string' && local.content.length > 0;
+              if (!dbHasBody && localHasBody) {
+                byId.set(dbFile.id, { ...dbFile, content: local.content });
+              } else {
+                byId.set(dbFile.id, dbFile);
+              }
+            }
+            return [...byId.values()];
+          });
+        }
         if (cws.length > 0) {
           setCoworkers(prev => {
             const prevById = new Map((prev || []).map(c => [c.id, c]));

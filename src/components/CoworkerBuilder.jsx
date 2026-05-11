@@ -410,6 +410,11 @@ function FilePicker({ fileTree, selectedIds, onChange, folderName, onUpdateConte
             >
               {f.name.replace(/\.md$/, '')}
             </span>
+            {f.createdBy && (
+              <span className="cwb-picker-author" title={`Authored by ${f.createdBy}`}>
+                by {f.createdBy}
+              </span>
+            )}
             <span className="cwb-picker-ext">.md</span>
           </div>
         );

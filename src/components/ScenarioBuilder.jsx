@@ -121,7 +121,7 @@ function flattenForPicker(tree, folder) {
     if (!node) return;
     const nextAncestor = node.type === 'folder' ? node.name : ancestorFolderName;
     if (node.type === 'file' && ancestorFolderName === folder) {
-      out.push({ id: node.id, name: node.name });
+      out.push({ id: node.id, name: node.name, createdBy: node.createdBy ?? null });
     }
     for (const child of node.children || []) walk(child, nextAncestor);
   }
@@ -236,6 +236,11 @@ function FilePicker({ value, onChange, fileTree, folder }) {
                   onChange={() => toggle(opt.id)}
                 />
                 <span className="cs-filepicker-option-name">{stripExt(opt.name)}</span>
+                {opt.createdBy && (
+                  <span className="cs-filepicker-option-author" title={`Authored by ${opt.createdBy}`}>
+                    by {opt.createdBy}
+                  </span>
+                )}
               </label>
             ))
           )}

@@ -14287,7 +14287,18 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
 }
 .cs-filepicker-option:hover { background: var(--cream-soft); }
 .cs-filepicker-option input[type="checkbox"] { accent-color: var(--peach-deep); }
-.cs-filepicker-option-name { color: var(--ink); }
+.cs-filepicker-option-name { color: var(--ink); flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cs-filepicker-option-author {
+  font-family: var(--serif);
+  font-style: italic;
+  font-size: 12px;
+  color: var(--ink-muted);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  overflow: hidden;
+  max-width: 180px;
+  flex-shrink: 0;
+}
 
 /* ----- Reviewer picker ----- */
 .cs-reviewer {

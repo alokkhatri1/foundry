@@ -543,31 +543,22 @@ function App() {
     return () => { cancelled = true; };
   }, [myParticipantId, sb]);
 
-  async function handleSaveDemographics({ demographics, consent }) {
+  async function handleSaveDemographics(payload) {
     setDemographicsError(null);
     setSavingDemographics(true);
-    // Two writes — demographics row and consent row. Both must succeed
-    // before we lift the gate; if either fails the user retries from the
-    // same form. Consent moved into the demographics gate per the
-    // research instrument (research-questions.md Q14 sits in Section 2,
-    // pre-chat), so the post-workshop FeedbackForm no longer asks.
-    const [demoRes, consentRes] = await Promise.all([
-      sb.saveDemographics({
-        ...demographics,
-        participant_id: myParticipantId,
-        participant_name: userName,
-      }),
-      sb.saveResearchConsent({
-        participantId: myParticipantId,
-        granted: !!consent?.granted,
-        consentTextVersion: consent?.consentTextVersion || 1,
-      }),
-    ]);
+    // Demographics only. Research consent is collected at workshop close
+    // (FeedbackForm Section E) so participants give informed consent
+    // having seen what their workshop activity actually contains.
+    const res = await sb.saveDemographics({
+      ...payload,
+      participant_id: myParticipantId,
+      participant_name: userName,
+    });
     setSavingDemographics(false);
-    if (demoRes.ok && consentRes.ok) {
+    if (res.ok) {
       setDemographicsStatus('submitted');
     } else {
-      setDemographicsError(demoRes.error || consentRes.error || 'Could not save. Try again.');
+      setDemographicsError(res.error || 'Could not save. Try again.');
     }
   }
 

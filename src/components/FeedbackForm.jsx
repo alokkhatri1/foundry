@@ -1,9 +1,12 @@
 import { useMemo, useState } from 'react';
 
 // End-of-workshop survey — research+industry required instrument.
-// Source: research-questions.md, Section 4 (Q39-Q58).
-// 20 required questions across four sections. Research consent (Q14)
-// now lives on the pre-chat DemographicsForm, not here.
+// Source: research-questions.md, Sections 2 (Q14 research consent) and
+// 4 (Q39-Q58, training/platform/learning/perception).
+// 21 required questions: 20 evaluation Q's across four sections plus
+// a final research consent at the very end. Consent is asked *after*
+// the workshop so participants give informed consent having seen
+// what their activity actually contains.
 
 const SCALE_LEGEND = [
   { v: 1, label: 'Strongly disagree' },
@@ -25,10 +28,9 @@ const CONCEPT_OPTIONS = [
   { v: 'other',      label: 'Other' },
 ];
 
-// Re-exported so the GraduationScreen / parent can stamp the consent
-// row's text version if it ever needs to read it from here. Kept at 1
-// because Section G (consent) moved out of this form; bumping it would
-// claim a consent wording change that didn't happen.
+// Stamped onto every research_consent row so analysis can interpret
+// the answer against the exact wording shown at submit time. Bump
+// when the consent text materially changes.
 export const CONSENT_TEXT_VERSION = 1;
 
 const SECTIONS = [
@@ -82,6 +84,24 @@ const SECTIONS = [
       { id: 'aware_cost_tradeoffs',   type: 'scale', text: 'After this workshop, I feel more aware that AI use involves cost and resource tradeoffs.' },
       { id: 'trust_when_inspectable', type: 'scale', text: 'I would trust AI more when I can inspect its instructions, knowledge, and workflow steps.' },
       { id: 'would_recommend',        type: 'yesno', text: 'Would you recommend this workshop to a colleague?' },
+    ],
+  },
+  // Final ask. Research consent is intentionally last so participants
+  // see the full workshop before agreeing to share it. Yes / no with a
+  // description; the parent (GraduationScreen) writes it to the
+  // separate research_consent table on submit.
+  {
+    id: 'E',
+    eyebrow: 'Section E',
+    title: 'Research consent',
+    sub: 'Now that you have seen the workshop, may we learn from it?',
+    questions: [
+      {
+        id: 'research_consent',
+        type: 'yesno',
+        text: 'May we use your workshop activity to improve Foundry and study how professionals learn to work with AI?',
+        description: 'If you choose yes, the chats, files, coworkers, workflows, reflections, and feedback you created during this workshop may be used as research data. Your name and email will be replaced with an anonymous participant ID before analysis. Participation is voluntary. Saying no does not affect anything about your workshop. You may withdraw consent later by contacting the research team.',
+      },
     ],
   },
 ];
@@ -193,6 +213,7 @@ function Question({ q, index, value, onChange }) {
       </div>
       <div className="sv-q-body">
         <p className="sv-q-text">{q.text}</p>
+        {q.description && <p className="sv-q-desc">{q.description}</p>}
         {q.type === 'scale' && <ScaleControl value={value} onChange={onChange} name={q.text} />}
         {q.type === 'yesno' && <YesNoControl value={value} onChange={onChange} name={q.text} />}
         {q.type === 'chip'  && <ChipSelect   value={value} onChange={onChange} options={q.options} name={q.text} />}
@@ -274,12 +295,14 @@ export default function FeedbackForm({ onSubmit, submitting, errorMessage, userN
       trust_when_inspectable:   answers.trust_when_inspectable,
       would_recommend:          answers.would_recommend === 'yes',
     };
-    // Consent is now collected on the pre-chat DemographicsForm. The
-    // parent (GraduationScreen) still expects the consent shape on the
-    // submit payload; pass through a null consent so its handler can
-    // skip the second write without erroring. Kept here so existing
-    // call sites don't need to change shape.
-    onSubmit({ feedback, consent: null });
+    // Consent rides alongside feedback — the parent (GraduationScreen)
+    // splits the payload and writes feedback + research_consent in
+    // parallel. Versioned against the on-screen wording at submit time.
+    const consent = {
+      granted: answers.research_consent === 'yes',
+      consentTextVersion: CONSENT_TEXT_VERSION,
+    };
+    onSubmit({ feedback, consent });
   }
 
   return (

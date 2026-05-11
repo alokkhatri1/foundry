@@ -1,15 +1,15 @@
 import { useMemo, useState } from 'react';
 
-// Pre-chat questionnaire — research+industry required instrument.
-// Source: research-questions.md, Sections 1 and 2.
-// 13 baseline questions + 1 research consent question (14 total).
-// All required. Submit unlocks Chat.
+// Pre-chat questionnaire — research+industry required instrument,
+// baseline only. Source: research-questions.md, Section 1 (Q1-Q13).
+// 13 baseline questions, all required. Submit unlocks Chat.
 //
-// Persistence: 13 demographics fields land on participant_demographics
-// (loader: saveDemographics). The consent answer lands on
-// research_consent (loader: saveResearchConsent). App.jsx fires both
-// writes from a single handleSaveDemographics so the gate only clears
-// when both rows are upserted.
+// Research consent (Section 2 / Q14) is deliberately NOT collected here.
+// We ask consent at workshop close instead, when participants have seen
+// what their workshop activity actually contains and can make an
+// informed decision. The FeedbackForm carries that ask.
+//
+// Persistence: all 13 fields land on participant_demographics.
 
 export const DEMOGRAPHICS_TEXT_VERSION = 2;
 
@@ -159,20 +159,6 @@ const SECTIONS = [
       { id: 'delegation_comfort',    type: 'agreement', text: 'I feel comfortable delegating a work task to AI if I can review the output before using it.' },
       { id: 'adoption_criteria_top3', type: 'rank',    text: 'When deciding whether to use AI, what matters most to you? Rank your top three.', options: ADOPTION_CRITERIA_OPTIONS, pickCount: 3 },
       { id: 'delegation_boundary',   type: 'text',     text: 'What kind of work would you not want AI to do for you? Why?', placeholder: 'A type of decision, a kind of judgment, a domain you would keep human…' },
-    ],
-  },
-  {
-    id: 'D',
-    eyebrow: 'Section D',
-    title: 'Research consent',
-    sub: 'Your participation in the research, separately from the workshop itself.',
-    questions: [
-      {
-        id: 'research_consent',
-        type: 'yesno',
-        text: 'May we use your workshop activity to improve Foundry and study how professionals learn to work with AI?',
-        description: 'If you choose yes, the chats, files, coworkers, workflows, reflections, and feedback you create during this workshop may be used as research data. Your name and email will be replaced with an anonymous participant ID before analysis. Participation is voluntary. You can still complete the workshop if you say no. You may withdraw consent later by contacting the research team.',
-      },
     ],
   },
 ];
@@ -420,28 +406,20 @@ export default function DemographicsForm({ onSubmit, submitting, errorMessage, u
   function handleSubmit() {
     if (!ready || submitting) return;
     const payload = {
-      // demographics row
-      demographics: {
-        role:                    String(answers.role || '').trim(),
-        tenure_band:             answers.tenure_band,
-        industry:                answers.industry,
-        work_type:               Array.isArray(answers.work_type) ? answers.work_type : [],
-        ai_familiarity:          answers.ai_familiarity,
-        ai_use_frequency:        answers.ai_use_frequency,
-        ai_tools:                Array.isArray(answers.ai_tools) ? answers.ai_tools : [],
-        ai_use_cases:            Array.isArray(answers.ai_use_cases) ? answers.ai_use_cases : [],
-        ai_mental_model:         answers.ai_mental_model,
-        evaluation_confidence:   answers.evaluation_confidence,
-        delegation_comfort:      answers.delegation_comfort,
-        adoption_criteria_top3:  Array.isArray(answers.adoption_criteria_top3) ? answers.adoption_criteria_top3 : [],
-        delegation_boundary:     String(answers.delegation_boundary || '').trim(),
-        questions_text_version:  DEMOGRAPHICS_TEXT_VERSION,
-      },
-      // consent row (separate write — same submit, different table)
-      consent: {
-        granted: answers.research_consent === 'yes',
-        consentTextVersion: DEMOGRAPHICS_TEXT_VERSION,
-      },
+      role:                    String(answers.role || '').trim(),
+      tenure_band:             answers.tenure_band,
+      industry:                answers.industry,
+      work_type:               Array.isArray(answers.work_type) ? answers.work_type : [],
+      ai_familiarity:          answers.ai_familiarity,
+      ai_use_frequency:        answers.ai_use_frequency,
+      ai_tools:                Array.isArray(answers.ai_tools) ? answers.ai_tools : [],
+      ai_use_cases:            Array.isArray(answers.ai_use_cases) ? answers.ai_use_cases : [],
+      ai_mental_model:         answers.ai_mental_model,
+      evaluation_confidence:   answers.evaluation_confidence,
+      delegation_comfort:      answers.delegation_comfort,
+      adoption_criteria_top3:  Array.isArray(answers.adoption_criteria_top3) ? answers.adoption_criteria_top3 : [],
+      delegation_boundary:     String(answers.delegation_boundary || '').trim(),
+      questions_text_version:  DEMOGRAPHICS_TEXT_VERSION,
     };
     onSubmit(payload);
   }
@@ -465,7 +443,7 @@ export default function DemographicsForm({ onSubmit, submitting, errorMessage, u
             Before you start,&nbsp;<em>a few things about you</em>.
           </h1>
           <p className="sv-sub">
-            A short questionnaire about your role, how you work with AI today, and how you weigh trust against delegation. Plus a final consent ask about using your workshop activity for research.
+            A short questionnaire about your role, how you work with AI today, and how you weigh trust against delegation. About a minute.
           </p>
         </header>
 

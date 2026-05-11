@@ -129,27 +129,31 @@ export default function GraduationScreen({
   async function handleFeedbackSubmit({ feedback, consent }) {
     setFeedbackError(null);
     setSubmitting(true);
-    // Two independent writes — feedback row (workshop_feedback) and consent
-    // row (research_consent). Run in parallel; if either fails, surface the
-    // error and keep the user on the form so nothing silently drops.
-    const [fbRes, consentRes] = await Promise.all([
+    // Feedback is the only write at workshop close now — research consent
+    // moved to the pre-chat DemographicsForm. The FeedbackForm still
+    // passes a `consent` field for back-compat, but it's null in the
+    // research-instrument version; if present (older flow), honour it.
+    const writes = [
       sb.saveFeedback({
         ...feedback,
         participant_id: myParticipantId,
         participant_name: userName,
       }),
-      sb.saveResearchConsent({
+    ];
+    if (consent && typeof consent.granted === 'boolean') {
+      writes.push(sb.saveResearchConsent({
         participantId: myParticipantId,
         granted: consent.granted,
         consentTextVersion: consent.consentTextVersion,
-      }),
-    ]);
+      }));
+    }
+    const results = await Promise.all(writes);
     setSubmitting(false);
-    if (fbRes.ok && consentRes.ok) {
+    const failure = results.find(r => !r.ok);
+    if (!failure) {
       setFeedbackStatus('submitted');
     } else {
-      const err = fbRes.error || consentRes.error || 'Could not save. Try again.';
-      setFeedbackError(err);
+      setFeedbackError(failure.error || 'Could not save. Try again.');
     }
   }
 

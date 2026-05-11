@@ -205,11 +205,18 @@ function renderReflections(reflections) {
   if (!reflections.length) return '';
   const sorted = [...reflections].sort((a, b) => String(a.stage).localeCompare(String(b.stage)));
   return sorted.map(r => {
+    const structuredBlock = renderStructured(r.stage, r.structured);
     const lines = [
       `### Stage ${r.stage}`,
-      r.confidence != null ? `- **Confidence**: ${r.confidence} / 5` : null,
-      r.note ? `- **Note**: ${r.note}` : null,
-      r.habit ? `- **Habit**: ${r.habit}` : null,
+      // `confidence` carries the new clarity rating (kept on the legacy
+      // column so the takeaway PDF doesn't need a rename).
+      r.confidence != null   ? `- **Clarity**: ${r.confidence} / 5`         : null,
+      r.agreement  != null   ? `- **Agreement**: ${r.agreement} / 5`         : null,
+      r.transfer_text        ? `- **Transfer to work**: ${r.transfer_text}` : null,
+      structuredBlock        ? `- **Structured answers**:\n${structuredBlock}` : null,
+      // Legacy fields — surface only when populated (pre-instrument rows).
+      r.note  ? `- **Note (legacy)**: ${r.note}`   : null,
+      r.habit ? `- **Habit (legacy)**: ${r.habit}` : null,
     ].filter(Boolean);
     return lines.join('\n');
   }).join('\n\n');
@@ -222,10 +229,9 @@ function consentLine(consent) {
   return `${verb} · text v${consent.consent_text_version} · ${fmtTime(consent.granted_at)}`;
 }
 
-// Pretty-print the demographics row's enum codes as the human-readable
-// labels participants saw on the form. Codes that aren't recognised pass
-// through verbatim (forward-compat for new options).
-const DEMOGRAPHICS_LABELS = {
+// Pretty-print enum codes as the labels participants saw. Codes that
+// aren't recognised pass through verbatim (forward-compat).
+const LABELS = {
   tenure_band: {
     lt_1y: 'Less than 1 year', '1_3y': '1–3 years', '3_7y': '3–7 years',
     '7_15y': '7–15 years', gt_15y: '15+ years',
@@ -240,6 +246,13 @@ const DEMOGRAPHICS_LABELS = {
     '18_24': '18–24', '25_34': '25–34', '35_44': '35–44',
     '45_54': '45–54', '55_plus': '55+',
   },
+  work_type: {
+    strategy: 'Strategy / planning', operations: 'Operations',
+    analysis: 'Analysis / reporting', research: 'Research',
+    writing: 'Writing / communication', customer: 'Customer or client work',
+    product_eng: 'Product / engineering', management: 'Management',
+    other: 'Other',
+  },
   ai_use_frequency: {
     never: 'Never', occasional: 'Occasionally', weekly: 'Weekly',
     daily: 'Daily', multi_daily: 'Multiple times a day',
@@ -247,29 +260,148 @@ const DEMOGRAPHICS_LABELS = {
   ai_tools: {
     chatgpt: 'ChatGPT', claude: 'Claude', gemini: 'Gemini',
     copilot: 'Copilot', perplexity: 'Perplexity',
-    midjourney: 'Midjourney / image tools', other: 'Other', none: 'None yet',
+    image_gen: 'Image-generation tools', internal: 'Internal company AI tool',
+    midjourney: 'Midjourney / image tools',
+    other: 'Other', none: 'None yet',
+  },
+  ai_use_cases: {
+    drafting: 'Drafting text', summarizing: 'Summarizing documents',
+    brainstorm: 'Brainstorming', research: 'Research',
+    data: 'Data analysis', coding: 'Coding',
+    decision: 'Decision support', automation: 'Automating repeated work',
+    not_yet: 'I do not use AI yet', other: 'Other',
+  },
+  ai_mental_model: {
+    search: 'A search engine', writing: 'A writing assistant',
+    productivity: 'A productivity tool', coworker: 'A coworker',
+    expert: 'An expert advisor', automation: 'An automation system',
+    risky: 'A risky tool that needs close supervision', unsure: 'I am not sure yet',
+  },
+  adoption_criteria_top3: {
+    accuracy: 'Accuracy', speed: 'Speed', privacy: 'Privacy',
+    ease: 'Ease of use', control: 'Control', explainability: 'Explainability',
+    cost: 'Cost', quality: 'Quality of final output',
+    reviewability: 'Ability to review or edit before use',
+  },
+  // Reflection structured option codes — one map per stage/question.
+  s3_barriers: {
+    wrong_application: 'It might apply the instruction incorrectly',
+    forget_contents: 'I might forget what the skill contains',
+    too_rigid: 'It might make the AI too rigid',
+    manual_control: 'I would rather control each prompt manually',
+    no_repeated_tasks: 'I do not have repeated tasks where this is useful',
+    privacy: 'Privacy or company policy concerns',
+    other: 'Other',
+  },
+  s4_barriers: {
+    confidentiality: 'Confidentiality', unclear_policy: 'Unclear data policy',
+    misinterpretation: 'Fear of wrong interpretation',
+    too_much_effort: 'Too much effort',
+    unsure_which: 'I do not know which documents are useful',
+    do_not_trust: 'I do not trust the AI with files', other: 'Other',
+  },
+  s5_feeling: {
+    saved_prompt: 'A saved prompt', specialized_assistant: 'A specialized assistant',
+    junior_teammate: 'A junior teammate', sme: 'A subject-matter expert',
+    workflow_component: 'A workflow component', chatbot_label: 'A chatbot with a label',
+    unsure: 'I am not sure',
+  },
+  s6_review_point: {
+    before_start: 'Before the AI starts', after_each_step: 'After each AI step',
+    before_final: 'Only before the final output',
+    when_uncertain: 'Only when the AI is uncertain',
+    high_risk: 'Only for high-risk tasks',
+    not_always: 'Human review is not always needed', other: 'Other',
+  },
+  s7_confidence_shift: {
+    much_less: 'Much less confident', slightly_less: 'Slightly less confident',
+    no_change: 'No change', slightly_more: 'Slightly more confident',
+    much_more: 'Much more confident',
+  },
+  s7_check_first: {
+    prompt: 'The original prompt', skill: 'The skill/instruction file',
+    knowledge: 'The knowledge file', coworker_role: 'The coworker role',
+    workflow_step: 'The workflow step where the issue appeared',
+    review_point: 'The human review or approval point',
+    final_output: 'The final output only', unsure: 'I am not sure',
+  },
+  s8_behavior_change: {
+    use_less: 'I would use AI less', use_selectively: 'I would use AI more selectively',
+    simpler_flows: 'I would choose simpler workflows when possible',
+    quality_over: 'I would still prioritize quality over cost',
+    do_not_grok: 'I do not understand the cost well enough yet',
+    no_change: 'It would not change my behavior', other: 'Other',
+  },
+  // Workshop feedback — Q51 concept-first single-select
+  concept_used_first: {
+    skill: 'Skill file', knowledge: 'Knowledge file', coworker: 'AI coworker',
+    workflow: 'Workflow', audit: 'Audit log', cost: 'Cost view',
+    none_yet: 'None yet', other: 'Other',
   },
 };
-function dmLabel(field, code) {
-  return DEMOGRAPHICS_LABELS[field]?.[code] || code || '_unset_';
+
+function lbl(field, code) {
+  if (code === undefined || code === null || code === '') return '_unset_';
+  return LABELS[field]?.[code] || code;
+}
+
+function listLbl(field, codes) {
+  if (!Array.isArray(codes) || codes.length === 0) return '_none picked_';
+  return codes.map(c => lbl(field, c)).join(', ');
 }
 
 function renderDemographics(d) {
   if (!d) return '_no demographics on file_';
-  const tools = Array.isArray(d.ai_tools) && d.ai_tools.length > 0
-    ? d.ai_tools.map(t => dmLabel('ai_tools', t)).join(', ')
-    : '_none picked_';
   return [
     `- **Role**: ${(d.role || '').trim() || '_unset_'}`,
-    `- **Tenure**: ${dmLabel('tenure_band', d.tenure_band)}`,
-    `- **Industry**: ${dmLabel('industry', d.industry)}`,
-    `- **Age**: ${dmLabel('age_band', d.age_band)}`,
+    `- **Tenure**: ${lbl('tenure_band', d.tenure_band)}`,
+    `- **Industry**: ${lbl('industry', d.industry)}`,
+    `- **Work type**: ${listLbl('work_type', d.work_type)}`,
     `- **AI familiarity**: ${d.ai_familiarity ?? '—'} / 5`,
-    `- **AI use frequency**: ${dmLabel('ai_use_frequency', d.ai_use_frequency)}`,
-    `- **AI tools used**: ${tools}`,
-    `- **Workshop goal**: ${(d.workshop_goal || '').trim() || '_unset_'}`,
+    `- **AI use frequency**: ${lbl('ai_use_frequency', d.ai_use_frequency)}`,
+    `- **AI tools used**: ${listLbl('ai_tools', d.ai_tools)}`,
+    `- **AI use cases**: ${listLbl('ai_use_cases', d.ai_use_cases)}`,
+    `- **Mental model of AI**: ${lbl('ai_mental_model', d.ai_mental_model)}`,
+    `- **Evaluation confidence**: ${d.evaluation_confidence ?? '—'} / 5 (1 disagree → 5 agree)`,
+    `- **Delegation comfort (with review)**: ${d.delegation_comfort ?? '—'} / 5`,
+    `- **Top 3 adoption criteria**: ${
+      Array.isArray(d.adoption_criteria_top3) && d.adoption_criteria_top3.length > 0
+        ? d.adoption_criteria_top3.map((c, i) => `${i + 1}. ${lbl('adoption_criteria_top3', c)}`).join(' · ')
+        : '_unset_'
+    }`,
+    `- **What they would not delegate**: ${(d.delegation_boundary || '').trim() || '_unset_'}`,
+    // Legacy fields — surface only when present, so old rows with the
+    // pre-instrument shape still read cleanly.
+    d.age_band      ? `- **Age (legacy field)**: ${lbl('age_band', d.age_band)}`        : null,
+    d.workshop_goal ? `- **Workshop goal (legacy field)**: ${d.workshop_goal.trim()}`   : null,
     `- **Submitted**: ${fmtTime(d.created_at)} · text v${d.questions_text_version || 1}`,
-  ].join('\n');
+  ].filter(Boolean).join('\n');
+}
+
+// Stage → which label map keys to use for the structured jsonb keys.
+const STAGE_STRUCTURED_KEYS = {
+  '3': { barriers: 's3_barriers' },
+  '4': { barriers: 's4_barriers' },
+  '5': { feeling: 's5_feeling' },
+  '6': { review_point: 's6_review_point' },
+  '7': { confidence_shift: 's7_confidence_shift', check_first: 's7_check_first' },
+  '8': { behavior_change: 's8_behavior_change' },
+};
+function renderStructured(stage, structured) {
+  if (!structured || typeof structured !== 'object') return null;
+  const map = STAGE_STRUCTURED_KEYS[String(stage)] || {};
+  const lines = [];
+  for (const [key, val] of Object.entries(structured)) {
+    const field = map[key];
+    if (!field) {
+      // Unknown key — render verbatim so research can see novel data.
+      lines.push(`  - ${key}: ${Array.isArray(val) ? val.join(', ') : val}`);
+      continue;
+    }
+    if (Array.isArray(val)) lines.push(`  - ${key}: ${listLbl(field, val)}`);
+    else                    lines.push(`  - ${key}: ${lbl(field, val)}`);
+  }
+  return lines.length > 0 ? lines.join('\n') : null;
 }
 
 function renderParticipant(p, data, pathFor) {

@@ -417,7 +417,7 @@ export default function useSupabase() {
         .order('created_at', { ascending: true })
         .limit(20000),
       supabase.from('stage_reflections')
-        .select('participant_id, stage, confidence, note, habit, created_at, updated_at')
+        .select('participant_id, stage, confidence, note, habit, agreement, transfer_text, structured, created_at, updated_at')
         .eq('workshop_id', roomId),
       supabase.from('research_consent')
         .select('participant_id, granted, scope, consent_text_version, granted_at, withdrawn_at')
@@ -1779,7 +1779,7 @@ export default function useSupabase() {
     if (!isSupabaseConfigured || !roomIdRef.current || !participantId) return [];
     const { data, error } = await supabase
       .from('stage_reflections')
-      .select('stage, confidence, note, habit, updated_at')
+      .select('stage, confidence, note, habit, agreement, transfer_text, structured, updated_at')
       .eq('workshop_id', roomIdRef.current)
       .eq('participant_id', participantId);
     if (error) { console.error('[sb] loadMyStageReflections:', error.message); return []; }
@@ -1789,13 +1789,21 @@ export default function useSupabase() {
   const saveStageReflection = useCallback(async (participantId, stage, payload) => {
     if (!isSupabaseConfigured || !roomIdRef.current) return { ok: false, error: 'Not connected' };
     if (!participantId || !stage) return { ok: false, error: 'Missing participant_id or stage' };
+    // Payload from the research instrument:
+    //   { confidence, agreement, transfer_text, structured, questions_text_version }
+    // `confidence` is the clarity rating (kept on the original column
+    // so the takeaway PDF rendering doesn't need a rename). The new
+    // 043 migration columns ride alongside.
     const row = {
       workshop_id: roomIdRef.current,
       participant_id: participantId,
       stage: String(stage),
-      confidence: payload?.confidence ?? null,
-      note: payload?.note ?? null,
-      habit: payload?.habit ?? null,
+      confidence:    payload?.confidence ?? null,
+      agreement:     payload?.agreement ?? null,
+      transfer_text: payload?.transfer_text ?? null,
+      structured:    payload?.structured ?? {},
+      // Legacy `note` / `habit` columns stay nullable; the new form
+      // doesn't populate them. Old rows preserve their note/habit text.
       updated_at: new Date().toISOString(),
     };
     const { error } = await supabase
@@ -1812,7 +1820,7 @@ export default function useSupabase() {
     if (!isSupabaseConfigured || !workshopId) return [];
     const { data, error } = await supabase
       .from('stage_reflections')
-      .select('participant_id, stage, confidence, note, habit, updated_at')
+      .select('participant_id, stage, confidence, note, habit, agreement, transfer_text, structured, updated_at')
       .eq('workshop_id', workshopId);
     if (error) { console.error('[sb] loadAllStageReflections:', error.message); return []; }
     return data || [];

@@ -1,30 +1,9 @@
 import { useMemo, useState } from 'react';
 
-// Pre-graduation feedback survey — 18 questions across six sections, plus
-// an appended Section G for research consent. Sections + question wording
-// follow the editorial design at design/Foundry Survey + Graduation.html.
-//
-// Section A — Training evaluation (6 scales)        → satisfaction, relevance,
-//                                                     clarity, trainer_knowledge,
-//                                                     trainer_delivery,
-//                                                     trainer_engagement
-// Section B — Design & materials (2 scales, 1 yes/no)→ materials_quality,
-//                                                     duration_appropriate,
-//                                                     theory_practice
-// Section C — Learning impact (2 scales)            → improved_skills, can_apply
-// Section D — Open feedback (3 optional texts)      → most_valuable,
-//                                                     future_topics,
-//                                                     improvement_notes
-// Section E — Recommendation (1 yes/no)             → would_recommend
-// Section F — The platform (3 scales)               → platform_rating,
-//                                                     platform_reliability,
-//                                                     platform_support
-// Section G — Research (1 yes/no, appended past the design's E&F)
-//                                                   → research_consent table
-//
-// Required = all scale + yes/no questions (15 from the design + 1 consent).
-// Section D's three texts are optional. Submit is enabled once required is
-// complete; texts can stay empty and ride through as NULL.
+// End-of-workshop survey — research+industry required instrument.
+// Source: research-questions.md, Section 4 (Q39-Q58).
+// 20 required questions across four sections. Research consent (Q14)
+// now lives on the pre-chat DemographicsForm, not here.
 
 const SCALE_LEGEND = [
   { v: 1, label: 'Strongly disagree' },
@@ -34,99 +13,80 @@ const SCALE_LEGEND = [
   { v: 5, label: 'Strongly agree' },
 ];
 
-// Bumped whenever the on-screen consent copy materially changes, so each
-// research_consent row records the wording the participant actually saw.
+// Concept-first single-select (Q51)
+const CONCEPT_OPTIONS = [
+  { v: 'skill',      label: 'Skill file' },
+  { v: 'knowledge',  label: 'Knowledge file' },
+  { v: 'coworker',   label: 'AI coworker' },
+  { v: 'workflow',   label: 'Workflow' },
+  { v: 'audit',      label: 'Audit log' },
+  { v: 'cost',       label: 'Cost view' },
+  { v: 'none_yet',   label: 'None yet' },
+  { v: 'other',      label: 'Other' },
+];
+
+// Re-exported so the GraduationScreen / parent can stamp the consent
+// row's text version if it ever needs to read it from here. Kept at 1
+// because Section G (consent) moved out of this form; bumping it would
+// claim a consent wording change that didn't happen.
 export const CONSENT_TEXT_VERSION = 1;
 
 const SECTIONS = [
   {
     id: 'A',
     eyebrow: 'Section A',
-    title: 'Training evaluation',
-    sub: 'A read of the session itself — content, trainer, delivery.',
+    title: 'Training and facilitation',
+    sub: 'A read of the session itself.',
     questions: [
-      { id: 'satisfaction',       type: 'scale', text: 'Overall satisfaction with the training session.' },
-      { id: 'relevance',          type: 'scale', text: 'Relevance of the training content to your role and work.' },
-      { id: 'clarity',            type: 'scale', text: 'Clarity and organization of the training content.' },
-      { id: 'trainer_knowledge',  type: 'scale', text: 'Trainer’s knowledge of the subject matter.' },
-      { id: 'trainer_delivery',   type: 'scale', text: 'Trainer’s effectiveness in delivering the content.' },
-      { id: 'trainer_engagement', type: 'scale', text: 'Trainer’s ability to engage and interact with participants.' },
+      { id: 'satisfaction',    type: 'scale', text: 'Overall, I was satisfied with the workshop.' },
+      { id: 'relevance',       type: 'scale', text: 'The workshop content was relevant to my role or work.' },
+      { id: 'clarity',         type: 'scale', text: 'The workshop was clearly organized.' },
+      { id: 'theory_practice', type: 'scale', text: 'The balance between explanation and hands-on practice was appropriate.' },
     ],
   },
   {
     id: 'B',
     eyebrow: 'Section B',
-    title: 'Design & materials',
-    sub: 'Slides, pacing, time on the platform.',
+    title: 'Platform experience',
+    sub: 'How Foundry held up while you were learning.',
     questions: [
-      { id: 'materials_quality',    type: 'scale', text: 'Quality and usefulness of the slides and reference content.' },
-      { id: 'duration_appropriate', type: 'yesno', text: 'Was the training duration appropriate?' },
-      { id: 'theory_practice',      type: 'scale', text: 'Balance between guided explanation and hands-on practice on the platform.' },
+      { id: 'platform_rating',           type: 'scale', text: 'The Foundry platform was easy to navigate.' },
+      { id: 'platform_reliability',      type: 'scale', text: 'The platform was reliable during the workshop.' },
+      { id: 'platform_support',          type: 'scale', text: 'The platform helped me understand AI workflows better than a lecture alone would have.' },
+      { id: 'foundry_improvement_text',  type: 'text',  text: 'What is one thing that would make Foundry easier to use?', placeholder: 'A friction, a confusing moment, a thing you wished worked differently…' },
     ],
   },
   {
     id: 'C',
     eyebrow: 'Section C',
-    title: 'Learning impact',
-    sub: 'What you take with you.',
+    title: 'Learning and adoption',
+    sub: 'What you take with you, and what you would use it for.',
     questions: [
-      { id: 'improved_skills', type: 'scale', text: 'The training improved my knowledge and skills.' },
-      { id: 'can_apply',       type: 'scale', text: 'I can apply what I learned in my work.' },
+      { id: 'improved_skills',       type: 'scale', text: 'The workshop improved my ability to use AI at work.' },
+      { id: 'identify_ai_tasks',     type: 'scale', text: 'I can identify tasks in my work that are suitable for AI.' },
+      { id: 'identify_human_review', type: 'scale', text: 'I can identify tasks in my work that should still require human review.' },
+      { id: 'likely_to_use',         type: 'scale', text: 'I am likely to use at least one Foundry concept in my real work.' },
+      { id: 'concept_used_first',    type: 'chip',  text: 'Which Foundry concept are you most likely to use first?', options: CONCEPT_OPTIONS },
+      { id: 'real_task_text',        type: 'text',  text: 'What is one real task where you could imagine using Foundry?', placeholder: 'A task at work, a recurring decision, a piece of someone’s job…' },
     ],
   },
   {
     id: 'D',
     eyebrow: 'Section D',
-    title: 'Open feedback',
-    sub: 'In your own words. All three are optional.',
+    title: 'Perception, trust, and recommendation',
+    sub: 'How your view of AI shifted — and whether you would send a colleague.',
     questions: [
-      { id: 'most_valuable',     type: 'text', text: 'What aspects of the training did you find most valuable?', placeholder: 'A method, a moment, a mental model that clicked…' },
-      { id: 'future_topics',     type: 'text', text: 'What topics would you like to see in future trainings?',    placeholder: 'A skill, a tool, an unanswered question…' },
-      { id: 'improvement_notes', type: 'text', text: 'Any suggestions to improve future training sessions?',     placeholder: 'Anything you would change, drop, or add.' },
-    ],
-  },
-  {
-    id: 'E',
-    eyebrow: 'Section E',
-    title: 'Recommendation',
-    sub: 'Would you send a colleague?',
-    questions: [
-      { id: 'would_recommend', type: 'yesno', text: 'Would you recommend this training to others?' },
-    ],
-  },
-  {
-    id: 'F',
-    eyebrow: 'Section F',
-    title: 'The platform',
-    sub: 'How Foundry held up while you were learning.',
-    questions: [
-      { id: 'platform_rating',      type: 'scale', text: 'Ease of using the Foundry platform — intuitive, easy to navigate.' },
-      { id: 'platform_reliability', type: 'scale', text: 'Reliability during the workshop — no lag, errors, or sync issues.' },
-      { id: 'platform_support',     type: 'scale', text: 'How well the platform supported what you were trying to learn.' },
-    ],
-  },
-  // Section G is the legal/research consent — not part of the training-
-  // evaluation design, but required to keep the research_consent table
-  // in sync. Rendered with the same shell as the design sections.
-  {
-    id: 'G',
-    eyebrow: 'Section G',
-    title: 'Research',
-    sub: 'A final ask about using your work to make Foundry better.',
-    questions: [
-      {
-        id: 'research_consent',
-        type: 'yesno',
-        text: 'May we learn from your journey to improve future workshops?',
-        description: 'If yes, the chats, files, coworkers, workflows, and reflections you produced during this workshop will be used as research data to make Foundry better. Your name and email will be replaced with an anonymous participant ID before any analysis. You can withdraw consent any time by emailing alok@tangible.careers.',
-      },
+      { id: 'ai_was_chat_tool',       type: 'scale', text: 'Before this workshop, I mostly thought of AI as a chat tool.' },
+      { id: 'ai_repeatable_systems',  type: 'scale', text: 'After this workshop, I see AI as something that can be organized into repeatable work systems.' },
+      { id: 'aware_human_oversight',  type: 'scale', text: 'After this workshop, I feel more aware of where AI needs human oversight.' },
+      { id: 'aware_cost_tradeoffs',   type: 'scale', text: 'After this workshop, I feel more aware that AI use involves cost and resource tradeoffs.' },
+      { id: 'trust_when_inspectable', type: 'scale', text: 'I would trust AI more when I can inspect its instructions, knowledge, and workflow steps.' },
+      { id: 'would_recommend',        type: 'yesno', text: 'Would you recommend this workshop to a colleague?' },
     ],
   },
 ];
 
 const ALL_QUESTIONS = SECTIONS.flatMap(s => s.questions);
-// "Required" excludes free-text fields — Section D is opt-in writing.
-const REQUIRED_IDS = ALL_QUESTIONS.filter(q => q.type !== 'text').map(q => q.id);
 
 function pad2(n) { return String(n).padStart(2, '0'); }
 
@@ -136,7 +96,7 @@ function isAnswered(q, value) {
   return value !== '';
 }
 
-// ---------------------------------------------------------------- controls
+// ---------- controls
 
 function ScaleControl({ value, onChange, name }) {
   return (
@@ -187,6 +147,28 @@ function YesNoControl({ value, onChange, name }) {
   );
 }
 
+function ChipSelect({ value, onChange, options, name }) {
+  return (
+    <div className="dm-chips" role="radiogroup" aria-label={name}>
+      {options.map(opt => {
+        const sel = value === opt.v;
+        return (
+          <button
+            key={opt.v}
+            type="button"
+            role="radio"
+            aria-checked={sel}
+            className={`dm-chip${sel ? ' is-selected' : ''}`}
+            onClick={() => onChange(opt.v)}
+          >
+            {opt.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 function TextControl({ value, onChange, placeholder }) {
   return (
     <textarea
@@ -199,21 +181,21 @@ function TextControl({ value, onChange, placeholder }) {
   );
 }
 
-// ---------------------------------------------------------------- rows
+// ---------- rows
 
-function Question({ q, index, value, onChange, isRequired }) {
+function Question({ q, index, value, onChange }) {
   const answered = isAnswered(q, value);
   return (
     <div className={`sv-q${answered ? ' is-answered' : ''}`}>
       <div className="sv-q-meta">
         <span className="sv-q-num">{pad2(index)}</span>
-        {isRequired && <span className="sv-q-req">required</span>}
+        <span className="sv-q-req">required</span>
       </div>
       <div className="sv-q-body">
         <p className="sv-q-text">{q.text}</p>
-        {q.description && <p className="sv-q-desc">{q.description}</p>}
         {q.type === 'scale' && <ScaleControl value={value} onChange={onChange} name={q.text} />}
         {q.type === 'yesno' && <YesNoControl value={value} onChange={onChange} name={q.text} />}
+        {q.type === 'chip'  && <ChipSelect   value={value} onChange={onChange} options={q.options} name={q.text} />}
         {q.type === 'text'  && <TextControl  value={value} onChange={onChange} placeholder={q.placeholder} />}
       </div>
     </div>
@@ -236,7 +218,6 @@ function Section({ section, startIndex, answers, setAnswer }) {
             index={startIndex + i + 1}
             value={answers[q.id]}
             onChange={v => setAnswer(q.id, v)}
-            isRequired={q.type !== 'text'}
           />
         ))}
       </div>
@@ -244,22 +225,19 @@ function Section({ section, startIndex, answers, setAnswer }) {
   );
 }
 
-// ---------------------------------------------------------------- shell
+// ---------- shell
 
 export default function FeedbackForm({ onSubmit, submitting, errorMessage, userName }) {
   const [answers, setAnswers] = useState({});
   const setAnswer = (id, v) => setAnswers(a => ({ ...a, [id]: v }));
 
-  const answeredRequired = useMemo(() => {
-    return REQUIRED_IDS.filter(id => {
-      const q = ALL_QUESTIONS.find(qq => qq.id === id);
-      return isAnswered(q, answers[id]);
-    }).length;
-  }, [answers]);
-  const totalRequired = REQUIRED_IDS.length;
-  const ready = answeredRequired === totalRequired;
+  const answeredCount = useMemo(
+    () => ALL_QUESTIONS.filter(q => isAnswered(q, answers[q.id])).length,
+    [answers],
+  );
+  const totalCount = ALL_QUESTIONS.length;
+  const ready = answeredCount === totalCount;
 
-  // Section start indices for 01..NN numbering across sections.
   let cursor = 0;
   const startIndices = SECTIONS.map(s => {
     const start = cursor;
@@ -270,42 +248,45 @@ export default function FeedbackForm({ onSubmit, submitting, errorMessage, userN
   function handleSubmit() {
     if (!ready || submitting) return;
     const trim = (v) => (typeof v === 'string' ? v.trim() : '');
-    // Maps every answer onto the workshop_feedback column it was named for.
-    // Yes/no → boolean for the two boolean columns; scales pass through as
-    // 1-5 ints. Optional texts go through as empty string when blank — the
-    // save layer turns those into NULL.
     const feedback = {
-      satisfaction:         answers.satisfaction,
-      relevance:            answers.relevance,
-      clarity:              answers.clarity,
-      trainer_knowledge:    answers.trainer_knowledge,
-      trainer_delivery:     answers.trainer_delivery,
-      trainer_engagement:   answers.trainer_engagement,
-      materials_quality:    answers.materials_quality,
-      duration_appropriate: answers.duration_appropriate === 'yes',
-      theory_practice:      answers.theory_practice,
-      improved_skills:      answers.improved_skills,
-      can_apply:            answers.can_apply,
-      most_valuable:        trim(answers.most_valuable),
-      future_topics:        trim(answers.future_topics),
-      improvement_notes:    trim(answers.improvement_notes),
-      would_recommend:      answers.would_recommend === 'yes',
-      platform_rating:      answers.platform_rating,
-      platform_reliability: answers.platform_reliability,
-      platform_support:     answers.platform_support,
+      // Section A — Training and facilitation
+      satisfaction:             answers.satisfaction,
+      relevance:                answers.relevance,
+      clarity:                  answers.clarity,
+      theory_practice:          answers.theory_practice,
+      // Section B — Platform
+      platform_rating:          answers.platform_rating,
+      platform_reliability:     answers.platform_reliability,
+      platform_support:         answers.platform_support,
+      foundry_improvement_text: trim(answers.foundry_improvement_text),
+      // Section C — Learning & adoption
+      improved_skills:          answers.improved_skills,
+      identify_ai_tasks:        answers.identify_ai_tasks,
+      identify_human_review:    answers.identify_human_review,
+      likely_to_use:            answers.likely_to_use,
+      concept_used_first:       answers.concept_used_first,
+      real_task_text:           trim(answers.real_task_text),
+      // Section D — Perception, trust, recommendation
+      ai_was_chat_tool:         answers.ai_was_chat_tool,
+      ai_repeatable_systems:    answers.ai_repeatable_systems,
+      aware_human_oversight:    answers.aware_human_oversight,
+      aware_cost_tradeoffs:     answers.aware_cost_tradeoffs,
+      trust_when_inspectable:   answers.trust_when_inspectable,
+      would_recommend:          answers.would_recommend === 'yes',
     };
-    const consent = {
-      granted: answers.research_consent === 'yes',
-      consentTextVersion: CONSENT_TEXT_VERSION,
-    };
-    onSubmit({ feedback, consent });
+    // Consent is now collected on the pre-chat DemographicsForm. The
+    // parent (GraduationScreen) still expects the consent shape on the
+    // submit payload; pass through a null consent so its handler can
+    // skip the second write without erroring. Kept here so existing
+    // call sites don't need to change shape.
+    onSubmit({ feedback, consent: null });
   }
 
   return (
     <div className="sv-page">
       <div className="sv-progress" aria-live="polite">
         <span className="sv-progress-num">
-          {pad2(answeredRequired)}<span className="sv-progress-of"> / {pad2(totalRequired)}</span>
+          {pad2(answeredCount)}<span className="sv-progress-of"> / {pad2(totalCount)}</span>
         </span>
         <span className="sv-progress-label">required</span>
       </div>
@@ -320,7 +301,7 @@ export default function FeedbackForm({ onSubmit, submitting, errorMessage, userN
             Before your scorecard,&nbsp;<em>a few words from you</em>.
           </h1>
           <p className="sv-sub">
-            Eighteen short questions about the training, the materials, and the platform. Twelve scales, three yes/no, three optional notes — about five minutes. Your answers shape the next cohort.
+            Twenty short questions about the training, the platform, what you’ll take to your work, and how this changed your view of AI. Your answers shape the next cohort.
           </p>
           <div className="sv-legend" aria-label="Scale legend">
             <span className="sv-legend-eyebrow">Scale</span>
@@ -352,11 +333,11 @@ export default function FeedbackForm({ onSubmit, submitting, errorMessage, userN
             {ready ? (
               <span className="sv-footer-ready">
                 <span className="sv-footer-ready-dot" aria-hidden />
-                All required questions answered. Optional notes are still open.
+                All required questions answered. Ready to submit.
               </span>
             ) : (
               <span className="sv-footer-pending">
-                <em>{totalRequired - answeredRequired}</em> required {totalRequired - answeredRequired === 1 ? 'question' : 'questions'} left to answer.
+                <em>{totalCount - answeredCount}</em> required {totalCount - answeredCount === 1 ? 'question' : 'questions'} left to answer.
               </span>
             )}
           </div>
@@ -376,7 +357,7 @@ export default function FeedbackForm({ onSubmit, submitting, errorMessage, userN
         <div className="sv-stickybar-track">
           <div
             className="sv-stickybar-fill"
-            style={{ width: `${(answeredRequired / totalRequired) * 100}%` }}
+            style={{ width: `${(answeredCount / totalCount) * 100}%` }}
           />
         </div>
       </div>

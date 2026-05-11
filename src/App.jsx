@@ -543,19 +543,31 @@ function App() {
     return () => { cancelled = true; };
   }, [myParticipantId, sb]);
 
-  async function handleSaveDemographics(payload) {
+  async function handleSaveDemographics({ demographics, consent }) {
     setDemographicsError(null);
     setSavingDemographics(true);
-    const res = await sb.saveDemographics({
-      ...payload,
-      participant_id: myParticipantId,
-      participant_name: userName,
-    });
+    // Two writes — demographics row and consent row. Both must succeed
+    // before we lift the gate; if either fails the user retries from the
+    // same form. Consent moved into the demographics gate per the
+    // research instrument (research-questions.md Q14 sits in Section 2,
+    // pre-chat), so the post-workshop FeedbackForm no longer asks.
+    const [demoRes, consentRes] = await Promise.all([
+      sb.saveDemographics({
+        ...demographics,
+        participant_id: myParticipantId,
+        participant_name: userName,
+      }),
+      sb.saveResearchConsent({
+        participantId: myParticipantId,
+        granted: !!consent?.granted,
+        consentTextVersion: consent?.consentTextVersion || 1,
+      }),
+    ]);
     setSavingDemographics(false);
-    if (res.ok) {
+    if (demoRes.ok && consentRes.ok) {
       setDemographicsStatus('submitted');
     } else {
-      setDemographicsError(res.error || 'Could not save. Try again.');
+      setDemographicsError(demoRes.error || consentRes.error || 'Could not save. Try again.');
     }
   }
 
@@ -3129,7 +3141,12 @@ Answer in ONE sentence. If the user asks "how", a second sentence is allowed —
         <StageReflection
           key={pendingReflectionStage}
           stage={pendingReflectionStage}
-          onSubmit={async ({ confidence, note, habit }) => {
+          onSubmit={async (payload) => {
+            // Payload shape (from research instrument):
+            //   { confidence, agreement, transfer_text, structured, questions_text_version }
+            // `confidence` keeps the old column name for back-compat with
+            // the takeaway PDF rendering; the new fields ride on the
+            // 043 migration's added columns.
             if (!myParticipantId) {
               // Edge case: not yet bound to a participant row. Optimistically
               // mark this stage submitted locally so the participant isn't
@@ -3141,7 +3158,7 @@ Answer in ONE sentence. If the user asks "how", a second sentence is allowed —
               });
               return;
             }
-            const res = await sb.saveStageReflection(myParticipantId, pendingReflectionStage, { confidence, note, habit });
+            const res = await sb.saveStageReflection(myParticipantId, pendingReflectionStage, payload);
             if (!res?.ok) {
               throw new Error(res?.error || 'Could not save your reflection. Please try again.');
             }

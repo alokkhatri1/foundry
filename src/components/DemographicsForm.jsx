@@ -1,17 +1,19 @@
 import { useMemo, useState } from 'react';
 
-// Demographics gate — first thing after JoinScreen, before any chat or
-// workshop tab is reachable. Eight required questions split across two
-// sections; submit upserts a participant_demographics row and unlocks
-// the rest of the workshop. Reuses the survey's editorial shell
-// (`.sv-page` / `.sv-section` / `.sv-q`) and adds two control variants:
+// Pre-chat questionnaire — research+industry required instrument.
+// Source: research-questions.md, Sections 1 and 2.
+// 13 baseline questions + 1 research consent question (14 total).
+// All required. Submit unlocks Chat.
 //
-//   ChipSelect    — single-select pills for tenure / industry / age / use freq
-//   ChipMultiSelect — multi-select pills for AI tools used
-//
-// Bumped whenever the on-screen wording materially changes so each
-// stored row records the wording the participant actually saw.
-export const DEMOGRAPHICS_TEXT_VERSION = 1;
+// Persistence: 13 demographics fields land on participant_demographics
+// (loader: saveDemographics). The consent answer lands on
+// research_consent (loader: saveResearchConsent). App.jsx fires both
+// writes from a single handleSaveDemographics so the gate only clears
+// when both rows are upserted.
+
+export const DEMOGRAPHICS_TEXT_VERSION = 2;
+
+// ---------- option sets (codes persisted; labels here are the on-screen text)
 
 const TENURE_OPTIONS = [
   { v: 'lt_1y',  label: 'Less than 1 year' },
@@ -32,12 +34,16 @@ const INDUSTRY_OPTIONS = [
   { v: 'other',         label: 'Other' },
 ];
 
-const AGE_OPTIONS = [
-  { v: '18_24',   label: '18–24' },
-  { v: '25_34',   label: '25–34' },
-  { v: '35_44',   label: '35–44' },
-  { v: '45_54',   label: '45–54' },
-  { v: '55_plus', label: '55+' },
+const WORK_TYPE_OPTIONS = [
+  { v: 'strategy',    label: 'Strategy / planning' },
+  { v: 'operations',  label: 'Operations' },
+  { v: 'analysis',    label: 'Analysis / reporting' },
+  { v: 'research',    label: 'Research' },
+  { v: 'writing',     label: 'Writing / communication' },
+  { v: 'customer',    label: 'Customer or client work' },
+  { v: 'product_eng', label: 'Product / engineering' },
+  { v: 'management',  label: 'Management' },
+  { v: 'other',       label: 'Other' },
 ];
 
 const USE_FREQ_OPTIONS = [
@@ -49,19 +55,55 @@ const USE_FREQ_OPTIONS = [
 ];
 
 const TOOL_OPTIONS = [
-  { v: 'chatgpt',  label: 'ChatGPT' },
-  { v: 'claude',   label: 'Claude' },
-  { v: 'gemini',   label: 'Gemini' },
-  { v: 'copilot',  label: 'Copilot (GitHub or Microsoft)' },
-  { v: 'perplexity', label: 'Perplexity' },
-  { v: 'midjourney', label: 'Midjourney / image tools' },
-  { v: 'other',    label: 'Other' },
-  { v: 'none',     label: 'None yet' },
+  { v: 'chatgpt',     label: 'ChatGPT' },
+  { v: 'claude',      label: 'Claude' },
+  { v: 'gemini',      label: 'Gemini' },
+  { v: 'copilot',     label: 'Copilot' },
+  { v: 'perplexity',  label: 'Perplexity' },
+  { v: 'image_gen',   label: 'Image-generation tools' },
+  { v: 'internal',    label: 'Internal company AI tool' },
+  { v: 'other',       label: 'Other' },
+  { v: 'none',        label: 'None yet' },
 ];
 
-// 1-5 scale for AI familiarity. Distinct legend from the post-workshop
-// survey (which uses Strongly disagree → Strongly agree) — here we want
-// "where you start", so it's a self-rated ladder.
+const USE_CASES_OPTIONS = [
+  { v: 'drafting',     label: 'Drafting text' },
+  { v: 'summarizing',  label: 'Summarizing documents' },
+  { v: 'brainstorm',   label: 'Brainstorming' },
+  { v: 'research',     label: 'Research' },
+  { v: 'data',         label: 'Data analysis' },
+  { v: 'coding',       label: 'Coding' },
+  { v: 'decision',     label: 'Decision support' },
+  { v: 'automation',   label: 'Automating repeated work' },
+  { v: 'not_yet',      label: 'I do not use AI yet' },
+  { v: 'other',        label: 'Other' },
+];
+
+const MENTAL_MODEL_OPTIONS = [
+  { v: 'search',         label: 'A search engine' },
+  { v: 'writing',        label: 'A writing assistant' },
+  { v: 'productivity',   label: 'A productivity tool' },
+  { v: 'coworker',       label: 'A coworker' },
+  { v: 'expert',         label: 'An expert advisor' },
+  { v: 'automation',     label: 'An automation system' },
+  { v: 'risky',          label: 'A risky tool that needs close supervision' },
+  { v: 'unsure',         label: 'I am not sure yet' },
+];
+
+const ADOPTION_CRITERIA_OPTIONS = [
+  { v: 'accuracy',       label: 'Accuracy' },
+  { v: 'speed',          label: 'Speed' },
+  { v: 'privacy',        label: 'Privacy' },
+  { v: 'ease',           label: 'Ease of use' },
+  { v: 'control',        label: 'Control' },
+  { v: 'explainability', label: 'Explainability' },
+  { v: 'cost',           label: 'Cost' },
+  { v: 'quality',        label: 'Quality of final output' },
+  { v: 'reviewability',  label: 'Ability to review or edit before use' },
+];
+
+// 1-5 self-rated AI familiarity ladder. Distinct from the workshop
+// survey's Strongly disagree → Strongly agree scale.
 const FAMILIARITY_LEGEND = [
   { v: 1, label: 'New to AI' },
   { v: 2, label: 'Curious' },
@@ -70,29 +112,67 @@ const FAMILIARITY_LEGEND = [
   { v: 5, label: 'Expert' },
 ];
 
+// 1-5 agreement scale used for Q10 and Q11.
+const AGREEMENT_LEGEND = [
+  { v: 1, label: 'Strongly disagree' },
+  { v: 2, label: 'Disagree' },
+  { v: 3, label: 'Neutral' },
+  { v: 4, label: 'Agree' },
+  { v: 5, label: 'Strongly agree' },
+];
+
+// ---------- question schema (numbering matches research-questions.md)
+
 const SECTIONS = [
   {
     id: 'A',
     eyebrow: 'Section A',
     title: 'About you',
-    sub: 'Helps us understand who built which reflections.',
+    sub: 'A read of your role and the kind of work you do.',
     questions: [
-      { id: 'role',         type: 'text',  text: 'What’s your role or job title?', placeholder: 'e.g. Product manager, Credit analyst, Designer…' },
-      { id: 'tenure_band',  type: 'chip',  text: 'How long have you been in your current role?', options: TENURE_OPTIONS },
-      { id: 'industry',     type: 'chip',  text: 'Which industry are you in?',                    options: INDUSTRY_OPTIONS },
-      { id: 'age_band',     type: 'chip',  text: 'Age band',                                      options: AGE_OPTIONS },
+      { id: 'role',       type: 'text',  text: 'What is your role or job title?', placeholder: 'e.g. Product manager, Credit analyst, Designer…' },
+      { id: 'tenure_band', type: 'chip',  text: 'How long have you been in your current role?', options: TENURE_OPTIONS },
+      { id: 'industry',   type: 'chip',  text: 'Which industry are you in?',                    options: INDUSTRY_OPTIONS },
+      { id: 'work_type',  type: 'chips', text: 'Which best describes the type of work you do?',  options: WORK_TYPE_OPTIONS },
     ],
   },
   {
     id: 'B',
     eyebrow: 'Section B',
-    title: 'You and AI',
-    sub: 'A quick read of where you start — not a test.',
+    title: 'Current AI use',
+    sub: 'Where you start with AI tools today — not a test.',
     questions: [
-      { id: 'ai_familiarity',   type: 'familiarity', text: 'How would you rate your familiarity with AI today?' },
-      { id: 'ai_use_frequency', type: 'chip',        text: 'How often do you use AI tools right now?', options: USE_FREQ_OPTIONS },
-      { id: 'ai_tools',         type: 'chips',       text: 'Which AI tools have you used? Pick any.',  options: TOOL_OPTIONS },
-      { id: 'workshop_goal',    type: 'text',        text: 'What do you want to walk away with from this workshop?', placeholder: 'A skill, a habit, a decision you want to feel ready to make…' },
+      { id: 'ai_familiarity',   type: 'familiarity', text: 'How familiar are you with AI tools today?' },
+      { id: 'ai_use_frequency', type: 'chip',        text: 'How often do you use AI tools right now?',                       options: USE_FREQ_OPTIONS },
+      { id: 'ai_tools',         type: 'chips',       text: 'Which AI tools have you used? Pick any.',                         options: TOOL_OPTIONS },
+      { id: 'ai_use_cases',     type: 'chips',       text: 'What do you usually use AI for?',                                 options: USE_CASES_OPTIONS },
+      { id: 'ai_mental_model',  type: 'chip',        text: 'Which statement best describes how you currently think about AI?', options: MENTAL_MODEL_OPTIONS },
+    ],
+  },
+  {
+    id: 'C',
+    eyebrow: 'Section C',
+    title: 'Trust, delegation, and control',
+    sub: 'How you decide whether AI gets to do the work.',
+    questions: [
+      { id: 'evaluation_confidence', type: 'agreement', text: 'I can usually tell when an AI answer is good enough to use.' },
+      { id: 'delegation_comfort',    type: 'agreement', text: 'I feel comfortable delegating a work task to AI if I can review the output before using it.' },
+      { id: 'adoption_criteria_top3', type: 'rank',    text: 'When deciding whether to use AI, what matters most to you? Rank your top three.', options: ADOPTION_CRITERIA_OPTIONS, pickCount: 3 },
+      { id: 'delegation_boundary',   type: 'text',     text: 'What kind of work would you not want AI to do for you? Why?', placeholder: 'A type of decision, a kind of judgment, a domain you would keep human…' },
+    ],
+  },
+  {
+    id: 'D',
+    eyebrow: 'Section D',
+    title: 'Research consent',
+    sub: 'Your participation in the research, separately from the workshop itself.',
+    questions: [
+      {
+        id: 'research_consent',
+        type: 'yesno',
+        text: 'May we use your workshop activity to improve Foundry and study how professionals learn to work with AI?',
+        description: 'If you choose yes, the chats, files, coworkers, workflows, reflections, and feedback you create during this workshop may be used as research data. Your name and email will be replaced with an anonymous participant ID before analysis. Participation is voluntary. You can still complete the workshop if you say no. You may withdraw consent later by contacting the research team.',
+      },
     ],
   },
 ];
@@ -105,10 +185,11 @@ function isAnswered(q, value) {
   if (value === undefined || value === null) return false;
   if (q.type === 'text')  return String(value).trim().length > 0;
   if (q.type === 'chips') return Array.isArray(value) && value.length > 0;
+  if (q.type === 'rank')  return Array.isArray(value) && value.length === (q.pickCount || 3);
   return value !== '';
 }
 
-// ---------------------------------------------------------------- controls
+// ---------- controls
 
 function FamiliarityControl({ value, onChange }) {
   return (
@@ -116,17 +197,10 @@ function FamiliarityControl({ value, onChange }) {
       {FAMILIARITY_LEGEND.map(opt => {
         const sel = value === opt.v;
         return (
-          <button
-            key={opt.v}
-            type="button"
-            role="radio"
-            aria-checked={sel}
+          <button key={opt.v} type="button" role="radio" aria-checked={sel}
             className={`sv-scale-btn${sel ? ' is-selected' : ''}`}
-            onClick={() => onChange(opt.v)}
-            title={opt.label}
-          >
-            {opt.v}
-          </button>
+            onClick={() => onChange(opt.v)} title={opt.label}
+          >{opt.v}</button>
         );
       })}
       <div className="sv-scale-legend" aria-hidden>
@@ -137,22 +211,52 @@ function FamiliarityControl({ value, onChange }) {
   );
 }
 
+function AgreementControl({ value, onChange, name }) {
+  return (
+    <div className="sv-scale" role="radiogroup" aria-label={name}>
+      {AGREEMENT_LEGEND.map(opt => {
+        const sel = value === opt.v;
+        return (
+          <button key={opt.v} type="button" role="radio" aria-checked={sel}
+            className={`sv-scale-btn${sel ? ' is-selected' : ''}`}
+            onClick={() => onChange(opt.v)} title={opt.label}
+          >{opt.v}</button>
+        );
+      })}
+      <div className="sv-scale-legend" aria-hidden>
+        <span>{AGREEMENT_LEGEND[0].label}</span>
+        <span>{AGREEMENT_LEGEND[AGREEMENT_LEGEND.length - 1].label}</span>
+      </div>
+    </div>
+  );
+}
+
+function YesNoControl({ value, onChange, name }) {
+  return (
+    <div className="sv-yesno" role="radiogroup" aria-label={name}>
+      {['yes', 'no'].map(v => {
+        const sel = value === v;
+        return (
+          <button key={v} type="button" role="radio" aria-checked={sel}
+            className={`sv-yesno-btn${sel ? ' is-selected' : ''} is-${v}`}
+            onClick={() => onChange(v)}
+          >{v.charAt(0).toUpperCase() + v.slice(1)}</button>
+        );
+      })}
+    </div>
+  );
+}
+
 function ChipSelect({ value, onChange, options, name }) {
   return (
     <div className="dm-chips" role="radiogroup" aria-label={name}>
       {options.map(opt => {
         const sel = value === opt.v;
         return (
-          <button
-            key={opt.v}
-            type="button"
-            role="radio"
-            aria-checked={sel}
+          <button key={opt.v} type="button" role="radio" aria-checked={sel}
             className={`dm-chip${sel ? ' is-selected' : ''}`}
             onClick={() => onChange(opt.v)}
-          >
-            {opt.label}
-          </button>
+          >{opt.label}</button>
         );
       })}
     </div>
@@ -166,29 +270,69 @@ function ChipMultiSelect({ value, onChange, options, name }) {
       {options.map(opt => {
         const sel = set.has(opt.v);
         return (
-          <button
-            key={opt.v}
-            type="button"
-            aria-pressed={sel}
+          <button key={opt.v} type="button" aria-pressed={sel}
             className={`dm-chip${sel ? ' is-selected' : ''}`}
             onClick={() => {
               const next = new Set(set);
               if (next.has(opt.v)) next.delete(opt.v);
               else next.add(opt.v);
-              // 'none' is exclusive: picking it clears others; picking
-              // others while 'none' is set unsets it.
-              if (opt.v === 'none' && next.has('none')) {
-                onChange(['none']);
+              // Codes that mean "none of the above" are exclusive with
+              // other selections — picking them clears the rest, picking
+              // anything else clears them. Q7 ('none') and Q8 ('not_yet')
+              // both have this semantics.
+              const exclusives = new Set(['none', 'not_yet']);
+              if (exclusives.has(opt.v) && next.has(opt.v)) {
+                onChange([opt.v]);
                 return;
               }
-              if (opt.v !== 'none' && next.has('none')) next.delete('none');
+              if (!exclusives.has(opt.v)) {
+                for (const ex of exclusives) next.delete(ex);
+              }
               onChange([...next]);
             }}
-          >
-            {opt.label}
-          </button>
+          >{opt.label}</button>
         );
       })}
+    </div>
+  );
+}
+
+// Top-N ranking pills. Click to add (gets next rank); click again to
+// remove (subsequent ranks slide down). Once `pickCount` are picked,
+// further clicks are no-ops until the user removes one.
+function RankControl({ value, onChange, options, pickCount = 3, name }) {
+  const order = Array.isArray(value) ? value : [];
+  const rankOf = (v) => {
+    const idx = order.indexOf(v);
+    return idx === -1 ? null : idx + 1;
+  };
+  return (
+    <div className="dm-rank" role="group" aria-label={name}>
+      <div className="dm-rank-help">
+        {order.length < pickCount
+          ? `Pick ${pickCount - order.length} more — your top three in order.`
+          : `Top three picked. Click a chip again to remove.`}
+      </div>
+      <div className="dm-chips">
+        {options.map(opt => {
+          const r = rankOf(opt.v);
+          const sel = r !== null;
+          const atLimit = order.length >= pickCount && !sel;
+          return (
+            <button key={opt.v} type="button" aria-pressed={sel}
+              disabled={atLimit}
+              className={`dm-chip dm-rank-chip${sel ? ' is-selected' : ''}${atLimit ? ' is-disabled' : ''}`}
+              onClick={() => {
+                if (sel) onChange(order.filter(x => x !== opt.v));
+                else if (order.length < pickCount) onChange([...order, opt.v]);
+              }}
+            >
+              {sel && <span className="dm-rank-badge">{r}</span>}
+              {opt.label}
+            </button>
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -205,7 +349,7 @@ function TextControl({ value, onChange, placeholder }) {
   );
 }
 
-// ---------------------------------------------------------------- rows
+// ---------- rows
 
 function Question({ q, index, value, onChange }) {
   const answered = isAnswered(q, value);
@@ -217,10 +361,14 @@ function Question({ q, index, value, onChange }) {
       </div>
       <div className="sv-q-body">
         <p className="sv-q-text">{q.text}</p>
-        {q.type === 'text'        && <TextControl     value={value} onChange={onChange} placeholder={q.placeholder} />}
-        {q.type === 'chip'        && <ChipSelect      value={value} onChange={onChange} options={q.options} name={q.text} />}
-        {q.type === 'chips'       && <ChipMultiSelect value={value} onChange={onChange} options={q.options} name={q.text} />}
+        {q.description && <p className="sv-q-desc">{q.description}</p>}
+        {q.type === 'text'        && <TextControl       value={value} onChange={onChange} placeholder={q.placeholder} />}
+        {q.type === 'chip'        && <ChipSelect        value={value} onChange={onChange} options={q.options} name={q.text} />}
+        {q.type === 'chips'       && <ChipMultiSelect   value={value} onChange={onChange} options={q.options} name={q.text} />}
+        {q.type === 'rank'        && <RankControl       value={value} onChange={onChange} options={q.options} pickCount={q.pickCount} name={q.text} />}
         {q.type === 'familiarity' && <FamiliarityControl value={value} onChange={onChange} />}
+        {q.type === 'agreement'   && <AgreementControl   value={value} onChange={onChange} name={q.text} />}
+        {q.type === 'yesno'       && <YesNoControl      value={value} onChange={onChange} name={q.text} />}
       </div>
     </div>
   );
@@ -249,7 +397,7 @@ function Section({ section, startIndex, answers, setAnswer }) {
   );
 }
 
-// ---------------------------------------------------------------- shell
+// ---------- shell
 
 export default function DemographicsForm({ onSubmit, submitting, errorMessage, userName }) {
   const [answers, setAnswers] = useState({});
@@ -272,15 +420,28 @@ export default function DemographicsForm({ onSubmit, submitting, errorMessage, u
   function handleSubmit() {
     if (!ready || submitting) return;
     const payload = {
-      role:               String(answers.role || '').trim(),
-      tenure_band:        answers.tenure_band,
-      industry:           answers.industry,
-      age_band:           answers.age_band,
-      ai_familiarity:     answers.ai_familiarity,
-      ai_use_frequency:   answers.ai_use_frequency,
-      ai_tools:           Array.isArray(answers.ai_tools) ? answers.ai_tools : [],
-      workshop_goal:      String(answers.workshop_goal || '').trim(),
-      questions_text_version: DEMOGRAPHICS_TEXT_VERSION,
+      // demographics row
+      demographics: {
+        role:                    String(answers.role || '').trim(),
+        tenure_band:             answers.tenure_band,
+        industry:                answers.industry,
+        work_type:               Array.isArray(answers.work_type) ? answers.work_type : [],
+        ai_familiarity:          answers.ai_familiarity,
+        ai_use_frequency:        answers.ai_use_frequency,
+        ai_tools:                Array.isArray(answers.ai_tools) ? answers.ai_tools : [],
+        ai_use_cases:            Array.isArray(answers.ai_use_cases) ? answers.ai_use_cases : [],
+        ai_mental_model:         answers.ai_mental_model,
+        evaluation_confidence:   answers.evaluation_confidence,
+        delegation_comfort:      answers.delegation_comfort,
+        adoption_criteria_top3:  Array.isArray(answers.adoption_criteria_top3) ? answers.adoption_criteria_top3 : [],
+        delegation_boundary:     String(answers.delegation_boundary || '').trim(),
+        questions_text_version:  DEMOGRAPHICS_TEXT_VERSION,
+      },
+      // consent row (separate write — same submit, different table)
+      consent: {
+        granted: answers.research_consent === 'yes',
+        consentTextVersion: DEMOGRAPHICS_TEXT_VERSION,
+      },
     };
     onSubmit(payload);
   }
@@ -304,9 +465,7 @@ export default function DemographicsForm({ onSubmit, submitting, errorMessage, u
             Before you start,&nbsp;<em>a few things about you</em>.
           </h1>
           <p className="sv-sub">
-            Eight short questions — about a minute. We use these to make
-            sense of how different roles and starting points experience
-            the workshop.
+            A short questionnaire about your role, how you work with AI today, and how you weigh trust against delegation. Plus a final consent ask about using your workshop activity for research.
           </p>
         </header>
 

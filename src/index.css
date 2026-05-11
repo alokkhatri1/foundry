@@ -16312,6 +16312,51 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
   box-shadow: 0 2px 6px rgba(217, 119, 87, 0.25);
 }
 .dm-chip.is-selected:hover { color: var(--paper); }
+.dm-chip.is-disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.dm-chip.is-disabled:hover {
+  border-color: var(--cream-deep);
+  color: var(--ink-mid);
+}
+
+/* Top-N ranking control — chips show their picked rank as a small badge.
+   Once N picks are in, remaining chips are disabled until the user
+   un-picks one. The help line above the row tells the user where they
+   stand. Used on Q12 of the demographics gate. */
+.dm-rank {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.dm-rank-help {
+  font-family: var(--serif);
+  font-style: italic;
+  font-size: 13px;
+  color: var(--ink-muted);
+  line-height: 1.4;
+}
+.dm-rank-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.dm-rank-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: var(--radius-pill);
+  background: var(--paper);
+  color: var(--peach-deep);
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
 
 /* Top-right progress chip — N / M required, sticks while scrolling */
 .sv-progress {

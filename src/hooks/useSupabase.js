@@ -427,7 +427,7 @@ export default function useSupabase() {
         .eq('workshop_id', roomId)
         .limit(50000),
       supabase.from('participant_demographics')
-        .select('participant_id, role, tenure_band, industry, age_band, ai_familiarity, ai_use_frequency, ai_tools, workshop_goal, questions_text_version, created_at')
+        .select('participant_id, role, tenure_band, industry, age_band, work_type, ai_familiarity, ai_use_frequency, ai_tools, ai_use_cases, ai_mental_model, evaluation_confidence, delegation_comfort, adoption_criteria_top3, delegation_boundary, workshop_goal, questions_text_version, created_at')
         .eq('workshop_id', roomId),
     ]);
 

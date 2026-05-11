@@ -71,20 +71,32 @@ function WorkshopRow({ w, selected, onSelect, copied, onCopy, stats, dim }) {
 
 // Scaled feedback questions, shared between the per-cohort summary
 // (FeedbackResponses) and the per-participant card on the participants tab.
+// Fields the research instrument's end-of-workshop survey populates.
+// Legacy 1-5 columns that the new form stopped writing (trainer_*,
+// materials_quality, can_apply) are dropped from the list so the Recap
+// averages don't show "—" for every new row. Old rows still exist in
+// the DB but aren't displayed as headline metrics.
 const SCORE_FIELDS = [
-  { key: 'satisfaction',         label: 'Satisfaction' },
-  { key: 'relevance',            label: 'Relevance' },
-  { key: 'clarity',              label: 'Clarity' },
-  { key: 'trainer_knowledge',    label: 'Trainer knowledge' },
-  { key: 'trainer_delivery',     label: 'Trainer delivery' },
-  { key: 'trainer_engagement',   label: 'Trainer engagement' },
-  { key: 'materials_quality',    label: 'Slides & content' },
-  { key: 'theory_practice',      label: 'Explain / practice mix' },
-  { key: 'improved_skills',      label: 'Improved skills' },
-  { key: 'can_apply',            label: 'Can apply' },
-  { key: 'platform_rating',      label: 'Platform ease' },
-  { key: 'platform_reliability', label: 'Platform reliability' },
-  { key: 'platform_support',     label: 'Platform support' },
+  // Section A — Training & facilitation
+  { key: 'satisfaction',           label: 'Satisfaction' },
+  { key: 'relevance',              label: 'Relevance' },
+  { key: 'clarity',                label: 'Clearly organized' },
+  { key: 'theory_practice',        label: 'Explain / practice mix' },
+  // Section B — Platform
+  { key: 'platform_rating',        label: 'Platform ease' },
+  { key: 'platform_reliability',   label: 'Platform reliability' },
+  { key: 'platform_support',       label: 'Helped understand AI' },
+  // Section C — Learning & adoption
+  { key: 'improved_skills',        label: 'Improved my ability' },
+  { key: 'identify_ai_tasks',      label: 'Identify AI tasks' },
+  { key: 'identify_human_review',  label: 'Identify human-review tasks' },
+  { key: 'likely_to_use',          label: 'Likely to use a concept' },
+  // Section D — Perception, trust, recommendation
+  { key: 'ai_was_chat_tool',       label: 'Saw AI as chat (before)' },
+  { key: 'ai_repeatable_systems',  label: 'Sees AI as systems (after)' },
+  { key: 'aware_human_oversight',  label: 'Aware of oversight needs' },
+  { key: 'aware_cost_tradeoffs',   label: 'Aware of cost tradeoffs' },
+  { key: 'trust_when_inspectable', label: 'Trusts when inspectable' },
 ];
 
 export default function AdminDashboard({ sb, user, onBack, onEnterWorkshop }) {
@@ -835,12 +847,14 @@ export default function AdminDashboard({ sb, user, onBack, onEnterWorkshop }) {
                                       </div>
                                       <div className="admin-person-binary">
                                         Recommend: <strong>{fb.would_recommend === true ? 'Yes' : fb.would_recommend === false ? 'No' : '—'}</strong>
-                                        {' · '}
-                                        Duration ok: <strong>{fb.duration_appropriate === true ? 'Yes' : fb.duration_appropriate === false ? 'No' : '—'}</strong>
+                                        {fb.concept_used_first && <> · First concept: <strong>{fb.concept_used_first}</strong></>}
                                       </div>
-                                      {fb.most_valuable && (<div className="admin-person-text"><span className="l">Most valuable</span><div>{fb.most_valuable}</div></div>)}
-                                      {fb.future_topics && (<div className="admin-person-text"><span className="l">Future topics</span><div>{fb.future_topics}</div></div>)}
-                                      {fb.improvement_notes && (<div className="admin-person-text"><span className="l">Suggestions</span><div>{fb.improvement_notes}</div></div>)}
+                                      {fb.foundry_improvement_text && (<div className="admin-person-text"><span className="l">What would make Foundry easier</span><div>{fb.foundry_improvement_text}</div></div>)}
+                                      {fb.real_task_text         && (<div className="admin-person-text"><span className="l">Real task</span><div>{fb.real_task_text}</div></div>)}
+                                      {/* Legacy free-text from the pre-instrument form. Shown only when present. */}
+                                      {fb.most_valuable     && (<div className="admin-person-text"><span className="l">Most valuable (legacy)</span><div>{fb.most_valuable}</div></div>)}
+                                      {fb.future_topics     && (<div className="admin-person-text"><span className="l">Future topics (legacy)</span><div>{fb.future_topics}</div></div>)}
+                                      {fb.improvement_notes && (<div className="admin-person-text"><span className="l">Suggestions (legacy)</span><div>{fb.improvement_notes}</div></div>)}
                                     </div>
                                   ) : (
                                     <div className="admin-person-feedback-empty">Hasn't submitted feedback yet.</div>
@@ -978,8 +992,17 @@ function WorkshopRecap({ feedback, humanParticipants }) {
   };
   const avgSatisfaction = avgOf('satisfaction');
   const avgImproved = avgOf('improved_skills');
-  const trainerComposite = (() => {
-    const parts = ['trainer_knowledge', 'trainer_delivery', 'trainer_engagement'].map(avgOf).filter(v => v !== null);
+  // Perception-shift composite — averages the five 1-5 items in Section
+  // D of the research instrument (saw-AI-as-chat-before, sees-AI-as-
+  // systems-after, oversight-awareness, cost-awareness, trust-when-
+  // inspectable). Replaces the prior trainer-composite tile, which has
+  // no data on the new form. Old rows that lack these columns just
+  // contribute nothing to the average.
+  const perceptionComposite = (() => {
+    const parts = [
+      'ai_was_chat_tool', 'ai_repeatable_systems', 'aware_human_oversight',
+      'aware_cost_tradeoffs', 'trust_when_inspectable',
+    ].map(avgOf).filter(v => v !== null);
     if (parts.length === 0) return null;
     return parts.reduce((a, b) => a + b, 0) / parts.length;
   })();
@@ -1007,8 +1030,8 @@ function WorkshopRecap({ feedback, humanParticipants }) {
           <span className="admin-recap-stat-hint">of 5</span>
         </div>
         <div className="admin-recap-stat">
-          <span className="admin-recap-stat-label">Trainer</span>
-          <span className="admin-recap-stat-value">{fmtScore(trainerComposite)}</span>
+          <span className="admin-recap-stat-label">Perception shift</span>
+          <span className="admin-recap-stat-value">{fmtScore(perceptionComposite)}</span>
           <span className="admin-recap-stat-hint">composite of 5</span>
         </div>
         <div className="admin-recap-stat">
@@ -1091,7 +1114,6 @@ function FeedbackResponses({ rows }) {
     if (vals.length === 0) return null;
     return Math.round((vals.filter(v => v === true).length / vals.length) * 100);
   };
-  const durationYes = yesShare('duration_appropriate');
   const recommendYes = yesShare('would_recommend');
 
   return (
@@ -1107,12 +1129,6 @@ function FeedbackResponses({ rows }) {
             <div className="admin-feedback-stat-value">{s.avg.toFixed(1)}</div>
           </div>
         ))}
-        {durationYes !== null && (
-          <div className="admin-feedback-stat">
-            <div className="admin-feedback-stat-label">Duration ok</div>
-            <div className="admin-feedback-stat-value">{durationYes}%</div>
-          </div>
-        )}
         {recommendYes !== null && (
           <div className="admin-feedback-stat">
             <div className="admin-feedback-stat-label">Would recommend</div>
@@ -1135,27 +1151,42 @@ function FeedbackResponses({ rows }) {
                 </div>
               ))}
               <div className="admin-feedback-score-cell">
-                Duration ok: <strong>{r.duration_appropriate === true ? 'Yes' : r.duration_appropriate === false ? 'No' : '—'}</strong>
-              </div>
-              <div className="admin-feedback-score-cell">
                 Recommend: <strong>{r.would_recommend === true ? 'Yes' : r.would_recommend === false ? 'No' : '—'}</strong>
               </div>
+              {r.concept_used_first && (
+                <div className="admin-feedback-score-cell">
+                  First concept: <strong>{r.concept_used_first}</strong>
+                </div>
+              )}
             </div>
+            {r.foundry_improvement_text && (
+              <>
+                <div className="admin-feedback-text-label">What would make Foundry easier</div>
+                <div className="admin-feedback-text">{r.foundry_improvement_text}</div>
+              </>
+            )}
+            {r.real_task_text && (
+              <>
+                <div className="admin-feedback-text-label">Real task</div>
+                <div className="admin-feedback-text">{r.real_task_text}</div>
+              </>
+            )}
+            {/* Legacy free-text from the pre-instrument form. */}
             {r.most_valuable && (
               <>
-                <div className="admin-feedback-text-label">Most valuable</div>
+                <div className="admin-feedback-text-label">Most valuable (legacy)</div>
                 <div className="admin-feedback-text">{r.most_valuable}</div>
               </>
             )}
             {r.future_topics && (
               <>
-                <div className="admin-feedback-text-label">Future topics</div>
+                <div className="admin-feedback-text-label">Future topics (legacy)</div>
                 <div className="admin-feedback-text">{r.future_topics}</div>
               </>
             )}
             {r.improvement_notes && (
               <>
-                <div className="admin-feedback-text-label">Suggestions</div>
+                <div className="admin-feedback-text-label">Suggestions (legacy)</div>
                 <div className="admin-feedback-text">{r.improvement_notes}</div>
               </>
             )}

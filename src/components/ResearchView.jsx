@@ -338,13 +338,37 @@ function ReflectionsPanel({ reflections, consent }) {
           <span>{consent.granted ? 'Granted' : 'Declined'} · {fmtTime(consent.granted_at)} · text v{consent.consent_text_version}</span>
         </div>
       )}
-      {reflections.map(r => (
-        <div key={`${r.participant_id}-${r.stage}`} className="rv-refl-row">
-          <div className="rv-refl-head"><strong>Stage {r.stage}</strong> · confidence {r.confidence ?? '—'}</div>
-          {r.note && <div><span className="rv-label">Note</span><div>{r.note}</div></div>}
-          {r.habit && <div><span className="rv-label">Habit</span><div>{r.habit}</div></div>}
-        </div>
-      ))}
+      {reflections.map(r => {
+        // `confidence` carries the clarity rating (kept on the legacy
+        // column so the takeaway PDF didn't need a rename). The
+        // research instrument's new fields ride alongside.
+        const structured = r.structured && typeof r.structured === 'object' ? r.structured : {};
+        const structuredKeys = Object.keys(structured);
+        return (
+          <div key={`${r.participant_id}-${r.stage}`} className="rv-refl-row">
+            <div className="rv-refl-head">
+              <strong>Stage {r.stage}</strong>
+              {' · clarity '}{r.confidence ?? '—'}
+              {' · agreement '}{r.agreement ?? '—'}
+            </div>
+            {r.transfer_text && <div><span className="rv-label">Transfer to work</span><div>{r.transfer_text}</div></div>}
+            {structuredKeys.length > 0 && (
+              <div>
+                <span className="rv-label">Structured</span>
+                <div>
+                  {structuredKeys.map(k => {
+                    const v = structured[k];
+                    const text = Array.isArray(v) ? v.join(', ') : String(v);
+                    return <div key={k}><em>{k}:</em> {text}</div>;
+                  })}
+                </div>
+              </div>
+            )}
+            {r.note  && <div><span className="rv-label">Note (legacy)</span><div>{r.note}</div></div>}
+            {r.habit && <div><span className="rv-label">Habit (legacy)</span><div>{r.habit}</div></div>}
+          </div>
+        );
+      })}
     </div>
   );
 }

@@ -340,7 +340,7 @@ function TextControl({ value, onChange, placeholder }) {
 function Question({ q, index, value, onChange }) {
   const answered = isAnswered(q, value);
   return (
-    <div className={`sv-q${answered ? ' is-answered' : ''}`}>
+    <div id={`dm-q-${q.id}`} className={`sv-q${answered ? ' is-answered' : ''}`}>
       <div className="sv-q-meta">
         <span className="sv-q-num">{pad2(index)}</span>
         <span className="sv-q-req">required</span>
@@ -467,9 +467,19 @@ export default function DemographicsForm({ onSubmit, submitting, errorMessage, u
                 All {totalCount} answered. Ready to begin.
               </span>
             ) : (
-              <span className="sv-footer-pending">
-                <em>{totalCount - answeredCount}</em> {totalCount - answeredCount === 1 ? 'question' : 'questions'} left.
-              </span>
+              <button
+                type="button"
+                className="sv-footer-pending sv-footer-pending-jump"
+                onClick={() => {
+                  const firstUnanswered = ALL_QUESTIONS.find(q => !isAnswered(q, answers[q.id]));
+                  if (!firstUnanswered) return;
+                  const el = document.getElementById(`dm-q-${firstUnanswered.id}`);
+                  if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }}
+                title="Jump to the first question you haven't answered yet"
+              >
+                <em>{totalCount - answeredCount}</em> {totalCount - answeredCount === 1 ? 'question' : 'questions'} left — jump to it →
+              </button>
             )}
           </div>
           <button

@@ -3160,6 +3160,9 @@ Answer in ONE sentence. If the user asks "how", a second sentence is allowed —
         <DemographicsForm
           userName={userName}
           onSubmit={handleSaveDemographics}
+          // Admin-only escape hatch — bypass the gate without writing
+          // a row. Session-only: refresh brings the gate back.
+          onSkip={() => setDemographicsStatus('submitted')}
           submitting={savingDemographics}
           errorMessage={demographicsError}
         />
@@ -3209,6 +3212,17 @@ Answer in ONE sentence. If the user asks "how", a second sentence is allowed —
             if (!res?.ok) {
               throw new Error(res?.error || 'Could not save your reflection. Please try again.');
             }
+            setSubmittedReflections(prev => {
+              const next = new Set(prev || []);
+              next.add(pendingReflectionStage);
+              return next;
+            });
+          }}
+          // Admin-only escape hatch — local-state only, no row written.
+          // Marks the stage as submitted so the modal closes and the
+          // participant flow continues; doesn't pollute stage_reflections
+          // with a row that has no answers.
+          onSkip={() => {
             setSubmittedReflections(prev => {
               const next = new Set(prev || []);
               next.add(pendingReflectionStage);

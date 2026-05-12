@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { useAuth } from './AuthGate';
 
 // Pre-chat questionnaire — research+industry required instrument,
 // baseline only. Source: research-questions.md, Section 1 (Q1-Q13).
@@ -385,7 +386,8 @@ function Section({ section, startIndex, answers, setAnswer }) {
 
 // ---------- shell
 
-export default function DemographicsForm({ onSubmit, submitting, errorMessage, userName }) {
+export default function DemographicsForm({ onSubmit, onSkip, submitting, errorMessage, userName }) {
+  const { isAdmin } = useAuth();
   const [answers, setAnswers] = useState({});
   const setAnswer = (id, v) => setAnswers(a => ({ ...a, [id]: v }));
 
@@ -482,6 +484,16 @@ export default function DemographicsForm({ onSubmit, submitting, errorMessage, u
               </button>
             )}
           </div>
+          {isAdmin && onSkip && (
+            <button
+              type="button"
+              className="sv-skip"
+              onClick={onSkip}
+              title="Admin only — bypass the gate without saving a row"
+            >
+              Skip (admin)
+            </button>
+          )}
           <button
             type="button"
             className={`sv-submit${ready ? ' is-ready' : ''}`}

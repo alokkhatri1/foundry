@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react';
 import { REFLECTION_PROMPTS, REFLECTION_TEXT_VERSION } from '../data/reflectionPrompts';
+import { useAuth } from './AuthGate';
 
 // Per-stage reflection sheet — research+industry required instrument.
 // Source: research-questions.md, Section 3 (Q15-Q38).
@@ -121,7 +122,8 @@ function isAnswered(q, value) {
   return value !== '';
 }
 
-export default function StageReflection({ stage, onSubmit }) {
+export default function StageReflection({ stage, onSubmit, onSkip }) {
+  const { isAdmin } = useAuth();
   const prompt = REFLECTION_PROMPTS[stage];
   const [answers, setAnswers] = useState({});
   const [submitting, setSubmitting] = useState(false);
@@ -228,6 +230,16 @@ export default function StageReflection({ stage, onSubmit }) {
         {error && <div className="sr-error">{error}</div>}
 
         <div className="sr-actions">
+          {isAdmin && onSkip && (
+            <button
+              type="button"
+              className="sr-skip"
+              onClick={onSkip}
+              title="Admin only — bypass the gate without saving a reflection"
+            >
+              Skip (admin)
+            </button>
+          )}
           <button type="button" className="sr-save" onClick={handleSave} disabled={!canSave}>
             {submitting ? 'Saving…' : 'Save and continue'}
           </button>

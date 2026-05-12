@@ -673,6 +673,28 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
   cursor: not-allowed;
 }
 
+/* Admin-only escape hatch on the stage reflection modal. Subordinate
+   to .sr-save — neutral chrome, no accent. Only rendered when
+   useAuth().isAdmin is true. */
+.sr-skip {
+  padding: 9px 18px;
+  background: transparent;
+  border: 1px dashed var(--border-color, #d8c8ad);
+  border-radius: 8px;
+  color: var(--ink-muted, #8a7a64);
+  font-family: var(--mono, 'JetBrains Mono', monospace);
+  font-size: 10.5px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  cursor: pointer;
+  margin-right: 8px;
+  transition: border-color 0.12s, color 0.12s;
+}
+.sr-skip:hover {
+  border-color: var(--ink-muted, #8a7a64);
+  color: var(--ink, #1d1611);
+}
+
 /* Admin tabs */
 .admin-tabs { display: flex; gap: 0; border-bottom: 1px solid var(--border-color); margin-bottom: 20px; }
 .admin-tab {
@@ -16812,6 +16834,30 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
   background: var(--green);
   box-shadow: 0 0 0 3px var(--green-soft);
 }
+
+/* Admin-only escape hatch on the demographics / feedback forms.
+   Visually subordinate to the primary submit — neutral background, no
+   accent — so participants don't read it as the main action. Only
+   rendered when useAuth().isAdmin is true. */
+.sv-skip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 18px;
+  background: transparent;
+  color: var(--ink-muted);
+  border: 1px dashed var(--cream-deep);
+  border-radius: var(--radius-pill);
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  cursor: pointer;
+  margin-right: 8px;
+  transition: border-color 0.12s, color 0.12s;
+}
+.sv-skip:hover { border-color: var(--ink-muted); color: var(--ink); }
+
 .sv-submit {
   display: inline-flex;
   align-items: center;

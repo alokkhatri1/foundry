@@ -204,6 +204,10 @@ export default function GraduationScreen({
       <FeedbackForm
         userName={userName}
         onSubmit={handleFeedbackSubmit}
+        // Admin-only escape hatch — flip to submitted locally without
+        // writing workshop_feedback or research_consent rows. Lets the
+        // facilitator preview the scorecard without polluting research data.
+        onSkip={() => setFeedbackStatus('submitted')}
         submitting={submitting}
         errorMessage={feedbackError}
       />

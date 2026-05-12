@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { useAuth } from './AuthGate';
 
 // End-of-workshop survey — research+industry required instrument.
 // Source: research-questions.md, Sections 2 (Q14 research consent) and
@@ -248,7 +249,8 @@ function Section({ section, startIndex, answers, setAnswer }) {
 
 // ---------- shell
 
-export default function FeedbackForm({ onSubmit, submitting, errorMessage, userName }) {
+export default function FeedbackForm({ onSubmit, onSkip, submitting, errorMessage, userName }) {
+  const { isAdmin } = useAuth();
   const [answers, setAnswers] = useState({});
   const setAnswer = (id, v) => setAnswers(a => ({ ...a, [id]: v }));
 
@@ -364,6 +366,16 @@ export default function FeedbackForm({ onSubmit, submitting, errorMessage, userN
               </span>
             )}
           </div>
+          {isAdmin && onSkip && (
+            <button
+              type="button"
+              className="sv-skip"
+              onClick={onSkip}
+              title="Admin only — bypass the gate without saving feedback or consent"
+            >
+              Skip (admin)
+            </button>
+          )}
           <button
             type="button"
             className={`sv-submit${ready ? ' is-ready' : ''}`}

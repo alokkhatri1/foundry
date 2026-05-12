@@ -147,8 +147,13 @@ export default function FileExplorer({ fileTree, selectedFileId, onSelectFile, o
   // a workspace. Block creation, upload, and AI-draft entry points when
   // any ancestor in the breadcrumb is system-owned.
   const insideExample = breadcrumb.some(n => n.createdBy === 'System');
-  // Skills reveal at Stage 3 in the post-2026-05-09 swap (was Stage 4).
+  // Stage reveals — additive: each unlocks a new subfolder beside the
+  // previous one. Stage 3 reveals skills (post-2026-05-09 swap, was 4),
+  // Stage 4 reveals knowledge. Before each gate the corresponding
+  // subfolder is hidden even if it exists in the data (migration
+  // backfill, seed content, etc.) so the lesson lands in order.
   const skillsRevealed = stageReached(currentStage, '3');
+  const knowledgeRevealed = stageReached(currentStage, '4');
   // The example references folder (a canonical workflow file) is only
   // revealed once the copilot is unlocked at Stage 9 (after Capstone).
   // Hidden before that even if it exists in the data.
@@ -230,13 +235,14 @@ export default function FileExplorer({ fileTree, selectedFileId, onSelectFile, o
     const path = buildPath(fileTree, currentFolderId);
     const insideHidden = path.some(n =>
       (!referencesRevealed && n.type === 'folder' && n.name === 'references')
-      || (!skillsRevealed && n.type === 'folder' && n.name === 'skills'),
+      || (!skillsRevealed    && n.type === 'folder' && n.name === 'skills')
+      || (!knowledgeRevealed && n.type === 'folder' && n.name === 'knowledge'),
     );
     if (insideHidden) {
       setCurrentFolderId(fileTree.id);
       onSelectFile(null);
     }
-  }, [fileTree, currentFolderId, referencesRevealed, skillsRevealed, onSelectFile]);
+  }, [fileTree, currentFolderId, referencesRevealed, skillsRevealed, knowledgeRevealed, onSelectFile]);
 
   const isRoot = currentFolder.id === fileTree.id;
   // Stage 4 reveals the skills subfolder. Before that, hide it even if present
@@ -248,7 +254,8 @@ export default function FileExplorer({ fileTree, selectedFileId, onSelectFile, o
   // removed ensureStageFolder auto-creator. Non-empty ones stay visible so no
   // data is ever lost silently.
   const items = rawItems.filter(c => {
-    if (!skillsRevealed && c.type === 'folder' && c.name === 'skills') return false;
+    if (!skillsRevealed    && c.type === 'folder' && c.name === 'skills')    return false;
+    if (!knowledgeRevealed && c.type === 'folder' && c.name === 'knowledge') return false;
     if (!referencesRevealed && c.type === 'folder' && c.name === 'references') return false;
     if (isRoot && c.type === 'folder'
         && (c.name === 'Knowledge' || c.name === 'Instructions')

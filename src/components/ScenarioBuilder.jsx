@@ -28,10 +28,15 @@ function newRow() {
   return {
     id: 'row-' + Math.random().toString(36).slice(2, 10),
     type: 'coworker', // 'coworker' | 'human'
-    name: '',             // coworker-only — what to call this teammate
+    // Coworker rows can be sourced two ways:
+    //   'inline' — build a fresh coworker from name + step + files (legacy)
+    //   'saved'  — point at one already authored in Stage 5
+    source: 'inline',
+    coworkerId: '',       // populated when source === 'saved'
+    name: '',             // coworker-only — what to call this teammate (inline)
     step: '',
-    knowledgeFileIds: [], // coworker-only
-    skillsFileIds: [],    // coworker-only
+    knowledgeFileIds: [], // coworker-only (inline)
+    skillsFileIds: [],    // coworker-only (inline)
     reviewerId: '',       // human-only
     reviewerName: '',     // human-only — cached for stale-handling
     remarks: '',          // legacy, kept for back-compat
@@ -80,13 +85,22 @@ export function deriveCoworkerName(step) {
 }
 
 function isRowComplete(row) {
-  const step = (row.step || '').trim();
-  if (!step) return false;
   if ((row.type || 'coworker') === 'coworker') {
+    // Saved-coworker source: just needs the coworkerId. The saved row
+    // already carries its own role, files, and name; we don't ask the
+    // builder to re-author any of it.
+    if (row.source === 'saved') {
+      return !!(row.coworkerId || '').trim();
+    }
+    // Inline-new source: name + step + at least one knowledge/skills file.
+    const step = (row.step || '').trim();
+    if (!step) return false;
     if (!(row.name || '').trim()) return false;
     const hasFiles = (row.knowledgeFileIds || []).length > 0 || (row.skillsFileIds || []).length > 0;
     return hasFiles;
   }
+  // Human review row: needs a reviewer + a description.
+  if (!(row.step || '').trim()) return false;
   if (!(row.reviewerName || '').trim()) return false;
   return true;
 }
@@ -96,20 +110,21 @@ function firstIncompleteReason(rows) {
     const r = rows[i];
     const num = i + 1;
     const isCoworker = (r.type || 'coworker') === 'coworker';
-    if (isCoworker && !(r.name || '').trim()) {
-      return `Step ${num}: name the coworker`;
-    }
-    if (!(r.step || '').trim()) {
-      return isCoworker
-        ? `Step ${num}: describe what the coworker does`
-        : `Step ${num}: describe what the human verifies`;
-    }
     if (isCoworker) {
+      if (r.source === 'saved') {
+        if (!(r.coworkerId || '').trim()) {
+          return `Step ${num}: pick a saved coworker`;
+        }
+        continue;
+      }
+      if (!(r.name || '').trim())  return `Step ${num}: name the coworker`;
+      if (!(r.step || '').trim())  return `Step ${num}: describe what the coworker does`;
       const hasFiles = (r.knowledgeFileIds || []).length > 0 || (r.skillsFileIds || []).length > 0;
       if (!hasFiles) return `Step ${num}: attach at least one knowledge or skills file`;
-    } else {
-      if (!(r.reviewerName || '').trim()) return `Step ${num}: name a reviewer`;
+      continue;
     }
+    if (!(r.step || '').trim())   return `Step ${num}: describe what the human verifies`;
+    if (!(r.reviewerName || '').trim()) return `Step ${num}: name a reviewer`;
   }
   return null;
 }
@@ -358,13 +373,122 @@ function ReviewerPicker({ value, valueName, participants, onChange }) {
   );
 }
 
+// Mode toggle that decides whether the row's coworker is built fresh
+// from this card (inline) or pointed at one already authored in Stage 5
+// (saved). Switching modes clears the fields that don't belong to the
+// new mode — keeps the row valid against isRowComplete without ghost
+// data leaking into the run.
+function CoworkerSourceToggle({ row, onUpdate }) {
+  const source = row.source || 'inline';
+  return (
+    <div className="cs-source-toggle" role="tablist" aria-label="Coworker source">
+      <button
+        type="button"
+        role="tab"
+        aria-selected={source === 'saved'}
+        className={`cs-source-tab${source === 'saved' ? ' is-active' : ''}`}
+        onClick={() => {
+          if (source === 'saved') return;
+          onUpdate({
+            source: 'saved',
+            name: '',
+            step: '',
+            knowledgeFileIds: [],
+            skillsFileIds: [],
+          });
+        }}
+      >
+        Pick a saved coworker
+      </button>
+      <button
+        type="button"
+        role="tab"
+        aria-selected={source === 'inline'}
+        className={`cs-source-tab${source === 'inline' ? ' is-active' : ''}`}
+        onClick={() => {
+          if (source === 'inline') return;
+          onUpdate({ source: 'inline', coworkerId: '' });
+        }}
+      >
+        Build a new one
+      </button>
+    </div>
+  );
+}
+
+// Dropdown over every coworker in the room (any participant + System
+// examples). The selected coworker's role + file counts surface as a
+// summary card so the participant can confirm what they just picked
+// without having to leave the workflow builder.
+function CoworkerPicker({ row, onUpdate, coworkers, fileTree }) {
+  const list = (coworkers || []).slice().sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+  const picked = list.find(c => c.id === row.coworkerId) || null;
+
+  const knowledgeCount = (picked?.knowledgeFileIds || []).length;
+  const skillsCount    = (picked?.instructionFileIds || []).length;
+  const role           = (picked?.role || '').trim();
+
+  return (
+    <div className="cs-field">
+      <label className="cs-field-label">
+        SAVED COWORKER
+        <em className="cs-field-hint">from your room library</em>
+      </label>
+      {list.length === 0 ? (
+        <div className="cs-picker-empty">
+          No saved coworkers in this room yet — build one in the Coworkers tab,
+          or switch to <strong>Build a new one</strong> above.
+        </div>
+      ) : (
+        <select
+          className="cs-input"
+          value={row.coworkerId || ''}
+          onChange={e => onUpdate({ coworkerId: e.target.value })}
+        >
+          <option value="">Pick a coworker…</option>
+          {list.map(c => {
+            const author = c.createdBy && c.createdBy !== 'System' ? ` · by ${c.createdBy}` : (c.createdBy === 'System' ? ' · example' : '');
+            return <option key={c.id} value={c.id}>{c.name}{author}</option>;
+          })}
+        </select>
+      )}
+      {picked && (
+        <div className="cs-becomes is-coworker">
+          <span className="cs-becomes-label">ON SEND, RUNS</span>
+          <span className="cs-becomes-name">{picked.name}</span>
+          <span className="cs-becomes-arrow" aria-hidden>↗</span>
+          {role && (
+            <div className="cs-picker-role" title={role}>{role}</div>
+          )}
+          <div className="cs-picker-meta">
+            <span className="cs-mini-chip is-knowledge">{knowledgeCount}</span>
+            <span className="cs-mini-chip-sep" aria-hidden>·</span>
+            <span className="cs-mini-chip is-skills">{skillsCount}</span>
+            <span className="cs-picker-meta-hint">knowledge / skills files</span>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function StepCard({
-  row, idx, total, isLast, isComplete, fileTree, participants,
+  row, idx, total, isLast, isComplete, fileTree, participants, coworkers,
   collapsed, onUpdate, onMove, onDelete, onToggleCollapse, canDelete,
 }) {
   const isCoworker = (row.type || 'coworker') !== 'human';
+  // Saved-mode rows pull display fields (name, role text, file counts) from
+  // the picked coworker; inline-mode rows pull them from the row's own
+  // editable fields. The collapsed strip below shows whichever set is live.
+  const savedCw = (row.source === 'saved' && row.coworkerId)
+    ? (coworkers || []).find(c => c.id === row.coworkerId)
+    : null;
+  const isSaved = !!savedCw;
+
   const explicitName = (row.name || '').trim();
-  const derivedName = isCoworker ? (explicitName || deriveCoworkerName(row.step)) : '';
+  const derivedName = isCoworker
+    ? (isSaved ? (savedCw?.name || '') : (explicitName || deriveCoworkerName(row.step)))
+    : '';
   const reviewerName = (row.reviewerName || '').trim();
   const reviewerInitial = reviewerName ? reviewerName[0].toUpperCase() : '';
   const reviewerOnline = useMemo(() => {
@@ -375,10 +499,18 @@ function StepCard({
 
   const numStr = pad2(idx + 1);
   const totStr = pad2(total);
-  const typeLabel = isCoworker ? 'COWORKER STEP' : 'HUMAN STEP';
-  const knowledgeCount = (row.knowledgeFileIds || []).length;
-  const skillsCount = (row.skillsFileIds || []).length;
-  const stepText = (row.step || '').trim();
+  const typeLabel = isCoworker
+    ? (row.source === 'saved' ? 'SAVED COWORKER' : 'COWORKER STEP')
+    : 'HUMAN STEP';
+  const knowledgeCount = isSaved
+    ? (savedCw?.knowledgeFileIds || []).length
+    : (row.knowledgeFileIds || []).length;
+  const skillsCount = isSaved
+    ? (savedCw?.instructionFileIds || []).length
+    : (row.skillsFileIds || []).length;
+  const stepText = isSaved
+    ? (savedCw?.role || '').trim()
+    : (row.step || '').trim();
 
   if (collapsed) {
     return (
@@ -516,64 +648,76 @@ function StepCard({
       <div className="cs-card-body">
         {isCoworker ? (
           <>
-            <label className="cs-field">
-              <span className="cs-field-label">
-                COWORKER NAME
-                <em className="cs-field-hint">what to call them</em>
-              </span>
-              <input
-                type="text"
-                className="cs-input"
-                value={row.name || ''}
-                placeholder="e.g. Compliance Reviewer"
-                onChange={e => onUpdate({ name: e.target.value })}
-                maxLength={60}
+            <CoworkerSourceToggle row={row} onUpdate={onUpdate} />
+            {row.source === 'saved' ? (
+              <CoworkerPicker
+                row={row}
+                onUpdate={onUpdate}
+                coworkers={coworkers}
+                fileTree={fileTree}
               />
-            </label>
-            <label className="cs-field">
-              <span className="cs-field-label">WHAT DOES THE COWORKER DO?</span>
-              <textarea
-                className="cs-textarea"
-                value={row.step}
-                placeholder="e.g. Capture borrower identity, registration, ownership, and guarantor details from the application."
-                onChange={e => onUpdate({ step: e.target.value })}
-                rows={3}
-              />
-            </label>
-            <div className="cs-field-row">
-              <label className="cs-field">
-                <span className="cs-field-label">
-                  <span className="cs-label-dot is-knowledge" aria-hidden />
-                  KNOWLEDGE FILES
-                  <em className="cs-field-hint">what it reads</em>
-                </span>
-                <FilePicker
-                  value={row.knowledgeFileIds || []}
-                  onChange={ids => onUpdate({ knowledgeFileIds: ids })}
-                  fileTree={fileTree}
-                  folder="knowledge"
-                />
-              </label>
-              <label className="cs-field">
-                <span className="cs-field-label">
-                  <span className="cs-label-dot is-skills" aria-hidden />
-                  SKILLS FILES
-                  <em className="cs-field-hint">what it produces</em>
-                </span>
-                <FilePicker
-                  value={row.skillsFileIds || []}
-                  onChange={ids => onUpdate({ skillsFileIds: ids })}
-                  fileTree={fileTree}
-                  folder="skills"
-                />
-              </label>
-            </div>
-            {derivedName && (
-              <div className="cs-becomes is-coworker">
-                <span className="cs-becomes-label">ON SEND, BECOMES A COWORKER NAMED</span>
-                <span className="cs-becomes-name">{derivedName}</span>
-                <span className="cs-becomes-arrow" aria-hidden>↗</span>
-              </div>
+            ) : (
+              <>
+                <label className="cs-field">
+                  <span className="cs-field-label">
+                    COWORKER NAME
+                    <em className="cs-field-hint">what to call them</em>
+                  </span>
+                  <input
+                    type="text"
+                    className="cs-input"
+                    value={row.name || ''}
+                    placeholder="e.g. Compliance Reviewer"
+                    onChange={e => onUpdate({ name: e.target.value })}
+                    maxLength={60}
+                  />
+                </label>
+                <label className="cs-field">
+                  <span className="cs-field-label">WHAT DOES THE COWORKER DO?</span>
+                  <textarea
+                    className="cs-textarea"
+                    value={row.step}
+                    placeholder="e.g. Capture borrower identity, registration, ownership, and guarantor details from the application."
+                    onChange={e => onUpdate({ step: e.target.value })}
+                    rows={3}
+                  />
+                </label>
+                <div className="cs-field-row">
+                  <label className="cs-field">
+                    <span className="cs-field-label">
+                      <span className="cs-label-dot is-knowledge" aria-hidden />
+                      KNOWLEDGE FILES
+                      <em className="cs-field-hint">what it reads</em>
+                    </span>
+                    <FilePicker
+                      value={row.knowledgeFileIds || []}
+                      onChange={ids => onUpdate({ knowledgeFileIds: ids })}
+                      fileTree={fileTree}
+                      folder="knowledge"
+                    />
+                  </label>
+                  <label className="cs-field">
+                    <span className="cs-field-label">
+                      <span className="cs-label-dot is-skills" aria-hidden />
+                      SKILLS FILES
+                      <em className="cs-field-hint">what it produces</em>
+                    </span>
+                    <FilePicker
+                      value={row.skillsFileIds || []}
+                      onChange={ids => onUpdate({ skillsFileIds: ids })}
+                      fileTree={fileTree}
+                      folder="skills"
+                    />
+                  </label>
+                </div>
+                {derivedName && (
+                  <div className="cs-becomes is-coworker">
+                    <span className="cs-becomes-label">ON SEND, BECOMES A COWORKER NAMED</span>
+                    <span className="cs-becomes-name">{derivedName}</span>
+                    <span className="cs-becomes-arrow" aria-hidden>↗</span>
+                  </div>
+                )}
+              </>
             )}
           </>
         ) : (
@@ -765,6 +909,7 @@ export default function ScenarioBuilder({
   currentUserName,
   fileTree,
   participants,
+  coworkers,
   onRunWorkflow,
   running = false,
 }) {
@@ -1171,6 +1316,7 @@ export default function ScenarioBuilder({
             isComplete={isRowComplete(row)}
             fileTree={fileTree}
             participants={allowedReviewers}
+            coworkers={coworkers || []}
             collapsed={!!collapsed[row.id]}
             onUpdate={patch => update(idx, patch)}
             onMove={dir => moveRow(idx, dir)}

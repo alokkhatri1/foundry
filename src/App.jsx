@@ -1445,9 +1445,24 @@ function App() {
     // The executor's agent path falls back through `step.coworker` first
     // (embedded), then `step.coworkerId` lookup — so an inline-only
     // coworker runs identically to a saved one for this step's purposes.
+    // Saved-mode rows point at an existing coworker (built in Stage 5).
+    // We pass the saved row through verbatim — same shape the executor
+    // expects — so the participant's library is the single source of
+    // truth for that coworker's role, files, and tools. Inline-mode rows
+    // continue to mint a one-off inline coworker for this run.
     const coworkerByRowId = new Map();
     for (const r of rows) {
       if (r.type !== 'coworker') continue;
+      if (r.source === 'saved' && r.coworkerId) {
+        const saved = (coworkers || []).find(c => c.id === r.coworkerId);
+        if (saved) {
+          coworkerByRowId.set(r.id, saved);
+          continue;
+        }
+        // Saved id no longer resolves (deleted in Stage 5 between save +
+        // run). Fall through to the inline path so the run doesn't crash;
+        // it'll execute as a blank coworker and the user will see why.
+      }
       const name = (r.name || '').trim() || deriveCoworkerName(r.step) || 'Coworker';
       const cw = {
         id: 'cw-inline-' + Math.random().toString(36).slice(2, 8),
@@ -3333,6 +3348,7 @@ Answer in ONE sentence. If the user asks "how", a second sentence is allowed —
               currentUserName={userName}
               fileTree={fileTree}
               participants={participants || []}
+              coworkers={coworkers || []}
               onRunWorkflow={handleRunCaseWorkflow}
             />
           </div>

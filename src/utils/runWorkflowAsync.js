@@ -206,6 +206,25 @@ export async function executeWorkflowRun({
         '\n\nRespond according to your instructions.',
       ].join('\n');
 
+      // Surface what the coworker is about to read so the participant
+      // can SEE the context is flowing forward, not vanishing into the
+      // model. Lists every predecessor that contributed something —
+      // including the upstream Trigger (case input) and any human-review
+      // step whose comment/attachments are now part of its output.
+      const contextSources = [];
+      if (caseInput) contextSources.push('Case input');
+      for (const e of fPreds) {
+        const srcStep = stepById.get(e.source);
+        if (!srcStep || srcStep.type === 'trigger') continue;
+        contextSources.push(nodeLabel(srcStep));
+      }
+      if (contextSources.length > 0) {
+        onMessage({
+          type: 'status',
+          content: `${coworkerLabel} is receiving: ${contextSources.join(', ')}`,
+        });
+      }
+
       onMessage({ type: 'loading', label: coworkerLabel });
       const result = await callClaudeAPI(systemPrompt, userMessage, {
         segment: 'workflow_run',
@@ -325,7 +344,19 @@ export async function executeWorkflowRun({
       }
 
       if (decision.action === 'Approve') {
-        executed.set(nodeId, { output: upstreamDraft });
+        // Approval-step output = upstream draft (what the reviewer saw)
+        // PLUS the reviewer's comment and any attachments folded into it.
+        // The ApprovalActionForm has already concatenated attached file
+        // contents into `decision.comment` as markdown sections
+        // ("---\n**Attached: <name>**\n\n<content>"), so the same string
+        // is the input the next coworker step needs to see. We fold it
+        // under a clearly-labelled 'Reviewer note' heading so downstream
+        // coworkers can tell apart upstream output from human additions.
+        const reviewerNote = (decision.comment || '').trim();
+        const approvedOutput = reviewerNote
+          ? `${upstreamDraft}\n\n## Reviewer note — ${decision.resolvedBy || userName}\n${reviewerNote}`
+          : upstreamDraft;
+        executed.set(nodeId, { output: approvedOutput });
         executionLog.push(nodeId);
         for (const e of (forwardOut.get(nodeId) || [])) queue.push(e.target);
         continue;

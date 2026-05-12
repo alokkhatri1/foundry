@@ -2641,6 +2641,18 @@ function App() {
   }
 
   function handleApprovalAction(runId, msgId, action, comment, stepInfo = {}) {
+    // Pull focus back to the run conversation no matter which surface
+    // the click came from. Without this, the participant who clicks
+    // Approve from the top-of-chat banner stays on whatever convo they
+    // had open (often the default Foundry one) and never sees the run
+    // continue with the next coworker step. The conversation id is
+    // deterministic from runId so this works even if the run conversation
+    // hasn't been added to `conversations` yet (rare, e.g., race after
+    // a fresh reload — the run output would still land in the right
+    // convo because addMessage creates it on-demand).
+    setActiveConvoId('convo-run-' + runId);
+    setActiveTab('chat');
+
     // The in-memory resolver only exists in the browser tab that started
     // the run. If the page has been refreshed since then, the runtime is
     // gone and there's nothing to resolve. Retire the card inline with a
@@ -2694,6 +2706,11 @@ function App() {
   // picks up the realtime insert and fires the resolver there.
   async function handleRemoteApprove(run, stepResult, action, comment) {
     if (!run || !stepResult) return;
+    // Same focus-restore as handleApprovalAction. The cross-user reviewer
+    // may have been clicking from the top-of-chat banner; pull them into
+    // the run conversation so the rest of the run plays out in their view.
+    setActiveConvoId('convo-run-' + run.id);
+    setActiveTab('chat');
     // Optimistically hide the card so the reviewer doesn't see it flash back
     // during the DB round-trip. Cleared after a timeout as a safety net in
     // case the workflowRuns update never arrives.

@@ -3160,9 +3160,21 @@ Answer in ONE sentence. If the user asks "how", a second sentence is allowed —
         <DemographicsForm
           userName={userName}
           onSubmit={handleSaveDemographics}
-          // Admin-only escape hatch — bypass the gate without writing
-          // a row. Session-only: refresh brings the gate back.
-          onSkip={() => setDemographicsStatus('submitted')}
+          // Admin-only escape hatch. Skipping demographics also bypasses
+          // the per-stage reflection cascade — without this the admin
+          // would get hit with 6 reflection modals in succession the
+          // instant the app shell renders (one for each stage they've
+          // technically "advanced past" without submitting). Feedback
+          // still has its own Skip on the FeedbackForm; we don't touch
+          // it here because GraduationScreen owns that state.
+          onSkip={() => {
+            setDemographicsStatus('submitted');
+            setSubmittedReflections(prev => {
+              const next = new Set(prev || []);
+              for (const stage of reflectionStageList) next.add(stage);
+              return next;
+            });
+          }}
           submitting={savingDemographics}
           errorMessage={demographicsError}
         />

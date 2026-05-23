@@ -48,6 +48,10 @@ import {
   COMPLIANCE_EXCEPTIONS,
   CREDIT_REVIEW_SKILL,
   COMPLIANCE_CHECK_SKILL,
+  IDEAL_CUSTOMER_PROFILE,
+  PITCH_RUBRIC,
+  CUSTOMER_INTERVIEW_SYNTH_SKILL,
+  PITCH_REVIEWER_SKILL,
 } from './data/exampleArtifacts';
 
 // Canonical content for the System-seeded example files. Used as a fallback
@@ -60,6 +64,10 @@ const EXAMPLE_FILE_CONTENT = {
   'example-file-compliance-exceptions': COMPLIANCE_EXCEPTIONS,
   'example-file-credit-review':         CREDIT_REVIEW_SKILL,
   'example-file-compliance-check':      COMPLIANCE_CHECK_SKILL,
+  'example-file-icp':                   IDEAL_CUSTOMER_PROFILE,
+  'example-file-pitch-rubric':          PITCH_RUBRIC,
+  'example-file-interview-synth':       CUSTOMER_INTERVIEW_SYNTH_SKILL,
+  'example-file-pitch-review':          PITCH_REVIEWER_SKILL,
   [EXAMPLE_BLUEPRINT_FILE_ID]:          CAPSTONE_BLUEPRINT,
 };
 import { executeWorkflowRun } from './utils/runWorkflowAsync';

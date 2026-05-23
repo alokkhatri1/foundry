@@ -7,6 +7,7 @@ import {
   createExampleFiles,
   createExampleCoworkers,
   createExampleWorkflow,
+  createEntrepreneurWorkflow,
   EXAMPLE_FOLDER_ID,
   EXAMPLE_SKILLS_FOLDER_ID,
   EXAMPLE_BLUEPRINTS_FOLDER_ID,
@@ -59,8 +60,8 @@ async function seedStageExamples(roomId, toStage) {
   }
 
   if (stageStr === '6') {
-    const wf = createExampleWorkflow(roomId);
-    const { error } = await supabase.from('workflows').upsert(wf, { onConflict: 'id' });
+    const wfs = [createExampleWorkflow(roomId), createEntrepreneurWorkflow(roomId)];
+    const { error } = await supabase.from('workflows').upsert(wfs, { onConflict: 'id' });
     if (error) console.error('[sb] seedStageExamples(6):', error.message);
     return;
   }

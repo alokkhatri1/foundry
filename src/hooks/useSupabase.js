@@ -147,7 +147,7 @@ export default function useSupabase() {
     // (clean live-session view); dev admin sees everything (so the research
     // view can be built and tested against real prod data without merging).
     let query = supabase.from('rooms')
-      .select('id, code, org_name, created_at, deprecated_at, current_stage, credit_allocation, environment')
+      .select('id, code, org_name, created_at, deprecated_at, paused_at, current_stage, credit_allocation, environment')
       .eq('admin_id', adminId)
       .order('created_at', { ascending: false });
     if (isProduction()) query = query.eq('environment', 'production');
@@ -175,6 +175,31 @@ export default function useSupabase() {
       .update({ deprecated_at: new Date().toISOString() })
       .eq('id', roomId);
     if (error) console.error('[sb] deprecateWorkshop:', error.message);
+  }, []);
+
+  // Pause a workshop — sets paused_at to now(). Participant writes refuse
+  // while paused (the participant App gates handlers on room.paused_at).
+  // Admin reveals / credit edits / DMs from the admin dashboard are NOT
+  // gated — the admin needs to keep control of the room across the pause
+  // boundary. Realtime row update fans paused_at out to all participant
+  // clients via the existing rooms subscription.
+  const pauseRoom = useCallback(async (roomId) => {
+    if (!isSupabaseConfigured) return;
+    const { error } = await supabase.from('rooms')
+      .update({ paused_at: new Date().toISOString() })
+      .eq('id', roomId);
+    if (error) console.error('[sb] pauseRoom:', error.message);
+  }, []);
+
+  // Resume a paused workshop — clears paused_at. Stage and content are
+  // preserved (nothing else changes), so participants reopen tomorrow at
+  // the same stage they left.
+  const resumeRoom = useCallback(async (roomId) => {
+    if (!isSupabaseConfigured) return;
+    const { error } = await supabase.from('rooms')
+      .update({ paused_at: null })
+      .eq('id', roomId);
+    if (error) console.error('[sb] resumeRoom:', error.message);
   }, []);
 
   const revealStage = useCallback(async (roomId, toStage, fromStage, actorUserId) => {
@@ -522,7 +547,7 @@ export default function useSupabase() {
     const env = getCurrentEnvironment();
     const { data: room, error } = await supabase
       .from('rooms')
-      .select('id, org_name, deprecated_at, current_stage, credit_allocation')
+      .select('id, org_name, deprecated_at, paused_at, current_stage, credit_allocation')
       .eq('code', code)
       .eq('environment', env)
       .maybeSingle();
@@ -537,6 +562,7 @@ export default function useSupabase() {
       current_stage: room.current_stage,
       credit_allocation: room.credit_allocation ?? 1000,
       deprecated_at: room.deprecated_at || null,
+      paused_at: room.paused_at || null,
     };
   }, []);
 
@@ -1954,7 +1980,7 @@ export default function useSupabase() {
     signOut, checkIsAdmin, onAuthStateChange,
     // Admin
     createWorkshop, loadAdminWorkshops, loadWorkshopParticipants,
-    deleteWorkshop, deprecateWorkshop, revealStage, unrevealStage, revealAllStages, loadWorkshopStats, loadWorkshopContent, loadWorkshopActivity,
+    deleteWorkshop, deprecateWorkshop, pauseRoom, resumeRoom, revealStage, unrevealStage, revealAllStages, loadWorkshopStats, loadWorkshopContent, loadWorkshopActivity,
     loadAdminScorecardData, loadAdminResearchData,
     seedWorkshopContent, subscribeToWorkshopPresence,
     // Room

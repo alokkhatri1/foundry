@@ -1321,6 +1321,38 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
   background: var(--bg-warm);
 }
 
+/* Workshop pause banner — sits above the header when the facilitator
+   has paused the room. Warm-toned so it reads as a soft pause, not an
+   error. Pulsing dot signals "still here, just resting." */
+.workshop-pause-banner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 10px 24px;
+  background: var(--peach, #f5d3b8);
+  color: var(--ink, #2c2419);
+  font-size: 14px;
+  font-weight: 500;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+  flex-shrink: 0;
+  letter-spacing: 0.01em;
+}
+.workshop-pause-banner-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--ink, #2c2419);
+  opacity: 0.45;
+  animation: pause-banner-pulse 1.8s ease-in-out infinite;
+  flex-shrink: 0;
+}
+.workshop-pause-banner-text { line-height: 1.4; }
+@keyframes pause-banner-pulse {
+  0%, 100% { opacity: 0.25; }
+  50% { opacity: 0.7; }
+}
+
 /* ========== HEADER — editorial masthead (v2) ==========
    Aligned with the marketing landing aesthetic: warm cream + peach
    + Fraunces editorial type. Tokens (--cream, --ink, --peach, etc.)

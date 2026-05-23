@@ -183,6 +183,28 @@ export default function AdminDashboard({ sb, user, onBack, onEnterWorkshop }) {
     await loadWorkshops();
   }
 
+  // Toggle pause. While paused, participant-facing writes (chat, workflow
+  // runs, file/coworker/workflow edits) refuse with a banner. Admin actions
+  // (reveal, credit top-up, DM) stay live. Stage state is preserved across
+  // the pause boundary — designed for multi-day workshops.
+  async function handlePauseResume(workshopId) {
+    const isPaused = !!selected?.paused_at;
+    const ok = await confirm({
+      title: isPaused ? 'Resume workshop' : 'Pause workshop',
+      message: isPaused
+        ? 'Participants will be able to chat, run workflows, and edit again.'
+        : 'Participants will see a paused banner and writes will refuse. You can still reveal stages, top up credits, etc.',
+      confirmLabel: isPaused ? 'Resume' : 'Pause',
+    });
+    if (!ok) return;
+    if (isPaused) await sb.resumeRoom(workshopId);
+    else await sb.pauseRoom(workshopId);
+    const newPausedAt = isPaused ? null : new Date().toISOString();
+    if (selected?.id === workshopId) setSelected(prev => prev ? { ...prev, paused_at: newPausedAt } : prev);
+    setMenuOpen(false);
+    await loadWorkshops();
+  }
+
   async function handleReveal(toStage) {
     if (!selected) return;
     const fromStage = selected.current_stage || '1';
@@ -590,6 +612,12 @@ export default function AdminDashboard({ sb, user, onBack, onEnterWorkshop }) {
                     </span>
                     <span className="admin-detail-sub-sep">·</span>
                     Created {new Date(selected.created_at).toLocaleDateString()}
+                    {selected.paused_at && !selected.deprecated_at && (
+                      <>
+                        <span className="admin-detail-sub-sep">·</span>
+                        <span className="admin-detail-sub-dep">Paused {new Date(selected.paused_at).toLocaleDateString()}</span>
+                      </>
+                    )}
                     {selected.deprecated_at && (
                       <>
                         <span className="admin-detail-sub-sep">·</span>
@@ -621,6 +649,11 @@ export default function AdminDashboard({ sb, user, onBack, onEnterWorkshop }) {
                     </button>
                     {menuOpen && (
                       <div className="admin-menu" onClick={e => e.stopPropagation()}>
+                        {!selected.deprecated_at && (
+                          <button className="admin-menu-item" onClick={() => handlePauseResume(selected.id)}>
+                            {selected.paused_at ? 'Resume workshop' : 'Pause workshop'}
+                          </button>
+                        )}
                         {!selected.deprecated_at && (
                           <button className="admin-menu-item" onClick={() => handleDeprecate(selected.id)}>
                             Deprecate

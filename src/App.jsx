@@ -431,6 +431,11 @@ function App() {
   // suppress the workshopEnded → GraduationScreen routing so they get the
   // full participant UI for browsing. Cleared on leave.
   const [bypassDeprecation, setBypassDeprecation] = useState(false);
+  // Workshop pause. When true, participant-initiated writes (chat, workflow
+  // runs, file/coworker/workflow saves) refuse with a toast; a banner sits
+  // at the top of the chrome. Drives off rooms.paused_at — set by admin
+  // dashboard, propagated via the existing rooms realtime subscription.
+  const [workshopPaused, setWorkshopPaused] = useState(false);
   const [currentStage, setCurrentStage] = useState('6');
   // Per-stage reflection state. Tracks which stages this participant has
   // already submitted a reflection for; the pending stage is *derived*
@@ -683,6 +688,7 @@ function App() {
         if (result?.error === 'deprecated') { setWorkshopEnded(true); return; }
         if (result?.error || !result?.id || !userName) return;
         if (result.current_stage) setCurrentStage(normalizeStage(result.current_stage));
+        setWorkshopPaused(!!result.paused_at);
         if (result.org_name) setOrgName(result.org_name);
 
         const myColor = participants.find(p => p.name === userName)?.color || COLORS[0];
@@ -948,6 +954,7 @@ function App() {
         if (row?.deprecated_at && !bypassDeprecation) setWorkshopEnded(true);
         if (row?.current_stage) setCurrentStage(normalizeStage(row.current_stage));
         if (row?.credit_allocation != null) setCreditAllocation(row.credit_allocation);
+        if (row && 'paused_at' in row) setWorkshopPaused(!!row.paused_at);
       },
       onReconnect: async () => {
         // Realtime reattached after a disconnect — refetch what matters
@@ -1147,6 +1154,7 @@ function App() {
     const roomId = result.id;
     if (result.current_stage) setCurrentStage(normalizeStage(result.current_stage));
     if (result.credit_allocation != null) setCreditAllocation(result.credit_allocation);
+    setWorkshopPaused(!!result.paused_at);
     if (result.org_name) setOrgName(result.org_name);
 
     // Load from Supabase granular tables
@@ -2204,6 +2212,16 @@ function App() {
       });
       return;
     }
+    // Pause freeze. Multi-day workshops pause overnight; workflow runs are
+    // the most disruptive thing to leak past a pause boundary (they fan
+    // out to coworkers, write artifacts, burn credits).
+    if (workshopPaused) {
+      addMessage({
+        type: 'error',
+        content: "Workshop is paused. Workflow runs are unavailable until the facilitator resumes.",
+      });
+      return;
+    }
 
     // Capture-terminal heads-up. The Capture step is the workflow's
     // compounding affordance — without an edge into it, the run produces
@@ -2808,6 +2826,17 @@ function App() {
       });
       return;
     }
+    // Pause freeze. Echo the user message locally so they see they wrote
+    // it, then refuse with an inline error — matches the credit-exhausted
+    // pattern above so the UX is consistent.
+    if (workshopPaused) {
+      addMessage({ type: 'user', content: text, participantName: userName });
+      addMessage({
+        type: 'error',
+        content: "Workshop is paused. Chat will work again once the facilitator resumes.",
+      });
+      return;
+    }
     // Build attachment info for message display
     const attachmentMeta = attachments?.map(a => ({ fileName: a.fileName || a.originalName, category: a.category })) || [];
     addMessage({ type: 'user', content: text, participantName: userName, attachments: attachmentMeta });
@@ -3250,6 +3279,14 @@ Answer in ONE sentence. If the user asks "how", a second sentence is allowed —
             });
           }}
         />
+      )}
+      {workshopPaused && (
+        <div className="workshop-pause-banner" role="status">
+          <span className="workshop-pause-banner-dot" aria-hidden="true" />
+          <span className="workshop-pause-banner-text">
+            Workshop is paused. Chat and workflow runs are unavailable — we&apos;ll pick up where we left off when the facilitator resumes.
+          </span>
+        </div>
       )}
       <header className="app-header">
         <div className="app-header-left" onClick={() => { setActiveTab('chat'); setChatBadge(false); }}>

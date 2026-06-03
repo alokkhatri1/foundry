@@ -567,25 +567,18 @@ function StepCard({ step, index, coworkers, tools, participants, onUpdate, onDel
                       assigneeName: picked?.name || null,
                     });
                   }}>
-                    {/* Workshop self-only mode: the dropdown only offers
-                        the current participant as a reviewer. Cross-user
-                        review delivery has unresolved bugs we couldn't
-                        ship through in time for the 04-29 workshop, so
-                        for the session we constrain reviews to the run
-                        starter — the path that's been verified end-to-
-                        end. Re-enable other participants by reverting
-                        this filter when the cross-user path is fixed. */}
-                    {selfParticipantId && selfParticipantName ? (
-                      <option value={selfParticipantId}>{selfParticipantName} (you)</option>
-                    ) : (
+                    {(!participants || participants.length === 0) && (
                       <option value="">Anyone can review</option>
                     )}
+                    {(participants || []).map(p => (
+                      <option key={p.id} value={p.id}>
+                        {p.name}{p.id === selfParticipantId ? ' (you)' : ''}
+                      </option>
+                    ))}
                   </select>
-                  {selfParticipantId && (
-                    <div className="step-config-help" style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>
-                      Workshop mode: reviewers are limited to you. The card lands in your run chat with Approve / Reject buttons.
-                    </div>
-                  )}
+                  <div className="step-config-help" style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>
+                    Pick anyone in the room. If you assign yourself, the approval card lands in your run chat. If you assign someone else, they get a DM with the card and the run pauses until they decide.
+                  </div>
                 </div>
                 {assignedPerson && (
                   <div className="step-agent-info">

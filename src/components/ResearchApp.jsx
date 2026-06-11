@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '../supabase';
 import useSupabase from '../hooks/useSupabase';
 import { handleAuthCallback } from '../utils/authCallback';
@@ -308,9 +308,15 @@ export default function ResearchApp() {
   // Tri-state mirrors AuthGate so a network blip shows retry, not a hard "no".
   const [access, setAccess] = useState('unknown'); // 'unknown' | 'yes' | 'no' | 'error'
   const [accessError, setAccessError] = useState(null);
+  // The auth id we've already resolved access for. Supabase fires
+  // onAuthStateChange on tab focus / token refresh; without this guard we'd
+  // re-check (flipping access to 'unknown') on every such event, which
+  // unmounts the Bench and wipes the researcher's cohort + chat in progress.
+  const resolvedForUser = useRef(null);
 
-  const resolveAccess = useCallback(async (user) => {
-    if (!user) { setAccess('no'); return; }
+  const resolveAccess = useCallback(async (user, { force = false } = {}) => {
+    if (!user) { resolvedForUser.current = null; setAccess('no'); return; }
+    if (!force && resolvedForUser.current === user.id) return; // already settled for this user
     setAccess('unknown');
     setAccessError(null);
     try {
@@ -318,9 +324,11 @@ export default function ResearchApp() {
         sb.checkIsAdmin(user.id),
         sb.checkResearchAccess(user.email),
       ]);
+      resolvedForUser.current = user.id;
       setAccess(isAdmin || allowed ? 'yes' : 'no');
     } catch (err) {
       console.error('[research] access check failed:', err);
+      resolvedForUser.current = null; // allow retry
       setAccess('error');
       setAccessError(err?.message || 'Access check failed');
     }
@@ -385,7 +393,7 @@ export default function ResearchApp() {
             <div className="rb-wordmark">Foundry <span>Research</span></div>
             <h2>Couldn’t verify access</h2>
             <p className="rb-error">{accessError}</p>
-            <button className="rb-btn" onClick={() => resolveAccess(session.user)}>Retry</button>
+            <button className="rb-btn" onClick={() => resolveAccess(session.user, { force: true })}>Retry</button>
             <div style={{ marginTop: 14 }}>
               <button className="rb-btn rb-btn-ghost" onClick={() => sb.signOut()}>Sign out</button>
             </div>

@@ -38,6 +38,70 @@ function AdminCreditAllocation({ value, onSave, deprecated }) {
   );
 }
 
+// Research Bench allowlist manager. Global (not per-workshop): emails added
+// here can sign into research.foundry.alokkhatri.com. Admins always have
+// access regardless of this list. Rendered as a modal off the admin topbar.
+function ResearchAccessModal({ sb, user, onClose }) {
+  const [rows, setRows] = useState(null);
+  const [email, setEmail] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState(null);
+
+  const reload = useCallback(async () => {
+    setRows(await sb.loadResearchAccess());
+  }, [sb]);
+  useEffect(() => { reload(); }, [reload]);
+
+  async function add() {
+    const e = email.trim().toLowerCase();
+    if (!e || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e)) { setErr('Enter a valid email'); return; }
+    setBusy(true); setErr(null);
+    const { error } = await sb.addResearchAccess(e, user?.id);
+    setBusy(false);
+    if (error) { setErr(error.message); return; }
+    setEmail('');
+    reload();
+  }
+
+  return (
+    <div className="ra-overlay" onClick={onClose}>
+      <div className="ra-modal" onClick={e => e.stopPropagation()}>
+        <div className="ra-modal-head">
+          <strong>Research Bench access</strong>
+          <button className="admin-btn-ghost" onClick={onClose}>Close</button>
+        </div>
+        <p className="ra-modal-hint">
+          Emails here can sign into the Research Bench. Admins always have access.
+        </p>
+        <div className="ra-modal-add">
+          <input
+            type="email"
+            placeholder="name@org.com"
+            value={email}
+            onChange={e => setEmail(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter') add(); }}
+          />
+          <button className="admin-btn-primary" onClick={add} disabled={busy}>Add</button>
+        </div>
+        {err && <div className="ra-modal-err">{err}</div>}
+        <ul className="ra-modal-list">
+          {rows === null && <li className="ra-modal-empty">Loading…</li>}
+          {rows && rows.length === 0 && <li className="ra-modal-empty">No one added yet.</li>}
+          {rows && rows.map(r => (
+            <li key={r.email}>
+              <span>{r.email}</span>
+              <button
+                className="admin-btn-ghost"
+                onClick={async () => { await sb.removeResearchAccess(r.email); reload(); }}
+              >Remove</button>
+            </li>
+          ))}
+        </ul>
+      </div>
+    </div>
+  );
+}
+
 function WorkshopRow({ w, selected, onSelect, copied, onCopy, stats, dim }) {
   const stageLabel = w.deprecated_at
     ? 'Delivered'
@@ -105,6 +169,7 @@ export default function AdminDashboard({ sb, user, onBack, onEnterWorkshop }) {
   const [stats, setStats] = useState({});
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
+  const [showResearchAccess, setShowResearchAccess] = useState(false);
   const [newOrg, setNewOrg] = useState('');
   const [creating, setCreating] = useState(false);
   const [selected, setSelected] = useState(null);
@@ -527,9 +592,14 @@ export default function AdminDashboard({ sb, user, onBack, onEnterWorkshop }) {
           </div>
         </div>
         <div className="admin-topbar-right">
+          <button className="admin-btn-ghost" onClick={() => setShowResearchAccess(true)}>Research Access</button>
           <button className="admin-btn-ghost" onClick={() => sb.signOut()}>Sign Out</button>
         </div>
       </div>
+
+      {showResearchAccess && (
+        <ResearchAccessModal sb={sb} user={user} onClose={() => setShowResearchAccess(false)} />
+      )}
 
       <div className="admin-split">
         {/* Left rail */}

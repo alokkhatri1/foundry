@@ -1,0 +1,161 @@
+/* Research Bench — standalone interface served on research.foundry.*.
+   All selectors are `rb-` prefixed to stay clear of the workshop app's
+   styles (and the known .fl-* landing-page collision). */
+
+.rb-root {
+  min-height: 100vh;
+  background: #0e1116;
+  color: #e6e9ef;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  display: flex;
+  flex-direction: column;
+}
+
+.rb-center {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 32px;
+}
+
+.rb-card {
+  max-width: 420px;
+  width: 100%;
+  background: #161b22;
+  border: 1px solid #232a33;
+  border-radius: 14px;
+  padding: 36px 32px;
+  text-align: center;
+}
+
+.rb-wordmark {
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+.rb-wordmark span { color: #6ea8fe; }
+.rb-sub { color: #8b95a3; font-size: 13px; margin-top: 6px; }
+
+.rb-card h2 { font-size: 17px; margin: 22px 0 8px; }
+.rb-card p { color: #9aa4b1; font-size: 14px; line-height: 1.5; margin: 0 0 20px; }
+
+.rb-btn {
+  appearance: none;
+  border: 1px solid #2d6cdf;
+  background: #2d6cdf;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 600;
+  padding: 10px 18px;
+  border-radius: 9px;
+  cursor: pointer;
+}
+.rb-btn:hover { background: #2a62c9; }
+.rb-btn-ghost { background: transparent; color: #9aa4b1; border-color: #2d3540; }
+.rb-btn-ghost:hover { color: #e6e9ef; }
+
+.rb-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 22px;
+  border-bottom: 1px solid #1d242d;
+}
+.rb-topbar-user { color: #8b95a3; font-size: 13px; display: flex; align-items: center; gap: 12px; }
+
+.rb-body { flex: 1; padding: 28px; }
+
+.rb-muted { color: #8b95a3; }
+.rb-error { color: #f0816f; }
+.rb-warn { color: #f2c14e; font-size: 12px; margin-top: 6px; }
+
+/* Bench layout: sidebar + main */
+.rb-bench { flex: 1; display: flex; min-height: 0; }
+.rb-sidebar {
+  width: 300px;
+  flex-shrink: 0;
+  border-right: 1px solid #1d242d;
+  padding: 20px;
+  overflow-y: auto;
+}
+.rb-main { flex: 1; padding: 24px 28px; overflow-y: auto; display: flex; flex-direction: column; min-width: 0; }
+
+.rb-field { margin-bottom: 18px; }
+.rb-field label {
+  display: block; font-size: 11px; text-transform: uppercase;
+  letter-spacing: 0.04em; color: #8b95a3; margin-bottom: 6px;
+}
+.rb-field select, .rb-field input, .rb-field textarea {
+  width: 100%; box-sizing: border-box;
+  background: #0e1116; color: #e6e9ef;
+  border: 1px solid #2d3540; border-radius: 8px;
+  padding: 9px 11px; font-size: 13px; font-family: inherit;
+}
+
+.rb-bundle-stats {
+  background: #11161d; border: 1px solid #232a33; border-radius: 10px;
+  padding: 12px 14px; font-size: 13px; line-height: 1.6;
+}
+
+/* Library panel */
+.rb-lib-section { margin-bottom: 14px; }
+.rb-lib-head {
+  display: flex; align-items: center; justify-content: space-between;
+  font-size: 12px; color: #b9c2cf; font-weight: 600; margin-bottom: 6px;
+}
+.rb-lib-add {
+  background: transparent; border: none; color: #6ea8fe;
+  font-size: 12px; cursor: pointer; padding: 0;
+}
+.rb-lib-empty { font-size: 12px; padding: 2px 0; }
+.rb-lib-item { display: flex; align-items: center; gap: 6px; }
+.rb-lib-name {
+  flex: 1; text-align: left; background: transparent; border: none;
+  color: #d7dce3; font-size: 13px; padding: 4px 0; cursor: pointer;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.rb-lib-name:hover { color: #fff; }
+.rb-lib-del {
+  background: transparent; border: none; color: #6b7682;
+  font-size: 16px; line-height: 1; cursor: pointer; padding: 0 4px;
+}
+.rb-lib-del:hover { color: #f0816f; }
+
+/* Modal (item editor) */
+.rb-overlay {
+  position: fixed; inset: 0; z-index: 1000;
+  background: rgba(0,0,0,0.55);
+  display: flex; align-items: center; justify-content: center; padding: 24px;
+}
+.rb-modal {
+  width: 100%; max-width: 540px; max-height: 86vh; overflow-y: auto;
+  background: #161b22; border: 1px solid #2d3540; border-radius: 14px; padding: 22px;
+}
+.rb-modal-head {
+  display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px;
+}
+.rb-modal textarea { resize: vertical; line-height: 1.5; }
+
+/* Chat */
+.rb-chat { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+.rb-chat-log { flex: 1; overflow-y: auto; padding-right: 6px; }
+.rb-msg { margin-bottom: 18px; }
+.rb-msg-who {
+  font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em;
+  color: #6ea8fe; margin-bottom: 4px;
+}
+.rb-msg-user .rb-msg-who { color: #8b95a3; }
+.rb-msg-body { white-space: pre-wrap; line-height: 1.6; font-size: 14px; }
+.rb-msg-user .rb-msg-body { color: #c9d1da; }
+.rb-chat-err { margin-top: 8px; }
+.rb-chat-input { border-top: 1px solid #1d242d; padding-top: 14px; margin-top: 10px; }
+.rb-chat-input textarea {
+  width: 100%; box-sizing: border-box; resize: vertical;
+  background: #0e1116; color: #e6e9ef; border: 1px solid #2d3540;
+  border-radius: 10px; padding: 11px 13px; font-size: 14px; font-family: inherit;
+  line-height: 1.5;
+}
+.rb-chat-actions {
+  display: flex; align-items: center; justify-content: space-between; margin-top: 10px;
+}

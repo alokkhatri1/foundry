@@ -118,6 +118,72 @@ export default function useSupabase() {
     return !!data;
   }, []);
 
+  // ===== Research Bench: access allowlist (research_access) =====
+  // Gating for the standalone research interface. Admins pass implicitly; the
+  // allowlist covers everyone else. Email is lowercased to match the table.
+  const checkResearchAccess = useCallback(async (email) => {
+    if (!isSupabaseConfigured || !email) return false;
+    const { data } = await supabase.from('research_access')
+      .select('email').eq('email', email.toLowerCase()).maybeSingle();
+    return !!data;
+  }, []);
+
+  const loadResearchAccess = useCallback(async () => {
+    if (!isSupabaseConfigured) return [];
+    const { data, error } = await supabase.from('research_access')
+      .select('email, created_at').order('created_at', { ascending: true });
+    if (error) { console.error('[sb] loadResearchAccess:', error.message); return []; }
+    return data || [];
+  }, []);
+
+  const addResearchAccess = useCallback(async (email, addedBy) => {
+    if (!isSupabaseConfigured || !email) return { error: { message: 'No email' } };
+    const { error } = await supabase.from('research_access')
+      .insert({ email: email.trim().toLowerCase(), added_by: addedBy || null });
+    if (error) console.error('[sb] addResearchAccess:', error.message);
+    return { error };
+  }, []);
+
+  const removeResearchAccess = useCallback(async (email) => {
+    if (!isSupabaseConfigured || !email) return;
+    const { error } = await supabase.from('research_access')
+      .delete().eq('email', email.toLowerCase());
+    if (error) console.error('[sb] removeResearchAccess:', error.message);
+  }, []);
+
+  // ===== Research Bench: skills/theories library (research_library) =====
+  // Global repo — never room-scoped, so these don't touch roomIdRef.
+  const loadResearchLibrary = useCallback(async (kind) => {
+    if (!isSupabaseConfigured) return [];
+    let query = supabase.from('research_library')
+      .select('id, name, body, kind, year_tag, created_at, updated_at')
+      .order('name', { ascending: true });
+    if (kind) query = query.eq('kind', kind);
+    const { data, error } = await query;
+    if (error) { console.error('[sb] loadResearchLibrary:', error.message); return []; }
+    return data || [];
+  }, []);
+
+  const saveResearchItem = useCallback(async ({ id, name, body, kind, yearTag }) => {
+    if (!isSupabaseConfigured) return { error: { message: 'Supabase not configured' } };
+    const { data: { user } } = await supabase.auth.getUser();
+    const row = {
+      name, body: body || '', kind, year_tag: yearTag || null,
+      updated_at: new Date().toISOString(),
+    };
+    if (id) row.id = id; else row.created_by = user?.id || null;
+    const { data, error } = await supabase.from('research_library')
+      .upsert(row, { onConflict: 'id' }).select('id').single();
+    if (error) console.error('[sb] saveResearchItem:', error.message);
+    return { data, error };
+  }, []);
+
+  const deleteResearchItem = useCallback(async (id) => {
+    if (!isSupabaseConfigured || !id) return;
+    const { error } = await supabase.from('research_library').delete().eq('id', id);
+    if (error) console.error('[sb] deleteResearchItem:', error.message);
+  }, []);
+
   const onAuthStateChange = useCallback((callback) => {
     if (!isSupabaseConfigured) return () => {};
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
@@ -153,6 +219,19 @@ export default function useSupabase() {
     if (isProduction()) query = query.eq('environment', 'production');
     const { data, error } = await query;
     if (error) { console.error('[sb] loadAdminWorkshops:', error.message); return []; }
+    return data || [];
+  }, []);
+
+  // Research Bench cohort picker. Unlike loadAdminWorkshops this is NOT scoped
+  // by admin_id (a researcher may not own the room) and NOT filtered by
+  // environment (researchers want every cohort, prod and dev alike). RLS on
+  // rooms is open, so this returns the full list.
+  const loadAllCohorts = useCallback(async () => {
+    if (!isSupabaseConfigured) return [];
+    const { data, error } = await supabase.from('rooms')
+      .select('id, code, org_name, environment, created_at, current_stage')
+      .order('created_at', { ascending: false });
+    if (error) { console.error('[sb] loadAllCohorts:', error.message); return []; }
     return data || [];
   }, []);
 
@@ -1219,6 +1298,31 @@ export default function useSupabase() {
     }
   }, []);
 
+  // Research Bench usage — no room and no participant (the researcher isn't a
+  // participant). logLlmUsage can't be reused: it early-returns without a
+  // roomIdRef and hard-codes workshop_id. llm_usage allows null workshop_id /
+  // participant_id (016) and RLS is open, so a null-keyed insert is valid.
+  // segmentRefId carries the cohort room id for later attribution.
+  const logResearchUsage = useCallback(async ({ segment, segmentRefId, model, usage, costUsd }) => {
+    if (!isSupabaseConfigured || !usage) return;
+    try {
+      await supabase.from('llm_usage').insert({
+        workshop_id: null,
+        participant_id: null,
+        segment: segment || 'research_bench',
+        segment_ref_id: segmentRefId || null,
+        model,
+        input_tokens: usage.input_tokens || 0,
+        output_tokens: usage.output_tokens || 0,
+        cache_creation_input_tokens: usage.cache_creation_input_tokens || 0,
+        cache_read_input_tokens: usage.cache_read_input_tokens || 0,
+        cost_usd: costUsd,
+      });
+    } catch (err) {
+      console.warn('logResearchUsage failed:', err?.message || err);
+    }
+  }, []);
+
   // Workshop-wide usage — every row tagged with this workshop, regardless
   // of which participant spent it. Stage 8's primary view uses this so
   // the room sees the collective cost as pedagogy ("look how cheap a
@@ -1978,8 +2082,12 @@ export default function useSupabase() {
     // Auth
     getSession, getUser, signInWithGoogle, signInWithMagicLink,
     signOut, checkIsAdmin, onAuthStateChange,
+    // Research Bench access
+    checkResearchAccess, loadResearchAccess, addResearchAccess, removeResearchAccess,
+    // Research Bench library
+    loadResearchLibrary, saveResearchItem, deleteResearchItem, logResearchUsage,
     // Admin
-    createWorkshop, loadAdminWorkshops, loadWorkshopParticipants,
+    createWorkshop, loadAdminWorkshops, loadAllCohorts, loadWorkshopParticipants,
     deleteWorkshop, deprecateWorkshop, pauseRoom, resumeRoom, revealStage, unrevealStage, revealAllStages, loadWorkshopStats, loadWorkshopContent, loadWorkshopActivity,
     loadAdminScorecardData, loadAdminResearchData,
     seedWorkshopContent, subscribeToWorkshopPresence,

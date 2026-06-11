@@ -24,6 +24,14 @@ const RATES = {
     cacheWrite: 1.25,
     cacheRead: 0.10,
   },
+  // Opus — used by the Research Bench for synthesis quality over large
+  // consent-filtered cohort bundles. Standard Opus pricing.
+  'claude-opus-4-8': {
+    input: 15.00,
+    output: 75.00,
+    cacheWrite: 18.75,
+    cacheRead: 1.50,
+  },
   // Fallback for unknown models — Sonnet 4 pricing so cost is non-zero but
   // not obviously wrong. If a new model lands, add it here.
   default: {

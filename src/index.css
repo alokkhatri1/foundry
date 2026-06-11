@@ -777,6 +777,36 @@ input, textarea, select { font-family: inherit; font-size: inherit; }
 }
 .admin-btn-primary:hover { opacity: 0.85; }
 
+/* Research Access modal (admin) */
+.ra-overlay {
+  position: fixed; inset: 0; z-index: 1000;
+  background: rgba(0,0,0,0.4);
+  display: flex; align-items: center; justify-content: center;
+  padding: 24px;
+}
+.ra-modal {
+  width: 100%; max-width: 460px;
+  background: var(--surface, #fff);
+  border: 1px solid var(--border-color);
+  border-radius: 14px;
+  padding: 22px;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.25);
+}
+.ra-modal-head { display: flex; align-items: center; justify-content: space-between; }
+.ra-modal-hint { font-size: 12px; color: var(--text-muted); margin: 10px 0 16px; }
+.ra-modal-add { display: flex; gap: 8px; }
+.ra-modal-add input {
+  flex: 1; padding: 8px 12px; font-size: 13px;
+  border: 1px solid var(--border-color); border-radius: 8px;
+}
+.ra-modal-err { color: #c0392b; font-size: 12px; margin-top: 8px; }
+.ra-modal-list { list-style: none; margin: 16px 0 0; padding: 0; max-height: 320px; overflow-y: auto; }
+.ra-modal-list li {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 8px 0; font-size: 13px; border-top: 1px solid var(--border-color);
+}
+.ra-modal-empty { color: var(--text-muted); justify-content: center; }
+
 .admin-split {
   display: flex;
   flex: 1;

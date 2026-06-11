@@ -475,11 +475,21 @@ export function buildParticipantMarkdown(participant, data, { workshopCode, orgN
   return header + body + '\n';
 }
 
-export function buildResearchMarkdown(data, { workshopCode, orgName }) {
+// consentedOnly: when true, drop participants who haven't granted research
+// consent (or have withdrawn it). The admin export leaves it false (test-bed
+// behaviour — every participant, consent line tells the truth). The Research
+// Bench passes true so synthesis only ever sees consented data.
+export function buildResearchMarkdown(data, { workshopCode, orgName, consentedOnly = false }) {
   const pathFor = pathLookup(data.files);
-  const humans = data.participants
+  const consented = (p) => {
+    const c = data.consentByPid?.[p.id];
+    return !!(c && c.granted === true && !c.withdrawn_at);
+  };
+  const allHumans = data.participants
     .filter(p => (p.kind || 'human') === 'human')
     .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+  const humans = consentedOnly ? allHumans.filter(consented) : allHumans;
+  const dropped = allHumans.length - humans.length;
   const header = [
     `# Foundry research bundle — ${orgName || 'workshop'}`,
     '',
@@ -487,7 +497,9 @@ export function buildResearchMarkdown(data, { workshopCode, orgName }) {
     `- **Generated**: ${fmtTime(new Date())}`,
     `- **Participants**: ${humans.length}`,
     '',
-    '_v1 test bed — every participant included regardless of consent. The Consent line on each section tells the truth; downstream synthesis can filter._',
+    consentedOnly
+      ? `_Consent-filtered — only participants who granted research consent are included${dropped ? ` (${dropped} excluded)` : ''}._`
+      : '_v1 test bed — every participant included regardless of consent. The Consent line on each section tells the truth; downstream synthesis can filter._',
     '',
     '---',
     '',

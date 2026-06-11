@@ -69,7 +69,7 @@ function Chat({ sb, bundle, library }) {
     setInput('');
     setBusy(true);
     try {
-      const res = await callClaudeProxy(sb, {
+      const res = await callClaudeProxy(supabase, {
         model: BENCH_MODEL,
         max_tokens: BENCH_MAX_TOKENS,
         system: buildSystem(bundle, library),

@@ -235,6 +235,17 @@ export default function useSupabase() {
     return data || [];
   }, []);
 
+  // Total consented participants across every cohort — the size of the
+  // research corpus the bench can draw on. Counts granted, non-withdrawn rows.
+  const loadTotalConsented = useCallback(async () => {
+    if (!isSupabaseConfigured) return 0;
+    const { count, error } = await supabase.from('research_consent')
+      .select('participant_id', { count: 'exact', head: true })
+      .eq('granted', true).is('withdrawn_at', null);
+    if (error) { console.error('[sb] loadTotalConsented:', error.message); return 0; }
+    return count || 0;
+  }, []);
+
   const loadWorkshopParticipants = useCallback(async (roomId) => {
     if (!isSupabaseConfigured) return [];
     const { data } = await supabase.from('participants').select('*').eq('room_id', roomId);
@@ -2087,7 +2098,7 @@ export default function useSupabase() {
     // Research Bench library
     loadResearchLibrary, saveResearchItem, deleteResearchItem, logResearchUsage,
     // Admin
-    createWorkshop, loadAdminWorkshops, loadAllCohorts, loadWorkshopParticipants,
+    createWorkshop, loadAdminWorkshops, loadAllCohorts, loadTotalConsented, loadWorkshopParticipants,
     deleteWorkshop, deprecateWorkshop, pauseRoom, resumeRoom, revealStage, unrevealStage, revealAllStages, loadWorkshopStats, loadWorkshopContent, loadWorkshopActivity,
     loadAdminScorecardData, loadAdminResearchData,
     seedWorkshopContent, subscribeToWorkshopPresence,

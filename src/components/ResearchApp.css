@@ -63,6 +63,10 @@
   border-bottom: 1px solid #1d242d;
 }
 .rb-topbar-user { color: #8b95a3; font-size: 13px; display: flex; align-items: center; gap: 12px; }
+.rb-corpus {
+  background: #11161d; border: 1px solid #232a33; border-radius: 999px;
+  padding: 4px 12px; color: #6ea8fe; font-weight: 600;
+}
 
 .rb-body { flex: 1; padding: 28px; }
 

@@ -308,6 +308,7 @@ export default function ResearchApp() {
   // Tri-state mirrors AuthGate so a network blip shows retry, not a hard "no".
   const [access, setAccess] = useState('unknown'); // 'unknown' | 'yes' | 'no' | 'error'
   const [accessError, setAccessError] = useState(null);
+  const [totalConsented, setTotalConsented] = useState(null); // corpus size, all cohorts
   // The auth id we've already resolved access for. Supabase fires
   // onAuthStateChange on tab focus / token refresh; without this guard we'd
   // re-check (flipping access to 'unknown') on every such event, which
@@ -353,6 +354,12 @@ export default function ResearchApp() {
     });
     return () => { mounted = false; subscription.unsubscribe(); };
   }, [resolveAccess]);
+
+  // Corpus size — total consented participants across all cohorts. Loaded once
+  // access is granted.
+  useEffect(() => {
+    if (access === 'yes') sb.loadTotalConsented().then(setTotalConsented);
+  }, [access, sb]);
 
   // --- Loading ---
   if (loading) {
@@ -425,6 +432,11 @@ export default function ResearchApp() {
       <header className="rb-topbar">
         <div className="rb-wordmark">Foundry <span>Research</span></div>
         <div className="rb-topbar-user">
+          {totalConsented != null && (
+            <span className="rb-corpus" title="Total consented participants across all cohorts">
+              {totalConsented.toLocaleString()} consented participants
+            </span>
+          )}
           <span>{email}</span>
           <button className="rb-btn rb-btn-ghost" onClick={() => sb.signOut()}>Sign out</button>
         </div>

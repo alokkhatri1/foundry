@@ -1,4 +1,9 @@
 import { useState } from 'react';
+import { REFLECTION_PROMPTS } from '../data/reflectionPrompts';
+
+// Scale legends (mirror StageReflection.jsx) so a rating shows its word too.
+const CLARITY_LEGEND = { 1: 'Not clear at all', 2: 'Slightly clear', 3: 'Moderately clear', 4: 'Very clear', 5: 'Extremely clear' };
+const AGREEMENT_LEGEND = { 1: 'Strongly disagree', 2: 'Disagree', 3: 'Neutral', 4: 'Agree', 5: 'Strongly agree' };
 
 // Forms & responses view for the Research Bench. Shows the actual answers
 // participants entered in the workshop's forms — Demographics, per-stage
@@ -118,15 +123,52 @@ const SURVEY_COLS = [
 const STAGES = ['3', '4', '5', '6', '7', '8'];
 const STAGE_NAME = { 3: 'Skills', 4: 'Knowledge', 5: 'Coworkers', 6: 'Workflow', 7: 'Audit', 8: 'Economics' };
 
-function ReflectionCell({ refl }) {
+// Map a structured chip value (or array) to the question's own option labels —
+// authoritative per question, since codes repeat across stages with different
+// meanings (e.g. 'unsure', 'no_change', 'privacy').
+function optLabel(q, value) {
+  const map = Object.fromEntries((q.options || []).map(o => [o.v, o.label]));
+  if (Array.isArray(value)) return value.map(v => map[v] || lbl(v)).join(', ');
+  return map[value] || lbl(value);
+}
+
+// Answer the participant gave to one reflection question, by its type.
+function answerFor(q, refl) {
+  if (q.type === 'clarity') {
+    const v = refl.confidence;
+    return v == null ? '—' : `${v} — ${CLARITY_LEGEND[v] || ''}`;
+  }
+  if (q.type === 'agreement') {
+    const v = refl.agreement;
+    return v == null ? '—' : `${v} — ${AGREEMENT_LEGEND[v] || ''}`;
+  }
+  if (q.type === 'text') {
+    const v = refl.transfer_text;
+    return v ? `“${v}”` : '—';
+  }
+  // chip / chips → stored under structured[q.id]
+  const v = refl.structured?.[q.id];
+  return v == null || (Array.isArray(v) && !v.length) ? '—' : optLabel(q, v);
+}
+
+// One stage's cell: each question (full text) paired with the participant's
+// answer, in the order the form asked them.
+function ReflectionCell({ stage, refl }) {
   if (!refl) return <span className="rf-muted">—</span>;
-  const struct = refl.structured && typeof refl.structured === 'object' ? refl.structured : {};
-  const structParts = Object.values(struct).map(v => fmt(v)).filter(s => s && s !== '—');
+  const prompt = REFLECTION_PROMPTS[stage];
+  if (!prompt) return <span className="rf-muted">—</span>;
   return (
     <div className="rf-refl-cell">
-      <div className="rf-refl-rate">clarity <b>{refl.confidence ?? '—'}</b> · agree <b>{refl.agreement ?? '—'}</b></div>
-      {refl.transfer_text && <div className="rf-refl-text">“{refl.transfer_text}”</div>}
-      {structParts.length > 0 && <div className="rf-refl-struct">{structParts.join(' · ')}</div>}
+      {prompt.questions.map(q => {
+        const ans = answerFor(q, refl);
+        const isText = q.type === 'text';
+        return (
+          <div className="rf-rq" key={q.id}>
+            <div className="rf-rq-text">{q.text}</div>
+            <div className={`rf-rq-ans${isText ? ' rf-rq-quote' : ''}`}>{ans}</div>
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -224,7 +266,7 @@ export default function ResearchForms({ data }) {
                   <tr key={i}>
                     <td className="rf-sticky rf-sticky-1 rf-name">{r.name}</td>
                     {showCohort && <td className="rf-sticky rf-sticky-2 rf-cohort">{r.cohort}</td>}
-                    {STAGES.map(s => <td key={s}><ReflectionCell refl={r.refl[s]} /></td>)}
+                    {STAGES.map(s => <td key={s}><ReflectionCell stage={s} refl={r.refl[s]} /></td>)}
                   </tr>
                 ))}
               </tbody>

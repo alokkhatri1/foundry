@@ -168,12 +168,11 @@
 .rf-empty { color: var(--text-muted); padding: 28px 4px; }
 .rf-muted { color: var(--text-muted); }
 
-/* reflection cells */
-.rf-refl-cell { display: flex; flex-direction: column; gap: 3px; min-width: 160px; }
-.rf-refl-rate { color: var(--text-body); }
-.rf-refl-rate b { color: var(--text-dark); }
-.rf-refl-text { color: var(--text-dark); font-style: italic; }
-.rf-refl-struct { color: var(--accent-agent); font-size: 11.5px; }
+/* reflection cells: each question (full text) + the participant's answer */
+.rf-refl-cell { display: flex; flex-direction: column; gap: 9px; min-width: 220px; max-width: 300px; }
+.rf-rq-text { color: var(--text-muted); font-size: 11px; line-height: 1.35; margin-bottom: 2px; }
+.rf-rq-ans { color: var(--text-dark); font-weight: 600; }
+.rf-rq-quote { font-weight: 400; font-style: italic; color: var(--text-body); }
 
 /* Chat */
 .rb-chat { flex: 1; display: flex; flex-direction: column; min-height: 0; }

@@ -500,7 +500,7 @@ export default function useSupabase() {
     if (!isSupabaseConfigured) return null;
     const [
       participants, coworkers, workflows, runs, approvals, files,
-      messages, dms, reflections, consent, usage, demographics,
+      messages, dms, reflections, consent, usage, demographics, feedback,
     ] = await Promise.all([
       supabase.from('participants')
         .select('id, name, email, auth_user_id, kind, joined_at')
@@ -545,6 +545,9 @@ export default function useSupabase() {
       supabase.from('participant_demographics')
         .select('participant_id, role, tenure_band, industry, age_band, work_type, ai_familiarity, ai_use_frequency, ai_tools, ai_use_cases, ai_mental_model, evaluation_confidence, delegation_comfort, adoption_criteria_top3, delegation_boundary, workshop_goal, questions_text_version, created_at')
         .eq('workshop_id', roomId),
+      supabase.from('workshop_feedback')
+        .select('participant_id, satisfaction, relevance, clarity, theory_practice, improved_skills, can_apply, would_recommend, platform_rating, platform_reliability, platform_support, ai_was_chat_tool, ai_repeatable_systems, aware_human_oversight, aware_cost_tradeoffs, trust_when_inspectable, identify_ai_tasks, identify_human_review, likely_to_use, concept_used_first, foundry_improvement_text, real_task_text, most_valuable, future_topics, improvement_notes')
+        .eq('workshop_id', roomId),
     ]);
 
     // Preferences live keyed by auth_user_id; fold them into a per-participant
@@ -571,6 +574,9 @@ export default function useSupabase() {
     const demographicsByPid = {};
     for (const d of (demographics.data || [])) demographicsByPid[d.participant_id] = d;
 
+    const feedbackByPid = {};
+    for (const f of (feedback.data || [])) feedbackByPid[f.participant_id] = f;
+
     return {
       participants: participantRows,
       coworkers: coworkers.data || [],
@@ -585,6 +591,7 @@ export default function useSupabase() {
       prefsByPid,
       consentByPid,
       demographicsByPid,
+      feedbackByPid,
     };
   }, []);
 

@@ -5,6 +5,7 @@ import { handleAuthCallback } from '../utils/authCallback';
 import { buildResearchMarkdown } from '../utils/researchBundle';
 import { callClaudeProxy } from '../utils/claudeFetch';
 import { computeCost, formatUsd } from '../utils/llmCost';
+import ResearchForms from './ResearchForms';
 import './ResearchApp.css';
 
 // Rough token estimate for the context-size guardrail (~4 chars/token).
@@ -220,9 +221,10 @@ function LibraryPanel({ sb, items, onReload }) {
 function Bench({ sb }) {
   const [cohorts, setCohorts] = useState([]);
   const [cohortId, setCohortId] = useState('');
-  const [bundle, setBundle] = useState(null);   // { text, consented, total, tokens, cohort }
+  const [bundle, setBundle] = useState(null);   // { text, consented, total, tokens, cohort, data }
   const [loadingBundle, setLoadingBundle] = useState(false);
   const [library, setLibrary] = useState([]);
+  const [view, setView] = useState('data');     // 'data' | 'chat'
 
   const reloadLibrary = useCallback(() => { sb.loadResearchLibrary().then(setLibrary); }, [sb]);
   useEffect(() => { sb.loadAllCohorts().then(setCohorts); reloadLibrary(); }, [sb, reloadLibrary]);
@@ -244,7 +246,7 @@ function Bench({ sb }) {
     const text = buildResearchMarkdown(data, {
       workshopCode: cohort?.code, orgName: cohort?.org_name, consentedOnly: true,
     });
-    setBundle({ text, consented, total, tokens: estTokens(text), cohort });
+    setBundle({ text, consented, total, tokens: estTokens(text), cohort, data });
     setLoadingBundle(false);
   }, [sb, cohorts]);
 
@@ -281,12 +283,20 @@ function Bench({ sb }) {
       </aside>
 
       <main className="rb-main">
-        {!bundle && <p className="rb-muted">Pick a cohort to load its consent-filtered research data.</p>}
+        {!bundle && <p className="rb-muted">Pick a cohort to see its form responses and chat with the data.</p>}
         {bundle && bundle.consented === 0 && (
-          <p className="rb-muted">No consented participants in this cohort — nothing to synthesize.</p>
+          <p className="rb-muted">No consented participants in this cohort.</p>
         )}
         {bundle && bundle.consented > 0 && (
-          <Chat sb={sb} bundle={bundle} library={library} />
+          <>
+            <div className="rb-viewtabs">
+              <button className={view === 'data' ? 'is-active' : ''} onClick={() => setView('data')}>Data</button>
+              <button className={view === 'chat' ? 'is-active' : ''} onClick={() => setView('chat')}>Chat</button>
+            </div>
+            {view === 'data'
+              ? <ResearchForms data={bundle.data} />
+              : <Chat sb={sb} bundle={bundle} library={library} />}
+          </>
         )}
       </main>
     </div>

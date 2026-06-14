@@ -235,6 +235,43 @@ export default function useSupabase() {
     return data || [];
   }, []);
 
+  // All form responses across every cohort, consent-aware — the corpus-wide
+  // Data view. Deliberately light: only the form tables (demographics,
+  // feedback, reflections) + consent + participant/room names. Skips the heavy
+  // messages/DMs/files/usage that loadAdminResearchData pulls per cohort, so
+  // this stays fast even across all rooms. Same shape the Data tables expect,
+  // plus roomNameByPid for the cohort column.
+  const loadAllFormResponses = useCallback(async () => {
+    if (!isSupabaseConfigured) return null;
+    const [parts, rooms, consent, demographics, feedback, reflections] = await Promise.all([
+      supabase.from('participants').select('id, name, room_id, kind').limit(20000),
+      supabase.from('rooms').select('id, org_name'),
+      supabase.from('research_consent').select('participant_id, granted, withdrawn_at').limit(20000),
+      supabase.from('participant_demographics')
+        .select('participant_id, role, tenure_band, industry, work_type, ai_familiarity, ai_use_frequency, ai_tools, ai_use_cases, ai_mental_model, evaluation_confidence, delegation_comfort, adoption_criteria_top3, delegation_boundary')
+        .limit(20000),
+      supabase.from('workshop_feedback')
+        .select('participant_id, satisfaction, relevance, clarity, theory_practice, improved_skills, can_apply, would_recommend, platform_rating, platform_reliability, platform_support, ai_was_chat_tool, ai_repeatable_systems, aware_human_oversight, aware_cost_tradeoffs, trust_when_inspectable, identify_ai_tasks, identify_human_review, likely_to_use, concept_used_first, foundry_improvement_text, real_task_text, most_valuable')
+        .limit(20000),
+      supabase.from('stage_reflections')
+        .select('participant_id, stage, confidence, agreement, transfer_text, structured').limit(50000),
+    ]);
+    const roomName = Object.fromEntries((rooms.data || []).map(r => [r.id, r.org_name]));
+    const participants = parts.data || [];
+    const roomNameByPid = {};
+    for (const p of participants) roomNameByPid[p.id] = roomName[p.room_id] || '—';
+    const consentByPid = {};
+    for (const c of (consent.data || [])) consentByPid[c.participant_id] = c;
+    const demographicsByPid = {};
+    for (const d of (demographics.data || [])) demographicsByPid[d.participant_id] = d;
+    const feedbackByPid = {};
+    for (const f of (feedback.data || [])) feedbackByPid[f.participant_id] = f;
+    return {
+      participants, consentByPid, demographicsByPid, feedbackByPid,
+      stageReflections: reflections.data || [], roomNameByPid,
+    };
+  }, []);
+
   // Total consented participants across every cohort — the size of the
   // research corpus the bench can draw on. Counts granted, non-withdrawn rows.
   const loadTotalConsented = useCallback(async () => {
@@ -2105,7 +2142,7 @@ export default function useSupabase() {
     // Research Bench library
     loadResearchLibrary, saveResearchItem, deleteResearchItem, logResearchUsage,
     // Admin
-    createWorkshop, loadAdminWorkshops, loadAllCohorts, loadTotalConsented, loadWorkshopParticipants,
+    createWorkshop, loadAdminWorkshops, loadAllCohorts, loadAllFormResponses, loadTotalConsented, loadWorkshopParticipants,
     deleteWorkshop, deprecateWorkshop, pauseRoom, resumeRoom, revealStage, unrevealStage, revealAllStages, loadWorkshopStats, loadWorkshopContent, loadWorkshopActivity,
     loadAdminScorecardData, loadAdminResearchData,
     seedWorkshopContent, subscribeToWorkshopPresence,

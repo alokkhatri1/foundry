@@ -229,24 +229,35 @@ function Bench({ sb }) {
   const reloadLibrary = useCallback(() => { sb.loadResearchLibrary().then(setLibrary); }, [sb]);
   useEffect(() => { sb.loadAllCohorts().then(setCohorts); reloadLibrary(); }, [sb, reloadLibrary]);
 
+  const countConsented = (data) => (data.participants || [])
+    .filter(p => (p.kind || 'human') === 'human')
+    .filter(p => {
+      const c = data.consentByPid?.[p.id];
+      return c && c.granted === true && !c.withdrawn_at;
+    }).length;
+
   const loadCohort = useCallback(async (id) => {
     setCohortId(id);
     setBundle(null);
     if (!id) return;
     setLoadingBundle(true);
+    if (id === '__all__') {
+      // Corpus-wide Data view. No chat here — a single cohort's bundle fits
+      // context; all cohorts together would not. Data-only by design.
+      const data = await sb.loadAllFormResponses();
+      setView('data');
+      setBundle({ allCohorts: true, consented: countConsented(data), data,
+        cohort: { org_name: 'All consented cohorts' } });
+      setLoadingBundle(false);
+      return;
+    }
     const cohort = cohorts.find(c => c.id === id);
     const data = await sb.loadAdminResearchData(id);
     const total = (data.participants || []).filter(p => (p.kind || 'human') === 'human').length;
-    const consented = (data.participants || [])
-      .filter(p => (p.kind || 'human') === 'human')
-      .filter(p => {
-        const c = data.consentByPid?.[p.id];
-        return c && c.granted === true && !c.withdrawn_at;
-      }).length;
     const text = buildResearchMarkdown(data, {
       workshopCode: cohort?.code, orgName: cohort?.org_name, consentedOnly: true,
     });
-    setBundle({ text, consented, total, tokens: estTokens(text), cohort, data });
+    setBundle({ text, consented: countConsented(data), total, tokens: estTokens(text), cohort, data });
     setLoadingBundle(false);
   }, [sb, cohorts]);
 
@@ -257,6 +268,7 @@ function Bench({ sb }) {
           <label>Cohort</label>
           <select value={cohortId} onChange={e => loadCohort(e.target.value)}>
             <option value="">Select a cohort…</option>
+            <option value="__all__">★ All consented cohorts (data only)</option>
             {cohorts.map(c => (
               <option key={c.id} value={c.id}>
                 {c.org_name} · {c.code}{c.environment !== 'production' ? ' (dev)' : ''}
@@ -266,7 +278,13 @@ function Bench({ sb }) {
         </div>
 
         {loadingBundle && <div className="rb-muted rb-field">Loading cohort data…</div>}
-        {bundle && (
+        {bundle && bundle.allCohorts && (
+          <div className="rb-bundle-stats">
+            <div><strong>{bundle.consented}</strong> consented participants, all cohorts</div>
+            <div className="rb-muted">Data view only — pick one cohort to chat.</div>
+          </div>
+        )}
+        {bundle && !bundle.allCohorts && (
           <div className="rb-bundle-stats">
             <div><strong>{bundle.consented}</strong> of {bundle.total} participants consented</div>
             <div className="rb-muted">{bundle.tokens.toLocaleString()} tokens in context</div>
@@ -291,9 +309,11 @@ function Bench({ sb }) {
           <>
             <div className="rb-viewtabs">
               <button className={view === 'data' ? 'is-active' : ''} onClick={() => setView('data')}>Data</button>
-              <button className={view === 'chat' ? 'is-active' : ''} onClick={() => setView('chat')}>Chat</button>
+              {!bundle.allCohorts && (
+                <button className={view === 'chat' ? 'is-active' : ''} onClick={() => setView('chat')}>Chat</button>
+              )}
             </div>
-            {view === 'data'
+            {view === 'data' || bundle.allCohorts
               ? <ResearchForms data={bundle.data} />
               : <Chat sb={sb} bundle={bundle} library={library} />}
           </>

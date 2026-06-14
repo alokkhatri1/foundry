@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { REFLECTION_PROMPTS } from '../data/reflectionPrompts';
-import { isIncluded, consentBreakdown } from '../utils/researchBundle';
+import { consentBreakdown, completeRecordPids } from '../utils/researchBundle';
 
 // Scale legends (mirror StageReflection.jsx) so a rating shows its word too.
 const CLARITY_LEGEND = { 1: 'Not clear at all', 2: 'Slightly clear', 3: 'Moderately clear', 4: 'Very clear', 5: 'Extremely clear' };
@@ -208,13 +208,16 @@ export default function ResearchForms({ data }) {
 
   const showCohort = !!data.roomNameByPid; // all-cohorts mode
 
+  const completeSet = completeRecordPids(data);
   const consented = (data.participants || [])
     .filter(p => (p.kind || 'human') === 'human')
-    .filter(p => isIncluded(data.consentByPid?.[p.id]))
+    .filter(p => completeSet.has(p.id))
     .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
   const bd = consentBreakdown(data.participants, data.consentByPid);
 
-  if (!consented.length) return <div className="rf-empty">No included participants (all declined or none yet).</div>;
+  if (!consented.length) {
+    return <div className="rf-empty">No complete records here — only participants who finished demographics, the survey, and all their reflected stages are shown.</div>;
+  }
 
   const reflByPid = {};
   for (const r of data.stageReflections || []) {
@@ -237,7 +240,7 @@ export default function ResearchForms({ data }) {
         <button className={form === 'reflections' ? 'is-active' : ''} onClick={() => setForm('reflections')}>Reflections</button>
         <button className={form === 'survey' ? 'is-active' : ''} onClick={() => setForm('survey')}>End survey</button>
         <span className="rf-count">
-          {bd.included} included ({bd.consented} consented · {bd.pending} no response · {bd.declined} declined excluded){showCohort ? ' · all cohorts' : ''}
+          {consented.length} complete records (of {bd.included} included){showCohort ? ' · all cohorts' : ''}
         </span>
       </div>
 

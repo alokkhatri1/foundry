@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '../supabase';
 import useSupabase from '../hooks/useSupabase';
 import { handleAuthCallback } from '../utils/authCallback';
-import { buildResearchMarkdown, consentBreakdown } from '../utils/researchBundle';
+import { buildResearchMarkdown, consentBreakdown, completeRecordPids } from '../utils/researchBundle';
 import { callClaudeProxy } from '../utils/claudeFetch';
 import { computeCost, formatUsd } from '../utils/llmCost';
 import ResearchForms from './ResearchForms';
@@ -240,17 +240,18 @@ function Bench({ sb }) {
       const data = await sb.loadAllFormResponses();
       setView('data');
       setBundle({ allCohorts: true, breakdown: consentBreakdown(data.participants, data.consentByPid),
-        data, cohort: { org_name: 'All cohorts' } });
+        complete: completeRecordPids(data).size, data, cohort: { org_name: 'All cohorts' } });
       setLoadingBundle(false);
       return;
     }
     const cohort = cohorts.find(c => c.id === id);
     const data = await sb.loadAdminResearchData(id);
     const breakdown = consentBreakdown(data.participants, data.consentByPid);
+    const complete = completeRecordPids(data).size;
     const text = buildResearchMarkdown(data, {
       workshopCode: cohort?.code, orgName: cohort?.org_name, consentedOnly: true,
     });
-    setBundle({ text, breakdown, tokens: estTokens(text), cohort, data });
+    setBundle({ text, breakdown, complete, tokens: estTokens(text), cohort, data });
     setLoadingBundle(false);
   }, [sb, cohorts]);
 
@@ -273,16 +274,16 @@ function Bench({ sb }) {
         {loadingBundle && <div className="rb-muted rb-field">Loading cohort data…</div>}
         {bundle && (
           <div className="rb-bundle-stats">
-            <div><strong>{bundle.breakdown.included}</strong> included{bundle.allCohorts ? ', all cohorts' : ''}</div>
+            <div><strong>{bundle.complete}</strong> complete records{bundle.allCohorts ? ', all cohorts' : ''}</div>
             <div className="rb-muted">
-              {bundle.breakdown.consented} consented · {bundle.breakdown.pending} no response · {bundle.breakdown.declined} declined (excluded)
+              of {bundle.breakdown.included} included · {bundle.breakdown.declined} declined excluded · partial responders hidden
             </div>
             {bundle.allCohorts
               ? <div className="rb-muted">Data view only — pick one cohort to chat.</div>
               : <>
                   <div className="rb-muted">{bundle.tokens.toLocaleString()} tokens in context</div>
                   {bundle.tokens > 150000 && <div className="rb-warn">Large context — synthesis will be slow and costly.</div>}
-                  {bundle.breakdown.included === 0 && <div className="rb-warn">No included participants — nothing to synthesize.</div>}
+                  {bundle.complete === 0 && <div className="rb-warn">No complete records — nothing to synthesize.</div>}
                 </>}
           </div>
         )}
@@ -292,10 +293,10 @@ function Bench({ sb }) {
 
       <main className="rb-main">
         {!bundle && <p className="rb-muted">Pick a cohort to see its form responses and chat with the data.</p>}
-        {bundle && bundle.breakdown.included === 0 && (
-          <p className="rb-muted">No included participants in this cohort (all declined or none yet).</p>
+        {bundle && bundle.complete === 0 && (
+          <p className="rb-muted">No complete records in this cohort — partial responders are hidden.</p>
         )}
-        {bundle && bundle.breakdown.included > 0 && (
+        {bundle && bundle.complete > 0 && (
           <>
             <div className="rb-viewtabs">
               <button className={view === 'data' ? 'is-active' : ''} onClick={() => setView('data')}>Data</button>

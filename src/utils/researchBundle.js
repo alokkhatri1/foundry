@@ -484,6 +484,44 @@ export function isIncluded(consentRow) {
   return !consentRow || (consentRow.granted !== false && !consentRow.withdrawn_at);
 }
 
+// "Complete record" = a participant worth analysing: included (not declined),
+// has demographics (key fields filled), submitted the end survey, AND has a
+// reflection for every stage their cohort actually reached. Partial responders
+// are excluded — they add noise, not signal. Threshold is lenient: cohort depth
+// is read from the data (max reflected stage in that room), so a cohort that
+// ended at Stage 6 only needs reflections 3–6, not a fixed 3–8.
+export function completeRecordPids(data) {
+  const parts = (data.participants || []).filter(p => (p.kind || 'human') === 'human');
+  // participants from loadAdminResearchData have no room_id (single cohort);
+  // from loadAllFormResponses they do. Bucket by room so cohort depth is per-room.
+  const roomByPid = {};
+  for (const p of parts) roomByPid[p.id] = p.room_id || '_single';
+  const maxStageByRoom = {};
+  const stagesByPid = {};
+  for (const r of data.stageReflections || []) {
+    const s = Number(r.stage);
+    if (!(s >= 3 && s <= 8)) continue;
+    (stagesByPid[r.participant_id] ||= new Set()).add(s);
+    const room = roomByPid[r.participant_id];
+    if (room != null) maxStageByRoom[room] = Math.max(maxStageByRoom[room] || 0, s);
+  }
+  const out = new Set();
+  for (const p of parts) {
+    if (!isIncluded(data.consentByPid?.[p.id])) continue;
+    const demo = data.demographicsByPid?.[p.id];
+    if (!demo || !demo.role || demo.ai_familiarity == null || !demo.ai_mental_model) continue;
+    const fb = data.feedbackByPid?.[p.id];
+    if (!fb || fb.satisfaction == null) continue;
+    const maxStage = maxStageByRoom[roomByPid[p.id]] || 0;
+    if (maxStage < 3) continue; // cohort never reflected → no full record possible
+    const have = stagesByPid[p.id] || new Set();
+    let ok = true;
+    for (let s = 3; s <= maxStage; s++) if (!have.has(s)) { ok = false; break; }
+    if (ok) out.add(p.id);
+  }
+  return out;
+}
+
 // Per-cohort consent tally over human participants.
 export function consentBreakdown(participants, consentByPid) {
   let consented = 0, pending = 0, declined = 0;
@@ -506,9 +544,10 @@ export function buildResearchMarkdown(data, { workshopCode, orgName, consentedOn
   const allHumans = data.participants
     .filter(p => (p.kind || 'human') === 'human')
     .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
-  const humans = consentedOnly
-    ? allHumans.filter(p => isIncluded(data.consentByPid?.[p.id]))
-    : allHumans;
+  // The bench (consentedOnly) restricts to complete records — partial
+  // responders add noise to synthesis. The admin export keeps everyone.
+  const completeSet = consentedOnly ? completeRecordPids(data) : null;
+  const humans = consentedOnly ? allHumans.filter(p => completeSet.has(p.id)) : allHumans;
   const b = consentBreakdown(allHumans, data.consentByPid);
   const header = [
     `# Foundry research bundle — ${orgName || 'workshop'}`,
@@ -518,7 +557,7 @@ export function buildResearchMarkdown(data, { workshopCode, orgName, consentedOn
     `- **Participants**: ${humans.length}`,
     '',
     consentedOnly
-      ? `_Included ${b.included} (${b.consented} consented · ${b.pending} no response). Excludes ${b.declined} who explicitly declined or withdrew._`
+      ? `_Complete records only — ${humans.length} of ${b.included} included participants have a full record (demographics + survey + all reflected stages). Partial responders and ${b.declined} who declined are excluded._`
       : '_v1 test bed — every participant included regardless of consent. The Consent line on each section tells the truth; downstream synthesis can filter._',
     '',
     '---',

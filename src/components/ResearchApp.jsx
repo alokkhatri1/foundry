@@ -473,21 +473,6 @@ function Bench({ sb }) {
         </div>
 
         {loadingBundle && <div className="rb-muted rb-field">Loading cohort data…</div>}
-        {bundle && (
-          <div className="rb-bundle-stats">
-            <div><strong>{bundle.complete}</strong> complete records{bundle.allCohorts ? ', all cohorts' : ''}</div>
-            <div className="rb-muted">
-              of {bundle.breakdown.included} included · {bundle.breakdown.declined} declined excluded · partial responders hidden
-            </div>
-            {bundle.allCohorts
-              ? <div className="rb-muted">Data view only — pick one cohort to chat.</div>
-              : <>
-                  <div className="rb-muted">{bundle.tokens.toLocaleString()} tokens in context</div>
-                  {bundle.tokens > 150000 && <div className="rb-warn">Large context — synthesis will be slow and costly.</div>}
-                  {bundle.complete === 0 && <div className="rb-warn">No complete records — nothing to synthesize.</div>}
-                </>}
-          </div>
-        )}
 
         <LibraryPanel sb={sb} items={library} onReload={reloadLibrary} onRun={setRunSkill} />
       </aside>

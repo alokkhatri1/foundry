@@ -4,6 +4,7 @@ import useSupabase from '../hooks/useSupabase';
 import { handleAuthCallback } from '../utils/authCallback';
 import { buildResearchMarkdown, consentBreakdown, completeRecordPids } from '../utils/researchBundle';
 import { buildProfileText, buildRunPrompt } from '../utils/researchProfiles';
+import { fetchGithubText } from '../utils/fetchSource';
 import { SEED_THEORIES, SEED_SKILLS } from '../data/researchSeed';
 import { callClaudeProxy } from '../utils/claudeFetch';
 import { computeCost, formatUsd } from '../utils/llmCost';
@@ -136,42 +137,45 @@ function Chat({ sb, bundle, library }) {
 
 const KIND_LABEL = { skill: 'Skill', theory: 'Theory' };
 
-const DIMENSIONS = [
-  { v: 'demographics', label: 'Demographics' },
-  { v: 'reflections', label: 'Reflections' },
-  { v: 'survey', label: 'End survey' },
-  { v: 'usage', label: 'Usage / behavior' },
-];
-
-// Modal editor. Theories are free-text (a lens). Skills are a structured
-// template: question / method / output format / which data dimensions to use.
+// Modal editor. Both skills and theories are documents: paste text, pull from
+// a public GitHub file, or upload a .md/.txt. The document IS the content — a
+// skill's prose carries the analysis recipe; a theory's carries the framework.
 function ItemEditor({ initial, onSave, onCancel }) {
   const kind = initial.kind;
+  const sp = initial?.spec || {};
   const [name, setName] = useState(initial?.name || '');
   const [yearTag, setYearTag] = useState(initial?.year_tag || '');
   const [body, setBody] = useState(initial?.body || '');
-  const sp = initial?.spec || {};
-  const [question, setQuestion] = useState(sp.question || '');
-  const [method, setMethod] = useState(sp.method || '');
-  const [outputFormat, setOutputFormat] = useState(sp.output_format || '');
-  const [dims, setDims] = useState(sp.dimensions || ['demographics', 'survey', 'reflections', 'usage']);
+  const [sourceType, setSourceType] = useState(sp.source_type || 'paste'); // paste | github | upload
+  const [sourceUrl, setSourceUrl] = useState(sp.source_url || '');
+  const [fetching, setFetching] = useState(false);
+  const [err, setErr] = useState(null);
   const [busy, setBusy] = useState(false);
 
-  const toggleDim = (v) => setDims(d => d.includes(v) ? d.filter(x => x !== v) : [...d, v]);
-
+  async function pullGithub() {
+    setFetching(true); setErr(null);
+    try { setBody(await fetchGithubText(sourceUrl)); }
+    catch (e) { setErr(e.message); }
+    setFetching(false);
+  }
+  function onFile(e) {
+    const f = e.target.files?.[0];
+    if (!f) return;
+    const r = new FileReader();
+    r.onload = () => { setBody(String(r.result || '')); setSourceUrl(f.name); };
+    r.onerror = () => setErr('Could not read that file.');
+    r.readAsText(f);
+  }
   async function save() {
     setBusy(true);
-    const payload = { id: initial.id, name: name.trim(), kind, yearTag: yearTag.trim() };
-    if (kind === 'skill') {
-      payload.spec = { question, method, output_format: outputFormat, dimensions: dims };
-      payload.body = '';
-    } else {
-      payload.body = body;
-    }
-    await onSave(payload);
+    await onSave({
+      id: initial.id, name: name.trim(), kind, yearTag: yearTag.trim(),
+      body, spec: { source_type: sourceType, source_url: sourceUrl },
+    });
     setBusy(false);
   }
 
+  const noun = kind === 'skill' ? 'analysis recipe' : 'framework / theory';
   return (
     <div className="rb-overlay" onClick={onCancel}>
       <div className="rb-modal" onClick={e => e.stopPropagation()}>
@@ -189,42 +193,44 @@ function ItemEditor({ initial, onSave, onCancel }) {
           <input value={yearTag} onChange={e => setYearTag(e.target.value)} placeholder="2026" />
         </div>
 
-        {kind === 'theory' ? (
-          <div className="rb-field">
-            <label>Theory / framework (the lens)</label>
-            <textarea rows={10} value={body} onChange={e => setBody(e.target.value)}
-              placeholder="Summarize the framework, cite it, and say when to apply it as a lens." />
+        <div className="rb-field">
+          <label>Source</label>
+          <div className="rb-dims">
+            {['paste', 'github', 'upload'].map(s => (
+              <button key={s} type="button" className={`rb-dim${sourceType === s ? ' is-on' : ''}`}
+                onClick={() => setSourceType(s)}>
+                {s === 'paste' ? 'Paste' : s === 'github' ? 'GitHub link' : 'Upload file'}
+              </button>
+            ))}
           </div>
-        ) : (
-          <>
-            <div className="rb-field">
-              <label>Question — what are we asking?</label>
-              <textarea rows={2} value={question} onChange={e => setQuestion(e.target.value)}
-                placeholder="e.g. Did the workshop shift how participants frame AI, and for whom?" />
-            </div>
-            <div className="rb-field">
-              <label>Method — how should it analyze?</label>
-              <textarea rows={4} value={method} onChange={e => setMethod(e.target.value)}
-                placeholder="e.g. Compare before/after items; segment by baseline mental model; surface quotes." />
-            </div>
-            <div className="rb-field">
-              <label>Output format</label>
-              <textarea rows={2} value={outputFormat} onChange={e => setOutputFormat(e.target.value)}
-                placeholder="e.g. A short narrative + a table by segment with representative quotes." />
-            </div>
-            <div className="rb-field">
-              <label>Data dimensions to use</label>
-              <div className="rb-dims">
-                {DIMENSIONS.map(d => (
-                  <button key={d.v} type="button"
-                    className={`rb-dim${dims.includes(d.v) ? ' is-on' : ''}`}
-                    onClick={() => toggleDim(d.v)}>{d.label}</button>
-                ))}
-              </div>
-            </div>
-          </>
+        </div>
+
+        {sourceType === 'github' && (
+          <div className="rb-field rb-src-row">
+            <input value={sourceUrl} onChange={e => setSourceUrl(e.target.value)}
+              placeholder="https://github.com/org/repo/blob/main/skills/perception-shift.md" />
+            <button className="rb-btn rb-btn-ghost" disabled={fetching || !sourceUrl.trim()} onClick={pullGithub}>
+              {fetching ? 'Pulling…' : 'Pull'}
+            </button>
+          </div>
         )}
-        <button className="rb-btn" disabled={busy || !name.trim()} onClick={save}>Save</button>
+        {sourceType === 'upload' && (
+          <div className="rb-field">
+            <input type="file" accept=".md,.txt,text/markdown,text/plain" onChange={onFile} />
+            {sourceUrl && <span className="rb-muted"> {sourceUrl}</span>}
+          </div>
+        )}
+
+        {err && <div className="rb-error">{err}</div>}
+
+        <div className="rb-field">
+          <label>{noun} {sourceType !== 'paste' ? '(fetched — editable)' : ''}</label>
+          <textarea rows={12} value={body} onChange={e => setBody(e.target.value)}
+            placeholder={kind === 'skill'
+              ? 'The skill document: describe the analysis to run — question, method, and how to present the finding.'
+              : 'The framework: summarize it, cite it, and say when to apply it as a lens.'} />
+        </div>
+        <button className="rb-btn" disabled={busy || !name.trim() || !body.trim()} onClick={save}>Save</button>
       </div>
     </div>
   );
@@ -245,8 +251,8 @@ function LibraryPanel({ sb, items, onReload, onRun }) {
 
   async function seed() {
     setSeeding(true);
-    for (const t of SEED_THEORIES) await sb.saveResearchItem({ name: t.name, kind: 'theory', body: t.body });
-    for (const s of SEED_SKILLS) await sb.saveResearchItem({ name: s.name, kind: 'skill', spec: s.spec });
+    for (const t of SEED_THEORIES) await sb.saveResearchItem({ name: t.name, kind: 'theory', body: t.body, spec: { source_type: 'seed' } });
+    for (const s of SEED_SKILLS) await sb.saveResearchItem({ name: s.name, kind: 'skill', body: s.body, spec: { source_type: 'seed' } });
     setSeeding(false);
     onReload();
   }
@@ -263,7 +269,7 @@ function LibraryPanel({ sb, items, onReload, onRun }) {
           {kind === 'skill' && (
             <button className="rb-lib-run" title="Run this skill" onClick={() => onRun(it)}>▶</button>
           )}
-          <button className="rb-lib-name" title={it.kind === 'theory' ? it.body : (it.spec?.question || '')} onClick={() => setEditing(it)}>
+          <button className="rb-lib-name" title={(it.body || '').slice(0, 200)} onClick={() => setEditing(it)}>
             {it.name}{it.year_tag ? ` · ${it.year_tag}` : ''}
           </button>
           <button className="rb-lib-del" title="Delete"
@@ -305,8 +311,7 @@ function RunModal({ sb, skill, theories, cohorts, currentCohort, onClose, onSave
     try {
       const data = scope === 'all' ? await sb.loadAllFormResponses() : await sb.loadAdminResearchData(scope);
       const usageByPid = await sb.loadUsageByParticipant();
-      const dims = skill.spec?.dimensions || [];
-      const { text, n } = buildProfileText(data, dims, usageByPid);
+      const { text, n } = buildProfileText(data, null, usageByPid); // full profile; the skill doc decides what to use
       if (!n) { setError('No complete records in this scope.'); setPhase('error'); return; }
       const lenses = theories.filter(t => picked.has(t.id));
       const { system, user } = buildRunPrompt({ skill, theories: lenses, profileText: text, n, scopeLabel });
@@ -358,7 +363,7 @@ function RunModal({ sb, skill, theories, cohorts, currentCohort, onClose, onSave
               </div>
             </div>
             <div className="rb-muted rb-run-note">
-              Uses dimensions: {(skill.spec?.dimensions || []).join(', ') || 'all'} · runs Opus over complete records only.
+              Runs Opus over complete records only — full profiles (form + usage); the skill document steers the analysis.
             </div>
             {error && <div className="rb-error">{error}</div>}
             <button className="rb-btn" disabled={phase === 'running'} onClick={run}>

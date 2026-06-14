@@ -73,9 +73,18 @@ export function buildProfileText(data, dims, usageByPid = {}) {
   return { text: blocks.join('\n\n'), n: humans.length };
 }
 
-// Assemble the {system, user} prompt for a skill Run.
+// Assemble the {system, user} prompt for a skill Run. The skill is a document
+// (skill.body); for older structured skills we fall back to composing from spec.
 export function buildRunPrompt({ skill, theories, profileText, n, scopeLabel }) {
-  const spec = skill.spec || {};
+  let recipe = (skill.body || '').trim();
+  if (!recipe) {
+    const s = skill.spec || {};
+    recipe = [
+      s.question ? `Question: ${s.question}` : '',
+      s.method ? `Method: ${s.method}` : '',
+      s.output_format ? `Output format: ${s.output_format}` : '',
+    ].filter(Boolean).join('\n\n') || '(no skill content)';
+  }
   const lenses = (theories || []).length
     ? '\n\n## Theoretical lenses to apply\n' + theories.map(t => `### ${t.name}\n${t.body}`).join('\n\n')
     : '';
@@ -84,14 +93,13 @@ export function buildRunPrompt({ skill, theories, profileText, n, scopeLabel }) 
     + 'consented, anonymised participant profiles and produce a grounded finding. Every claim must be '
     + 'supported by the data — cite counts and quote participants by their number (e.g. "Participant 12"). '
     + 'Do not invent data or generalise beyond what the profiles show. If the data is insufficient for '
-    + 'part of the question, say so.' + lenses;
+    + 'part of the analysis, say so.' + lenses;
   const user = [
     `# Research skill: ${skill.name}`,
     `**Scope:** ${scopeLabel} · ${n} complete participant records.`,
     '',
-    `**Question:** ${spec.question || '(none specified)'}`,
-    `**Method:** ${spec.method || '(none specified)'}`,
-    `**Output format:** ${spec.output_format || 'A clear, well-structured findings write-up.'}`,
+    '## Skill instructions',
+    recipe,
     '',
     '---',
     '',
@@ -100,7 +108,7 @@ export function buildRunPrompt({ skill, theories, profileText, n, scopeLabel }) 
     '',
     '---',
     '',
-    'Produce the finding now, following the method and output format above.',
+    'Produce the finding now, following the skill instructions above.',
   ].join('\n');
   return { system, user };
 }

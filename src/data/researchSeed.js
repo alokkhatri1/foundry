@@ -31,79 +31,81 @@ export const SEED_THEORIES = [
   },
 ];
 
-const DIMS = { demographics: 'demographics', reflections: 'reflections', survey: 'survey', usage: 'usage' };
+// Skills are documents (markdown). Each is a self-contained recipe: question,
+// method, output. Edit them in-app, or replace with your own GitHub-hosted .md.
+const skill = (name, body) => ({ name, body: body.trim() });
 
 export const SEED_SKILLS = [
-  {
-    name: 'Perception shift: chat tool → work system',
-    spec: {
-      question: 'Did the workshop shift how participants frame AI — from a chat tool to something organized into repeatable work systems? For whom most/least?',
-      method: 'Compare the "before: AI was a chat tool" vs "after: AI as repeatable system" survey items. Segment the shift by baseline mental model and AI familiarity. Identify who shifted most and who barely moved.',
-      output_format: 'A short narrative + a table of mean before/after by segment, with 2–3 representative quotes from real-task / transfer answers.',
-      dimensions: [DIMS.demographics, DIMS.survey, DIMS.reflections],
-    },
-  },
-  {
-    name: 'Trust calibration & inspectability',
-    spec: {
-      question: 'Does seeing instructions, knowledge, and workflow steps (inspectability) raise trust — and is the trust calibrated or naive?',
-      method: 'Relate trust-when-inspectable and the Stage 7 (audit) confidence-shift to evaluation confidence and satisfaction. Read drops in confidence as possible healthy calibration (trust-in-automation) rather than failure.',
-      output_format: 'Findings list, each as claim → evidence (counts + quotes) → confidence, flagging where a confidence drop looks like good calibration.',
-      dimensions: [DIMS.survey, DIMS.reflections],
-    },
-  },
-  {
-    name: 'Delegation-boundary taxonomy',
-    spec: {
-      question: 'Where do participants draw the line on what they will not delegate to AI, and why?',
-      method: 'Cluster the free-text "what would you not want AI to do, and why" answers into a taxonomy of boundary types. Note which baseline mental models and roles map to which boundaries.',
-      output_format: 'A taxonomy: each theme with a count, a one-line definition, and 2–3 verbatim quotes.',
-      dimensions: [DIMS.demographics],
-    },
-  },
-  {
-    name: 'Engagement type → satisfaction',
-    spec: {
-      question: 'Do "builders" (heavy file/workflow usage) and "talkers" (heavy chat) differ in satisfaction and perceived capability?',
-      method: 'Classify each participant by their usage segment mix (chat vs file_generation vs workflow_run). Relate engagement type and total tokens to satisfaction, likely-to-use, and the perception shift. Watch for the trap that more tokens ≠ more value.',
-      output_format: 'Narrative + a 2x2 (engagement type × satisfaction) with counts, plus 2 contrasting participant vignettes.',
-      dimensions: [DIMS.usage, DIMS.survey, DIMS.reflections],
-    },
-  },
-  {
-    name: 'Adoption predictors',
-    spec: {
-      question: 'What predicts intention to adopt (likely-to-use) and advocacy (would-recommend)?',
-      method: 'Through TAM/UTAUT, relate adoption intent to perceived usefulness/relevance, ease/clarity, baseline familiarity, role, and engagement. Note contradictions (e.g. low ratings but would-recommend true).',
-      output_format: 'Ranked list of predictors with supporting evidence; call out any unreliable signals in the instrument.',
-      dimensions: [DIMS.demographics, DIMS.survey, DIMS.usage],
-    },
-  },
-  {
-    name: 'Mental model → outcomes',
-    spec: {
-      question: 'How does the AI mental model participants arrive with (search engine / assistant / coworker / expert) shape their experience and satisfaction?',
-      method: 'Group by baseline ai_mental_model. Compare delegation comfort, what they delegate to a coworker vs a chat (Stage 5), satisfaction, and disappointment signals. Apply mental-models theory: accurate framing → calibrated expectations.',
-      output_format: 'One paragraph per mental-model group with its outcome profile and a representative quote.',
-      dimensions: [DIMS.demographics, DIMS.reflections, DIMS.survey],
-    },
-  },
-  {
-    name: 'Where confidence dips (stage trajectory)',
-    spec: {
-      question: 'Across the stages, where does clarity/agreement dip — and does a mid-workshop dip predict a low final rating?',
-      method: 'Trace mean clarity and agreement across stages 3–8. Identify the stages with the largest drops. Test whether individuals who dipped at a stage rated lower at the end (early-warning signal).',
-      output_format: 'A stage-by-stage trajectory summary + the 2–3 stages that most predict low satisfaction, with evidence.',
-      dimensions: [DIMS.reflections, DIMS.survey],
-    },
-  },
-  {
-    name: 'Economic awareness & cost reasoning',
-    spec: {
-      question: 'After seeing token cost, how do participants reason about when an AI workflow is worth its cost?',
-      method: 'Combine the Stage 8 cost reflection and the "aware of cost tradeoffs" survey item with actual usage (their own token spend). Note whether heavier users reason differently about cost than lighter ones.',
-      output_format: 'Findings on cost-reasoning patterns, each with evidence and a quote; note any mismatch between stated cost-awareness and actual spend.',
-      dimensions: [DIMS.survey, DIMS.reflections, DIMS.usage],
-    },
-  },
+  skill('Perception shift: chat tool → work system', `
+# Perception shift: chat tool → work system
+
+**Question.** Did the workshop shift how participants frame AI — from a chat tool to something organized into repeatable work systems? For whom most, and least?
+
+**Method.** Compare each participant's "before: AI was a chat tool" vs "after: AI as a repeatable system" survey items. Segment the shift by baseline mental model and AI familiarity. Identify who shifted most and who barely moved.
+
+**Output.** A short narrative plus a table of mean before/after by segment, with 2–3 representative quotes from the real-task / transfer answers.
+`),
+  skill('Trust calibration & inspectability', `
+# Trust calibration & inspectability
+
+**Question.** Does seeing instructions, knowledge, and workflow steps (inspectability) raise trust — and is that trust calibrated or naive?
+
+**Method.** Relate trust-when-inspectable and the Stage 7 (audit) confidence shift to evaluation confidence and satisfaction. Read drops in confidence as possible *healthy calibration* (trust-in-automation), not necessarily failure.
+
+**Output.** A findings list: each as claim → evidence (counts + quotes) → confidence. Flag where a confidence drop looks like good calibration.
+`),
+  skill('Delegation-boundary taxonomy', `
+# Delegation-boundary taxonomy
+
+**Question.** Where do participants draw the line on what they will not delegate to AI, and why?
+
+**Method.** Cluster the free-text "what would you not want AI to do, and why" answers into a taxonomy of boundary types. Note which baseline mental models and roles map to which boundaries.
+
+**Output.** A taxonomy: each theme with a count, a one-line definition, and 2–3 verbatim quotes.
+`),
+  skill('Engagement type → satisfaction', `
+# Engagement type → satisfaction
+
+**Question.** Do "builders" (heavy file / workflow usage) and "talkers" (heavy chat) differ in satisfaction and perceived capability?
+
+**Method.** Classify each participant by their usage segment mix (chat vs file_generation vs workflow_run). Relate engagement type and total tokens to satisfaction, likely-to-use, and the perception shift. Watch for the trap that more tokens ≠ more value.
+
+**Output.** A narrative plus a 2×2 (engagement type × satisfaction) with counts, and 2 contrasting participant vignettes.
+`),
+  skill('Adoption predictors', `
+# Adoption predictors
+
+**Question.** What predicts intention to adopt (likely-to-use) and advocacy (would-recommend)?
+
+**Method.** Through TAM / UTAUT, relate adoption intent to perceived usefulness / relevance, ease / clarity, baseline familiarity, role, and engagement. Note contradictions (e.g. low ratings but would-recommend = yes).
+
+**Output.** A ranked list of predictors with supporting evidence; call out any unreliable signals in the instrument.
+`),
+  skill('Mental model → outcomes', `
+# Mental model → outcomes
+
+**Question.** How does the AI mental model participants arrive with (search engine / assistant / coworker / expert) shape their experience and satisfaction?
+
+**Method.** Group by baseline mental model. Compare delegation comfort, what they'd delegate to a coworker vs a chat (Stage 5), satisfaction, and disappointment signals. Apply mental-models theory: accurate framing → calibrated expectations.
+
+**Output.** One paragraph per mental-model group with its outcome profile and a representative quote.
+`),
+  skill('Where confidence dips (stage trajectory)', `
+# Where confidence dips (stage trajectory)
+
+**Question.** Across the stages, where does clarity / agreement dip — and does a mid-workshop dip predict a low final rating?
+
+**Method.** Trace mean clarity and agreement across stages 3–8. Identify the stages with the largest drops. Test whether individuals who dipped at a stage rated lower at the end (an early-warning signal).
+
+**Output.** A stage-by-stage trajectory summary plus the 2–3 stages that most predict low satisfaction, with evidence.
+`),
+  skill('Economic awareness & cost reasoning', `
+# Economic awareness & cost reasoning
+
+**Question.** After seeing token cost, how do participants reason about when an AI workflow is worth its cost?
+
+**Method.** Combine the Stage 8 cost reflection and the "aware of cost tradeoffs" survey item with actual usage (their own token spend). Note whether heavier users reason about cost differently from lighter ones.
+
+**Output.** Findings on cost-reasoning patterns, each with evidence and a quote; note any mismatch between stated cost-awareness and actual spend.
+`),
 ];

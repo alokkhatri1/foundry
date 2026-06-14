@@ -157,6 +157,11 @@
   position: sticky; top: 0; z-index: 2; background: var(--bg-warm); color: var(--text-dark);
   font-weight: 600; line-height: 1.35; white-space: normal;
 }
+.rf-agg {
+  margin-top: 6px; font-size: 11.5px; font-weight: 700; color: var(--accent-gold);
+  background: var(--bg-white); border: 1px solid var(--border-color);
+  border-radius: var(--radius-pill); padding: 2px 9px; display: inline-block; white-space: nowrap;
+}
 .rf-table td { color: var(--text-body); }
 /* sticky-left columns: participant (always), cohort (all-cohorts mode) */
 .rf-sticky { position: sticky; background: var(--bg-white); }

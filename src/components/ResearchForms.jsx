@@ -80,44 +80,78 @@ function fmt(v) {
   return lbl(v);
 }
 
+// Lifetime aggregate for a column across the displayed rows. `agg` is the
+// column's declared type; returns a short summary string (or null for text /
+// no data). Aggregates exactly the rows shown — so 'All cohorts' is all-time.
+function aggregate(agg, key, rows) {
+  const vals = rows.map(r => r.row?.[key]).filter(v => v != null && v !== '');
+  if (!vals.length) return null;
+  if (agg === 'mean') {
+    const nums = vals.filter(v => typeof v === 'number');
+    if (!nums.length) return null;
+    const m = nums.reduce((a, b) => a + b, 0) / nums.length;
+    return `avg ${m.toFixed(2)} · n=${nums.length}`;
+  }
+  if (agg === 'yesno') {
+    const bools = vals.filter(v => typeof v === 'boolean');
+    if (!bools.length) return null;
+    const yes = bools.filter(Boolean).length;
+    return `${Math.round((yes / bools.length) * 100)}% yes · n=${bools.length}`;
+  }
+  if (agg === 'cat' || agg === 'multi') {
+    const counts = new Map();
+    let denom = 0;
+    for (const v of vals) {
+      const items = agg === 'multi' ? (Array.isArray(v) ? v : [v]) : [v];
+      if (agg === 'multi' && !items.length) continue;
+      denom++;
+      for (const it of items) counts.set(it, (counts.get(it) || 0) + 1);
+    }
+    if (!counts.size) return null;
+    const [top, n] = [...counts.entries()].sort((a, b) => b[1] - a[1])[0];
+    return `${lbl(top)} · ${Math.round((n / denom) * 100)}%`;
+  }
+  return null;
+}
+
 // Full question text as column headers (verified against the form components).
 const DEMO_COLS = [
   { key: 'role', label: 'What is your role or job title?' },
-  { key: 'tenure_band', label: 'How long have you been in your current role?' },
-  { key: 'industry', label: 'Which industry are you in?' },
-  { key: 'work_type', label: 'Which best describes the type of work you do?' },
-  { key: 'ai_familiarity', label: 'How familiar are you with AI tools today? (1–5)' },
-  { key: 'ai_use_frequency', label: 'How often do you use AI tools right now?' },
-  { key: 'ai_tools', label: 'Which AI tools have you used?' },
-  { key: 'ai_use_cases', label: 'What do you usually use AI for?' },
-  { key: 'ai_mental_model', label: 'Which statement best describes how you currently think about AI?' },
-  { key: 'evaluation_confidence', label: 'I can usually tell when an AI answer is good enough to use. (1–5)' },
-  { key: 'delegation_comfort', label: 'I feel comfortable delegating a work task to AI if I can review the output. (1–5)' },
-  { key: 'adoption_criteria_top3', label: 'When deciding whether to use AI, what matters most? (top 3, ranked)' },
+  { key: 'tenure_band', label: 'How long have you been in your current role?', agg: 'cat' },
+  { key: 'industry', label: 'Which industry are you in?', agg: 'cat' },
+  { key: 'work_type', label: 'Which best describes the type of work you do?', agg: 'multi' },
+  { key: 'ai_familiarity', label: 'How familiar are you with AI tools today? (1–5)', agg: 'mean' },
+  { key: 'ai_use_frequency', label: 'How often do you use AI tools right now?', agg: 'cat' },
+  { key: 'ai_tools', label: 'Which AI tools have you used?', agg: 'multi' },
+  { key: 'ai_use_cases', label: 'What do you usually use AI for?', agg: 'multi' },
+  { key: 'ai_mental_model', label: 'Which statement best describes how you currently think about AI?', agg: 'cat' },
+  { key: 'evaluation_confidence', label: 'I can usually tell when an AI answer is good enough to use. (1–5)', agg: 'mean' },
+  { key: 'delegation_comfort', label: 'I feel comfortable delegating a work task to AI if I can review the output. (1–5)', agg: 'mean' },
+  { key: 'adoption_criteria_top3', label: 'When deciding whether to use AI, what matters most? (top 3, ranked)', agg: 'multi' },
   { key: 'delegation_boundary', label: 'What kind of work would you not want AI to do for you? Why?' },
 ];
 
 const SURVEY_COLS = [
-  { key: 'satisfaction', label: 'Overall, I was satisfied with the workshop. (1–5)' },
-  { key: 'relevance', label: 'The workshop content was relevant to my role or work. (1–5)' },
-  { key: 'clarity', label: 'The workshop was clearly organized. (1–5)' },
-  { key: 'theory_practice', label: 'The balance between explanation and hands-on practice was appropriate. (1–5)' },
-  { key: 'improved_skills', label: 'The workshop improved my ability to use AI at work. (1–5)' },
-  { key: 'identify_ai_tasks', label: 'I can identify tasks in my work that are suitable for AI. (1–5)' },
-  { key: 'identify_human_review', label: 'I can identify tasks that should still require human review. (1–5)' },
-  { key: 'likely_to_use', label: 'I am likely to use at least one Foundry concept in my real work. (1–5)' },
-  { key: 'concept_used_first', label: 'Which Foundry concept are you most likely to use first?' },
+  { key: 'satisfaction', label: 'Overall, I was satisfied with the workshop. (1–5)', agg: 'mean' },
+  { key: 'relevance', label: 'The workshop content was relevant to my role or work. (1–5)', agg: 'mean' },
+  { key: 'clarity', label: 'The workshop was clearly organized. (1–5)', agg: 'mean' },
+  { key: 'theory_practice', label: 'The balance between explanation and hands-on practice was appropriate. (1–5)', agg: 'mean' },
+  { key: 'improved_skills', label: 'The workshop improved my ability to use AI at work. (1–5)', agg: 'mean' },
+  { key: 'identify_ai_tasks', label: 'I can identify tasks in my work that are suitable for AI. (1–5)', agg: 'mean' },
+  { key: 'identify_human_review', label: 'I can identify tasks that should still require human review. (1–5)', agg: 'mean' },
+  { key: 'likely_to_use', label: 'I am likely to use at least one Foundry concept in my real work. (1–5)', agg: 'mean' },
+  { key: 'concept_used_first', label: 'Which Foundry concept are you most likely to use first?', agg: 'cat' },
   { key: 'real_task_text', label: 'What is one real task where you could imagine using Foundry?' },
   { key: 'foundry_improvement_text', label: 'What is one thing that would make Foundry easier to use?' },
-  { key: 'platform_rating', label: 'The Foundry platform was easy to navigate. (1–5)' },
-  { key: 'platform_reliability', label: 'The platform was reliable during the workshop. (1–5)' },
-  { key: 'platform_support', label: 'The platform helped me understand AI workflows better than a lecture alone. (1–5)' },
-  { key: 'ai_was_chat_tool', label: 'Before this workshop, I mostly thought of AI as a chat tool. (1–5)' },
-  { key: 'ai_repeatable_systems', label: 'After this workshop, I see AI as something organized into repeatable work systems. (1–5)' },
-  { key: 'aware_human_oversight', label: 'After this workshop, I feel more aware of where AI needs human oversight. (1–5)' },
-  { key: 'aware_cost_tradeoffs', label: 'After this workshop, I feel more aware that AI use involves cost/resource tradeoffs. (1–5)' },
-  { key: 'trust_when_inspectable', label: 'I would trust AI more when I can inspect its instructions, knowledge, and workflow steps. (1–5)' },
-  { key: 'would_recommend', label: 'Would you recommend this workshop to a colleague?' },
+  { key: 'platform_rating', label: 'The Foundry platform was easy to navigate. (1–5)', agg: 'mean' },
+  { key: 'platform_reliability', label: 'The platform was reliable during the workshop. (1–5)', agg: 'mean' },
+  { key: 'platform_support', label: 'The platform helped me understand AI workflows better than a lecture alone. (1–5)', agg: 'mean' },
+  { key: 'ai_was_chat_tool', label: 'Before this workshop, I mostly thought of AI as a chat tool. (1–5)', agg: 'mean' },
+  { key: 'ai_repeatable_systems', label: 'After this workshop, I see AI as something organized into repeatable work systems. (1–5)', agg: 'mean' },
+  { key: 'aware_human_oversight', label: 'After this workshop, I feel more aware of where AI needs human oversight. (1–5)', agg: 'mean' },
+  { key: 'aware_cost_tradeoffs', label: 'After this workshop, I feel more aware that AI use involves cost/resource tradeoffs. (1–5)', agg: 'mean' },
+  { key: 'trust_when_inspectable', label: 'I would trust AI more when I can inspect its instructions, knowledge, and workflow steps. (1–5)', agg: 'mean' },
+  { key: 'would_recommend', label: 'Would you recommend this workshop to a colleague?', agg: 'yesno' },
   { key: 'most_valuable', label: 'What was most valuable? (legacy)' },
 ];
 
@@ -185,7 +219,15 @@ function Table({ cols, rows, showCohort }) {
           <tr>
             <th className="rf-sticky rf-sticky-1">Participant</th>
             {showCohort && <th className="rf-sticky rf-sticky-2">Cohort</th>}
-            {cols.map(c => <th key={c.key}>{c.label}</th>)}
+            {cols.map(c => {
+              const a = c.agg ? aggregate(c.agg, c.key, rows) : null;
+              return (
+                <th key={c.key}>
+                  {c.label}
+                  {a && <div className="rf-agg">{a}</div>}
+                </th>
+              );
+            })}
           </tr>
         </thead>
         <tbody>
@@ -262,7 +304,21 @@ export default function ResearchForms({ data }) {
                 <tr>
                   <th className="rf-sticky rf-sticky-1">Participant</th>
                   {showCohort && <th className="rf-sticky rf-sticky-2">Cohort</th>}
-                  {STAGES.map(s => <th key={s}>Stage {s} · {STAGE_NAME[s]}</th>)}
+                  {STAGES.map(s => {
+                    const cells = reflRows.map(r => r.refl[s]).filter(Boolean);
+                    const mean = (f) => {
+                      const ns = cells.map(c => c[f]).filter(v => typeof v === 'number');
+                      return ns.length ? (ns.reduce((a, b) => a + b, 0) / ns.length).toFixed(1) : '—';
+                    };
+                    return (
+                      <th key={s}>
+                        Stage {s} · {STAGE_NAME[s]}
+                        {cells.length > 0 && (
+                          <div className="rf-agg">avg clarity {mean('confidence')} · agree {mean('agreement')} · n={cells.length}</div>
+                        )}
+                      </th>
+                    );
+                  })}
                 </tr>
               </thead>
               <tbody>

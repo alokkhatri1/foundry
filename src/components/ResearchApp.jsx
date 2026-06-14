@@ -3,6 +3,8 @@ import { supabase } from '../supabase';
 import useSupabase from '../hooks/useSupabase';
 import { handleAuthCallback } from '../utils/authCallback';
 import { buildResearchMarkdown, consentBreakdown, completeRecordPids } from '../utils/researchBundle';
+import { buildProfileText, buildRunPrompt } from '../utils/researchProfiles';
+import { SEED_THEORIES, SEED_SKILLS } from '../data/researchSeed';
 import { callClaudeProxy } from '../utils/claudeFetch';
 import { computeCost, formatUsd } from '../utils/llmCost';
 import ResearchForms from './ResearchForms';
@@ -134,13 +136,42 @@ function Chat({ sb, bundle, library }) {
 
 const KIND_LABEL = { skill: 'Skill', theory: 'Theory' };
 
-// Modal editor for a single skill/theory.
+const DIMENSIONS = [
+  { v: 'demographics', label: 'Demographics' },
+  { v: 'reflections', label: 'Reflections' },
+  { v: 'survey', label: 'End survey' },
+  { v: 'usage', label: 'Usage / behavior' },
+];
+
+// Modal editor. Theories are free-text (a lens). Skills are a structured
+// template: question / method / output format / which data dimensions to use.
 function ItemEditor({ initial, onSave, onCancel }) {
+  const kind = initial.kind;
   const [name, setName] = useState(initial?.name || '');
   const [yearTag, setYearTag] = useState(initial?.year_tag || '');
   const [body, setBody] = useState(initial?.body || '');
+  const sp = initial?.spec || {};
+  const [question, setQuestion] = useState(sp.question || '');
+  const [method, setMethod] = useState(sp.method || '');
+  const [outputFormat, setOutputFormat] = useState(sp.output_format || '');
+  const [dims, setDims] = useState(sp.dimensions || ['demographics', 'survey', 'reflections', 'usage']);
   const [busy, setBusy] = useState(false);
-  const kind = initial.kind;
+
+  const toggleDim = (v) => setDims(d => d.includes(v) ? d.filter(x => x !== v) : [...d, v]);
+
+  async function save() {
+    setBusy(true);
+    const payload = { id: initial.id, name: name.trim(), kind, yearTag: yearTag.trim() };
+    if (kind === 'skill') {
+      payload.spec = { question, method, output_format: outputFormat, dimensions: dims };
+      payload.body = '';
+    } else {
+      payload.body = body;
+    }
+    await onSave(payload);
+    setBusy(false);
+  }
+
   return (
     <div className="rb-overlay" onClick={onCancel}>
       <div className="rb-modal" onClick={e => e.stopPropagation()}>
@@ -150,38 +181,73 @@ function ItemEditor({ initial, onSave, onCancel }) {
         </div>
         <div className="rb-field">
           <label>Name</label>
-          <input value={name} onChange={e => setName(e.target.value)} placeholder={kind === 'skill' ? 'e.g. Satisfaction driver analysis' : 'e.g. Algorithm aversion'} />
+          <input value={name} onChange={e => setName(e.target.value)}
+            placeholder={kind === 'skill' ? 'e.g. Perception shift analysis' : 'e.g. Algorithm aversion'} />
         </div>
         <div className="rb-field">
           <label>Year / version (optional)</label>
           <input value={yearTag} onChange={e => setYearTag(e.target.value)} placeholder="2026" />
         </div>
-        <div className="rb-field">
-          <label>{kind === 'skill' ? 'Analysis recipe' : 'Theory / framework'}</label>
-          <textarea rows={12} value={body} onChange={e => setBody(e.target.value)}
-            placeholder={kind === 'skill'
-              ? 'Describe how the bench should analyze. e.g. "Cluster the delegation-boundary free-text into a taxonomy; report counts and representative quotes."'
-              : 'Summarize the framework and how to apply it as a lens.'} />
-        </div>
-        <button className="rb-btn" disabled={busy || !name.trim()} onClick={async () => {
-          setBusy(true);
-          await onSave({ id: initial.id, name: name.trim(), body, kind, yearTag: yearTag.trim() });
-          setBusy(false);
-        }}>Save</button>
+
+        {kind === 'theory' ? (
+          <div className="rb-field">
+            <label>Theory / framework (the lens)</label>
+            <textarea rows={10} value={body} onChange={e => setBody(e.target.value)}
+              placeholder="Summarize the framework, cite it, and say when to apply it as a lens." />
+          </div>
+        ) : (
+          <>
+            <div className="rb-field">
+              <label>Question — what are we asking?</label>
+              <textarea rows={2} value={question} onChange={e => setQuestion(e.target.value)}
+                placeholder="e.g. Did the workshop shift how participants frame AI, and for whom?" />
+            </div>
+            <div className="rb-field">
+              <label>Method — how should it analyze?</label>
+              <textarea rows={4} value={method} onChange={e => setMethod(e.target.value)}
+                placeholder="e.g. Compare before/after items; segment by baseline mental model; surface quotes." />
+            </div>
+            <div className="rb-field">
+              <label>Output format</label>
+              <textarea rows={2} value={outputFormat} onChange={e => setOutputFormat(e.target.value)}
+                placeholder="e.g. A short narrative + a table by segment with representative quotes." />
+            </div>
+            <div className="rb-field">
+              <label>Data dimensions to use</label>
+              <div className="rb-dims">
+                {DIMENSIONS.map(d => (
+                  <button key={d.v} type="button"
+                    className={`rb-dim${dims.includes(d.v) ? ' is-on' : ''}`}
+                    onClick={() => toggleDim(d.v)}>{d.label}</button>
+                ))}
+              </div>
+            </div>
+          </>
+        )}
+        <button className="rb-btn" disabled={busy || !name.trim()} onClick={save}>Save</button>
       </div>
     </div>
   );
 }
 
 // Sidebar library of skills + theories. `items` is the full library; edits go
-// through sb then call onReload so the parent's copy (used by chat) refreshes.
-function LibraryPanel({ sb, items, onReload }) {
+// through sb then call onReload. onRun(skill) opens the Run flow.
+function LibraryPanel({ sb, items, onReload, onRun }) {
   const [editing, setEditing] = useState(null); // {kind, id?, ...} or null
+  const [seeding, setSeeding] = useState(false);
   const byKind = (k) => items.filter(i => i.kind === k);
 
   async function save(item) {
     await sb.saveResearchItem(item);
     setEditing(null);
+    onReload();
+  }
+
+  async function seed() {
+    setSeeding(true);
+    for (const t of SEED_THEORIES) await sb.saveResearchItem({ name: t.name, kind: 'theory', body: t.body });
+    for (const s of SEED_SKILLS) await sb.saveResearchItem({ name: s.name, kind: 'skill', spec: s.spec });
+    setSeeding(false);
     onReload();
   }
 
@@ -194,7 +260,10 @@ function LibraryPanel({ sb, items, onReload }) {
       {byKind(kind).length === 0 && <div className="rb-muted rb-lib-empty">None yet</div>}
       {byKind(kind).map(it => (
         <div key={it.id} className="rb-lib-item">
-          <button className="rb-lib-name" title={it.body} onClick={() => setEditing(it)}>
+          {kind === 'skill' && (
+            <button className="rb-lib-run" title="Run this skill" onClick={() => onRun(it)}>▶</button>
+          )}
+          <button className="rb-lib-name" title={it.kind === 'theory' ? it.body : (it.spec?.question || '')} onClick={() => setEditing(it)}>
             {it.name}{it.year_tag ? ` · ${it.year_tag}` : ''}
           </button>
           <button className="rb-lib-del" title="Delete"
@@ -207,27 +276,154 @@ function LibraryPanel({ sb, items, onReload }) {
   return (
     <div className="rb-field">
       <label>Library</label>
+      {items.length === 0 && (
+        <button className="rb-btn rb-seed" disabled={seeding} onClick={seed}>
+          {seeding ? 'Seeding…' : 'Seed starter library'}
+        </button>
+      )}
       {section('skill', 'Research skills')}
       {section('theory', 'Research theories')}
-      {editing && (
-        <ItemEditor initial={editing} onSave={save} onCancel={() => setEditing(null)} />
-      )}
+      {editing && <ItemEditor initial={editing} onSave={save} onCancel={() => setEditing(null)} />}
+    </div>
+  );
+}
+
+// Run a skill: choose scope + which theory lenses, see the estimate, execute,
+// and save the result as a Finding.
+function RunModal({ sb, skill, theories, cohorts, currentCohort, onClose, onSaved }) {
+  const [scope, setScope] = useState(currentCohort?.id || 'all');
+  const [picked, setPicked] = useState(() => new Set(theories.map(t => t.id)));
+  const [phase, setPhase] = useState('config'); // config | running | done | error
+  const [result, setResult] = useState(null);    // { body, cost, n }
+  const [error, setError] = useState(null);
+
+  const toggle = (id) => setPicked(s => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n; });
+  const scopeLabel = scope === 'all' ? 'All cohorts' : (cohorts.find(c => c.id === scope)?.org_name || 'cohort');
+
+  async function run() {
+    setPhase('running'); setError(null);
+    try {
+      const data = scope === 'all' ? await sb.loadAllFormResponses() : await sb.loadAdminResearchData(scope);
+      const usageByPid = await sb.loadUsageByParticipant();
+      const dims = skill.spec?.dimensions || [];
+      const { text, n } = buildProfileText(data, dims, usageByPid);
+      if (!n) { setError('No complete records in this scope.'); setPhase('error'); return; }
+      const lenses = theories.filter(t => picked.has(t.id));
+      const { system, user } = buildRunPrompt({ skill, theories: lenses, profileText: text, n, scopeLabel });
+      const res = await callClaudeProxy(supabase, {
+        model: BENCH_MODEL, max_tokens: BENCH_MAX_TOKENS,
+        system: [{ type: 'text', text: system }],
+        messages: [{ role: 'user', content: user }],
+      }, { timeoutMs: 600000 });
+      const d = await res.json();
+      if (!res.ok || d.error) throw new Error(d.error?.message || d.error || `Request failed (${res.status})`);
+      const body = (d.content || []).filter(b => b.type === 'text').map(b => b.text).join('\n') || '(empty)';
+      const cost = d.usage ? computeCost(d.usage, d.model || BENCH_MODEL) : 0;
+      if (d.usage) sb.logResearchUsage({ segment: 'research_run', model: d.model || BENCH_MODEL, usage: d.usage, costUsd: cost });
+      const title = `${skill.name} — ${scopeLabel}`;
+      await sb.saveResearchFinding({ title, skillId: skill.id, skillName: skill.name, scope, scopeLabel, body, model: d.model || BENCH_MODEL, costUsd: cost });
+      setResult({ body, cost, n });
+      setPhase('done');
+      onSaved();
+    } catch (err) {
+      setError(err?.message || 'Run failed'); setPhase('error');
+    }
+  }
+
+  return (
+    <div className="rb-overlay" onClick={phase === 'running' ? undefined : onClose}>
+      <div className="rb-modal rb-modal-wide" onClick={e => e.stopPropagation()}>
+        <div className="rb-modal-head">
+          <strong>Run · {skill.name}</strong>
+          <button className="rb-btn rb-btn-ghost" disabled={phase === 'running'} onClick={onClose}>Close</button>
+        </div>
+
+        {(phase === 'config' || phase === 'running' || phase === 'error') && (
+          <>
+            <div className="rb-field">
+              <label>Scope</label>
+              <select value={scope} onChange={e => setScope(e.target.value)} disabled={phase === 'running'}>
+                <option value="all">All cohorts (lifetime)</option>
+                {cohorts.map(c => <option key={c.id} value={c.id}>{c.org_name} · {c.code}</option>)}
+              </select>
+            </div>
+            <div className="rb-field">
+              <label>Theory lenses to apply</label>
+              <div className="rb-dims">
+                {theories.length === 0 && <span className="rb-muted">No theories in the library yet.</span>}
+                {theories.map(t => (
+                  <button key={t.id} type="button" className={`rb-dim${picked.has(t.id) ? ' is-on' : ''}`}
+                    disabled={phase === 'running'} onClick={() => toggle(t.id)}>{t.name}</button>
+                ))}
+              </div>
+            </div>
+            <div className="rb-muted rb-run-note">
+              Uses dimensions: {(skill.spec?.dimensions || []).join(', ') || 'all'} · runs Opus over complete records only.
+            </div>
+            {error && <div className="rb-error">{error}</div>}
+            <button className="rb-btn" disabled={phase === 'running'} onClick={run}>
+              {phase === 'running' ? 'Running… (this can take a minute)' : 'Run'}
+            </button>
+          </>
+        )}
+
+        {phase === 'done' && result && (
+          <>
+            <div className="rb-muted rb-run-note">Saved to Findings · {result.n} records · {formatUsd(result.cost)}</div>
+            <div className="rb-finding-body">{result.body}</div>
+            <button className="rb-btn" onClick={onClose}>Done</button>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// The accumulating insight repo — every skill Run is saved here.
+function FindingsView({ sb, findings, onReload }) {
+  const [open, setOpen] = useState(null);
+  if (!findings.length) {
+    return <p className="rb-muted">No findings yet. Run a skill from the Library to produce one.</p>;
+  }
+  return (
+    <div className="rb-findings">
+      {findings.map(f => (
+        <div key={f.id} className={`rb-finding${open === f.id ? ' is-open' : ''}`}>
+          <div className="rb-finding-head" onClick={() => setOpen(open === f.id ? null : f.id)}>
+            <div>
+              <div className="rb-finding-title">{f.title}</div>
+              <div className="rb-muted rb-finding-meta">
+                {f.scope_label} · {f.created_at ? new Date(f.created_at).toLocaleDateString() : ''}
+                {f.cost_usd != null ? ` · ${formatUsd(Number(f.cost_usd))}` : ''}
+              </div>
+            </div>
+            <button className="rb-lib-del" title="Delete"
+              onClick={async (e) => { e.stopPropagation(); await sb.deleteResearchFinding(f.id); onReload(); }}>×</button>
+          </div>
+          {open === f.id && <div className="rb-finding-body">{f.body}</div>}
+        </div>
+      ))}
     </div>
   );
 }
 
 // The authorized bench: pick a cohort, load its consent-filtered bundle into
-// context, manage the skills/theories library (Phase 4), and chat (Phase 5).
+// context, manage the skills/theories library, run skills, and chat.
 function Bench({ sb }) {
   const [cohorts, setCohorts] = useState([]);
   const [cohortId, setCohortId] = useState('');
   const [bundle, setBundle] = useState(null);   // { text, consented, total, tokens, cohort, data }
   const [loadingBundle, setLoadingBundle] = useState(false);
   const [library, setLibrary] = useState([]);
-  const [view, setView] = useState('data');     // 'data' | 'chat'
+  const [findings, setFindings] = useState([]);
+  const [runSkill, setRunSkill] = useState(null); // skill being run, or null
+  const [view, setView] = useState('data');       // 'data' | 'chat' | 'findings'
 
   const reloadLibrary = useCallback(() => { sb.loadResearchLibrary().then(setLibrary); }, [sb]);
-  useEffect(() => { sb.loadAllCohorts().then(setCohorts); reloadLibrary(); }, [sb, reloadLibrary]);
+  const reloadFindings = useCallback(() => { sb.loadResearchFindings().then(setFindings); }, [sb]);
+  useEffect(() => { sb.loadAllCohorts().then(setCohorts); reloadLibrary(); reloadFindings(); }, [sb, reloadLibrary, reloadFindings]);
+
+  const theories = library.filter(i => i.kind === 'theory');
 
   const loadCohort = useCallback(async (id) => {
     setCohortId(id);
@@ -288,28 +484,36 @@ function Bench({ sb }) {
           </div>
         )}
 
-        <LibraryPanel sb={sb} items={library} onReload={reloadLibrary} />
+        <LibraryPanel sb={sb} items={library} onReload={reloadLibrary} onRun={setRunSkill} />
       </aside>
 
       <main className="rb-main">
-        {!bundle && <p className="rb-muted">Pick a cohort to see its form responses and chat with the data.</p>}
-        {bundle && bundle.complete === 0 && (
-          <p className="rb-muted">No complete records in this cohort — partial responders are hidden.</p>
-        )}
-        {bundle && bundle.complete > 0 && (
-          <>
-            <div className="rb-viewtabs">
-              <button className={view === 'data' ? 'is-active' : ''} onClick={() => setView('data')}>Data</button>
-              {!bundle.allCohorts && (
-                <button className={view === 'chat' ? 'is-active' : ''} onClick={() => setView('chat')}>Chat</button>
-              )}
-            </div>
-            {view === 'data' || bundle.allCohorts
-              ? <ResearchForms data={bundle.data} />
-              : <Chat sb={sb} bundle={bundle} library={library} />}
-          </>
-        )}
+        <div className="rb-viewtabs">
+          <button className={view === 'data' ? 'is-active' : ''} onClick={() => setView('data')}>Data</button>
+          {bundle && !bundle.allCohorts && (
+            <button className={view === 'chat' ? 'is-active' : ''} onClick={() => setView('chat')}>Chat</button>
+          )}
+          <button className={view === 'findings' ? 'is-active' : ''} onClick={() => setView('findings')}>
+            Findings{findings.length ? ` (${findings.length})` : ''}
+          </button>
+        </div>
+
+        {view === 'findings'
+          ? <FindingsView sb={sb} findings={findings} onReload={reloadFindings} />
+          : !bundle
+            ? <p className="rb-muted">Pick a cohort to see its form responses and chat — or open Findings.</p>
+            : bundle.complete === 0
+              ? <p className="rb-muted">No complete records in this cohort — partial responders are hidden.</p>
+              : (view === 'chat' && !bundle.allCohorts)
+                ? <Chat sb={sb} bundle={bundle} library={library} />
+                : <ResearchForms data={bundle.data} />}
       </main>
+
+      {runSkill && (
+        <RunModal sb={sb} skill={runSkill} theories={theories} cohorts={cohorts}
+          currentCohort={bundle && !bundle.allCohorts ? bundle.cohort : null}
+          onClose={() => setRunSkill(null)} onSaved={reloadFindings} />
+      )}
     </div>
   );
 }

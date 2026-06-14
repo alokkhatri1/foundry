@@ -182,12 +182,12 @@ export default function useSupabase() {
     return data || [];
   }, []);
 
-  const saveResearchItem = useCallback(async ({ id, name, body, kind, yearTag }) => {
+  const saveResearchItem = useCallback(async ({ id, name, body, kind, yearTag, spec }) => {
     if (!isSupabaseConfigured) return { error: { message: 'Supabase not configured' } };
     const { data: { user } } = await supabase.auth.getUser();
     const row = {
       name, body: body || '', kind, year_tag: yearTag || null,
-      updated_at: new Date().toISOString(),
+      spec: spec || {}, updated_at: new Date().toISOString(),
     };
     if (id) row.id = id; else row.created_by = user?.id || null;
     const { data, error } = await supabase.from('research_library')
@@ -200,6 +200,45 @@ export default function useSupabase() {
     if (!isSupabaseConfigured || !id) return;
     const { error } = await supabase.from('research_library').delete().eq('id', id);
     if (error) console.error('[sb] deleteResearchItem:', error.message);
+  }, []);
+
+  // Corpus-wide per-participant usage (tokens, cost, segment map) via the
+  // server-side aggregation RPC — see migration 048.
+  const loadUsageByParticipant = useCallback(async () => {
+    if (!isSupabaseConfigured) return {};
+    const { data, error } = await supabase.rpc('usage_by_participant');
+    if (error) { console.error('[sb] usage_by_participant:', error.message); return {}; }
+    const byPid = {};
+    for (const r of data || []) byPid[r.participant_id] = r;
+    return byPid;
+  }, []);
+
+  // ===== Research Bench: saved Findings (the insight repo) =====
+  const loadResearchFindings = useCallback(async () => {
+    if (!isSupabaseConfigured) return [];
+    const { data, error } = await supabase.from('research_findings')
+      .select('id, title, skill_name, scope, scope_label, body, model, cost_usd, created_at')
+      .order('created_at', { ascending: false });
+    if (error) { console.error('[sb] loadResearchFindings:', error.message); return []; }
+    return data || [];
+  }, []);
+
+  const saveResearchFinding = useCallback(async (f) => {
+    if (!isSupabaseConfigured) return { error: { message: 'not configured' } };
+    const { data: { user } } = await supabase.auth.getUser();
+    const { data, error } = await supabase.from('research_findings').insert({
+      title: f.title, skill_id: f.skillId || null, skill_name: f.skillName || null,
+      scope: f.scope || 'all', scope_label: f.scopeLabel || null, body: f.body || '',
+      model: f.model || null, cost_usd: f.costUsd ?? null, created_by: user?.id || null,
+    }).select('id').single();
+    if (error) console.error('[sb] saveResearchFinding:', error.message);
+    return { data, error };
+  }, []);
+
+  const deleteResearchFinding = useCallback(async (id) => {
+    if (!isSupabaseConfigured || !id) return;
+    const { error } = await supabase.from('research_findings').delete().eq('id', id);
+    if (error) console.error('[sb] deleteResearchFinding:', error.message);
   }, []);
 
   const onAuthStateChange = useCallback((callback) => {
@@ -2162,8 +2201,9 @@ export default function useSupabase() {
     signOut, checkIsAdmin, onAuthStateChange,
     // Research Bench access
     checkResearchAccess, loadResearchAccess, addResearchAccess, removeResearchAccess,
-    // Research Bench library
+    // Research Bench library + findings
     loadResearchLibrary, saveResearchItem, deleteResearchItem, logResearchUsage,
+    loadUsageByParticipant, loadResearchFindings, saveResearchFinding, deleteResearchFinding,
     // Admin
     createWorkshop, loadAdminWorkshops, loadAllCohorts, loadAllFormResponses, loadCorpusConsent, loadWorkshopParticipants,
     deleteWorkshop, deprecateWorkshop, pauseRoom, resumeRoom, revealStage, unrevealStage, revealAllStages, loadWorkshopStats, loadWorkshopContent, loadWorkshopActivity,

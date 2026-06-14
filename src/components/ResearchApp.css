@@ -127,6 +127,38 @@
 }
 .rb-modal-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
 .rb-modal textarea { resize: vertical; line-height: 1.5; }
+.rb-modal-wide { max-width: 760px; }
+
+/* dimension / theory toggle chips */
+.rb-dims { display: flex; flex-wrap: wrap; gap: 6px; }
+.rb-dim {
+  background: var(--bg-white); border: 1px solid var(--border-color); color: var(--text-body);
+  border-radius: var(--radius-pill); padding: 5px 12px; font-size: 12px; font-weight: 600; cursor: pointer;
+}
+.rb-dim.is-on { background: var(--accent-agent); border-color: var(--accent-agent); color: #fff; }
+.rb-dim:disabled { opacity: 0.5; cursor: default; }
+
+.rb-seed { width: 100%; margin-bottom: 14px; }
+.rb-run-note { font-size: 12px; margin: 10px 0; }
+
+/* run button in the library list */
+.rb-lib-run {
+  background: transparent; border: none; color: var(--accent-system);
+  font-size: 11px; cursor: pointer; padding: 0 2px;
+}
+.rb-lib-run:hover { color: var(--text-dark); }
+
+/* findings */
+.rb-findings { display: flex; flex-direction: column; gap: 10px; overflow-y: auto; }
+.rb-finding { border: 1px solid var(--border-color); border-radius: var(--radius); background: var(--bg-white); }
+.rb-finding-head { display: flex; align-items: flex-start; justify-content: space-between; padding: 12px 14px; cursor: pointer; }
+.rb-finding-title { font-weight: 600; color: var(--text-dark); }
+.rb-finding-meta { font-size: 12px; margin-top: 2px; }
+.rb-finding-body {
+  white-space: pre-wrap; line-height: 1.6; font-size: 14px; color: var(--text-dark);
+  padding: 0 14px 14px; max-height: 60vh; overflow-y: auto;
+}
+.rb-modal-wide .rb-finding-body { padding: 14px 0 0; border-top: 1px solid var(--border-color); margin-top: 12px; }
 
 /* View toggle (Data | Chat) */
 .rb-viewtabs { display: flex; gap: 6px; margin-bottom: 16px; flex-shrink: 0; }

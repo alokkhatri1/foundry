@@ -12,11 +12,18 @@ create table if not exists research_library (
   name       text not null,
   body       text not null default '',
   kind       text not null check (kind in ('skill', 'theory')),
+  -- Structured skills use `spec` (a template: question / method / output_format
+  -- / dimensions). Theories are free-text in `body`. Skills may also keep a
+  -- prose note in `body`. spec is {} for theories.
+  spec       jsonb not null default '{}'::jsonb,
   year_tag   text,
   created_by uuid references auth.users(id),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+
+-- For existing rows if the table predates spec.
+alter table research_library add column if not exists spec jsonb not null default '{}'::jsonb;
 
 create index if not exists research_library_kind_idx on research_library(kind);
 

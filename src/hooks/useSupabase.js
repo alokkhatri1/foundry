@@ -599,7 +599,7 @@ export default function useSupabase() {
     if (!isSupabaseConfigured) return null;
     const [
       participants, coworkers, workflows, runs, approvals, files,
-      messages, dms, reflections, consent, usage, demographics, feedback,
+      messages, dms, reflections, consent, usage, demographics, feedback, stageEvents,
     ] = await Promise.all([
       supabase.from('participants')
         .select('id, name, email, auth_user_id, kind, joined_at')
@@ -647,6 +647,10 @@ export default function useSupabase() {
       supabase.from('workshop_feedback')
         .select('participant_id, satisfaction, relevance, clarity, theory_practice, improved_skills, can_apply, would_recommend, platform_rating, platform_reliability, platform_support, ai_was_chat_tool, ai_repeatable_systems, aware_human_oversight, aware_cost_tradeoffs, trust_when_inspectable, identify_ai_tasks, identify_human_review, likely_to_use, concept_used_first, foundry_improvement_text, real_task_text, most_valuable, future_topics, improvement_notes')
         .eq('workshop_id', roomId),
+      supabase.from('stage_events')
+        .select('from_stage, to_stage, created_at')
+        .eq('room_id', roomId)
+        .order('created_at', { ascending: true }),
     ]);
 
     // Preferences live keyed by auth_user_id; fold them into a per-participant
@@ -691,6 +695,7 @@ export default function useSupabase() {
       consentByPid,
       demographicsByPid,
       feedbackByPid,
+      stageEvents: stageEvents.data || [],
     };
   }, []);
 

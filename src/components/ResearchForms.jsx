@@ -1,6 +1,9 @@
 import { useState } from 'react';
 import { REFLECTION_PROMPTS } from '../data/reflectionPrompts';
 import { consentBreakdown, completeRecordPids } from '../utils/researchBundle';
+import { buildStageWindows, stageActivity, STAGE_LABELS } from '../utils/researchUsage';
+
+const fmtTok = (n) => !n ? '—' : n < 1000 ? String(n) : `${(n / 1000).toFixed(n < 10000 ? 1 : 0)}k`;
 
 // Scale legends (mirror StageReflection.jsx) so a rating shows its word too.
 const CLARITY_LEGEND = { 1: 'Not clear at all', 2: 'Slightly clear', 3: 'Moderately clear', 4: 'Very clear', 5: 'Extremely clear' };
@@ -244,6 +247,54 @@ function Table({ cols, rows, showCohort }) {
   );
 }
 
+// Behavioral arc: per participant, activity (tokens · calls) in each stage
+// window, so you see how engagement shifts as levels are revealed. Header pill
+// per stage = cohort total + how many were active. Per-cohort only (stage
+// reveal times are cohort-specific).
+function UsageTable({ data, consented, showCohort }) {
+  if (!data.stageEvents || !data.llmUsage) {
+    return <div className="rf-empty">Select a single cohort to see the stage-by-stage behavioral arc (it’s anchored to that cohort’s reveal timeline).</div>;
+  }
+  const pidSet = new Set(consented.map(p => p.id));
+  const wins = buildStageWindows(data.stageEvents);
+  const { byPid, byStage } = stageActivity(data.llmUsage, wins, pidSet);
+  // stages to show: those with any activity, in order.
+  const stages = Object.keys(byStage).filter(s => byStage[s].calls > 0)
+    .sort((a, b) => Number(a) - Number(b));
+  if (!stages.length) return <div className="rf-empty">No usage recorded for this cohort.</div>;
+
+  return (
+    <div className="rf-scroll">
+      <table className="rf-table">
+        <thead>
+          <tr>
+            <th className="rf-sticky rf-sticky-1">Participant</th>
+            {showCohort && <th className="rf-sticky rf-sticky-2">Cohort</th>}
+            {stages.map(s => (
+              <th key={s}>
+                Stage {s} · {STAGE_LABELS[s] || ''}
+                <div className="rf-agg">{fmtTok(byStage[s].tokens)} tok · {byStage[s].ppl.size} active</div>
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {consented.map((p, i) => (
+            <tr key={i}>
+              <td className="rf-sticky rf-sticky-1 rf-name">{p.name}</td>
+              {showCohort && <td className="rf-sticky rf-sticky-2 rf-cohort">{data.roomNameByPid?.[p.id]}</td>}
+              {stages.map(s => {
+                const a = byPid[p.id]?.[s];
+                return <td key={s}>{a ? <span className="rf-use">{fmtTok(a.tokens)}<span className="rf-use-calls"> · {a.calls} calls</span></span> : <span className="rf-muted">—</span>}</td>;
+              })}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 export default function ResearchForms({ data }) {
   const [form, setForm] = useState('demographics');
   if (!data) return <div className="rf-empty">Pick a cohort to see its form responses.</div>;
@@ -281,6 +332,7 @@ export default function ResearchForms({ data }) {
         <button className={form === 'demographics' ? 'is-active' : ''} onClick={() => setForm('demographics')}>Demographics</button>
         <button className={form === 'reflections' ? 'is-active' : ''} onClick={() => setForm('reflections')}>Reflections</button>
         <button className={form === 'survey' ? 'is-active' : ''} onClick={() => setForm('survey')}>End survey</button>
+        <button className={form === 'usage' ? 'is-active' : ''} onClick={() => setForm('usage')}>Usage arc</button>
         <span className="rf-count">
           {consented.length} complete records (of {bd.included} included){showCohort ? ' · all cohorts' : ''}
         </span>
@@ -334,6 +386,8 @@ export default function ResearchForms({ data }) {
           </div>
         ) : <div className="rf-empty">No stage reflections here.</div>
       )}
+
+      {form === 'usage' && <UsageTable data={data} consented={consented} showCohort={showCohort} />}
     </div>
   );
 }

@@ -3,6 +3,7 @@
 // so profiles are numbered (Participant N), never named. Only the data
 // dimensions a skill declares are included, to keep the prompt tight.
 import { completeRecordPids } from './researchBundle';
+import { engagementSummary, buildStageWindows, stageActivity } from './researchUsage';
 
 const STAGES = ['3', '4', '5', '6', '7', '8'];
 
@@ -43,10 +44,12 @@ function reflLine(byStage) {
   return parts.length ? 'Reflections: ' + parts.join(' ') : 'Reflections: (none)';
 }
 
-function usageLine(u) {
+function usageLine(u, stageVec) {
   if (!u) return 'Behavior: (no usage recorded)';
+  const s = engagementSummary(u);
   const segs = u.by_segment ? Object.entries(u.by_segment).map(([k, v]) => `${k}=${v}`).join(', ') : '';
-  return `Behavior: total_tokens=${u.total_tokens ?? 0}; cost_usd=${Number(u.total_cost || 0).toFixed(3)}; calls=${u.n_calls ?? 0}; segments={${segs}}`;
+  const arc = stageVec ? ` stage_activity(calls)={${stageVec}};` : '';
+  return `Behavior: ${s.style} · ${s.breadth} capabilities · total_tokens=${u.total_tokens ?? 0}; cost_usd=${Number(u.total_cost || 0).toFixed(3)}; calls=${u.n_calls ?? 0};${arc} segments={${segs}}`;
 }
 
 // Build the profile text for complete records, including only `dims`.
@@ -60,6 +63,18 @@ export function buildProfileText(data, dims, usageByPid = {}) {
   const reflByPid = {};
   for (const r of data.stageReflections || []) (reflByPid[r.participant_id] ||= {})[String(r.stage)] = r;
 
+  // Per-cohort runs carry the precise stage arc (reveal times + usage rows).
+  let stageByPid = null;
+  if (data.stageEvents && data.llmUsage) {
+    const wins = buildStageWindows(data.stageEvents);
+    stageByPid = stageActivity(data.llmUsage, wins).byPid;
+  }
+  const stageVec = (pid) => {
+    const a = stageByPid?.[pid];
+    if (!a) return null;
+    return Object.keys(a).sort((x, y) => Number(x) - Number(y)).map(s => `S${s}=${a[s].calls}`).join(' ');
+  };
+
   const blocks = humans.map((p, i) => {
     const cohort = data.roomNameByPid?.[p.id];
     const head = `## Participant ${i + 1}${cohort ? ` — cohort: ${cohort}` : ''}`;
@@ -67,7 +82,7 @@ export function buildProfileText(data, dims, usageByPid = {}) {
     if (want.has('demographics')) lines.push(demoLine(data.demographicsByPid?.[p.id]));
     if (want.has('survey')) lines.push(surveyLine(data.feedbackByPid?.[p.id]));
     if (want.has('reflections')) lines.push(reflLine(reflByPid[p.id] || {}));
-    if (want.has('usage')) lines.push(usageLine(usageByPid[p.id]));
+    if (want.has('usage')) lines.push(usageLine(usageByPid[p.id], stageVec(p.id)));
     return lines.join('\n');
   });
   return { text: blocks.join('\n\n'), n: humans.length };

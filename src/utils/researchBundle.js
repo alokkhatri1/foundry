@@ -475,21 +475,41 @@ export function buildParticipantMarkdown(participant, data, { workshopCode, orgN
   return header + body + '\n';
 }
 
-// consentedOnly: when true, drop participants who haven't granted research
-// consent (or have withdrawn it). The admin export leaves it false (test-bed
-// behaviour — every participant, consent line tells the truth). The Research
-// Bench passes true so synthesis only ever sees consented data.
+// Inclusion rule for the Research Bench: include everyone EXCEPT those who
+// explicitly declined or withdrew consent. A missing consent row (joined
+// before the consent step, or never reached it) counts as "not declined" and
+// is included — it is NOT the same as an explicit grant, which is why the UI
+// labels the count "included" and breaks it down (consented vs no-response).
+export function isIncluded(consentRow) {
+  return !consentRow || (consentRow.granted !== false && !consentRow.withdrawn_at);
+}
+
+// Per-cohort consent tally over human participants.
+export function consentBreakdown(participants, consentByPid) {
+  let consented = 0, pending = 0, declined = 0;
+  for (const p of participants || []) {
+    if ((p.kind || 'human') !== 'human') continue;
+    const c = consentByPid?.[p.id];
+    if (c && (c.granted === false || c.withdrawn_at)) declined++;
+    else if (c && c.granted === true) consented++;
+    else pending++;
+  }
+  return { consented, pending, declined, included: consented + pending, total: consented + pending + declined };
+}
+
+// includedOnly: when true, drop only participants who explicitly declined or
+// withdrew (see isIncluded). The admin export leaves it false (test-bed — every
+// participant, the per-section consent line tells the truth). The Research
+// Bench passes true so declined data never enters tables or synthesis.
 export function buildResearchMarkdown(data, { workshopCode, orgName, consentedOnly = false }) {
   const pathFor = pathLookup(data.files);
-  const consented = (p) => {
-    const c = data.consentByPid?.[p.id];
-    return !!(c && c.granted === true && !c.withdrawn_at);
-  };
   const allHumans = data.participants
     .filter(p => (p.kind || 'human') === 'human')
     .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
-  const humans = consentedOnly ? allHumans.filter(consented) : allHumans;
-  const dropped = allHumans.length - humans.length;
+  const humans = consentedOnly
+    ? allHumans.filter(p => isIncluded(data.consentByPid?.[p.id]))
+    : allHumans;
+  const b = consentBreakdown(allHumans, data.consentByPid);
   const header = [
     `# Foundry research bundle — ${orgName || 'workshop'}`,
     '',
@@ -498,7 +518,7 @@ export function buildResearchMarkdown(data, { workshopCode, orgName, consentedOn
     `- **Participants**: ${humans.length}`,
     '',
     consentedOnly
-      ? `_Consent-filtered — only participants who granted research consent are included${dropped ? ` (${dropped} excluded)` : ''}._`
+      ? `_Included ${b.included} (${b.consented} consented · ${b.pending} no response). Excludes ${b.declined} who explicitly declined or withdrew._`
       : '_v1 test bed — every participant included regardless of consent. The Consent line on each section tells the truth; downstream synthesis can filter._',
     '',
     '---',

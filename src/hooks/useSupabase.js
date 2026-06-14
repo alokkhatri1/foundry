@@ -3,6 +3,24 @@ import { supabase, isSupabaseConfigured } from '../supabase';
 import { mapFileRow, mapCoworkerRow, mapToolRow, mapWorkflowRow } from '../utils/treeUtils';
 import { withSupabaseRetry } from '../utils/supabaseRetry';
 import { getCurrentEnvironment, isProduction } from '../utils/environment';
+
+// PostgREST caps a response at the project's max-rows (1000 on this project),
+// so a plain `.limit(20000)` silently truncates large unfiltered reads. This
+// pages through with .range() until the full set is retrieved. Use for
+// corpus-wide reads (participants, reflections) that exceed 1000 rows.
+async function fetchAllRows(table, select) {
+  const PAGE = 1000;
+  let from = 0;
+  const all = [];
+  for (;;) {
+    const { data, error } = await supabase.from(table).select(select).range(from, from + PAGE - 1);
+    if (error) { console.error(`[sb] fetchAllRows ${table}:`, error.message); break; }
+    all.push(...(data || []));
+    if (!data || data.length < PAGE) break;
+    from += PAGE;
+  }
+  return all;
+}
 import {
   createExampleFiles,
   createExampleCoworkers,
@@ -243,44 +261,49 @@ export default function useSupabase() {
   // plus roomNameByPid for the cohort column.
   const loadAllFormResponses = useCallback(async () => {
     if (!isSupabaseConfigured) return null;
-    const [parts, rooms, consent, demographics, feedback, reflections] = await Promise.all([
-      supabase.from('participants').select('id, name, room_id, kind').limit(20000),
-      supabase.from('rooms').select('id, org_name'),
-      supabase.from('research_consent').select('participant_id, granted, withdrawn_at').limit(20000),
-      supabase.from('participant_demographics')
-        .select('participant_id, role, tenure_band, industry, work_type, ai_familiarity, ai_use_frequency, ai_tools, ai_use_cases, ai_mental_model, evaluation_confidence, delegation_comfort, adoption_criteria_top3, delegation_boundary')
-        .limit(20000),
-      supabase.from('workshop_feedback')
-        .select('participant_id, satisfaction, relevance, clarity, theory_practice, improved_skills, can_apply, would_recommend, platform_rating, platform_reliability, platform_support, ai_was_chat_tool, ai_repeatable_systems, aware_human_oversight, aware_cost_tradeoffs, trust_when_inspectable, identify_ai_tasks, identify_human_review, likely_to_use, concept_used_first, foundry_improvement_text, real_task_text, most_valuable')
-        .limit(20000),
-      supabase.from('stage_reflections')
-        .select('participant_id, stage, confidence, agreement, transfer_text, structured').limit(50000),
+    // Paginated reads — participants (1300+) and reflections (1400+) exceed
+    // the 1000-row cap; consent/demographics/feedback are smaller but paged
+    // too for safety.
+    const [participants, rooms, consent, demographics, feedback, reflections] = await Promise.all([
+      fetchAllRows('participants', 'id, name, room_id, kind'),
+      fetchAllRows('rooms', 'id, org_name'),
+      fetchAllRows('research_consent', 'participant_id, granted, withdrawn_at'),
+      fetchAllRows('participant_demographics', 'participant_id, role, tenure_band, industry, work_type, ai_familiarity, ai_use_frequency, ai_tools, ai_use_cases, ai_mental_model, evaluation_confidence, delegation_comfort, adoption_criteria_top3, delegation_boundary'),
+      fetchAllRows('workshop_feedback', 'participant_id, satisfaction, relevance, clarity, theory_practice, improved_skills, can_apply, would_recommend, platform_rating, platform_reliability, platform_support, ai_was_chat_tool, ai_repeatable_systems, aware_human_oversight, aware_cost_tradeoffs, trust_when_inspectable, identify_ai_tasks, identify_human_review, likely_to_use, concept_used_first, foundry_improvement_text, real_task_text, most_valuable'),
+      fetchAllRows('stage_reflections', 'participant_id, stage, confidence, agreement, transfer_text, structured'),
     ]);
-    const roomName = Object.fromEntries((rooms.data || []).map(r => [r.id, r.org_name]));
-    const participants = parts.data || [];
+    const roomName = Object.fromEntries(rooms.map(r => [r.id, r.org_name]));
     const roomNameByPid = {};
     for (const p of participants) roomNameByPid[p.id] = roomName[p.room_id] || '—';
     const consentByPid = {};
-    for (const c of (consent.data || [])) consentByPid[c.participant_id] = c;
+    for (const c of consent) consentByPid[c.participant_id] = c;
     const demographicsByPid = {};
-    for (const d of (demographics.data || [])) demographicsByPid[d.participant_id] = d;
+    for (const d of demographics) demographicsByPid[d.participant_id] = d;
     const feedbackByPid = {};
-    for (const f of (feedback.data || [])) feedbackByPid[f.participant_id] = f;
-    return {
-      participants, consentByPid, demographicsByPid, feedbackByPid,
-      stageReflections: reflections.data || [], roomNameByPid,
-    };
+    for (const f of feedback) feedbackByPid[f.participant_id] = f;
+    return { participants, consentByPid, demographicsByPid, feedbackByPid, stageReflections: reflections, roomNameByPid };
   }, []);
 
-  // Total consented participants across every cohort — the size of the
-  // research corpus the bench can draw on. Counts granted, non-withdrawn rows.
-  const loadTotalConsented = useCallback(async () => {
-    if (!isSupabaseConfigured) return 0;
-    const { count, error } = await supabase.from('research_consent')
-      .select('participant_id', { count: 'exact', head: true })
-      .eq('granted', true).is('withdrawn_at', null);
-    if (error) { console.error('[sb] loadTotalConsented:', error.message); return 0; }
-    return count || 0;
+  // Corpus-wide consent tally — the size of the research the bench can draw
+  // on. "Included" = everyone except explicit declines/withdrawals (a missing
+  // consent row counts as not-declined). Light: two small queries.
+  const loadCorpusConsent = useCallback(async () => {
+    if (!isSupabaseConfigured) return { included: 0, consented: 0, pending: 0, declined: 0, total: 0 };
+    const [parts, consent] = await Promise.all([
+      fetchAllRows('participants', 'id, kind'),       // 1300+ rows — must page
+      fetchAllRows('research_consent', 'participant_id, granted, withdrawn_at'),
+    ]);
+    const byPid = {};
+    for (const c of consent) byPid[c.participant_id] = c;
+    let consented = 0, pending = 0, declined = 0;
+    for (const p of parts) {
+      if ((p.kind || 'human') !== 'human') continue;
+      const c = byPid[p.id];
+      if (c && (c.granted === false || c.withdrawn_at)) declined++;
+      else if (c && c.granted === true) consented++;
+      else pending++;
+    }
+    return { consented, pending, declined, included: consented + pending, total: consented + pending + declined };
   }, []);
 
   const loadWorkshopParticipants = useCallback(async (roomId) => {
@@ -2142,7 +2165,7 @@ export default function useSupabase() {
     // Research Bench library
     loadResearchLibrary, saveResearchItem, deleteResearchItem, logResearchUsage,
     // Admin
-    createWorkshop, loadAdminWorkshops, loadAllCohorts, loadAllFormResponses, loadTotalConsented, loadWorkshopParticipants,
+    createWorkshop, loadAdminWorkshops, loadAllCohorts, loadAllFormResponses, loadCorpusConsent, loadWorkshopParticipants,
     deleteWorkshop, deprecateWorkshop, pauseRoom, resumeRoom, revealStage, unrevealStage, revealAllStages, loadWorkshopStats, loadWorkshopContent, loadWorkshopActivity,
     loadAdminScorecardData, loadAdminResearchData,
     seedWorkshopContent, subscribeToWorkshopPresence,

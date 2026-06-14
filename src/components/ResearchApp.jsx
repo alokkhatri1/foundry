@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '../supabase';
 import useSupabase from '../hooks/useSupabase';
 import { handleAuthCallback } from '../utils/authCallback';
-import { buildResearchMarkdown } from '../utils/researchBundle';
+import { buildResearchMarkdown, consentBreakdown } from '../utils/researchBundle';
 import { callClaudeProxy } from '../utils/claudeFetch';
 import { computeCost, formatUsd } from '../utils/llmCost';
 import ResearchForms from './ResearchForms';
@@ -229,13 +229,6 @@ function Bench({ sb }) {
   const reloadLibrary = useCallback(() => { sb.loadResearchLibrary().then(setLibrary); }, [sb]);
   useEffect(() => { sb.loadAllCohorts().then(setCohorts); reloadLibrary(); }, [sb, reloadLibrary]);
 
-  const countConsented = (data) => (data.participants || [])
-    .filter(p => (p.kind || 'human') === 'human')
-    .filter(p => {
-      const c = data.consentByPid?.[p.id];
-      return c && c.granted === true && !c.withdrawn_at;
-    }).length;
-
   const loadCohort = useCallback(async (id) => {
     setCohortId(id);
     setBundle(null);
@@ -246,18 +239,18 @@ function Bench({ sb }) {
       // context; all cohorts together would not. Data-only by design.
       const data = await sb.loadAllFormResponses();
       setView('data');
-      setBundle({ allCohorts: true, consented: countConsented(data), data,
-        cohort: { org_name: 'All consented cohorts' } });
+      setBundle({ allCohorts: true, breakdown: consentBreakdown(data.participants, data.consentByPid),
+        data, cohort: { org_name: 'All cohorts' } });
       setLoadingBundle(false);
       return;
     }
     const cohort = cohorts.find(c => c.id === id);
     const data = await sb.loadAdminResearchData(id);
-    const total = (data.participants || []).filter(p => (p.kind || 'human') === 'human').length;
+    const breakdown = consentBreakdown(data.participants, data.consentByPid);
     const text = buildResearchMarkdown(data, {
       workshopCode: cohort?.code, orgName: cohort?.org_name, consentedOnly: true,
     });
-    setBundle({ text, consented: countConsented(data), total, tokens: estTokens(text), cohort, data });
+    setBundle({ text, breakdown, tokens: estTokens(text), cohort, data });
     setLoadingBundle(false);
   }, [sb, cohorts]);
 
@@ -278,22 +271,19 @@ function Bench({ sb }) {
         </div>
 
         {loadingBundle && <div className="rb-muted rb-field">Loading cohort data…</div>}
-        {bundle && bundle.allCohorts && (
+        {bundle && (
           <div className="rb-bundle-stats">
-            <div><strong>{bundle.consented}</strong> consented participants, all cohorts</div>
-            <div className="rb-muted">Data view only — pick one cohort to chat.</div>
-          </div>
-        )}
-        {bundle && !bundle.allCohorts && (
-          <div className="rb-bundle-stats">
-            <div><strong>{bundle.consented}</strong> of {bundle.total} participants consented</div>
-            <div className="rb-muted">{bundle.tokens.toLocaleString()} tokens in context</div>
-            {bundle.tokens > 150000 && (
-              <div className="rb-warn">Large context — synthesis will be slow and costly.</div>
-            )}
-            {bundle.consented === 0 && (
-              <div className="rb-warn">No consented participants — nothing to synthesize.</div>
-            )}
+            <div><strong>{bundle.breakdown.included}</strong> included{bundle.allCohorts ? ', all cohorts' : ''}</div>
+            <div className="rb-muted">
+              {bundle.breakdown.consented} consented · {bundle.breakdown.pending} no response · {bundle.breakdown.declined} declined (excluded)
+            </div>
+            {bundle.allCohorts
+              ? <div className="rb-muted">Data view only — pick one cohort to chat.</div>
+              : <>
+                  <div className="rb-muted">{bundle.tokens.toLocaleString()} tokens in context</div>
+                  {bundle.tokens > 150000 && <div className="rb-warn">Large context — synthesis will be slow and costly.</div>}
+                  {bundle.breakdown.included === 0 && <div className="rb-warn">No included participants — nothing to synthesize.</div>}
+                </>}
           </div>
         )}
 
@@ -302,10 +292,10 @@ function Bench({ sb }) {
 
       <main className="rb-main">
         {!bundle && <p className="rb-muted">Pick a cohort to see its form responses and chat with the data.</p>}
-        {bundle && bundle.consented === 0 && (
-          <p className="rb-muted">No consented participants in this cohort.</p>
+        {bundle && bundle.breakdown.included === 0 && (
+          <p className="rb-muted">No included participants in this cohort (all declined or none yet).</p>
         )}
-        {bundle && bundle.consented > 0 && (
+        {bundle && bundle.breakdown.included > 0 && (
           <>
             <div className="rb-viewtabs">
               <button className={view === 'data' ? 'is-active' : ''} onClick={() => setView('data')}>Data</button>
@@ -338,7 +328,7 @@ export default function ResearchApp() {
   // Tri-state mirrors AuthGate so a network blip shows retry, not a hard "no".
   const [access, setAccess] = useState('unknown'); // 'unknown' | 'yes' | 'no' | 'error'
   const [accessError, setAccessError] = useState(null);
-  const [totalConsented, setTotalConsented] = useState(null); // corpus size, all cohorts
+  const [corpus, setCorpus] = useState(null); // {included, consented, pending, declined} all cohorts
   // The auth id we've already resolved access for. Supabase fires
   // onAuthStateChange on tab focus / token refresh; without this guard we'd
   // re-check (flipping access to 'unknown') on every such event, which
@@ -385,10 +375,9 @@ export default function ResearchApp() {
     return () => { mounted = false; subscription.unsubscribe(); };
   }, [resolveAccess]);
 
-  // Corpus size — total consented participants across all cohorts. Loaded once
-  // access is granted.
+  // Corpus consent tally across all cohorts. Loaded once access is granted.
   useEffect(() => {
-    if (access === 'yes') sb.loadTotalConsented().then(setTotalConsented);
+    if (access === 'yes') sb.loadCorpusConsent().then(setCorpus);
   }, [access, sb]);
 
   // --- Loading ---
@@ -462,9 +451,10 @@ export default function ResearchApp() {
       <header className="rb-topbar">
         <div className="rb-wordmark">Foundry <span>Research</span></div>
         <div className="rb-topbar-user">
-          {totalConsented != null && (
-            <span className="rb-corpus" title="Total consented participants across all cohorts">
-              {totalConsented.toLocaleString()} consented participants
+          {corpus != null && (
+            <span className="rb-corpus"
+              title={`${corpus.consented} explicitly consented · ${corpus.pending} no response · ${corpus.declined} declined (excluded)`}>
+              {corpus.included.toLocaleString()} included participants
             </span>
           )}
           <span>{email}</span>

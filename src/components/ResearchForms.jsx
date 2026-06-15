@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { REFLECTION_PROMPTS } from '../data/reflectionPrompts';
 import { consentBreakdown, completeRecordPids } from '../utils/researchBundle';
-import { buildStageWindows, stageActivity, STAGE_LABELS } from '../utils/researchUsage';
+import { buildStageWindows, stageActivity, activeStageAt, STAGE_LABELS } from '../utils/researchUsage';
 import { lbl, fmt } from '../utils/researchLabels';
 
 const fmtTok = (n) => !n ? '—' : n < 1000 ? String(n) : `${(n / 1000).toFixed(n < 10000 ? 1 : 0)}k`;
@@ -242,6 +242,10 @@ function ChatsView({ data, consented }) {
   const byId = {}; const byName = {};
   for (const p of data.participants || []) { byId[p.id] = p; byName[(p.name || '').toLowerCase()] = p; }
   const byTime = (a, b) => new Date(a.created_at) - new Date(b.created_at);
+  // Stage each conversation by the reveal window active when it started, so we
+  // can show what a participant did at each stage.
+  const wins = buildStageWindows(data.stageEvents || []);
+  const stageOf = (ts) => ts ? activeStageAt(new Date(ts).getTime(), wins) : '1';
 
   const threads = [];
   // main chats grouped by conversation, attributed to the user-turn participant
@@ -257,7 +261,7 @@ function ChatsView({ data, consented }) {
     if (!owner || !idset.has(owner.id)) continue;
     msgs.sort(byTime);
     threads.push({
-      key: cid, who: owner.name, channel: 'Chat',
+      key: cid, who: owner.name, channel: 'Chat', stage: stageOf(msgs[0]?.created_at),
       turns: msgs.map(m => ({ role: m.type === 'user' ? owner.name : (m.label || 'AI'), content: m.content || '', mine: m.type === 'user' })),
     });
   }
@@ -274,6 +278,7 @@ function ChatsView({ data, consented }) {
   }
   for (const t of dm.values()) {
     t.turns.sort(byTime);
+    t.stage = stageOf(t.turns[0]?.created_at);
     t.turns = t.turns.map(d => ({ role: d.from_participant_id === t.hid ? t.who : t.otherName, content: d.content || '', mine: d.from_participant_id === t.hid }));
     threads.push(t);
   }
@@ -291,6 +296,15 @@ function ChatsView({ data, consented }) {
   const sel = byParticipant.has(who) ? who : names[0];
   const shown = byParticipant.get(sel) || [];
 
+  // Group this participant's conversations by the stage they happened in.
+  const STAGE_ORDER = ['1', '2', '3', '4', '5', '6', '7', '8', '9'];
+  const byStage = new Map();
+  for (const t of shown) {
+    if (!byStage.has(t.stage)) byStage.set(t.stage, []);
+    byStage.get(t.stage).push(t);
+  }
+  const stagesPresent = STAGE_ORDER.filter(s => byStage.has(s));
+
   return (
     <div className="rf-chats">
       <div className="rf-field rf-chat-pick">
@@ -301,25 +315,28 @@ function ChatsView({ data, consented }) {
           ))}
         </select>
       </div>
-      <div className="rf-count" style={{ marginBottom: 8 }}>
-        {sel}: {shown.length} conversation{shown.length === 1 ? '' : 's'}
-      </div>
-      {shown.map(t => (
-        <div key={t.key} className={`rf-thread${open === t.key ? ' is-open' : ''}`}>
-          <button className="rf-thread-head" onClick={() => setOpen(open === t.key ? null : t.key)}>
-            <span className="rf-thread-who">{t.channel}</span>
-            <span className="rf-thread-meta">{t.turns.length} turns</span>
-          </button>
-          {open === t.key && (
-            <div className="rf-thread-body">
-              {t.turns.map((tn, i) => (
-                <div key={i} className={`rf-turn${tn.mine ? ' is-mine' : ''}`}>
-                  <div className="rf-turn-who">{tn.role}</div>
-                  <div className="rf-turn-text">{tn.content}</div>
+
+      {stagesPresent.map(s => (
+        <div key={s} className="rf-stage-group">
+          <div className="rf-stage-head">Stage {s} · {STAGE_LABELS[s] || ''}</div>
+          {byStage.get(s).map(t => (
+            <div key={t.key} className={`rf-thread${open === t.key ? ' is-open' : ''}`}>
+              <button className="rf-thread-head" onClick={() => setOpen(open === t.key ? null : t.key)}>
+                <span className="rf-thread-who">{t.channel}</span>
+                <span className="rf-thread-meta">{t.turns.length} turns</span>
+              </button>
+              {open === t.key && (
+                <div className="rf-thread-body">
+                  {t.turns.map((tn, i) => (
+                    <div key={i} className={`rf-turn${tn.mine ? ' is-mine' : ''}`}>
+                      <div className="rf-turn-who">{tn.role}</div>
+                      <div className="rf-turn-text">{tn.content}</div>
+                    </div>
+                  ))}
                 </div>
-              ))}
+              )}
             </div>
-          )}
+          ))}
         </div>
       ))}
     </div>

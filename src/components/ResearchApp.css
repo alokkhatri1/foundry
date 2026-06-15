@@ -221,6 +221,13 @@
 /* chat transcripts */
 .rf-chats { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; }
 .rf-chat-pick { max-width: 360px; margin-bottom: 4px; }
+.rf-stage-group { margin-bottom: 16px; }
+.rf-stage-head {
+  font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em;
+  color: var(--accent-gold); margin: 10px 0 7px; padding-bottom: 4px;
+  border-bottom: 1px solid var(--border-color);
+}
+.rf-stage-group .rf-thread { margin-bottom: 6px; }
 .rf-thread { border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: var(--bg-white); }
 .rf-thread-head {
   width: 100%; display: flex; align-items: baseline; justify-content: space-between; gap: 12px;

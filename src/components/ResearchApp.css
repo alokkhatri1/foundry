@@ -141,6 +141,7 @@
 .rb-seed { width: 100%; margin-bottom: 14px; }
 .rb-src-row { display: flex; gap: 8px; align-items: center; }
 .rb-src-row input { flex: 1; }
+.rb-access-list { margin-top: 14px; max-height: 320px; overflow-y: auto; }
 .rb-run-note { font-size: 12px; margin: 10px 0; }
 
 /* run button in the library list */

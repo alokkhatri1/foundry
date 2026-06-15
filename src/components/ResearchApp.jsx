@@ -384,6 +384,60 @@ function RunModal({ sb, skill, theories, cohorts, currentCohort, onClose, onSave
   );
 }
 
+// Admin-only allowlist manager for the research portal. Granting access here
+// only lets someone into the research portal — it does NOT make them an admin
+// (the admin dashboard stays gated by the separate `admins` table). RLS
+// enforces that only admins can edit this list.
+function AccessManager({ sb, user, onClose }) {
+  const [rows, setRows] = useState(null);
+  const [email, setEmail] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState(null);
+  const reload = useCallback(() => { sb.loadResearchAccess().then(setRows); }, [sb]);
+  useEffect(() => { reload(); }, [reload]);
+
+  async function add() {
+    const e = email.trim().toLowerCase();
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e)) { setErr('Enter a valid email'); return; }
+    setBusy(true); setErr(null);
+    const { error } = await sb.addResearchAccess(e, user?.id);
+    setBusy(false);
+    if (error) { setErr(error.message); return; }
+    setEmail(''); reload();
+  }
+
+  return (
+    <div className="rb-overlay" onClick={onClose}>
+      <div className="rb-modal" onClick={e => e.stopPropagation()}>
+        <div className="rb-modal-head">
+          <strong>Research portal access</strong>
+          <button className="rb-btn rb-btn-ghost" onClick={onClose}>Close</button>
+        </div>
+        <p className="rb-muted" style={{ fontSize: 13, margin: '4px 0 16px' }}>
+          These people can sign into the research portal. This does <strong>not</strong> grant admin access. Admins are always allowed.
+        </p>
+        <div className="rb-src-row rb-field">
+          <input type="email" placeholder="name@org.com" value={email}
+            onChange={e => setEmail(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') add(); }} />
+          <button className="rb-btn" disabled={busy} onClick={add}>Add</button>
+        </div>
+        {err && <div className="rb-error">{err}</div>}
+        <div className="rb-access-list">
+          {rows === null && <div className="rb-muted">Loading…</div>}
+          {rows && rows.length === 0 && <div className="rb-muted">No one added yet.</div>}
+          {rows && rows.map(r => (
+            <div key={r.email} className="rb-lib-item">
+              <span className="rb-lib-name" style={{ cursor: 'default' }}>{r.email}</span>
+              <button className="rb-lib-del" title="Remove"
+                onClick={async () => { await sb.removeResearchAccess(r.email); reload(); }}>×</button>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // The accumulating insight repo — every skill Run is saved here.
 function FindingsView({ sb, findings, onReload }) {
   const [open, setOpen] = useState(null);
@@ -523,6 +577,8 @@ export default function ResearchApp() {
   // Tri-state mirrors AuthGate so a network blip shows retry, not a hard "no".
   const [access, setAccess] = useState('unknown'); // 'unknown' | 'yes' | 'no' | 'error'
   const [accessError, setAccessError] = useState(null);
+  const [isAdmin, setIsAdmin] = useState(false);   // gates the Access manager button
+  const [accessOpen, setAccessOpen] = useState(false);
   const [corpus, setCorpus] = useState(null); // {included, consented, pending, declined} all cohorts
   // The auth id we've already resolved access for. Supabase fires
   // onAuthStateChange on tab focus / token refresh; without this guard we'd
@@ -536,12 +592,13 @@ export default function ResearchApp() {
     setAccess('unknown');
     setAccessError(null);
     try {
-      const [isAdmin, allowed] = await Promise.all([
+      const [admin, allowed] = await Promise.all([
         sb.checkIsAdmin(user.id),
         sb.checkResearchAccess(user.email),
       ]);
       resolvedForUser.current = user.id;
-      setAccess(isAdmin || allowed ? 'yes' : 'no');
+      setIsAdmin(admin);
+      setAccess(admin || allowed ? 'yes' : 'no');
     } catch (err) {
       console.error('[research] access check failed:', err);
       resolvedForUser.current = null; // allow retry
@@ -653,10 +710,14 @@ export default function ResearchApp() {
             </span>
           )}
           <span>{email}</span>
+          {isAdmin && (
+            <button className="rb-btn rb-btn-ghost" onClick={() => setAccessOpen(true)}>Access</button>
+          )}
           <button className="rb-btn rb-btn-ghost" onClick={() => sb.signOut()}>Sign out</button>
         </div>
       </header>
       <Bench sb={sb} />
+      {accessOpen && <AccessManager sb={sb} user={session.user} onClose={() => setAccessOpen(false)} />}
     </div>
   );
 }

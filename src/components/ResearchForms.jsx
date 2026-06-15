@@ -229,6 +229,82 @@ function UsageTable({ data, consented, showCohort }) {
   );
 }
 
+// Readable chat transcripts: conversations + coworker DMs owned by a complete
+// record, grouped and expandable. Per-cohort (the messages are loaded with the
+// cohort); all-cohorts shows a note (the full traces are in the download).
+function ChatsView({ data, consented }) {
+  const [open, setOpen] = useState(null);
+  if (!data.messages && !data.directMessages) {
+    return <div className="rf-empty">Select a single cohort to read its chat transcripts. (The full traces across all cohorts are in the Download.)</div>;
+  }
+  const idset = new Set(consented.map(p => p.id));
+  const byId = {}; const byName = {};
+  for (const p of data.participants || []) { byId[p.id] = p; byName[(p.name || '').toLowerCase()] = p; }
+  const byTime = (a, b) => new Date(a.created_at) - new Date(b.created_at);
+
+  const threads = [];
+  // main chats grouped by conversation, attributed to the user-turn participant
+  const conv = new Map();
+  for (const m of data.messages || []) {
+    if (!m.conversation_id || (m.type !== 'user' && m.type !== 'assistant')) continue;
+    if (!conv.has(m.conversation_id)) conv.set(m.conversation_id, []);
+    conv.get(m.conversation_id).push(m);
+  }
+  for (const [cid, msgs] of conv) {
+    const ut = msgs.find(x => x.type === 'user' && x.participant_name);
+    const owner = ut && byName[ut.participant_name.toLowerCase()];
+    if (!owner || !idset.has(owner.id)) continue;
+    msgs.sort(byTime);
+    threads.push({
+      key: cid, who: owner.name, channel: 'Chat',
+      turns: msgs.map(m => ({ role: m.type === 'user' ? owner.name : (m.label || 'AI'), content: m.content || '', mine: m.type === 'user' })),
+    });
+  }
+  // coworker DMs grouped by (human, other)
+  const dm = new Map();
+  for (const d of data.directMessages || []) {
+    const from = byId[d.from_participant_id]; const to = byId[d.to_participant_id];
+    const human = from && (from.kind || 'human') === 'human' ? from : to && (to.kind || 'human') === 'human' ? to : null;
+    if (!human || !idset.has(human.id)) continue;
+    const other = human === from ? to : from;
+    const k = `${human.id}|${other?.id || '?'}`;
+    if (!dm.has(k)) dm.set(k, { key: k, who: human.name, hid: human.id, channel: `DM · ${other?.name || 'coworker'}`, otherName: other?.name || 'AI coworker', turns: [] });
+    dm.get(k).turns.push(d);
+  }
+  for (const t of dm.values()) {
+    t.turns.sort(byTime);
+    t.turns = t.turns.map(d => ({ role: d.from_participant_id === t.hid ? t.who : t.otherName, content: d.content || '', mine: d.from_participant_id === t.hid }));
+    threads.push(t);
+  }
+  threads.sort((a, b) => a.who.localeCompare(b.who) || a.channel.localeCompare(b.channel));
+
+  if (!threads.length) return <div className="rf-empty">No chat traces for complete records in this cohort.</div>;
+
+  return (
+    <div className="rf-chats">
+      <div className="rf-count" style={{ marginBottom: 8 }}>{threads.length} conversations</div>
+      {threads.map(t => (
+        <div key={t.key} className={`rf-thread${open === t.key ? ' is-open' : ''}`}>
+          <button className="rf-thread-head" onClick={() => setOpen(open === t.key ? null : t.key)}>
+            <span className="rf-thread-who">{t.who}</span>
+            <span className="rf-thread-meta">{t.channel} · {t.turns.length} turns</span>
+          </button>
+          {open === t.key && (
+            <div className="rf-thread-body">
+              {t.turns.map((tn, i) => (
+                <div key={i} className={`rf-turn${tn.mine ? ' is-mine' : ''}`}>
+                  <div className="rf-turn-who">{tn.role}</div>
+                  <div className="rf-turn-text">{tn.content}</div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export default function ResearchForms({ data }) {
   const [form, setForm] = useState('demographics');
   if (!data) return <div className="rf-empty">Pick a cohort to see its form responses.</div>;
@@ -267,6 +343,7 @@ export default function ResearchForms({ data }) {
         <button className={form === 'reflections' ? 'is-active' : ''} onClick={() => setForm('reflections')}>Reflections</button>
         <button className={form === 'survey' ? 'is-active' : ''} onClick={() => setForm('survey')}>End survey</button>
         <button className={form === 'usage' ? 'is-active' : ''} onClick={() => setForm('usage')}>Usage arc</button>
+        <button className={form === 'chats' ? 'is-active' : ''} onClick={() => setForm('chats')}>Chats</button>
         <span className="rf-count">
           {consented.length} complete records (of {bd.included} included){showCohort ? ' · all cohorts' : ''}
         </span>
@@ -322,6 +399,8 @@ export default function ResearchForms({ data }) {
       )}
 
       {form === 'usage' && <UsageTable data={data} consented={consented} showCohort={showCohort} />}
+
+      {form === 'chats' && <ChatsView data={data} consented={consented} />}
     </div>
   );
 }

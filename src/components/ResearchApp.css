@@ -220,6 +220,7 @@
 
 /* chat transcripts */
 .rf-chats { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; }
+.rf-chat-pick { max-width: 360px; margin-bottom: 4px; }
 .rf-thread { border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: var(--bg-white); }
 .rf-thread-head {
   width: 100%; display: flex; align-items: baseline; justify-content: space-between; gap: 12px;

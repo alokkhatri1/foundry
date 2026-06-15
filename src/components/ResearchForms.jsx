@@ -234,6 +234,7 @@ function UsageTable({ data, consented, showCohort }) {
 // cohort); all-cohorts shows a note (the full traces are in the download).
 function ChatsView({ data, consented }) {
   const [open, setOpen] = useState(null);
+  const [who, setWho] = useState('');
   if (!data.messages && !data.directMessages) {
     return <div className="rf-empty">Select a single cohort to read its chat transcripts. (The full traces across all cohorts are in the Download.)</div>;
   }
@@ -280,14 +281,34 @@ function ChatsView({ data, consented }) {
 
   if (!threads.length) return <div className="rf-empty">No chat traces for complete records in this cohort.</div>;
 
+  // Segregate by participant: one person's conversations at a time.
+  const byParticipant = new Map();
+  for (const t of threads) {
+    if (!byParticipant.has(t.who)) byParticipant.set(t.who, []);
+    byParticipant.get(t.who).push(t);
+  }
+  const names = [...byParticipant.keys()].sort((a, b) => a.localeCompare(b));
+  const sel = byParticipant.has(who) ? who : names[0];
+  const shown = byParticipant.get(sel) || [];
+
   return (
     <div className="rf-chats">
-      <div className="rf-count" style={{ marginBottom: 8 }}>{threads.length} conversations</div>
-      {threads.map(t => (
+      <div className="rf-field rf-chat-pick">
+        <label>Participant</label>
+        <select value={sel} onChange={e => { setWho(e.target.value); setOpen(null); }}>
+          {names.map(n => (
+            <option key={n} value={n}>{n} ({byParticipant.get(n).length})</option>
+          ))}
+        </select>
+      </div>
+      <div className="rf-count" style={{ marginBottom: 8 }}>
+        {sel}: {shown.length} conversation{shown.length === 1 ? '' : 's'}
+      </div>
+      {shown.map(t => (
         <div key={t.key} className={`rf-thread${open === t.key ? ' is-open' : ''}`}>
           <button className="rf-thread-head" onClick={() => setOpen(open === t.key ? null : t.key)}>
-            <span className="rf-thread-who">{t.who}</span>
-            <span className="rf-thread-meta">{t.channel} · {t.turns.length} turns</span>
+            <span className="rf-thread-who">{t.channel}</span>
+            <span className="rf-thread-meta">{t.turns.length} turns</span>
           </button>
           {open === t.key && (
             <div className="rf-thread-body">

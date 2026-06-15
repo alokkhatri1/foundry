@@ -8,12 +8,14 @@ import { getCurrentEnvironment, isProduction } from '../utils/environment';
 // so a plain `.limit(20000)` silently truncates large unfiltered reads. This
 // pages through with .range() until the full set is retrieved. Use for
 // corpus-wide reads (participants, reflections) that exceed 1000 rows.
-async function fetchAllRows(table, select) {
+async function fetchAllRows(table, select, eq) {
   const PAGE = 1000;
   let from = 0;
   const all = [];
   for (;;) {
-    const { data, error } = await supabase.from(table).select(select).range(from, from + PAGE - 1);
+    let q = supabase.from(table).select(select).range(from, from + PAGE - 1);
+    if (eq) q = q.eq(eq.col, eq.val);
+    const { data, error } = await q;
     if (error) { console.error(`[sb] fetchAllRows ${table}:`, error.message); break; }
     all.push(...(data || []));
     if (!data || data.length < PAGE) break;
@@ -305,13 +307,14 @@ export default function useSupabase() {
     // Paginated reads — participants (1300+) and reflections (1400+) exceed
     // the 1000-row cap; consent/demographics/feedback are smaller but paged
     // too for safety.
-    const [participants, rooms, consent, demographics, feedback, reflections] = await Promise.all([
+    const [participants, rooms, consent, demographics, feedback, reflections, stageEvents] = await Promise.all([
       fetchAllRows('participants', 'id, name, room_id, kind'),
       fetchAllRows('rooms', 'id, org_name'),
       fetchAllRows('research_consent', 'participant_id, granted, withdrawn_at'),
       fetchAllRows('participant_demographics', 'participant_id, role, tenure_band, industry, work_type, ai_familiarity, ai_use_frequency, ai_tools, ai_use_cases, ai_mental_model, evaluation_confidence, delegation_comfort, adoption_criteria_top3, delegation_boundary'),
       fetchAllRows('workshop_feedback', 'participant_id, satisfaction, relevance, clarity, theory_practice, improved_skills, can_apply, would_recommend, platform_rating, platform_reliability, platform_support, ai_was_chat_tool, ai_repeatable_systems, aware_human_oversight, aware_cost_tradeoffs, trust_when_inspectable, identify_ai_tasks, identify_human_review, likely_to_use, concept_used_first, foundry_improvement_text, real_task_text, most_valuable'),
       fetchAllRows('stage_reflections', 'participant_id, stage, confidence, agreement, transfer_text, structured'),
+      fetchAllRows('stage_events', 'room_id, from_stage, to_stage, created_at'),
     ]);
     const roomName = Object.fromEntries(rooms.map(r => [r.id, r.org_name]));
     const roomNameByPid = {};
@@ -322,7 +325,7 @@ export default function useSupabase() {
     for (const d of demographics) demographicsByPid[d.participant_id] = d;
     const feedbackByPid = {};
     for (const f of feedback) feedbackByPid[f.participant_id] = f;
-    return { participants, consentByPid, demographicsByPid, feedbackByPid, stageReflections: reflections, roomNameByPid };
+    return { participants, consentByPid, demographicsByPid, feedbackByPid, stageReflections: reflections, roomNameByPid, stageEvents };
   }, []);
 
   // All chat traces across every cohort — main AI chats + coworker DMs — for
@@ -332,6 +335,18 @@ export default function useSupabase() {
     const [messages, directMessages] = await Promise.all([
       fetchAllRows('messages', 'room_id, conversation_id, type, participant_name, label, content, created_at'),
       fetchAllRows('direct_messages', 'room_id, from_participant_id, to_participant_id, content, created_at'),
+    ]);
+    return { messages, directMessages };
+  }, []);
+
+  // Complete chat traces for a single cohort (paginated past the 1000 cap) —
+  // for the per-cohort download.
+  const loadCohortChatTraces = useCallback(async (roomId) => {
+    if (!isSupabaseConfigured) return { messages: [], directMessages: [] };
+    const eq = { col: 'room_id', val: roomId };
+    const [messages, directMessages] = await Promise.all([
+      fetchAllRows('messages', 'room_id, conversation_id, type, participant_name, label, content, created_at', eq),
+      fetchAllRows('direct_messages', 'room_id, from_participant_id, to_participant_id, content, created_at', eq),
     ]);
     return { messages, directMessages };
   }, []);
@@ -661,7 +676,7 @@ export default function useSupabase() {
         .select('participant_id, satisfaction, relevance, clarity, theory_practice, improved_skills, can_apply, would_recommend, platform_rating, platform_reliability, platform_support, ai_was_chat_tool, ai_repeatable_systems, aware_human_oversight, aware_cost_tradeoffs, trust_when_inspectable, identify_ai_tasks, identify_human_review, likely_to_use, concept_used_first, foundry_improvement_text, real_task_text, most_valuable, future_topics, improvement_notes')
         .eq('workshop_id', roomId),
       supabase.from('stage_events')
-        .select('from_stage, to_stage, created_at')
+        .select('room_id, from_stage, to_stage, created_at')
         .eq('room_id', roomId)
         .order('created_at', { ascending: true }),
     ]);
@@ -2223,7 +2238,7 @@ export default function useSupabase() {
     loadResearchLibrary, saveResearchItem, deleteResearchItem, logResearchUsage,
     loadUsageByParticipant, loadResearchFindings, saveResearchFinding, deleteResearchFinding,
     // Admin
-    createWorkshop, loadAdminWorkshops, loadAllCohorts, loadAllFormResponses, loadAllChatTraces, loadCorpusConsent, loadWorkshopParticipants,
+    createWorkshop, loadAdminWorkshops, loadAllCohorts, loadAllFormResponses, loadAllChatTraces, loadCohortChatTraces, loadCorpusConsent, loadWorkshopParticipants,
     deleteWorkshop, deprecateWorkshop, pauseRoom, resumeRoom, revealStage, unrevealStage, revealAllStages, loadWorkshopStats, loadWorkshopContent, loadWorkshopActivity,
     loadAdminScorecardData, loadAdminResearchData,
     seedWorkshopContent, subscribeToWorkshopPresence,

@@ -1,110 +1,86 @@
-// Download all consented data as a multi-sheet Excel workbook (Demographics /
-// Reflections / Survey / Usage). No LLM — pure client-side export of the data
-// the researcher is allowed to use (included = everyone except explicit
-// declines/withdrawals). Reuses the bundled `xlsx` dependency.
+// Download research data as a multi-sheet Excel workbook that mirrors the bench
+// Data tabs exactly — same columns/headers (Demographics, Survey via the shared
+// column defs), reflections as a participant×stage matrix, usage as the
+// stage-activity arc, and chats grouped by participant→stage. No LLM.
+// Works for one cohort (pass opts.cohortName) or all cohorts (data.roomNameByPid).
 import * as XLSX from 'xlsx';
 import { isIncluded } from './researchBundle';
-import { lbl, fmt } from './researchLabels';
-import { engagementSummary, STAGE_LABELS } from './researchUsage';
+import { fmt } from './researchLabels';
+import { DEMO_COLS, SURVEY_COLS, REFLECTION_STAGES, STAGE_NAME } from './researchColumns';
+import { engagementSummary, buildStageWindows, activeStageAt, stageActivity, STAGE_LABELS } from './researchUsage';
 
 const consentStatus = (c) => (c && c.granted === true && !c.withdrawn_at) ? 'consented'
   : (c && (c.granted === false || c.withdrawn_at)) ? 'declined' : 'no response';
 
-function idCols(p, data) {
-  return {
-    Cohort: data.roomNameByPid?.[p.id] || '—',
-    Participant: p.name || '—',
-    Consent: consentStatus(data.consentByPid?.[p.id]),
-  };
-}
-
-export function downloadConsentedData(data, usageByPid = {}, traces = null) {
-  const included = (data.participants || [])
-    .filter(p => (p.kind || 'human') === 'human' && isIncluded(data.consentByPid?.[p.id]))
-    .sort((a, b) => (data.roomNameByPid?.[a.id] || '').localeCompare(data.roomNameByPid?.[b.id] || '')
-      || (a.name || '').localeCompare(b.name || ''));
+export function downloadConsentedData(data, usageByPid = {}, traces = null, opts = {}) {
+  const cohortOf = (pid) => data.roomNameByPid?.[pid] || opts.cohortName || '—';
+  const idCols = (p) => ({ Cohort: cohortOf(p.id), Participant: p.name || '—', Consent: consentStatus(data.consentByPid?.[p.id]) });
   const includedPid = (pid) => isIncluded(data.consentByPid?.[pid]);
+
+  const included = (data.participants || [])
+    .filter(p => (p.kind || 'human') === 'human' && includedPid(p.id))
+    .sort((a, b) => cohortOf(a.id).localeCompare(cohortOf(b.id)) || (a.name || '').localeCompare(b.name || ''));
 
   const reflByPid = {};
   for (const r of data.stageReflections || []) (reflByPid[r.participant_id] ||= {})[String(r.stage)] = r;
 
-  // --- Demographics sheet ---
-  const demoRows = included.map(p => {
-    const d = data.demographicsByPid?.[p.id] || {};
-    return {
-      ...idCols(p, data),
-      Role: d.role || '',
-      Tenure: lbl(d.tenure_band),
-      Industry: lbl(d.industry),
-      'Work type': fmt(d.work_type),
-      'AI familiarity (1-5)': d.ai_familiarity ?? '',
-      'AI use frequency': lbl(d.ai_use_frequency),
-      'AI tools used': fmt(d.ai_tools),
-      'AI use cases': fmt(d.ai_use_cases),
-      'Mental model of AI': lbl(d.ai_mental_model),
-      'Eval confidence (1-5)': d.evaluation_confidence ?? '',
-      'Delegation comfort (1-5)': d.delegation_comfort ?? '',
-      'Top adoption criteria': fmt(d.adoption_criteria_top3),
-      'Would not delegate (why)': d.delegation_boundary || '',
-    };
+  // Demographics + Survey — same columns/headers as the bench tables.
+  const colRows = (cols, lookup) => included.map(p => {
+    const row = { ...idCols(p) };
+    const src = lookup(p) || {};
+    for (const c of cols) row[c.label] = fmt(src[c.key]);
+    return row;
   });
+  const demoRows = colRows(DEMO_COLS, p => data.demographicsByPid?.[p.id]);
+  const surveyRows = colRows(SURVEY_COLS, p => data.feedbackByPid?.[p.id]);
 
-  // --- Survey sheet ---
-  const surveyRows = included.map(p => {
-    const f = data.feedbackByPid?.[p.id] || {};
-    return {
-      ...idCols(p, data),
-      Satisfaction: f.satisfaction ?? '', Relevance: f.relevance ?? '', Clarity: f.clarity ?? '',
-      'Theory/practice balance': f.theory_practice ?? '', 'Improved skills': f.improved_skills ?? '',
-      'Can identify AI tasks': f.identify_ai_tasks ?? '', 'Can identify review needs': f.identify_human_review ?? '',
-      'Likely to use': f.likely_to_use ?? '', 'Would recommend': f.would_recommend == null ? '' : (f.would_recommend ? 'Yes' : 'No'),
-      'Platform: easy to navigate': f.platform_rating ?? '', 'Platform: reliable': f.platform_reliability ?? '',
-      'Platform: aided understanding': f.platform_support ?? '',
-      'Before: AI was chat tool': f.ai_was_chat_tool ?? '', 'After: AI repeatable system': f.ai_repeatable_systems ?? '',
-      'Aware: human oversight': f.aware_human_oversight ?? '', 'Aware: cost tradeoffs': f.aware_cost_tradeoffs ?? '',
-      'Trust if inspectable': f.trust_when_inspectable ?? '',
-      'Concept used first': lbl(f.concept_used_first),
-      'Real task for Foundry': f.real_task_text || '',
-      'What would make it easier': f.foundry_improvement_text || '',
-      'Most valuable (legacy)': f.most_valuable || '',
-    };
-  });
-
-  // --- Reflections sheet (long: one row per participant-stage) ---
-  const reflRows = [];
-  for (const p of included) {
+  // Reflections — participant × stage matrix (mirrors the bench Reflections tab).
+  const reflCell = (r) => {
+    if (!r) return '';
+    const parts = [`clarity ${r.confidence ?? '—'} · agree ${r.agreement ?? '—'}`];
+    if (r.transfer_text) parts.push(`“${r.transfer_text}”`);
+    const st = r.structured && typeof r.structured === 'object'
+      ? Object.entries(r.structured).map(([k, v]) => `${k}: ${fmt(v)}`).join(', ') : '';
+    if (st) parts.push(st);
+    return parts.join(' | ');
+  };
+  const reflRows = included.map(p => {
+    const row = { ...idCols(p) };
     const byStage = reflByPid[p.id] || {};
-    for (const s of Object.keys(byStage).sort((a, b) => Number(a) - Number(b))) {
-      const r = byStage[s];
-      const struct = r.structured && typeof r.structured === 'object'
-        ? Object.entries(r.structured).map(([k, v]) => `${k}: ${fmt(v)}`).join(' · ') : '';
-      reflRows.push({
-        ...idCols(p, data),
-        Stage: s, 'Stage name': STAGE_LABELS[s] || '',
-        'Clarity (1-5)': r.confidence ?? '', 'Agreement (1-5)': r.agreement ?? '',
-        'Transfer text': r.transfer_text || '', 'Structured answers': struct,
-      });
-    }
+    for (const s of REFLECTION_STAGES) row[`Stage ${s} · ${STAGE_NAME[s]}`] = reflCell(byStage[s]);
+    return row;
+  });
+
+  // Usage — stage-activity arc (mirrors the Usage arc tab) when the stage
+  // timeline + raw usage are available (per-cohort); otherwise an aggregate.
+  let usageRows;
+  if (data.stageEvents && data.llmUsage) {
+    const wins = buildStageWindows(data.stageEvents);
+    const { byPid, byStage } = stageActivity(data.llmUsage, wins, new Set(included.map(p => p.id)));
+    const stages = Object.keys(byStage).filter(s => byStage[s].calls > 0).sort((a, b) => Number(a) - Number(b));
+    usageRows = included.map(p => {
+      const row = { ...idCols(p) };
+      for (const s of stages) {
+        const a = byPid[p.id]?.[s];
+        row[`Stage ${s} · ${STAGE_LABELS[s] || ''}`] = a ? `${a.tokens} tok / ${a.calls} calls` : '';
+      }
+      return row;
+    });
+  } else {
+    usageRows = included.map(p => {
+      const u = usageByPid[p.id]; const s = engagementSummary(u) || {};
+      const segs = u?.by_segment ? Object.entries(u.by_segment).map(([k, v]) => `${k}=${v}`).join('; ') : '';
+      return {
+        ...idCols(p),
+        'Total tokens': u?.total_tokens ?? 0, 'Cost (USD)': u ? Number(u.total_cost || 0).toFixed(4) : 0,
+        'Calls': u?.n_calls ?? 0, 'Engagement style': s.style || '', 'Capabilities used': s.breadth ?? 0,
+        'Segment breakdown (tokens)': segs,
+      };
+    });
   }
 
-  // --- Usage sheet (derived behavioral signal) ---
-  const usageRows = included.map(p => {
-    const u = usageByPid[p.id];
-    const s = engagementSummary(u) || {};
-    const segs = u?.by_segment ? Object.entries(u.by_segment).map(([k, v]) => `${k}=${v}`).join('; ') : '';
-    return {
-      ...idCols(p, data),
-      'Total tokens': u?.total_tokens ?? 0,
-      'Cost (USD)': u ? Number(u.total_cost || 0).toFixed(4) : 0,
-      'Calls': u?.n_calls ?? 0,
-      'Engagement style': s.style || '',
-      'Capabilities used': s.breadth ?? 0,
-      'Segment breakdown (tokens)': segs,
-    };
-  });
-
-  // --- Chats sheet (long: one row per message turn; main chats + coworker DMs) ---
-  const chatRows = traces ? buildChatRows(traces, data, includedPid) : [];
+  // Chats — one row per turn, with a Stage column; ordered participant→stage→conversation→turn.
+  const chatRows = traces ? buildChatRows(traces, data, includedPid, cohortOf) : [];
 
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(demoRows), 'Demographics');
@@ -115,30 +91,33 @@ export function downloadConsentedData(data, usageByPid = {}, traces = null) {
 
   const d = new Date();
   const stamp = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-  XLSX.writeFile(wb, `foundry-consented-data-${stamp}.xlsx`);
+  const slug = opts.cohortName ? '-' + opts.cohortName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') : '';
+  XLSX.writeFile(wb, `foundry-consented-data${slug}-${stamp}.xlsx`);
   return included.length;
 }
 
-// Chat traces → long-format rows (one per turn). Messages are keyed by
-// participant_name, so we map (room_id, name) → participant to consent-filter;
-// DMs are keyed by participant id. Only conversations owned by an included
-// participant are exported. Both user and AI turns of those conversations are
-// included, so the trace is complete.
-function buildChatRows(traces, data, includedPid) {
-  const byId = {};
-  const byRoomName = {};
+function buildChatRows(traces, data, includedPid, cohortOf) {
+  const byId = {}; const byRoomName = {};
   for (const p of data.participants || []) {
     byId[p.id] = p;
-    byRoomName[`${p.room_id}|${(p.name || '').toLowerCase()}`] = p;
+    byRoomName[`${p.room_id || ''}|${(p.name || '').toLowerCase()}`] = p;
   }
-  const cohort = (pid) => data.roomNameByPid?.[pid] || '—';
+  // stage windows per room (events carry room_id)
+  const evByRoom = {};
+  for (const e of data.stageEvents || []) (evByRoom[e.room_id || '_'] ||= []).push(e);
+  const winsByRoom = {};
+  for (const [rid, evs] of Object.entries(evByRoom)) winsByRoom[rid] = buildStageWindows(evs);
+  const stageOf = (rid, ts) => {
+    const wins = winsByRoom[rid] || winsByRoom['_'];
+    return wins && ts ? activeStageAt(new Date(ts).getTime(), wins) : '1';
+  };
+  const stageLabel = (s) => `Stage ${s} · ${STAGE_LABELS[s] || ''}`;
   const rows = [];
 
-  // Main chats — group by conversation (room-scoped), attribute to the user-turn participant.
+  // main chats
   const conv = new Map();
   for (const m of traces.messages || []) {
-    if (!m.conversation_id) continue;
-    if (m.type !== 'user' && m.type !== 'assistant') continue;
+    if (!m.conversation_id || (m.type !== 'user' && m.type !== 'assistant')) continue;
     const key = `${m.room_id}|${m.conversation_id}`;
     if (!conv.has(key)) conv.set(key, []);
     conv.get(key).push(m);
@@ -146,24 +125,23 @@ function buildChatRows(traces, data, includedPid) {
   for (const msgs of conv.values()) {
     const ut = msgs.find(x => x.type === 'user' && x.participant_name);
     if (!ut) continue;
-    const owner = byRoomName[`${msgs[0].room_id}|${ut.participant_name.toLowerCase()}`];
+    const owner = byRoomName[`${msgs[0].room_id || ''}|${ut.participant_name.toLowerCase()}`]
+      || byRoomName[`|${ut.participant_name.toLowerCase()}`];
     if (!owner || !includedPid(owner.id)) continue;
     msgs.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+    const stage = stageOf(msgs[0].room_id, msgs[0].created_at);
     msgs.forEach((m, i) => rows.push({
-      Cohort: cohort(owner.id), Participant: owner.name, Channel: 'Chat',
+      Cohort: cohortOf(owner.id), Participant: owner.name, Stage: stageLabel(stage), Channel: 'Chat',
       Conversation: m.conversation_id, Turn: i + 1,
       Role: m.type === 'user' ? 'participant' : (m.label || 'AI'),
-      Content: m.content || '', Timestamp: m.created_at,
+      Content: m.content || '', Timestamp: m.created_at, _s: Number(stage),
     }));
   }
-
-  // Coworker DMs — group by (human, other), attribute to the human side.
+  // coworker DMs
   const threads = new Map();
   for (const dm of traces.directMessages || []) {
-    const from = byId[dm.from_participant_id];
-    const to = byId[dm.to_participant_id];
-    const human = from && (from.kind || 'human') === 'human' ? from
-      : to && (to.kind || 'human') === 'human' ? to : null;
+    const from = byId[dm.from_participant_id]; const to = byId[dm.to_participant_id];
+    const human = from && (from.kind || 'human') === 'human' ? from : to && (to.kind || 'human') === 'human' ? to : null;
     if (!human || !includedPid(human.id)) continue;
     const other = human === from ? to : from;
     const key = `${human.id}|${other?.id || '?'}`;
@@ -172,15 +150,18 @@ function buildChatRows(traces, data, includedPid) {
   }
   for (const t of threads.values()) {
     t.msgs.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+    const stage = stageOf(t.msgs[0].room_id, t.msgs[0].created_at);
     t.msgs.forEach((dm, i) => rows.push({
-      Cohort: cohort(t.human.id), Participant: t.human.name, Channel: 'Coworker DM',
+      Cohort: cohortOf(t.human.id), Participant: t.human.name, Stage: stageLabel(stage),
+      Channel: `Coworker DM · ${t.other?.name || 'coworker'}`,
       Conversation: `DM · ${t.other?.name || 'coworker'}`, Turn: i + 1,
       Role: dm.from_participant_id === t.human.id ? 'participant' : (t.other?.name || 'AI coworker'),
-      Content: dm.content || '', Timestamp: dm.created_at,
+      Content: dm.content || '', Timestamp: dm.created_at, _s: Number(stage),
     }));
   }
 
   rows.sort((a, b) => a.Cohort.localeCompare(b.Cohort) || a.Participant.localeCompare(b.Participant)
-    || String(a.Conversation).localeCompare(String(b.Conversation)) || a.Turn - b.Turn);
+    || a._s - b._s || String(a.Conversation).localeCompare(String(b.Conversation)) || a.Turn - b.Turn);
+  rows.forEach(r => delete r._s);
   return rows;
 }

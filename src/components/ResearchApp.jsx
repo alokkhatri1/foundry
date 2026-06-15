@@ -478,6 +478,22 @@ function Bench({ sb }) {
   const [findings, setFindings] = useState([]);
   const [runSkill, setRunSkill] = useState(null); // skill being run, or null
   const [view, setView] = useState('data');       // 'data' | 'chat' | 'findings'
+  const [dlCohort, setDlCohort] = useState(false);
+
+  const downloadThisCohort = useCallback(async () => {
+    if (!bundle || bundle.allCohorts) return;
+    setDlCohort(true);
+    try {
+      const [usageByPid, traces] = await Promise.all([
+        sb.loadUsageByParticipant(), sb.loadCohortChatTraces(bundle.cohort.id),
+      ]);
+      downloadConsentedData(bundle.data, usageByPid, traces, { cohortName: bundle.cohort.org_name });
+    } catch (e) {
+      console.error('[research] cohort download failed:', e);
+    } finally {
+      setDlCohort(false);
+    }
+  }, [bundle, sb]);
 
   const reloadLibrary = useCallback(() => { sb.loadResearchLibrary().then(setLibrary); }, [sb]);
   const reloadFindings = useCallback(() => { sb.loadResearchFindings().then(setFindings); }, [sb]);
@@ -528,6 +544,11 @@ function Bench({ sb }) {
         </div>
 
         {loadingBundle && <div className="rb-muted rb-field">Loading cohort data…</div>}
+        {bundle && !bundle.allCohorts && (
+          <button className="rb-btn rb-btn-ghost rb-dl-cohort" disabled={dlCohort} onClick={downloadThisCohort}>
+            {dlCohort ? 'Preparing…' : `Download this cohort`}
+          </button>
+        )}
 
         <LibraryPanel sb={sb} items={library} onReload={reloadLibrary} onRun={setRunSkill} />
       </aside>

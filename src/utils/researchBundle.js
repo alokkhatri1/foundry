@@ -1,3 +1,5 @@
+import { pseudonym } from './researchAnonymize';
+
 // Build a Markdown research bundle from the loadAdminResearchData payload.
 // One Markdown document per workshop, one H1 section per human participant,
 // with all 9 stages laid out in their own subsections. Optimised for
@@ -564,7 +566,26 @@ export function buildResearchMarkdown(data, { workshopCode, orgName, consentedOn
     '',
   ].join('\n');
   const body = humans.map(p => renderParticipant(p, data, pathFor)).join('\n\n---\n\n');
-  return header + body + '\n';
+  const doc = header + body + '\n';
+  // Bench path is anonymized: replace every participant's name with their stable
+  // pseudonym across the whole document — headers, chat/DM labels, and any name
+  // typed into content — so synthesis never sees real names.
+  return consentedOnly ? anonymizeDoc(doc, data.participants) : doc;
+}
+
+// Replace each participant full name with their pseudonym, word-boundary,
+// longest-first (so full names win over shared first names).
+function anonymizeDoc(doc, participants) {
+  const pairs = (participants || [])
+    .filter(p => p.name && p.name.trim().length >= 3)
+    .map(p => ({ name: p.name.trim(), pseu: pseudonym(p.id) }))
+    .sort((a, b) => b.name.length - a.name.length);
+  let out = doc;
+  for (const { name, pseu } of pairs) {
+    const re = new RegExp('\\b' + name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\b', 'gi');
+    out = out.replace(re, pseu);
+  }
+  return out;
 }
 
 function nameSlug(name) {

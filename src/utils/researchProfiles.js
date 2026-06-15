@@ -4,22 +4,23 @@
 // dimensions a skill declares are included, to keep the prompt tight.
 import { completeRecordPids } from './researchBundle';
 import { engagementSummary, buildStageWindows, stageActivity } from './researchUsage';
+import { makeRedactor } from './researchAnonymize';
 
 const STAGES = ['3', '4', '5', '6', '7', '8'];
 
 const arr = (v) => Array.isArray(v) ? (v.length ? v.join(', ') : '—') : (v ?? '—');
 const yn = (v) => v == null ? '—' : (v ? 'yes' : 'no');
 
-function demoLine(d) {
+function demoLine(d, redact) {
   if (!d) return 'Demographics: (none)';
-  return `Demographics: role="${d.role || '—'}"; tenure=${d.tenure_band || '—'}; industry=${d.industry || '—'}; `
+  return `Demographics: role="${redact(d.role || '—')}"; tenure=${d.tenure_band || '—'}; industry=${d.industry || '—'}; `
     + `work_type=[${arr(d.work_type)}]; ai_familiarity=${d.ai_familiarity ?? '—'}/5; use_frequency=${d.ai_use_frequency || '—'}; `
     + `tools=[${arr(d.ai_tools)}]; use_cases=[${arr(d.ai_use_cases)}]; mental_model=${d.ai_mental_model || '—'}; `
     + `eval_confidence=${d.evaluation_confidence ?? '—'}/5; delegation_comfort=${d.delegation_comfort ?? '—'}/5; `
-    + `top_adoption_criteria=[${arr(d.adoption_criteria_top3)}]; wont_delegate="${d.delegation_boundary || '—'}"`;
+    + `top_adoption_criteria=[${arr(d.adoption_criteria_top3)}]; wont_delegate="${redact(d.delegation_boundary || '—')}"`;
 }
 
-function surveyLine(f) {
+function surveyLine(f, redact) {
   if (!f) return 'Survey: (none)';
   return `Survey: satisfaction=${f.satisfaction ?? '—'}/5; relevance=${f.relevance ?? '—'}; clarity=${f.clarity ?? '—'}; `
     + `theory_practice=${f.theory_practice ?? '—'}; improved_skills=${f.improved_skills ?? '—'}; likely_to_use=${f.likely_to_use ?? '—'}; `
@@ -27,10 +28,10 @@ function surveyLine(f) {
     + `before_AI_was_chat_tool=${f.ai_was_chat_tool ?? '—'}/5; after_AI_repeatable_system=${f.ai_repeatable_systems ?? '—'}/5; `
     + `aware_oversight=${f.aware_human_oversight ?? '—'}; aware_cost=${f.aware_cost_tradeoffs ?? '—'}; trust_if_inspectable=${f.trust_when_inspectable ?? '—'}; `
     + `identify_ai_tasks=${f.identify_ai_tasks ?? '—'}; identify_human_review=${f.identify_human_review ?? '—'}; `
-    + `concept_used_first=${f.concept_used_first || '—'}; real_task="${f.real_task_text || '—'}"; improvement="${f.foundry_improvement_text || '—'}"`;
+    + `concept_used_first=${f.concept_used_first || '—'}; real_task="${redact(f.real_task_text || '—')}"; improvement="${redact(f.foundry_improvement_text || '—')}"`;
 }
 
-function reflLine(byStage) {
+function reflLine(byStage, redact) {
   const parts = [];
   for (const s of STAGES) {
     const r = byStage[s];
@@ -38,7 +39,7 @@ function reflLine(byStage) {
     const struct = r.structured && typeof r.structured === 'object'
       ? Object.entries(r.structured).map(([k, v]) => `${k}=${arr(v)}`).join(', ') : '';
     parts.push(`S${s}[clarity=${r.confidence ?? '—'},agree=${r.agreement ?? '—'}`
-      + (r.transfer_text ? `,transfer="${r.transfer_text}"` : '')
+      + (r.transfer_text ? `,transfer="${redact(r.transfer_text)}"` : '')
       + (struct ? `,${struct}` : '') + ']');
   }
   return parts.length ? 'Reflections: ' + parts.join(' ') : 'Reflections: (none)';
@@ -62,6 +63,8 @@ export function buildProfileText(data, dims, usageByPid = {}) {
     .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
   const reflByPid = {};
   for (const r of data.stageReflections || []) (reflByPid[r.participant_id] ||= {})[String(r.stage)] = r;
+  // Profiles are pseudonymized (Participant N); also redact names in free text.
+  const redact = makeRedactor((data.participants || []).map(p => p.name).filter(Boolean));
 
   // Per-cohort runs carry the precise stage arc (reveal times + usage rows).
   let stageByPid = null;
@@ -79,9 +82,9 @@ export function buildProfileText(data, dims, usageByPid = {}) {
     const cohort = data.roomNameByPid?.[p.id];
     const head = `## Participant ${i + 1}${cohort ? ` — cohort: ${cohort}` : ''}`;
     const lines = [head];
-    if (want.has('demographics')) lines.push(demoLine(data.demographicsByPid?.[p.id]));
-    if (want.has('survey')) lines.push(surveyLine(data.feedbackByPid?.[p.id]));
-    if (want.has('reflections')) lines.push(reflLine(reflByPid[p.id] || {}));
+    if (want.has('demographics')) lines.push(demoLine(data.demographicsByPid?.[p.id], redact));
+    if (want.has('survey')) lines.push(surveyLine(data.feedbackByPid?.[p.id], redact));
+    if (want.has('reflections')) lines.push(reflLine(reflByPid[p.id] || {}, redact));
     if (want.has('usage')) lines.push(usageLine(usageByPid[p.id], stageVec(p.id)));
     return lines.join('\n');
   });

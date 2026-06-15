@@ -4,6 +4,7 @@ import { consentBreakdown, completeRecordPids } from '../utils/researchBundle';
 import { buildStageWindows, stageActivity, activeStageAt, STAGE_LABELS } from '../utils/researchUsage';
 import { lbl, fmt } from '../utils/researchLabels';
 import { DEMO_COLS, SURVEY_COLS, REFLECTION_STAGES as STAGES, STAGE_NAME } from '../utils/researchColumns';
+import { pseudonym, makeRedactor } from '../utils/researchAnonymize';
 
 const fmtTok = (n) => !n ? '—' : n < 1000 ? String(n) : `${(n / 1000).toFixed(n < 10000 ? 1 : 0)}k`;
 
@@ -62,7 +63,8 @@ function optLabel(q, value) {
 }
 
 // Answer the participant gave to one reflection question, by its type.
-function answerFor(q, refl) {
+// `redact` scrubs participant names out of the free-text answer.
+function answerFor(q, refl, redact = (t) => t) {
   if (q.type === 'clarity') {
     const v = refl.confidence;
     return v == null ? '—' : `${v} — ${CLARITY_LEGEND[v] || ''}`;
@@ -73,7 +75,7 @@ function answerFor(q, refl) {
   }
   if (q.type === 'text') {
     const v = refl.transfer_text;
-    return v ? `“${v}”` : '—';
+    return v ? `“${redact(v)}”` : '—';
   }
   // chip / chips → stored under structured[q.id]
   const v = refl.structured?.[q.id];
@@ -82,14 +84,14 @@ function answerFor(q, refl) {
 
 // One stage's cell: each question (full text) paired with the participant's
 // answer, in the order the form asked them.
-function ReflectionCell({ stage, refl }) {
+function ReflectionCell({ stage, refl, redact }) {
   if (!refl) return <span className="rf-muted">—</span>;
   const prompt = REFLECTION_PROMPTS[stage];
   if (!prompt) return <span className="rf-muted">—</span>;
   return (
     <div className="rf-refl-cell">
       {prompt.questions.map(q => {
-        const ans = answerFor(q, refl);
+        const ans = answerFor(q, refl, redact);
         const isText = q.type === 'text';
         return (
           <div className="rf-rq" key={q.id}>
@@ -172,7 +174,7 @@ function UsageTable({ data, consented, showCohort }) {
         <tbody>
           {consented.map((p, i) => (
             <tr key={i}>
-              <td className="rf-sticky rf-sticky-1 rf-name">{p.name}</td>
+              <td className="rf-sticky rf-sticky-1 rf-name">{pseudonym(p.id)}</td>
               {showCohort && <td className="rf-sticky rf-sticky-2 rf-cohort">{data.roomNameByPid?.[p.id]}</td>}
               {stages.map(s => {
                 const a = byPid[p.id]?.[s];
@@ -199,6 +201,9 @@ function ChatsView({ data, consented }) {
   const byId = {}; const byName = {};
   for (const p of data.participants || []) { byId[p.id] = p; byName[(p.name || '').toLowerCase()] = p; }
   const byTime = (a, b) => new Date(a.created_at) - new Date(b.created_at);
+  // Names are used to MATCH messages (real names), but DISPLAY is pseudonymized
+  // and content is name-redacted.
+  const redact = makeRedactor((data.participants || []).map(p => p.name).filter(Boolean));
   // Stage each conversation by the reveal window active when it started, so we
   // can show what a participant did at each stage.
   const wins = buildStageWindows(data.stageEvents || []);
@@ -217,9 +222,10 @@ function ChatsView({ data, consented }) {
     const owner = ut && byName[ut.participant_name.toLowerCase()];
     if (!owner || !idset.has(owner.id)) continue;
     msgs.sort(byTime);
+    const pseu = pseudonym(owner.id);
     threads.push({
-      key: cid, who: owner.name, channel: 'Chat', stage: stageOf(msgs[0]?.created_at),
-      turns: msgs.map(m => ({ role: m.type === 'user' ? owner.name : (m.label || 'AI'), content: m.content || '', mine: m.type === 'user' })),
+      key: cid, who: pseu, channel: 'Chat', stage: stageOf(msgs[0]?.created_at),
+      turns: msgs.map(m => ({ role: m.type === 'user' ? pseu : (m.label || 'AI'), content: redact(m.content || ''), mine: m.type === 'user' })),
     });
   }
   // coworker DMs grouped by (human, other)
@@ -230,13 +236,15 @@ function ChatsView({ data, consented }) {
     if (!human || !idset.has(human.id)) continue;
     const other = human === from ? to : from;
     const k = `${human.id}|${other?.id || '?'}`;
-    if (!dm.has(k)) dm.set(k, { key: k, who: human.name, hid: human.id, channel: `DM · ${other?.name || 'coworker'}`, otherName: other?.name || 'AI coworker', turns: [] });
+    // Coworker names are kept (AI labels); a human "other" is pseudonymized.
+    const otherName = other && (other.kind || 'human') === 'human' ? pseudonym(other.id) : (other?.name || 'AI coworker');
+    if (!dm.has(k)) dm.set(k, { key: k, who: pseudonym(human.id), hid: human.id, channel: `DM · ${otherName}`, otherName, turns: [] });
     dm.get(k).turns.push(d);
   }
   for (const t of dm.values()) {
     t.turns.sort(byTime);
     t.stage = stageOf(t.turns[0]?.created_at);
-    t.turns = t.turns.map(d => ({ role: d.from_participant_id === t.hid ? t.who : t.otherName, content: d.content || '', mine: d.from_participant_id === t.hid }));
+    t.turns = t.turns.map(d => ({ role: d.from_participant_id === t.hid ? t.who : t.otherName, content: redact(d.content || ''), mine: d.from_participant_id === t.hid }));
     threads.push(t);
   }
   threads.sort((a, b) => a.who.localeCompare(b.who) || a.channel.localeCompare(b.channel));
@@ -322,9 +330,16 @@ export default function ResearchForms({ data }) {
     (reflByPid[r.participant_id] ||= {})[String(r.stage)] = r;
   }
 
-  const base = (p) => ({ name: p.name, cohort: data.roomNameByPid?.[p.id] });
-  const demoRows = consented.map(p => ({ ...base(p), row: data.demographicsByPid?.[p.id] || {} }));
-  const surveyRows = consented.map(p => ({ ...base(p), row: data.feedbackByPid?.[p.id] || {} }));
+  // Anonymize: pseudonyms for names, best-effort name redaction for free text.
+  const redact = makeRedactor((data.participants || []).map(p => p.name).filter(Boolean));
+  const redactRow = (obj) => {
+    const o = {};
+    for (const k in obj) o[k] = typeof obj[k] === 'string' ? redact(obj[k]) : obj[k];
+    return o;
+  };
+  const base = (p) => ({ name: pseudonym(p.id), cohort: data.roomNameByPid?.[p.id] });
+  const demoRows = consented.map(p => ({ ...base(p), row: redactRow(data.demographicsByPid?.[p.id] || {}) }));
+  const surveyRows = consented.map(p => ({ ...base(p), row: redactRow(data.feedbackByPid?.[p.id] || {}) }));
   const reflRows = consented.map(p => ({ ...base(p), refl: reflByPid[p.id] || {} }));
 
   const hasDemo = demoRows.some(r => Object.keys(r.row).length);
@@ -384,7 +399,7 @@ export default function ResearchForms({ data }) {
                   <tr key={i}>
                     <td className="rf-sticky rf-sticky-1 rf-name">{r.name}</td>
                     {showCohort && <td className="rf-sticky rf-sticky-2 rf-cohort">{r.cohort}</td>}
-                    {STAGES.map(s => <td key={s}><ReflectionCell stage={s} refl={r.refl[s]} /></td>)}
+                    {STAGES.map(s => <td key={s}><ReflectionCell stage={s} refl={r.refl[s]} redact={redact} /></td>)}
                   </tr>
                 ))}
               </tbody>

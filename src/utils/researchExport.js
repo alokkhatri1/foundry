@@ -8,13 +8,15 @@ import { isIncluded } from './researchBundle';
 import { fmt } from './researchLabels';
 import { DEMO_COLS, SURVEY_COLS, REFLECTION_STAGES, STAGE_NAME } from './researchColumns';
 import { engagementSummary, buildStageWindows, activeStageAt, stageActivity, STAGE_LABELS } from './researchUsage';
+import { pseudonym, makeRedactor } from './researchAnonymize';
 
 const consentStatus = (c) => (c && c.granted === true && !c.withdrawn_at) ? 'consented'
   : (c && (c.granted === false || c.withdrawn_at)) ? 'declined' : 'no response';
 
 export function downloadConsentedData(data, usageByPid = {}, traces = null, opts = {}) {
   const cohortOf = (pid) => data.roomNameByPid?.[pid] || opts.cohortName || '—';
-  const idCols = (p) => ({ Cohort: cohortOf(p.id), Participant: p.name || '—', Consent: consentStatus(data.consentByPid?.[p.id]) });
+  const redact = makeRedactor((data.participants || []).map(p => p.name).filter(Boolean));
+  const idCols = (p) => ({ Cohort: cohortOf(p.id), Participant: pseudonym(p.id), Consent: consentStatus(data.consentByPid?.[p.id]) });
   const includedPid = (pid) => isIncluded(data.consentByPid?.[pid]);
 
   const included = (data.participants || [])
@@ -28,7 +30,7 @@ export function downloadConsentedData(data, usageByPid = {}, traces = null, opts
   const colRows = (cols, lookup) => included.map(p => {
     const row = { ...idCols(p) };
     const src = lookup(p) || {};
-    for (const c of cols) row[c.label] = fmt(src[c.key]);
+    for (const c of cols) row[c.label] = redact(fmt(src[c.key]));
     return row;
   });
   const demoRows = colRows(DEMO_COLS, p => data.demographicsByPid?.[p.id]);
@@ -38,7 +40,7 @@ export function downloadConsentedData(data, usageByPid = {}, traces = null, opts
   const reflCell = (r) => {
     if (!r) return '';
     const parts = [`clarity ${r.confidence ?? '—'} · agree ${r.agreement ?? '—'}`];
-    if (r.transfer_text) parts.push(`“${r.transfer_text}”`);
+    if (r.transfer_text) parts.push(`“${redact(r.transfer_text)}”`);
     const st = r.structured && typeof r.structured === 'object'
       ? Object.entries(r.structured).map(([k, v]) => `${k}: ${fmt(v)}`).join(', ') : '';
     if (st) parts.push(st);
@@ -80,7 +82,7 @@ export function downloadConsentedData(data, usageByPid = {}, traces = null, opts
   }
 
   // Chats — one row per turn, with a Stage column; ordered participant→stage→conversation→turn.
-  const chatRows = traces ? buildChatRows(traces, data, includedPid, cohortOf) : [];
+  const chatRows = traces ? buildChatRows(traces, data, includedPid, cohortOf, redact) : [];
 
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(demoRows), 'Demographics');
@@ -96,7 +98,7 @@ export function downloadConsentedData(data, usageByPid = {}, traces = null, opts
   return included.length;
 }
 
-function buildChatRows(traces, data, includedPid, cohortOf) {
+function buildChatRows(traces, data, includedPid, cohortOf, redact = (t) => t) {
   const byId = {}; const byRoomName = {};
   for (const p of data.participants || []) {
     byId[p.id] = p;
@@ -130,11 +132,12 @@ function buildChatRows(traces, data, includedPid, cohortOf) {
     if (!owner || !includedPid(owner.id)) continue;
     msgs.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
     const stage = stageOf(msgs[0].room_id, msgs[0].created_at);
+    const pseu = pseudonym(owner.id);
     msgs.forEach((m, i) => rows.push({
-      Cohort: cohortOf(owner.id), Participant: owner.name, Stage: stageLabel(stage), Channel: 'Chat',
+      Cohort: cohortOf(owner.id), Participant: pseu, Stage: stageLabel(stage), Channel: 'Chat',
       Conversation: m.conversation_id, Turn: i + 1,
-      Role: m.type === 'user' ? 'participant' : (m.label || 'AI'),
-      Content: m.content || '', Timestamp: m.created_at, _s: Number(stage),
+      Role: m.type === 'user' ? pseu : (m.label || 'AI'),
+      Content: redact(m.content || ''), Timestamp: m.created_at, _s: Number(stage),
     }));
   }
   // coworker DMs
@@ -151,12 +154,14 @@ function buildChatRows(traces, data, includedPid, cohortOf) {
   for (const t of threads.values()) {
     t.msgs.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
     const stage = stageOf(t.msgs[0].room_id, t.msgs[0].created_at);
+    const pseu = pseudonym(t.human.id);
+    const otherName = t.other && (t.other.kind || 'human') === 'human' ? pseudonym(t.other.id) : (t.other?.name || 'AI coworker');
     t.msgs.forEach((dm, i) => rows.push({
-      Cohort: cohortOf(t.human.id), Participant: t.human.name, Stage: stageLabel(stage),
-      Channel: `Coworker DM · ${t.other?.name || 'coworker'}`,
-      Conversation: `DM · ${t.other?.name || 'coworker'}`, Turn: i + 1,
-      Role: dm.from_participant_id === t.human.id ? 'participant' : (t.other?.name || 'AI coworker'),
-      Content: dm.content || '', Timestamp: dm.created_at, _s: Number(stage),
+      Cohort: cohortOf(t.human.id), Participant: pseu, Stage: stageLabel(stage),
+      Channel: `Coworker DM · ${otherName}`,
+      Conversation: `DM · ${otherName}`, Turn: i + 1,
+      Role: dm.from_participant_id === t.human.id ? pseu : otherName,
+      Content: redact(dm.content || ''), Timestamp: dm.created_at, _s: Number(stage),
     }));
   }
 

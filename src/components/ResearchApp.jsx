@@ -5,6 +5,7 @@ import { handleAuthCallback } from '../utils/authCallback';
 import { buildResearchMarkdown, consentBreakdown, completeRecordPids } from '../utils/researchBundle';
 import { buildProfileText, buildRunPrompt } from '../utils/researchProfiles';
 import { fetchGithubText } from '../utils/fetchSource';
+import { downloadConsentedData } from '../utils/researchExport';
 import { SEED_THEORIES, SEED_SKILLS } from '../data/researchSeed';
 import { callClaudeProxy } from '../utils/claudeFetch';
 import { computeCost, formatUsd } from '../utils/llmCost';
@@ -579,6 +580,19 @@ export default function ResearchApp() {
   const [accessError, setAccessError] = useState(null);
   const [isAdmin, setIsAdmin] = useState(false);   // gates the Access manager button
   const [accessOpen, setAccessOpen] = useState(false);
+  const [downloading, setDownloading] = useState(false);
+
+  const downloadAll = useCallback(async () => {
+    setDownloading(true);
+    try {
+      const [data, usageByPid] = await Promise.all([sb.loadAllFormResponses(), sb.loadUsageByParticipant()]);
+      downloadConsentedData(data, usageByPid);
+    } catch (e) {
+      console.error('[research] download failed:', e);
+    } finally {
+      setDownloading(false);
+    }
+  }, [sb]);
   const [corpus, setCorpus] = useState(null); // {included, consented, pending, declined} all cohorts
   // The auth id we've already resolved access for. Supabase fires
   // onAuthStateChange on tab focus / token refresh; without this guard we'd
@@ -710,6 +724,9 @@ export default function ResearchApp() {
             </span>
           )}
           <span>{email}</span>
+          <button className="rb-btn rb-btn-ghost" disabled={downloading} onClick={downloadAll}>
+            {downloading ? 'Preparing…' : 'Download data'}
+          </button>
           {isAdmin && (
             <button className="rb-btn rb-btn-ghost" onClick={() => setAccessOpen(true)}>Access</button>
           )}

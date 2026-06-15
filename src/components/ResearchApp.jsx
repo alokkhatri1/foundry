@@ -585,8 +585,10 @@ export default function ResearchApp() {
   const downloadAll = useCallback(async () => {
     setDownloading(true);
     try {
-      const [data, usageByPid] = await Promise.all([sb.loadAllFormResponses(), sb.loadUsageByParticipant()]);
-      downloadConsentedData(data, usageByPid);
+      const [data, usageByPid, traces] = await Promise.all([
+        sb.loadAllFormResponses(), sb.loadUsageByParticipant(), sb.loadAllChatTraces(),
+      ]);
+      downloadConsentedData(data, usageByPid, traces);
     } catch (e) {
       console.error('[research] download failed:', e);
     } finally {

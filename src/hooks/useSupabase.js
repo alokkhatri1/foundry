@@ -325,6 +325,17 @@ export default function useSupabase() {
     return { participants, consentByPid, demographicsByPid, feedbackByPid, stageReflections: reflections, roomNameByPid };
   }, []);
 
+  // All chat traces across every cohort — main AI chats + coworker DMs — for
+  // the research export. Paginated (messages ~18k+ exceed the 1000-row cap).
+  const loadAllChatTraces = useCallback(async () => {
+    if (!isSupabaseConfigured) return { messages: [], directMessages: [] };
+    const [messages, directMessages] = await Promise.all([
+      fetchAllRows('messages', 'room_id, conversation_id, type, participant_name, label, content, created_at'),
+      fetchAllRows('direct_messages', 'room_id, from_participant_id, to_participant_id, content, created_at'),
+    ]);
+    return { messages, directMessages };
+  }, []);
+
   // Corpus-wide consent tally — the size of the research the bench can draw
   // on. "Included" = everyone except explicit declines/withdrawals (a missing
   // consent row counts as not-declined). Light: two small queries.
@@ -2212,7 +2223,7 @@ export default function useSupabase() {
     loadResearchLibrary, saveResearchItem, deleteResearchItem, logResearchUsage,
     loadUsageByParticipant, loadResearchFindings, saveResearchFinding, deleteResearchFinding,
     // Admin
-    createWorkshop, loadAdminWorkshops, loadAllCohorts, loadAllFormResponses, loadCorpusConsent, loadWorkshopParticipants,
+    createWorkshop, loadAdminWorkshops, loadAllCohorts, loadAllFormResponses, loadAllChatTraces, loadCorpusConsent, loadWorkshopParticipants,
     deleteWorkshop, deprecateWorkshop, pauseRoom, resumeRoom, revealStage, unrevealStage, revealAllStages, loadWorkshopStats, loadWorkshopContent, loadWorkshopActivity,
     loadAdminScorecardData, loadAdminResearchData,
     seedWorkshopContent, subscribeToWorkshopPresence,

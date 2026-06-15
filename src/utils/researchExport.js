@@ -18,11 +18,12 @@ function idCols(p, data) {
   };
 }
 
-export function downloadConsentedData(data, usageByPid = {}) {
+export function downloadConsentedData(data, usageByPid = {}, traces = null) {
   const included = (data.participants || [])
     .filter(p => (p.kind || 'human') === 'human' && isIncluded(data.consentByPid?.[p.id]))
     .sort((a, b) => (data.roomNameByPid?.[a.id] || '').localeCompare(data.roomNameByPid?.[b.id] || '')
       || (a.name || '').localeCompare(b.name || ''));
+  const includedPid = (pid) => isIncluded(data.consentByPid?.[pid]);
 
   const reflByPid = {};
   for (const r of data.stageReflections || []) (reflByPid[r.participant_id] ||= {})[String(r.stage)] = r;
@@ -102,14 +103,84 @@ export function downloadConsentedData(data, usageByPid = {}) {
     };
   });
 
+  // --- Chats sheet (long: one row per message turn; main chats + coworker DMs) ---
+  const chatRows = traces ? buildChatRows(traces, data, includedPid) : [];
+
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(demoRows), 'Demographics');
   XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(reflRows), 'Reflections');
   XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(surveyRows), 'Survey');
   XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(usageRows), 'Usage');
+  if (chatRows.length) XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(chatRows), 'Chats');
 
   const d = new Date();
   const stamp = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   XLSX.writeFile(wb, `foundry-consented-data-${stamp}.xlsx`);
   return included.length;
+}
+
+// Chat traces → long-format rows (one per turn). Messages are keyed by
+// participant_name, so we map (room_id, name) → participant to consent-filter;
+// DMs are keyed by participant id. Only conversations owned by an included
+// participant are exported. Both user and AI turns of those conversations are
+// included, so the trace is complete.
+function buildChatRows(traces, data, includedPid) {
+  const byId = {};
+  const byRoomName = {};
+  for (const p of data.participants || []) {
+    byId[p.id] = p;
+    byRoomName[`${p.room_id}|${(p.name || '').toLowerCase()}`] = p;
+  }
+  const cohort = (pid) => data.roomNameByPid?.[pid] || '—';
+  const rows = [];
+
+  // Main chats — group by conversation (room-scoped), attribute to the user-turn participant.
+  const conv = new Map();
+  for (const m of traces.messages || []) {
+    if (!m.conversation_id) continue;
+    if (m.type !== 'user' && m.type !== 'assistant') continue;
+    const key = `${m.room_id}|${m.conversation_id}`;
+    if (!conv.has(key)) conv.set(key, []);
+    conv.get(key).push(m);
+  }
+  for (const msgs of conv.values()) {
+    const ut = msgs.find(x => x.type === 'user' && x.participant_name);
+    if (!ut) continue;
+    const owner = byRoomName[`${msgs[0].room_id}|${ut.participant_name.toLowerCase()}`];
+    if (!owner || !includedPid(owner.id)) continue;
+    msgs.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+    msgs.forEach((m, i) => rows.push({
+      Cohort: cohort(owner.id), Participant: owner.name, Channel: 'Chat',
+      Conversation: m.conversation_id, Turn: i + 1,
+      Role: m.type === 'user' ? 'participant' : (m.label || 'AI'),
+      Content: m.content || '', Timestamp: m.created_at,
+    }));
+  }
+
+  // Coworker DMs — group by (human, other), attribute to the human side.
+  const threads = new Map();
+  for (const dm of traces.directMessages || []) {
+    const from = byId[dm.from_participant_id];
+    const to = byId[dm.to_participant_id];
+    const human = from && (from.kind || 'human') === 'human' ? from
+      : to && (to.kind || 'human') === 'human' ? to : null;
+    if (!human || !includedPid(human.id)) continue;
+    const other = human === from ? to : from;
+    const key = `${human.id}|${other?.id || '?'}`;
+    if (!threads.has(key)) threads.set(key, { human, other, msgs: [] });
+    threads.get(key).msgs.push(dm);
+  }
+  for (const t of threads.values()) {
+    t.msgs.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+    t.msgs.forEach((dm, i) => rows.push({
+      Cohort: cohort(t.human.id), Participant: t.human.name, Channel: 'Coworker DM',
+      Conversation: `DM · ${t.other?.name || 'coworker'}`, Turn: i + 1,
+      Role: dm.from_participant_id === t.human.id ? 'participant' : (t.other?.name || 'AI coworker'),
+      Content: dm.content || '', Timestamp: dm.created_at,
+    }));
+  }
+
+  rows.sort((a, b) => a.Cohort.localeCompare(b.Cohort) || a.Participant.localeCompare(b.Participant)
+    || String(a.Conversation).localeCompare(String(b.Conversation)) || a.Turn - b.Turn);
+  return rows;
 }

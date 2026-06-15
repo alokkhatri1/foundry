@@ -107,11 +107,13 @@ export default function useSupabase() {
     return user;
   }, []);
 
-  const signInWithGoogle = useCallback(async () => {
+  const signInWithGoogle = useCallback(async (redirectTo) => {
     if (!isSupabaseConfigured) return;
+    // redirectTo lets the research portal return to /research after OAuth
+    // (the default origin would drop the path and land on the workshop app).
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
-      options: { redirectTo: window.location.origin },
+      options: { redirectTo: redirectTo || window.location.origin },
     });
     if (error) console.error('[sb] Google sign-in:', error.message);
   }, []);

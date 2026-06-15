@@ -32,6 +32,10 @@ const RESEARCH_FLAG_KEY = 'sandbox:research-host';
 
 export function isResearchHost() {
   if (typeof window === 'undefined') return false;
+  // Production: a path under /research on the main domain. This is the primary
+  // mechanism — same domain, same deploy, no subdomain/DNS needed.
+  if (window.location.pathname.startsWith('/research')) return true;
+  // Legacy/alt: a research.* subdomain also works if ever set up.
   const host = window.location.hostname;
   if (host === RESEARCH_HOST || host.startsWith('research.')) return true;
   // Dev override.

@@ -653,7 +653,7 @@ export default function ResearchApp() {
             <div className="rb-sub">Talk to your workshop research data</div>
             <h2>Sign in to continue</h2>
             <p>Access is granted by a Foundry admin. Sign in with the Google account you were invited with.</p>
-            <button className="rb-btn" onClick={() => sb.signInWithGoogle()}>Sign in with Google</button>
+            <button className="rb-btn" onClick={() => sb.signInWithGoogle(window.location.origin + window.location.pathname)}>Sign in with Google</button>
           </div>
         </div>
       </div>
